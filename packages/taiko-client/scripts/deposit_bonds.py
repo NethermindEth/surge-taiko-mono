@@ -103,21 +103,6 @@ def send_deposit_bond_transaction(nonce: int, private_key : str, account: Accoun
     tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
     print(f'Transaction sent: {tx_hash.hex()}')
 
-def send_transaction(nonce : int, private_key : str, account: Account, contract_function: str):
-    tx = {
-        'nonce': nonce,
-        'to': recipient,
-        'value': deposit_amount,
-        'gas': 21000,
-        'gasPrice': w3.to_wei('10', 'gwei'),
-        'chainId': w3.eth.chain_id
-    }
-    print(f'Sending transaction: {tx} by RPC: {args.rpc}')
-    print(f'Sending from: {account.address}')
-    signed_tx = w3.eth.account.sign_transaction(tx, private_key)
-    tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
-    print(f'Transaction sent: {tx_hash.hex()}')
-
 def deposit_for_proposer():
     nonce = w3.eth.get_transaction_count(proposer_account.address)
     send_deposit_bond_transaction(nonce, l1_proposer_private_key, proposer_account)
