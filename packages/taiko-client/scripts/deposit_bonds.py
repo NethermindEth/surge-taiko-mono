@@ -56,16 +56,15 @@ prover_deposit_contract_address = os.getenv('PROVER_DEPOSIT_CONTRACT_ADDRESS')
 if not prover_deposit_contract_address:
     raise Exception("Environment variable PROVER_DEPOSIT_CONTRACT_ADDRESS not set")
 
-recipient = os.getenv('RECIPIENT_ADDRESS')
-if not recipient:
-    raise Exception("Environment variable RECIPIENT_ADDRESS not set")
+taiko_l1_contract_address = os.getenv('TAIKO_L1_CONTRACT_ADDRESS')
+if not taiko_l1_contract_address:
+    raise Exception("Environment variable TAIKO_L1_CONTRACT_ADDRESS not set")
 
 parser = argparse.ArgumentParser(description='Spam transactions on the Taiko network.')
 parser.add_argument('--amount', type=float, default=1000, help='Amount of ETH to send for deposit bonds')
 parser.add_argument('--rpc', type=str, help='RPC URL for the L1 network')
 args = parser.parse_args()
 
-import pdb; pdb.set_trace()
 w3 = Web3(Web3.HTTPProvider(args.rpc))
 
 # Check if connected
@@ -84,7 +83,7 @@ def send_deposit_bond_transaction(nonce: int, private_key : str, account: Accoun
     contract_abi = json.loads(ABI)
 
     # Create contract instance
-    contract = w3.eth.contract(address=recipient, abi=[contract_abi])
+    contract = w3.eth.contract(address=taiko_l1_contract_address, abi=[contract_abi])
 
     # Prepare the transaction
     tx = contract.functions.depositBond().build_transaction({
