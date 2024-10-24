@@ -48,14 +48,6 @@ l1_prover_private_key = os.getenv('L1_PROVER_PRIVATE_KEY')
 if not l1_prover_private_key:
     raise Exception("Environment variable L1_PROVER_PRIVATE_KEY not set")
 
-proposer_deposit_contract_address = os.getenv('PROPOSER_DEPOSIT_CONTRACT_ADDRESS')
-if not proposer_deposit_contract_address:
-    raise Exception("Environment variable PROPOSER_DEPOSIT_CONTRACT_ADDRESS not set")
-
-prover_deposit_contract_address = os.getenv('PROVER_DEPOSIT_CONTRACT_ADDRESS')
-if not prover_deposit_contract_address:
-    raise Exception("Environment variable PROVER_DEPOSIT_CONTRACT_ADDRESS not set")
-
 taiko_l1_contract_address = os.getenv('TAIKO_L1_CONTRACT_ADDRESS')
 if not taiko_l1_contract_address:
     raise Exception("Environment variable TAIKO_L1_CONTRACT_ADDRESS not set")
