@@ -119,7 +119,7 @@ func (s *ClientTestSuite) SetupTest() {
 		s.Nil(err)
 
 		// Set the value to 1 Ether (1 * 10^18 wei)
-		opts.Value = big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1e18))
+		opts.Value = big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1e18))
 
 		_, err = rpcCli.TaikoL1.DepositBond(opts)
 		s.Nil(err)
@@ -133,7 +133,7 @@ func (s *ClientTestSuite) SetupTest() {
 		s.Nil(err)
 
 		// Set the value to 1 Ether (1 * 10^18 wei)
-		ownerOpts.Value = big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1e18))
+		ownerOpts.Value = big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1e18))
 
 		_, err = rpcCli.TaikoL1.DepositBond(ownerOpts)
 		s.Nil(err)
