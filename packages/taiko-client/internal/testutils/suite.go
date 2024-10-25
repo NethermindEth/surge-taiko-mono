@@ -119,41 +119,42 @@ func (s *ClientTestSuite) SetupTest() {
 		proverBondBalance, err := rpcCli.TaikoL1.BondBalanceOf(nil, proverAddress)
 		s.Nil(err)
 		// Set the value to 1000 Ether (1000 * 10^18 wei)
-		bond_amount := big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1e18))
+		bondAmount := big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1e18))
 
 		log.Info("Prover bond balance", "balance", proverBondBalance.String())
 		// Deposit bond for prover
 		opts, err := bind.NewKeyedTransactorWithChainID(l1ProverPrivKey, rpcCli.L1.ChainID)
 		s.Nil(err)
-		opts.Value = bond_amount
+		opts.Value = bondAmount
 
-		if proverBondBalance.Cmp(bond_amount) < 0 {
+		if proverBondBalance.Cmp(bondAmount) < 0 {
 			log.Info("Deposit bond for prover")
 			_, err = rpcCli.TaikoL1.DepositBond(opts)
 			s.Nil(err)
 		}
 
 		// Get owner private key
-		ownerPrivKey, err := crypto.ToECDSA(common.FromHex(os.Getenv("L1_CONTRACT_OWNER_PRIVATE_KEY")))
+		proposerPrivKey, err := crypto.ToECDSA(common.FromHex(os.Getenv("L1_PROPOSER_PRIVATE_KEY")))
 		s.Nil(err)
 
 		// Deposit bond for proposer
-		ownerOpts, err := bind.NewKeyedTransactorWithChainID(ownerPrivKey, rpcCli.L1.ChainID)
+		proposerOpts, err := bind.NewKeyedTransactorWithChainID(proposerPrivKey, rpcCli.L1.ChainID)
 		s.Nil(err)
 
-		ownerOpts.Value = bond_amount
+		proposerOpts.Value = bondAmount
 
-		ownerAddress := crypto.PubkeyToAddress(ownerPrivKey.PublicKey)
-		ownerBondBalance, err := rpcCli.TaikoL1.BondBalanceOf(nil, ownerAddress)
+		proposerAddress := crypto.PubkeyToAddress(proposerPrivKey.PublicKey)
+		proposerBondBalance, err := rpcCli.TaikoL1.BondBalanceOf(nil, proposerAddress)
 		s.Nil(err)
+		log.Info("Proposer bond balance", "balance", proposerBondBalance.String())
 
-		if ownerBondBalance.Cmp(bond_amount) < 0 {
+		if proposerBondBalance.Cmp(bondAmount) < 0 {
 			log.Info("Deposit bond for proposer")
-			_, err = rpcCli.TaikoL1.DepositBond(ownerOpts)
+			_, err = rpcCli.TaikoL1.DepositBond(proposerOpts)
 			s.Nil(err)
 		}
 
-		balance, err := rpcCli.L1.BalanceAt(context.Background(), crypto.PubkeyToAddress(ownerPrivKey.PublicKey), nil)
+		balance, err := rpcCli.L1.BalanceAt(context.Background(), crypto.PubkeyToAddress(proposerPrivKey.PublicKey), nil)
 		s.Nil(err)
 		log.Info("L1 balance", "balance", balance.String())
 	}

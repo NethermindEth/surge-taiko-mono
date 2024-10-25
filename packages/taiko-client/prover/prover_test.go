@@ -520,7 +520,11 @@ func (s *ProverTestSuite) initProver(
 	ctx context.Context,
 	key *ecdsa.PrivateKey,
 ) {
-	decimal, err := s.RPCClient.TaikoToken.Decimals(nil)
+	var decimal uint8
+	var err error
+	if s.RPCClient.TaikoToken != nil {
+		decimal, err = s.RPCClient.TaikoToken.Decimals(nil)
+	}
 	s.Nil(err)
 
 	p := new(Prover)
