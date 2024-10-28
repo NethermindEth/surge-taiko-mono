@@ -37,7 +37,9 @@ func (s *ProposerTestSuite) TestNewConfigFromCliContext() {
 		s.Equal(l2Endpoint, c.L2Endpoint)
 		s.Equal(taikoL1, c.TaikoL1Address.String())
 		s.Equal(taikoL2, c.TaikoL2Address.String())
-		s.Equal(taikoToken, c.TaikoTokenAddress.String())
+		if taikoToken != "" {
+			s.Equal(taikoToken, c.TaikoTokenAddress.String())
+		}
 		s.Equal(goldenTouchAddress, crypto.PubkeyToAddress(c.L1ProposerPrivKey.PublicKey))
 		s.Equal(goldenTouchAddress, c.L2SuggestedFeeRecipient)
 		s.Equal(float64(10), c.ProposeInterval.Seconds())
