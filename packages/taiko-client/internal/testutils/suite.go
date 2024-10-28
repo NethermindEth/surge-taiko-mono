@@ -114,8 +114,8 @@ func (s *ClientTestSuite) SetupTest() {
 			s.setAllowance(ownerPrivKey)
 		}
 	} else {
-		// Set the value to 1000 Ether (1000 * 10^18 wei)
-		bondAmount := big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1e18))
+		// Set the value to 300 Ether (300 * 10^18 wei)
+		bondAmount := big.NewInt(0).Mul(big.NewInt(300), big.NewInt(1e18))
 
 		// Deposit bond for prover
 		s.Nil(s.depositBondIfNeeded(l1ProverPrivKey, bondAmount, "prover", crypto.PubkeyToAddress(l1ProverPrivKey.PublicKey)))

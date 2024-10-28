@@ -21,6 +21,7 @@ var (
 	taikoToken      = os.Getenv("TAIKO_TOKEN")
 	proposeInterval = "10s"
 	rpcTimeout      = "5s"
+	offChainCosts   = "10"
 )
 
 func (s *ProposerTestSuite) TestNewConfigFromCliContext() {
@@ -44,6 +45,7 @@ func (s *ProposerTestSuite) TestNewConfigFromCliContext() {
 		s.Equal(goldenTouchAddress, c.LocalAddresses[0])
 		s.Equal(5*time.Second, c.Timeout)
 		s.Equal(true, c.IncludeParentMetaHash)
+		s.Equal(offChainCosts, c.OffChainCosts)
 
 		s.Nil(new(Proposer).InitFromCli(context.Background(), cliCtx))
 		return nil
@@ -63,6 +65,7 @@ func (s *ProposerTestSuite) TestNewConfigFromCliContext() {
 		"--" + flags.RPCTimeout.Name, rpcTimeout,
 		"--" + flags.TxGasLimit.Name, "100000",
 		"--" + flags.ProposeBlockIncludeParentMetaHash.Name, "true",
+		"--" + flags.OffChainCosts.Name, offChainCosts,
 	}))
 }
 
@@ -118,6 +121,7 @@ func (s *ProposerTestSuite) SetupApp() *cli.App {
 		&cli.StringFlag{Name: flags.TxPoolLocals.Name},
 		&cli.DurationFlag{Name: flags.RPCTimeout.Name},
 		&cli.BoolFlag{Name: flags.ProposeBlockIncludeParentMetaHash.Name},
+		&cli.StringFlag{Name: flags.OffChainCosts.Name},
 	}
 	app.Flags = append(app.Flags, flags.TxmgrFlags...)
 	app.Action = func(ctx *cli.Context) error {
