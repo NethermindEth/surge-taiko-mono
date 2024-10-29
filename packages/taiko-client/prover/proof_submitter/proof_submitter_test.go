@@ -3,6 +3,7 @@ package submitter
 import (
 	"bytes"
 	"context"
+	"math/big"
 	"os"
 	"testing"
 	"time"
@@ -145,6 +146,10 @@ func (s *ProofSubmitterTestSuite) SetupTest() {
 		L2SuggestedFeeRecipient:    common.HexToAddress(os.Getenv("L2_SUGGESTED_FEE_RECIPIENT")),
 		ProposeInterval:            1024 * time.Hour,
 		MaxProposedTxListsPerEpoch: 1,
+		GasNeededForProposingBlock: 0,
+		GasNeededForProvingBlock:   0,
+		PriceFluctuationModifier:   50,
+		OffChainCosts:              big.NewInt(0),
 	}, txMgr, txMgr))
 
 	s.proposer = prop
