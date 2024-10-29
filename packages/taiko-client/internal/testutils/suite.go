@@ -70,47 +70,77 @@ func (s *ClientTestSuite) SetupTest() {
 	l1ProverPrivKey, err := crypto.ToECDSA(common.FromHex(os.Getenv("L1_PROVER_PRIVATE_KEY")))
 	s.Nil(err)
 
-	allowance, err := rpcCli.TaikoToken.Allowance(
-		nil,
-		crypto.PubkeyToAddress(l1ProverPrivKey.PublicKey),
-		common.HexToAddress(os.Getenv("TAIKO_L1")),
-	)
-	s.Nil(err)
+	if rpcCli.TaikoToken != nil {
+		allowance, err := rpcCli.TaikoToken.Allowance(
+			nil,
+			crypto.PubkeyToAddress(l1ProverPrivKey.PublicKey),
+			common.HexToAddress(os.Getenv("TAIKO_L1")),
+		)
+		s.Nil(err)
 
-	if allowance.Cmp(common.Big0) == 0 {
+		if allowance.Cmp(common.Big0) == 0 {
+			ownerPrivKey, err := crypto.ToECDSA(common.FromHex(os.Getenv("L1_CONTRACT_OWNER_PRIVATE_KEY")))
+			s.Nil(err)
+
+			// Transfer some tokens to provers.
+			balance, err := rpcCli.TaikoToken.BalanceOf(nil, crypto.PubkeyToAddress(ownerPrivKey.PublicKey))
+			s.Nil(err)
+			s.Greater(balance.Cmp(common.Big0), 0)
+
+			opts, err := bind.NewKeyedTransactorWithChainID(ownerPrivKey, rpcCli.L1.ChainID)
+			s.Nil(err)
+			proverBalance := new(big.Int).Div(balance, common.Big3)
+			s.Greater(proverBalance.Cmp(common.Big0), 0)
+
+			_, err = rpcCli.TaikoToken.Transfer(opts, crypto.PubkeyToAddress(l1ProverPrivKey.PublicKey), proverBalance)
+			s.Nil(err)
+
+			_, err = rpcCli.TaikoToken.Transfer(
+				opts,
+				common.HexToAddress(os.Getenv("GUARDIAN_PROVER_MINORITY")),
+				new(big.Int).Div(proverBalance, common.Big2),
+			)
+			s.Nil(err)
+
+			_, err = rpcCli.TaikoToken.Transfer(
+				opts,
+				common.HexToAddress(os.Getenv("GUARDIAN_PROVER_CONTRACT")),
+				new(big.Int).Div(proverBalance, common.Big2),
+			)
+			s.Nil(err)
+
+			// Increase allowance for TaikoL1
+			s.setAllowance(l1ProverPrivKey)
+			s.setAllowance(ownerPrivKey)
+		}
+	} else {
+		// Deposit bond for prover
+		opts, err := bind.NewKeyedTransactorWithChainID(l1ProverPrivKey, rpcCli.L1.ChainID)
+		s.Nil(err)
+
+		// Set the value to 1 Ether (1 * 10^18 wei)
+		opts.Value = big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1e18))
+
+		_, err = rpcCli.TaikoL1.DepositBond(opts)
+		s.Nil(err)
+
+		// Get owner private key
 		ownerPrivKey, err := crypto.ToECDSA(common.FromHex(os.Getenv("L1_CONTRACT_OWNER_PRIVATE_KEY")))
 		s.Nil(err)
 
-		// Transfer some tokens to provers.
-		balance, err := rpcCli.TaikoToken.BalanceOf(nil, crypto.PubkeyToAddress(ownerPrivKey.PublicKey))
-		s.Nil(err)
-		s.Greater(balance.Cmp(common.Big0), 0)
-
-		opts, err := bind.NewKeyedTransactorWithChainID(ownerPrivKey, rpcCli.L1.ChainID)
-		s.Nil(err)
-		proverBalance := new(big.Int).Div(balance, common.Big3)
-		s.Greater(proverBalance.Cmp(common.Big0), 0)
-
-		_, err = rpcCli.TaikoToken.Transfer(opts, crypto.PubkeyToAddress(l1ProverPrivKey.PublicKey), proverBalance)
+		// Deposit bond for proposer
+		ownerOpts, err := bind.NewKeyedTransactorWithChainID(ownerPrivKey, rpcCli.L1.ChainID)
 		s.Nil(err)
 
-		_, err = rpcCli.TaikoToken.Transfer(
-			opts,
-			common.HexToAddress(os.Getenv("GUARDIAN_PROVER_MINORITY")),
-			new(big.Int).Div(proverBalance, common.Big2),
-		)
+		// Set the value to 1 Ether (1 * 10^18 wei)
+		ownerOpts.Value = big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1e18))
+
+		_, err = rpcCli.TaikoL1.DepositBond(ownerOpts)
 		s.Nil(err)
 
-		_, err = rpcCli.TaikoToken.Transfer(
-			opts,
-			common.HexToAddress(os.Getenv("GUARDIAN_PROVER_CONTRACT")),
-			new(big.Int).Div(proverBalance, common.Big2),
-		)
+		balance, err := rpcCli.L1.BalanceAt(context.Background(), crypto.PubkeyToAddress(ownerPrivKey.PublicKey), nil)
 		s.Nil(err)
-
-		// Increase allowance for TaikoL1
-		s.setAllowance(l1ProverPrivKey)
-		s.setAllowance(ownerPrivKey)
+		log.Info("L1 balance", "balance", balance.String())
 	}
 
 	s.testnetL1SnapshotID = s.SetL1Snapshot()
