@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./.github/taiko-icon-blk.svg" width="80" alt="Logo for Taiko" />
+  <img src="./.github/SurgeLogoOnly.svg" width="80" alt="Logo for Surge" />
 </p>
 
 <h1 align="center">
@@ -9,17 +9,6 @@
 <p align="center">
   A vanilla implementation of Taiko stack based rollup.
 </p>
-
-<div align="center">
-
-[![Twitter Follow](https://img.shields.io/twitter/follow/taikoxyz?style=social)](https://twitter.com/taikoxyz)
-[![Discord](https://img.shields.io/discord/984015101017346058?color=%235865F2&label=Discord&logo=discord&logoColor=%23fff)](https://discord.gg/taikoxyz)
-[![YouTube](https://img.shields.io/youtube/channel/subscribers/UCxd_ARE9LtAEdnRQA6g1TaQ)](https://www.youtube.com/@taikoxyz)
-
-[![GitPOAP Badge](https://public-api.gitpoap.io/v1/repo/taikoxyz/taiko-mono/badge)](https://www.gitpoap.io/gh/taikoxyz/taiko-mono)
-[![License](https://img.shields.io/github/license/taikoxyz/taiko-mono)](https://github.com/taikoxyz/taiko-mono/blob/main/LICENSE.md)
-
-</div>
 
 ## Documentation
 
