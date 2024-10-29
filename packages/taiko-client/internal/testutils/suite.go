@@ -70,6 +70,9 @@ func (s *ClientTestSuite) SetupTest() {
 	l1ProverPrivKey, err := crypto.ToECDSA(common.FromHex(os.Getenv("L1_PROVER_PRIVATE_KEY")))
 	s.Nil(err)
 
+	ownerPrivKey, err := crypto.ToECDSA(common.FromHex(os.Getenv("L1_CONTRACT_OWNER_PRIVATE_KEY")))
+	s.Nil(err)
+
 	if rpcCli.TaikoToken != nil {
 		allowance, err := rpcCli.TaikoToken.Allowance(
 			nil,
@@ -79,9 +82,6 @@ func (s *ClientTestSuite) SetupTest() {
 		s.Nil(err)
 
 		if allowance.Cmp(common.Big0) == 0 {
-			ownerPrivKey, err := crypto.ToECDSA(common.FromHex(os.Getenv("L1_CONTRACT_OWNER_PRIVATE_KEY")))
-			s.Nil(err)
-
 			// Transfer some tokens to provers.
 			balance, err := rpcCli.TaikoToken.BalanceOf(nil, crypto.PubkeyToAddress(ownerPrivKey.PublicKey))
 			s.Nil(err)
@@ -114,36 +114,74 @@ func (s *ClientTestSuite) SetupTest() {
 			s.setAllowance(ownerPrivKey)
 		}
 	} else {
+		// Set the value to 300 Ether (300 * 10^18 wei)
+		bondAmount := big.NewInt(0).Mul(big.NewInt(300), big.NewInt(1e18))
+
 		// Deposit bond for prover
-		opts, err := bind.NewKeyedTransactorWithChainID(l1ProverPrivKey, rpcCli.L1.ChainID)
-		s.Nil(err)
-
-		// Set the value to 1 Ether (1 * 10^18 wei)
-		opts.Value = big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1e18))
-
-		_, err = rpcCli.TaikoL1.DepositBond(opts)
-		s.Nil(err)
-
-		// Get owner private key
-		ownerPrivKey, err := crypto.ToECDSA(common.FromHex(os.Getenv("L1_CONTRACT_OWNER_PRIVATE_KEY")))
-		s.Nil(err)
+		s.Nil(s.depositBondIfNeeded(l1ProverPrivKey, bondAmount, "prover", crypto.PubkeyToAddress(l1ProverPrivKey.PublicKey)))
 
 		// Deposit bond for proposer
-		ownerOpts, err := bind.NewKeyedTransactorWithChainID(ownerPrivKey, rpcCli.L1.ChainID)
+		proposerPrivKey, err := crypto.ToECDSA(common.FromHex(os.Getenv("L1_PROPOSER_PRIVATE_KEY")))
 		s.Nil(err)
+		s.Nil(s.depositBondIfNeeded(
+			proposerPrivKey,
+			bondAmount,
+			"proposer",
+			crypto.PubkeyToAddress(proposerPrivKey.PublicKey),
+		))
 
-		// Set the value to 1 Ether (1 * 10^18 wei)
-		ownerOpts.Value = big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1e18))
+		// TODO: deposit properly to guardian provers addresses
+		// // deposit bond for guardian prover minority
+		// s.Nil(s.depositBondIfNeeded(
+		// 	ownerPrivKey,
+		// 	bondAmount,
+		// 	"guardian prover minority",
+		// 	common.HexToAddress(os.Getenv("GUARDIAN_PROVER_MINORITY")),
+		// ))
 
-		_, err = rpcCli.TaikoL1.DepositBond(ownerOpts)
-		s.Nil(err)
+		// // deposit bond for guardian prover contract
+		// s.Nil(s.depositBondIfNeeded(
+		// 	ownerPrivKey,
+		// 	bondAmount,
+		// 	"guardian prover contract",
+		// 	common.HexToAddress(os.Getenv("GUARDIAN_PROVER_CONTRACT")),
+		// ))
 
-		balance, err := rpcCli.L1.BalanceAt(context.Background(), crypto.PubkeyToAddress(ownerPrivKey.PublicKey), nil)
+		balance, err := rpcCli.L1.BalanceAt(context.Background(), crypto.PubkeyToAddress(proposerPrivKey.PublicKey), nil)
 		s.Nil(err)
 		log.Info("L1 balance", "balance", balance.String())
 	}
 
 	s.testnetL1SnapshotID = s.SetL1Snapshot()
+}
+
+func (s *ClientTestSuite) depositBondIfNeeded(
+	privateKey *ecdsa.PrivateKey,
+	bondAmount *big.Int,
+	role string,
+	address common.Address,
+) error {
+	bondBalance, err := s.RPCClient.TaikoL1.BondBalanceOf(nil, address)
+	if err != nil {
+		return err
+	}
+	log.Info("Bond balance", "role", role, "balance", bondBalance.String())
+
+	if bondBalance.Cmp(common.Big0) == 0 {
+		opts, err := bind.NewKeyedTransactorWithChainID(privateKey, s.RPCClient.L1.ChainID)
+		if err != nil {
+			return err
+		}
+		opts.Value = bondAmount
+
+		log.Info("Deposit bond", "role", role)
+		_, err = s.RPCClient.TaikoL1.DepositBond(opts)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *ClientTestSuite) setAllowance(key *ecdsa.PrivateKey) {
