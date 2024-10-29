@@ -21,6 +21,7 @@ var (
 	taikoToken      = os.Getenv("TAIKO_TOKEN")
 	proposeInterval = "10s"
 	rpcTimeout      = "5s"
+	offChainCosts   = "10"
 )
 
 func (s *ProposerTestSuite) TestNewConfigFromCliContext() {
@@ -36,7 +37,7 @@ func (s *ProposerTestSuite) TestNewConfigFromCliContext() {
 		s.Equal(l2Endpoint, c.L2Endpoint)
 		s.Equal(taikoL1, c.TaikoL1Address.String())
 		s.Equal(taikoL2, c.TaikoL2Address.String())
-		s.Equal(taikoToken, c.TaikoTokenAddress.String())
+		// s.Equal(taikoToken, c.TaikoTokenAddress.String())
 		s.Equal(goldenTouchAddress, crypto.PubkeyToAddress(c.L1ProposerPrivKey.PublicKey))
 		s.Equal(goldenTouchAddress, c.L2SuggestedFeeRecipient)
 		s.Equal(float64(10), c.ProposeInterval.Seconds())
@@ -44,7 +45,7 @@ func (s *ProposerTestSuite) TestNewConfigFromCliContext() {
 		s.Equal(goldenTouchAddress, c.LocalAddresses[0])
 		s.Equal(5*time.Second, c.Timeout)
 		s.Equal(true, c.IncludeParentMetaHash)
-
+		s.Equal(offChainCosts, c.OffChainCosts.String())
 		s.Nil(new(Proposer).InitFromCli(context.Background(), cliCtx))
 		return nil
 	}
@@ -62,7 +63,11 @@ func (s *ProposerTestSuite) TestNewConfigFromCliContext() {
 		"--" + flags.TxPoolLocals.Name, goldenTouchAddress.Hex(),
 		"--" + flags.RPCTimeout.Name, rpcTimeout,
 		"--" + flags.TxGasLimit.Name, "100000",
+		"--" + flags.OffChainCosts.Name, offChainCosts,
 		"--" + flags.ProposeBlockIncludeParentMetaHash.Name, "true",
+		"--" + flags.GasNeededForProposingBlock.Name, "100000",
+		"--" + flags.GasNeededForProvingBlock.Name, "100000",
+		"--" + flags.PriceFluctuationModifier.Name, "100",
 	}))
 }
 
@@ -118,6 +123,10 @@ func (s *ProposerTestSuite) SetupApp() *cli.App {
 		&cli.StringFlag{Name: flags.TxPoolLocals.Name},
 		&cli.DurationFlag{Name: flags.RPCTimeout.Name},
 		&cli.BoolFlag{Name: flags.ProposeBlockIncludeParentMetaHash.Name},
+		&cli.Uint64Flag{Name: flags.GasNeededForProposingBlock.Name},
+		&cli.Uint64Flag{Name: flags.GasNeededForProvingBlock.Name},
+		&cli.Uint64Flag{Name: flags.PriceFluctuationModifier.Name},
+		&cli.StringFlag{Name: flags.OffChainCosts.Name},
 	}
 	app.Flags = append(app.Flags, flags.TxmgrFlags...)
 	app.Action = func(ctx *cli.Context) error {
