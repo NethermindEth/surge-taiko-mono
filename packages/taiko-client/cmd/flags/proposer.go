@@ -114,7 +114,7 @@ var (
 	}
 	// Surge related.
 	GasNeededForProposingBlock = &cli.Uint64Flag{
-		Name:     "gasNeededForProposingBlock",
+		Name:     "surge.gasNeededForProposingBlock",
 		Usage:    "Gas needed for proposing a block",
 		Value:    0,
 		Category: proposerCategory,
@@ -122,7 +122,7 @@ var (
 	}
 
 	GasNeededForProvingBlock = &cli.Uint64Flag{
-		Name:     "gasNeededForProvingBlock",
+		Name:     "surge.gasNeededForProvingBlock",
 		Usage:    "Gas needed for proving a block",
 		Value:    0,
 		Category: proposerCategory,
@@ -130,7 +130,7 @@ var (
 	}
 
 	PriceFluctuationModifier = &cli.Uint64Flag{
-		Name:     "priceFluctuationModifier",
+		Name:     "surge.priceFluctuationModifier",
 		Usage:    "Price fluctuation modifier in percentage",
 		Value:    50,
 		Category: proposerCategory,
@@ -138,7 +138,7 @@ var (
 	}
 
 	OffChainCosts = &cli.StringFlag{
-		Name:     "offChainCosts",
+		Name:     "surge.offChainCosts",
 		Usage:    "Off chain costs in WEI",
 		Value:    "0",
 		Category: proposerCategory,
