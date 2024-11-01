@@ -1,0 +1,8 @@
+{
+  "configuredRelayer": [
+    {
+      "chainIds": [3151908, 167000],
+      "url": "http://185.3.95.99:6061"
+    }
+  ]
+}

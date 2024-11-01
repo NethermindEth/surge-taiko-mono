@@ -1,0 +1,54 @@
+{
+  "configuredChains": [
+    {
+      "3151908": {
+        "name": "Kurtosis",
+        "type": "L1",
+        "icon": "path/or/url/to/icon1",
+        "rpcUrls": {
+          "default": {
+            "http": [
+              "http://185.3.95.99:32002"
+            ]
+          }
+        },
+        "nativeCurrency": {
+          "name": "ETH",
+          "symbol": "ETH",
+          "decimals": 18
+        },
+        "blockExplorers": {
+          "default": {
+            "name": "Explorer 1",
+            "url": "http://185.3.95.99:35001/"
+          }
+        }
+      }
+    },
+    {
+      "167000": {
+        "name": "Taiko",
+        "type": "L2",
+        "icon": "path/or/url/to/icon2",
+        "rpcUrls": {
+          "default": {
+            "http": [
+              "http://185.3.95.99:8547"
+            ]
+          }
+        },
+        "nativeCurrency": {
+          "name": "TaikoETH",
+          "symbol": "tETH",
+          "decimals": 18
+        },
+        "blockExplorers": {
+          "default": {
+            "name": "Explorer 2",
+            "url": "http://185.3.95.99:35003/"
+          }
+        }
+      }
+    }
+  ]
+}
