@@ -15,7 +15,7 @@ services:
 
   nginx:
     build:
-      context: ./packages/bridge-ui
+      context: .
       dockerfile: nginx/Dockerfile
     ports:
       - "80:80"
