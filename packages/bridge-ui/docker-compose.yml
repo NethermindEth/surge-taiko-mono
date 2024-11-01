@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: bridge-ui
     ports:
       - "4173:4173"
     volumes:
@@ -17,11 +18,14 @@ services:
     build:
       context: .
       dockerfile: nginx/Dockerfile
+    container_name: nginx
     ports:
       - "80:80"
       - "443:443"
     depends_on:
       - bridge-ui
+    profiles:
+      - nginx
     networks:
       - app-network
     volumes:
