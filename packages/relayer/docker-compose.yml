@@ -52,6 +52,8 @@ services:
     container_name: relayer-processor
     restart: always
     entrypoint: ["/usr/local/bin/relayer"]
+    ports:
+      - 6061:6061
     command:
       - processor
       - --db.host=db
@@ -85,6 +87,8 @@ services:
     container_name: relayer-indexer
     restart: always
     entrypoint: ["/usr/local/bin/relayer"]
+    ports:
+      - 6062:6062
     command:
       - indexer
       - --db.host=db
@@ -118,6 +122,8 @@ services:
     container_name: relayer-api
     restart: always
     entrypoint: ["/usr/local/bin/relayer"]
+    ports:
+      - 4102:4102
     command:
       - api
       - --db.host=db
