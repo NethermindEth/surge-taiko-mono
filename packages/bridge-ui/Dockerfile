@@ -5,7 +5,7 @@ FROM node:20-alpine as builder
 RUN npm install -g pnpm
 
 # Install dependencies required for node-gyp
-RUN apk add --no-cache python3 make g++
+RUN apk add --no-cache python3 make g++ rng-tools
 
 WORKDIR /app
 
