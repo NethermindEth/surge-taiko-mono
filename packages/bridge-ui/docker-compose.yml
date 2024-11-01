@@ -10,3 +10,23 @@ services:
     # Only build and start when explicitly requested
     profiles:
       - bridge-ui
+    networks:
+      - app-network
+
+  nginx:
+    build:
+      context: ./packages/bridge-ui
+      dockerfile: nginx/Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - bridge-ui
+    networks:
+      - app-network
+    volumes:
+      - ./packages/bridge-ui/nginx/ssl:/etc/nginx/ssl:ro
+
+networks:
+  app-network:
+    driver: bridge

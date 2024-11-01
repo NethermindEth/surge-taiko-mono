@@ -27,4 +27,4 @@ RUN pnpm export:config
 # Build the application
 RUN pnpm run build
 
-CMD ["pnpm", "run", "preview","--host"]
+CMD ["pnpm", "run", "preview"]
