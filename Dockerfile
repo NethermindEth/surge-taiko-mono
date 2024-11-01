@@ -1,4 +1,4 @@
-ARG PACKAGE=eventindexer
+ARG PACKAGE=relayer
 
 FROM golang:1.23.0 as builder
 
