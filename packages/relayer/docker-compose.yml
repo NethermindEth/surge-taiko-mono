@@ -11,7 +11,7 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - ~/.docker-conf/mysql/data/:/var/lib/mysql
+      - mysql_data:/var/lib/mysql
     networks:
       - rabbitmq_go_net
     profiles:
@@ -142,7 +142,7 @@ services:
       - relayer
 
 volumes:
-  db:
+  mysql_data:
     driver: local
 
 networks:
