@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -62,7 +63,7 @@ func TryParsingCustomError(originalError error) error {
 		return nil
 	}
 
-	errData := getErrorData(originalError)
+	errData := standardizeErrorData(getErrorData(originalError))
 
 	// if errData is unparsable and returns 0x, we should not match any errors.
 	if errData == "0x" {
@@ -102,4 +103,16 @@ func getErrorData(err error) string {
 	}
 
 	return err.Error()
+}
+
+// standardizeErrorData standardizes the error data to a hex string
+// considering Nethermind's error data format
+func standardizeErrorData(errData string) string {
+	errData = strings.TrimPrefix(errData, "Reverted ")
+
+	if !strings.HasPrefix(errData, "0x") {
+		errData = "0x" + hex.EncodeToString([]byte(errData))
+	}
+
+	return errData
 }
