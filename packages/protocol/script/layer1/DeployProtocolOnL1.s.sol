@@ -19,7 +19,8 @@ import "src/layer1/automata-attestation/AutomataDcapV3Attestation.sol";
 import "src/layer1/automata-attestation/lib/PEMCertChainLib.sol";
 import "src/layer1/automata-attestation/utils/SigVerifyLib.sol";
 import "src/layer1/devnet/DevnetTaikoL1.sol";
-import "src/layer1/devnet/DevnetTierProvider.sol";
+import "src/layer1/devnet/DevnetTierProviderSGX.sol";
+import "src/layer1/devnet/DevnetTierProviderRISC0.sol";
 import "src/layer1/mainnet/rollup/MainnetGuardianProver.sol";
 import "src/layer1/mainnet/rollup/MainnetTaikoL1.sol";
 import "src/layer1/mainnet/rollup/verifiers/MainnetSgxVerifier.sol";
@@ -397,8 +398,11 @@ contract DeployProtocolOnL1 is DeployCapability {
     }
 
     function deployTierProvider(string memory tierProviderName) private returns (address) {
-        if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("devnet"))) {
-            return address(new DevnetTierProvider());
+        if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("devnet_sgx"))) {
+            return address(new DevnetTierProviderSGX());
+        } else if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("devnet_risc0")))
+        {
+            return address(new DevnetTierProviderRISC0());
         } else if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("testnet"))) {
             return address(new TestTierProvider());
         } else if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("mainnet"))) {
