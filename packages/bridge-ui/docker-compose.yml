@@ -23,14 +23,13 @@ services:
     ports:
       - "80:80"
       - "443:443"
-    depends_on:
-      - bridge-ui
     profiles:
       - nginx
     networks:
       - app-network
     volumes:
       - ./packages/bridge-ui/nginx/ssl:/etc/nginx/ssl:ro
+      - ./packages/bridge-ui/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
 networks:
   app-network:
