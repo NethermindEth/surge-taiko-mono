@@ -5,9 +5,9 @@ services:
       dockerfile: Dockerfile
     container_name: bridge-ui
     ports:
-      - "4173:4173"
-    volumes:
-      - ./config:/app/config
+      - "3000:3000"
+    # volumes:
+    #   - ./config:/app/config
     # Only build and start when explicitly requested
     profiles:
       - bridge-ui
@@ -15,9 +15,10 @@ services:
       - app-network
 
   nginx:
-    build:
-      context: .
-      dockerfile: nginx/Dockerfile
+    image: nginx:latest
+    # build:
+    #   context: .
+    #   dockerfile: nginx/Dockerfile
     container_name: nginx
     ports:
       - "80:80"

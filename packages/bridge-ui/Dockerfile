@@ -1,30 +1,42 @@
-# Build stage
-FROM node:20-alpine as builder
+# Step 1: Build the application
+FROM node:20 AS builder
 
-# Install pnpm
 RUN npm install -g pnpm
-
-# Install dependencies required for node-gyp
-RUN apk add --no-cache python3 make g++ rng-tools
 
 WORKDIR /app
 
-# Copy package files
+# Install dependencies
 COPY package.json ./
 
-# Install dependencies
-RUN pnpm install --no-frozen-lockfile
+# Install dependencies without the lock file, generating a new one
+RUN pnpm install
 
-# Copy source code and config files
+# Copy the app source code and build
 COPY . .
 
-# Copy .env example if not exists
-RUN cp -n .env.example .env || true
+RUN cp .env.example .env
 
-# Export configs to .env
 RUN pnpm export:config
+RUN pnpm build
 
-# Build the application
-RUN pnpm run build
+# Step 2: Set up the final production environment
+FROM node:20
 
-CMD ["pnpm", "run", "preview"]
+# Install pnpm globally
+RUN npm install -g pnpm
+
+WORKDIR /app
+
+# Copy only necessary build files
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/pnpm-lock.yaml ./
+RUN pnpm install --prod
+
+# Copy the build output
+COPY --from=builder /app/build ./build
+
+# Expose port
+EXPOSE 3000
+
+# Start the SvelteKit app
+CMD ["node", "build"]
