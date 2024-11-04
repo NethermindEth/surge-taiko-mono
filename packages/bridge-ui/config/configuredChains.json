@@ -4,7 +4,7 @@
       "3151908": {
         "name": "Kurtosis",
         "type": "L1",
-        "icon": "path/or/url/to/icon1",
+        "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
           "default": {
             "http": [
@@ -20,7 +20,7 @@
         "blockExplorers": {
           "default": {
             "name": "Explorer 1",
-            "url": "https://sgx.nethermind.dev/l1-blocksscout/"
+            "url": "l1-blocksscout"
           }
         }
       }
@@ -29,7 +29,7 @@
       "167000": {
         "name": "Taiko",
         "type": "L2",
-        "icon": "path/or/url/to/icon2",
+        "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
           "default": {
             "http": [
