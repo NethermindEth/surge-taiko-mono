@@ -25,10 +25,11 @@ type Config struct {
 	BlobServerEndpoint *url.URL
 	SocialScanEndpoint *url.URL
 	SyntheticBlocks    struct {
-		Enabled     bool
-		BlockTime   time.Duration
-		NumAccounts int
-		InitialKey  *ecdsa.PrivateKey
+		Enabled      bool
+		BlockTime    time.Duration
+		NumAccounts  int
+		InitialKey   *ecdsa.PrivateKey
+		InitialNonce uint64
 	}
 }
 

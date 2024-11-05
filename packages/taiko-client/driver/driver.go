@@ -95,6 +95,7 @@ func (d *Driver) InitFromConfig(ctx context.Context, cfg *Config) (err error) {
 			cfg.SyntheticBlocks.BlockTime,
 			cfg.SyntheticBlocks.NumAccounts,
 			cfg.SyntheticBlocks.InitialKey,
+			cfg.SyntheticBlocks.InitialNonce,
 		)
 
 		// Pass generator to chain syncer
