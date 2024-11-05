@@ -47,48 +47,52 @@ services:
     profiles:
       - init
 
-  relayer-processor:
+  relayer-l1-processor:
     image: nethsurge/taiko-relayer:latest
-    container_name: relayer-processor
+    container_name: relayer-l1-processor
     restart: always
     entrypoint: ["/usr/local/bin/relayer"]
-    ports:
-      - 6061:6061
+    # ports:
+    #   - 6061:6061
     command:
       - processor
+      - --queue.prefetch=1
+      - --processorPrivateKey=39725efee3fb28614de3bacaffe4cc4bd8c436257e2c8bb887c4b5c4be45e76d
+      - --destBridgeAddress=0x1670000000000000000000000000000000000001
+      - --destERC20VaultAddress=0x1670000000000000000000000000000000000002
+      - --destERC721Address=0x1670000000000000000000000000000000000003
+      - --destERC1155Address=0x1670000000000000000000000000000000000004
+      - --destTaikoAddress=0x1670000000000000000000000000000000010001
+      - --srcSignalServiceAddress=0x00c042C4D5D913277CE16611a2ce6e9003554aD5
+      # - --targetTxHash=0x79b337cc89ffac2610727ae602b94896427fbd265efb4fa692fe1554a8956db6
+      - --srcRpcUrl=ws://185.3.95.99:32003
+      - --destRpcUrl=ws://185.3.95.99:8548
+      - --confirmations=1
+      - --headerSyncInterval=2
+      - --profitableOnly=true
+      - --tx.minTipCap=0.01
+      - --queue.host=rabbitmq
+      - --queue.password=root
+      - --queue.port=5672
+      - --queue.username=root
       - --db.host=db
       - --db.maxIdleConns=50
       - --db.maxOpenConns=3000
       - --db.name=relayer
       - --db.password=root
       - --db.username=root
-      - --destBridgeAddress=0x1670000000000000000000000000000000000001
-      - --destRpcUrl=ws://185.3.95.99:8548
-      - --confirmations=2
-      - --destERC1155Address=0x1670000000000000000000000000000000000004
-      - --destERC20VaultAddress=0x1670000000000000000000000000000000000002
-      - --destERC721Address=0x1670000000000000000000000000000000000003
-      - --destTaikoAddress=0x1670000000000000000000000000000000010001
-      - --processorPrivateKey=39725efee3fb28614de3bacaffe4cc4bd8c436257e2c8bb887c4b5c4be45e76d
-      - --srcRpcUrl=ws://185.3.95.99:32003
-      - --srcSignalServiceAddress=0x00c042C4D5D913277CE16611a2ce6e9003554aD5
-      - --headerSyncInterval=2
-      - --queue.host=rabbitmq
-      - --queue.password=root
-      - --queue.port=5672
-      - --queue.username=root
     networks:
       - rabbitmq_go_net
     profiles:
-      - relayer
+      - l1
 
-  relayer-indexer:
+  relayer-l1-indexer:
     image: nethsurge/taiko-relayer:latest
-    container_name: relayer-indexer
+    container_name: relayer-l1-indexer
     restart: always
     entrypoint: ["/usr/local/bin/relayer"]
-    ports:
-      - 6062:6062
+    # ports:
+    #   - 6062:6062
     command:
       - indexer
       - --db.host=db
@@ -98,24 +102,24 @@ services:
       - --db.name=relayer
       - --db.password=root
       - --db.username=root
+      - --srcBridgeAddress=0x72bCbB3f339aF622c28a26488Eed9097a2977404
       - --destBridgeAddress=0x1670000000000000000000000000000000000001
+      - --srcTaikoAddress=0xaE37C7A711bcab9B0f8655a97B738d6ccaB6560B
+      - --srcSignalServiceAddress=0x00c042C4D5D913277CE16611a2ce6e9003554aD5
+      - --srcRpcUrl=ws://185.3.95.99:32003
       - --destRpcUrl=ws://185.3.95.99:8548
-      - --metrics.port=6062
+      # - --metrics.port=6062
       - --queue.host=rabbitmq
       - --queue.password=root
       - --queue.port=5672
       - --queue.username=root
-      - --srcRpcUrl=ws://185.3.95.99:32003
-      - --srcSignalServiceAddress=0x00c042C4D5D913277CE16611a2ce6e9003554aD5
+      - --maxNumGoroutines=50
       - --blockBatchSize=100
       - --event=MessageSent
-      - --maxNumGoroutines=50
-      - --srcBridgeAddress=0x72bCbB3f339aF622c28a26488Eed9097a2977404
-      - --srcTaikoAddress=0xaE37C7A711bcab9B0f8655a97B738d6ccaB6560B
     networks:
       - rabbitmq_go_net
     profiles:
-      - relayer
+      - l1
 
   relayer-api:
     image: nethsurge/taiko-relayer:latest
@@ -133,13 +137,88 @@ services:
       - --db.name=relayer
       - --db.password=root
       - --db.username=root
+      - --srcRpcUrl=ws://185.3.95.99:32003
       - --destRpcUrl=ws://185.3.95.99:8548
       - --destTaikoAddress=0x1670000000000000000000000000000000010001
-      - --srcRpcUrl=ws://185.3.95.99:32003
+      - --processingFeeMultiplier=1.75
     networks:
       - rabbitmq_go_net
     profiles:
-      - relayer
+      - api
+
+  relayer-l2-processor:
+    image: nethsurge/taiko-relayer:latest
+    container_name: relayer-l2-processor
+    restart: always
+    entrypoint: ["/usr/local/bin/relayer"]
+    # ports:
+    #   - 6063:6063
+    command:
+      - processor
+      - --queue.prefetch=1
+      - --processorPrivateKey=bb1d0f125b4fb2bb173c318cdead45468474ca71474e2247776b2b4c0fa2d3f5
+      - --destBridgeAddress=0x72bCbB3f339aF622c28a26488Eed9097a2977404
+      - --destERC20VaultAddress=0x38435Ac0E0e9Bd8737c476F8F39a24b0735e00dc
+      - --destERC721Address=0x9ECB6f04D47FA2599449AaA523bF84476f7aD80f
+      - --destERC1155Address=0xB29dB8A6b1C596B64f7E1dD5358d59Db73648E17
+      - --destTaikoAddress=0xaE37C7A711bcab9B0f8655a97B738d6ccaB6560B
+      - --srcSignalServiceAddress=0x1670000000000000000000000000000000000005
+      # - --targetTxHash=0x79b337cc89ffac2610727ae602b94896427fbd265efb4fa692fe1554a8956db6
+      - --srcRpcUrl=ws://185.3.95.99:8548
+      - --destRpcUrl=ws://185.3.95.99:32003
+      - --confirmations=1
+      - --headerSyncInterval=2
+      - --profitableOnly=true
+      - --tx.minTipCap=0.01
+      - --queue.host=rabbitmq
+      - --queue.password=root
+      - --queue.port=5672
+      - --queue.username=root
+      - --db.host=db
+      - --db.maxIdleConns=50
+      - --db.maxOpenConns=3000
+      - --db.name=relayer
+      - --db.password=root
+      - --db.username=root
+    networks:
+      - rabbitmq_go_net
+    profiles:
+      - l2
+
+  relayer-l2-indexer:
+    image: nethsurge/taiko-relayer:latest
+    container_name: relayer-l2-indexer
+    restart: always
+    entrypoint: ["/usr/local/bin/relayer"]
+    # ports:
+    #   - 6064:6064
+    command:
+      - indexer
+      - --db.host=db
+      - --db.connMaxLifetime=100000
+      - --db.maxIdleConns=50
+      - --db.maxOpenConns=3000
+      - --db.name=relayer
+      - --db.password=root
+      - --db.username=root
+      - --srcBridgeAddress=0x1670000000000000000000000000000000000001
+      - --destBridgeAddress=0x72bCbB3f339aF622c28a26488Eed9097a2977404
+      # - --srcTaikoAddress=0x1670000000000000000000000000000000010001
+      - --srcSignalServiceAddress=0x1670000000000000000000000000000000000005
+      - --srcRpcUrl=http://185.3.95.99:8547
+      - --destRpcUrl=ws://185.3.95.99:32003
+      # - --metrics.port=6062
+      - --queue.host=rabbitmq
+      - --queue.password=root
+      - --queue.port=5672
+      - --queue.username=root
+      - --maxNumGoroutines=50
+      - --blockBatchSize=100
+      - --event=MessageSent
+    networks:
+      - rabbitmq_go_net
+    profiles:
+      - l2
 
 volumes:
   mysql_data:
