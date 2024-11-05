@@ -40,8 +40,8 @@ services:
       - 15672:15672
       - 15692:15692
     volumes:
-      - ~/.docker-conf/rabbitmq/data/:/var/lib/rabbitmq/
-      - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
+      - ./rabbitmq/data/:/var/lib/rabbitmq/
+      - ./rabbitmq/log/:/var/log/rabbitmq
     networks:
       - rabbitmq_go_net
     profiles:
