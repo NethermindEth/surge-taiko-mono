@@ -55,12 +55,12 @@ func createSelfTransferTx(nonce uint64, privateKey *ecdsa.PrivateKey) []byte {
 func createTransferToNextTx(nonce uint64, fromKey *ecdsa.PrivateKey, toKey *ecdsa.PrivateKey, value *big.Int) []byte {
 	toAddr := crypto.PubkeyToAddress(toKey.PublicKey)
 	tx := types.NewTransaction(
-		nonce,                  // nonce (will be 127)
-		toAddr,                 // to (next account)
-		value,                  // transfer amount
-		21000,                  // gas limit
-		big.NewInt(1000000000), // gas price (1 gwei)
-		nil,                    // data
+		nonce,         // nonce (will be 127)
+		toAddr,        // to (next account)
+		value,         // transfer amount
+		21000,         // gas limit
+		big.NewInt(1), // gas price (1 wei)
+		nil,           // data
 	)
 	signedTx, _ := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(1)), fromKey)
 	txBytes, _ := signedTx.MarshalBinary()
@@ -105,7 +105,7 @@ func (g *SyntheticBlockGenerator) GenerateBlock(parent *types.Header) *engine.Ex
 		GasUsed:       21000 * uint64(len(transactions)), // Update gas used (21000 per transaction)
 		Timestamp:     timestamp,
 		ExtraData:     []byte{},
-		BaseFeePerGas: big.NewInt(1000000000), // 1 gwei
+		BaseFeePerGas: big.NewInt(1), // 1 wei
 		BlockHash:     common.Hash{},
 		Transactions:  transactions,
 	}
