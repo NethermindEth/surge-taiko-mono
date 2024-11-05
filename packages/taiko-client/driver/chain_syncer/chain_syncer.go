@@ -93,23 +93,38 @@ func New(
 // Sync performs a sync operation to L2 execution engine's local chain.
 func (s *L2ChainSyncer) Sync() error {
 	if s.blockGenerator != nil {
-		// Generate synthetic blocks
-		parent, err := s.rpc.L2.HeaderByNumber(s.ctx, nil)
-		if err != nil {
-			return err
-		}
+		ticker := time.NewTicker(200 * time.Millisecond)
+		defer ticker.Stop()
 
-		execData := s.blockGenerator.GenerateBlock(parent)
+		go func() {
+			for {
+				select {
+				case <-s.ctx.Done():
+					return
+				case <-ticker.C:
+					// Generate synthetic blocks
+					parent, err := s.rpc.L2.HeaderByNumber(s.ctx, nil)
+					if err != nil {
+						log.Error("Failed to get parent header", "error", err)
+						continue
+					}
 
-		// Insert block directly via Engine API
-		status, err := s.rpc.L2Engine.NewPayload(s.ctx, execData)
-		if err != nil {
-			return fmt.Errorf("failed to insert synthetic block: %w", err)
-		}
+					execData := s.blockGenerator.GenerateBlock(parent)
 
-		if status.Status != "VALID" {
-			return fmt.Errorf("invalid synthetic block: %s", status.Status)
-		}
+					// Insert block directly via Engine API
+					status, err := s.rpc.L2Engine.NewPayload(s.ctx, execData)
+					if err != nil {
+						log.Error("Failed to insert synthetic block", "error", err)
+						continue
+					}
+
+					if status.Status != "VALID" {
+						log.Error("Invalid synthetic block", "status", status.Status)
+						continue
+					}
+				}
+			}
+		}()
 
 		return nil
 	}
