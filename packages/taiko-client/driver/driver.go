@@ -33,12 +33,13 @@ type Driver struct {
 	rpc           *rpc.Client
 	l2ChainSyncer *chainSyncer.L2ChainSyncer
 	state         *state.State
+	l1HeadCh      chan *types.Header
+	l1HeadSub     event.Subscription
+	ctx           context.Context
+	wg            sync.WaitGroup
 
-	l1HeadCh  chan *types.Header
-	l1HeadSub event.Subscription
-
-	ctx context.Context
-	wg  sync.WaitGroup
+	// Add synthetic block generator
+	syntheticBlockGen *SyntheticBlockGenerator
 }
 
 // InitFromCli initializes the given driver instance based on the command line flags.
@@ -88,6 +89,17 @@ func (d *Driver) InitFromConfig(ctx context.Context, cfg *Config) (err error) {
 	}
 
 	d.l1HeadSub = d.state.SubL1HeadsFeed(d.l1HeadCh)
+
+	if cfg.SyntheticBlocks.Enabled {
+		d.syntheticBlockGen = NewSyntheticBlockGenerator(
+			cfg.SyntheticBlocks.BlockTime,
+			cfg.SyntheticBlocks.NumAccounts,
+			cfg.SyntheticBlocks.InitialKey,
+		)
+
+		// Pass generator to chain syncer
+		d.l2ChainSyncer.SetBlockGenerator(d.syntheticBlockGen)
+	}
 
 	return nil
 }

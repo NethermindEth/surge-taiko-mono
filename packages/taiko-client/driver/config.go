@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"net/url"
@@ -23,6 +24,12 @@ type Config struct {
 	MaxExponent        uint64
 	BlobServerEndpoint *url.URL
 	SocialScanEndpoint *url.URL
+	SyntheticBlocks    struct {
+		Enabled     bool
+		BlockTime   time.Duration
+		NumAccounts int
+		InitialKey  *ecdsa.PrivateKey
+	}
 }
 
 // NewConfigFromCliContext creates a new config instance from

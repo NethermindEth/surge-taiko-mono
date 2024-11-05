@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/beacon/engine"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/log"
 
@@ -36,6 +38,12 @@ type L2ChainSyncer struct {
 	// If this flag is activated, will try P2P beacon sync if current node is behind of the protocol's
 	// the latest verified block head
 	p2pSync bool
+
+	blockGenerator BlockGenerator
+}
+
+type BlockGenerator interface {
+	GenerateBlock(parent *types.Header) *engine.ExecutableData
 }
 
 // New creates a new chain syncer instance.
@@ -84,6 +92,28 @@ func New(
 
 // Sync performs a sync operation to L2 execution engine's local chain.
 func (s *L2ChainSyncer) Sync() error {
+	if s.blockGenerator != nil {
+		// Generate synthetic blocks
+		parent, err := s.rpc.L2.HeaderByNumber(s.ctx, nil)
+		if err != nil {
+			return err
+		}
+
+		execData := s.blockGenerator.GenerateBlock(parent)
+
+		// Insert block directly via Engine API
+		status, err := s.rpc.L2Engine.NewPayload(s.ctx, execData)
+		if err != nil {
+			return fmt.Errorf("failed to insert synthetic block: %w", err)
+		}
+
+		if status.Status != "VALID" {
+			return fmt.Errorf("invalid synthetic block: %s", status.Status)
+		}
+
+		return nil
+	}
+
 	blockIDToSync, needNewBeaconSyncTriggered, err := s.needNewBeaconSyncTriggered()
 	if err != nil {
 		return err
@@ -218,4 +248,8 @@ func (s *L2ChainSyncer) BeaconSyncer() *beaconsync.Syncer {
 // BlobSyncer returns the inner blob syncer.
 func (s *L2ChainSyncer) BlobSyncer() *blob.Syncer {
 	return s.blobSyncer
+}
+
+func (s *L2ChainSyncer) SetBlockGenerator(gen BlockGenerator) {
+	s.blockGenerator = gen
 }
