@@ -1,19 +1,19 @@
-name: "Nethermind - Docker build and push - taiko-client"
+name: "Nethermind - Docker build and push - relayer"
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
     tags:
-      - "taiko-client-v*"
+      - "relayer-v*"
     paths:
-      - "packages/taiko-client/**"
+      - "packages/relayer/**"
 
 env:
   DOCKER_REGISTRY: nethermind.jfrog.io
   DOCKER_USERNAME: modular
-  DOCKER_REPOSITORY_DEV: modular-oci-local-dev/taiko-client
-  DOCKER_REPOSITORY_STAGING: modular-oci-local-staging/taiko-client
+  DOCKER_REPOSITORY_DEV: modular-oci-local-dev/relayer
+  DOCKER_REPOSITORY_STAGING: modular-oci-local-staging/relayer
 
 jobs:
   build:
@@ -53,7 +53,7 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
           context: .
-          file: packages/taiko-client/Dockerfile
+          file: packages/relayer/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
