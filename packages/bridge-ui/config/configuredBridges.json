@@ -12,6 +12,19 @@
         "signalServiceAddress": "0x00c042C4D5D913277CE16611a2ce6e9003554aD5",
         "quotaManagerAddress": ""
       }
+    },
+    {
+      "source": "167000",
+      "destination": "3151908",
+      "addresses": {
+        "bridgeAddress": "0x1670000000000000000000000000000000000001",
+        "erc20VaultAddress": "0x1670000000000000000000000000000000000002",
+        "erc721VaultAddress": "0x1670000000000000000000000000000000000003",
+        "erc1155VaultAddress": "0x1670000000000000000000000000000000000004",
+        "crossChainSyncAddress": "",
+        "signalServiceAddress": "0x1670000000000000000000000000000000000005",
+        "quotaManagerAddress": ""
+      }
     }
   ]
 }
