@@ -34,7 +34,7 @@ jobs:
         with:
           registry: ${{ env.DOCKER_REGISTRY }}
           username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ secrets.ARTIFACTORY_MODULAR_TOKEN_CONTRIBUTOR }}
+          password: ${{ secrets.ARTIFACTORY_MODULAR_TOKEN_DEVELOPER }}
 
       - name: Docker meta
         id: meta
