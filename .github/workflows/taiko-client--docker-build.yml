@@ -64,7 +64,7 @@ jobs:
         run: |
           oras login ${{ env.DOCKER_REGISTRY }} \
             -u ${{ env.DOCKER_USERNAME }} \
-            -p ${{ secrets.ARTIFACTORY_MODULAR_TOKEN_CONTRIBUTOR }}
+            -p ${{ secrets.ARTIFACTORY_MODULAR_TOKEN_DEVELOPER }}
 
       - name: Promote to Staging
         run: |
