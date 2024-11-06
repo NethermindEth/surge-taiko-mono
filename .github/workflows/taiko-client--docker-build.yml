@@ -1,4 +1,4 @@
-name: "Nethermind - Docker build and push"
+name: "Nethermind - Docker build and push taiko-client"
 
 on:
   workflow_dispatch:
