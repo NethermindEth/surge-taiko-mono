@@ -12,7 +12,8 @@ on:
 env:
   DOCKER_REGISTRY: nethermind.jfrog.io
   DOCKER_USERNAME: modular
-  DOCKER_REPOSITORY: modular-oci-local-staging/taiko-client
+  DOCKER_REPOSITORY_DEV: modular-oci-local-dev/taiko-client
+  DOCKER_REPOSITORY_STAGING: modular-oci-local-staging/taiko-client
 
 jobs:
   build:
@@ -39,7 +40,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -56,6 +57,35 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - uses: oras-project/setup-oras@v1
+      - run: oras version
+      - name: Login to registry with oras
+        run: |
+          oras login ${{ env.DOCKER_REGISTRY }} \
+            -u ${{ env.DOCKER_USERNAME }} \
+            -p ${{ secrets.ARTIFACTORY_MODULAR_TOKEN_CONTRIBUTOR }}
+
+      - name: Promote to Staging
+        run: |
+          # Split comma-separated tags into an array
+          IFS=',' read -ra tags <<< "${{ steps.meta.outputs.tags }}"
+
+          # For each source tag, create corresponding staging tag and copy the image
+          for tag in "${tags[@]}"; do
+            # Trim any whitespace from the tag
+            tag=$(echo "$tag" | xargs)
+
+            # Extract the tag suffix (everything after the last colon)
+            tag_suffix="${tag##*:}"
+
+            # Construct source and destination tags
+            source_image="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY_DEV}:${tag_suffix}"
+            staging_image="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY_STAGING}:${tag_suffix}"
+
+            echo "Promoting ${source_image} to ${staging_image}"
+            oras cp -r "${source_image}" "${staging_image}"
+          done
 
       - name: Summary
         run: |
