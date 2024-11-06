@@ -10,6 +10,8 @@ module.exports = {
   seedAccounts: [
     { "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39": 1000 },
     { "0x79fcdef22feed20eddacbb2587640e45491b757f": 1000 },
+    { "0xE25583099BA105D9ec0A67f5Ae86D90e50036425": 10000 },
+    { "0x8943545177806ED17B9F23F0a21ee5948eCaa776": 10000 },
   ],
   ownerSecurityCouncil: "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39",
   ownerTimelockController: "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39",
