@@ -3,7 +3,7 @@ const ADDRESS_LENGTH = 40;
 
 module.exports = {
   // Owner address of the pre-deployed L2 contracts.
-  contractOwner: "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39",
+  contractOwner: process.env.CONTRACT_OWNER,
   l1ChainId: parseInt(process.env.L1_CHAINID),
   // Chain ID of the Taiko L2 network.
   chainId: parseInt(process.env.L2_CHAINID),
