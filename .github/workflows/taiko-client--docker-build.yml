@@ -53,7 +53,7 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
           context: .
-          file: packages/taiko-client/Dockerfile.dummy
+          file: packages/taiko-client/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -94,3 +94,5 @@ jobs:
           echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r TAG; do
             echo "- $TAG" >> $GITHUB_STEP_SUMMARY
           done
+          echo "### Notes" >> $GITHUB_STEP_SUMMARY
+          echo "- The images have also been pushed to ${DOCKER_REPOSITORY_STAGING} repo" >> $GITHUB_STEP_SUMMARY
