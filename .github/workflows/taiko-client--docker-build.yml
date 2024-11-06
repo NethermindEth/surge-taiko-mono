@@ -11,8 +11,8 @@ on:
 
 env:
   DOCKER_REGISTRY: nethermind.jfrog.io
-  DOCKER_USERNAME: core
-  DOCKER_REPOSITORY: core-oci-local-dev/taiko-client
+  DOCKER_USERNAME: modular
+  DOCKER_REPOSITORY: modular-oci-local-staging/taiko-client
 
 jobs:
   build:
@@ -33,7 +33,7 @@ jobs:
         with:
           registry: ${{ env.DOCKER_REGISTRY }}
           username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ secrets.ARTIFACTORY_CORE_TOKEN_CONTRIBUTOR }}
+          password: ${{ secrets.ARTIFACTORY_MODULAR_TOKEN_CONTRIBUTOR }}
 
       - name: Docker meta
         id: meta
