@@ -21,6 +21,7 @@ import "src/layer1/automata-attestation/utils/SigVerifyLib.sol";
 import "src/layer1/devnet/DevnetTaikoL1.sol";
 import "src/layer1/devnet/DevnetTierProviderSGX.sol";
 import "src/layer1/devnet/DevnetTierProviderRISC0.sol";
+import "src/layer1/devnet/DevnetTierProviderOP.sol";
 import "src/layer1/mainnet/rollup/MainnetGuardianProver.sol";
 import "src/layer1/mainnet/rollup/MainnetTaikoL1.sol";
 import "src/layer1/mainnet/rollup/verifiers/MainnetSgxVerifier.sol";
@@ -403,6 +404,9 @@ contract DeployProtocolOnL1 is DeployCapability {
         } else if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("devnet_risc0")))
         {
             return address(new DevnetTierProviderRISC0());
+        } else if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("devnet_op")))
+        {
+            return address(new DevnetTierProviderOP());
         } else if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("testnet"))) {
             return address(new TestTierProvider());
         } else if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("mainnet"))) {
