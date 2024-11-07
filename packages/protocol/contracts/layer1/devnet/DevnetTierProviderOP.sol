@@ -16,7 +16,7 @@ contract DevnetTierProviderOP is TierProviderBase, ITierRouter {
     function getTierIds() public pure override returns (uint16[] memory tiers_) {
         tiers_ = new uint16[](2);
         tiers_[0] = LibTiers.TIER_OPTIMISTIC;
-        tiers_[2] = LibTiers.TIER_GUARDIAN;
+        tiers_[1] = LibTiers.TIER_GUARDIAN;
     }
 
     /// @inheritdoc ITierProvider
