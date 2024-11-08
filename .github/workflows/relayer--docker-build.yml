@@ -68,9 +68,8 @@ jobs:
 
       - name: Promote to Staging
         run: |
-          echo "TAGS: ${{ steps.meta.outputs.tags }}"
           # Split comma-separated tags into an array
-          IFS=',' read -ra tags <<< "${{ steps.meta.outputs.tags }}"
+          IFS='\n' read -ra tags <<< "${{ steps.meta.outputs.tags }}"
 
           # For each source tag, create corresponding staging tag and copy the image
           for tag in "${tags[@]}"; do
