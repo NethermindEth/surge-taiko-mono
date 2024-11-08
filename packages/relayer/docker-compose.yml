@@ -116,6 +116,7 @@ services:
       - --maxNumGoroutines=50
       - --blockBatchSize=100
       - --event=MessageSent
+      - --confirmations=1
     networks:
       - rabbitmq_go_net
     profiles:
@@ -243,6 +244,7 @@ services:
       - --maxNumGoroutines=50
       - --blockBatchSize=100
       - --event=MessageSent
+      - --confirmations=1
     networks:
       - rabbitmq_go_net
     profiles:
