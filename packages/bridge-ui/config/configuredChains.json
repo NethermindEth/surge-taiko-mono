@@ -45,7 +45,7 @@
         "blockExplorers": {
           "default": {
             "name": "Explorer 2",
-            "url": "http://185.3.95.99:35003/"
+            "url": "http://139.162.249.67:35003/"
           }
         }
       }
