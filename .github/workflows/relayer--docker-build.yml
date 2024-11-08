@@ -1,4 +1,4 @@
-name: "Nethermind - Docker build and push - relayer"
+name: "[Nethermind] Relayer - Docker build and push"
 
 on:
   workflow_dispatch:
@@ -53,7 +53,7 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
           context: .
-          file: packages/relayer/Dockerfile
+          file: packages/relayer/Dockerfile.dummy
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -68,11 +68,13 @@ jobs:
 
       - name: Promote to Staging
         run: |
+          echo "TAGS: ${{ steps.meta.outputs.tags }}"
           # Split comma-separated tags into an array
           IFS=',' read -ra tags <<< "${{ steps.meta.outputs.tags }}"
 
           # For each source tag, create corresponding staging tag and copy the image
           for tag in "${tags[@]}"; do
+            echo "Current tag: $tag"
             # Trim any whitespace from the tag
             tag=$(echo "$tag" | xargs)
 
