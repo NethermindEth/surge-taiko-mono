@@ -8,7 +8,7 @@
         "rpcUrls": {
           "default": {
             "http": [
-              "https://sgx.nethermind.dev/l1-rpc/"
+              "https://risc0.nethermind.dev/l1-rpc/"
             ]
           }
         },
@@ -33,7 +33,7 @@
         "rpcUrls": {
           "default": {
             "http": [
-              "https://sgx.nethermind.dev/l2-rpc/"
+              "https://risc0.nethermind.dev/l2-rpc/"
             ]
           }
         },

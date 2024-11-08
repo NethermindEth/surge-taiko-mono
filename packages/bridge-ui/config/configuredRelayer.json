@@ -2,7 +2,7 @@
   "configuredRelayer": [
     {
       "chainIds": [3151908, 763374],
-      "url": "https://sgx.nethermind.dev/relayer/"
+      "url": "https://risc0.nethermind.dev/relayer/"
     }
   ]
 }
