@@ -122,33 +122,33 @@ services:
     profiles:
       - l1
 
-  # relayer-l1-bridge:
-  #   image: nethsurge/taiko-relayer:latest
-  #   container_name: relayer-l1-bridge
-  #   restart: always
-  #   entrypoint: ["/usr/local/bin/relayer"]
-  #   # ports:
-  #   #   - 4102:4102
-  #   command:
-  #     - bridge
-  #     - --db.host=db
-  #     - --db.name=relayer
-  #     - --db.password=root
-  #     - --db.username=root
-  #     - --queue.host=rabbitmq
-  #     - --queue.password=root
-  #     - --queue.port=5672
-  #     - --queue.username=root
-  #     - --srcBridgeAddress=0x72bCbB3f339aF622c28a26488Eed9097a2977404
-  #     - --destBridgeAddress=0x7633740000000000000000000000000000000001
-  #     - --srcRpcUrl=ws://185.3.95.99:32003
-  #     - --destRpcUrl=ws://185.3.95.99:8548
-  #     - --bridgePrivateKey=bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31
-  #     - --bridgeMessageValue=10000
-  #   networks:
-  #     - rabbitmq_go_net
-  #   profiles:
-  #     - l1
+  relayer-l1-bridge:
+    image: nethsurge/taiko-relayer:latest
+    container_name: relayer-l1-bridge
+    restart: always
+    entrypoint: ["/usr/local/bin/relayer"]
+    # ports:
+    #   - 4102:4102
+    command:
+      - bridge
+      - --db.host=db
+      - --db.name=relayer
+      - --db.password=root
+      - --db.username=root
+      - --queue.host=rabbitmq
+      - --queue.password=root
+      - --queue.port=5672
+      - --queue.username=root
+      - --srcBridgeAddress=0x72bCbB3f339aF622c28a26488Eed9097a2977404
+      - --destBridgeAddress=0x7633740000000000000000000000000000000001
+      - --srcRpcUrl=ws://185.3.95.99:32003
+      - --destRpcUrl=ws://185.3.95.99:8548
+      - --bridgePrivateKey=bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31
+      - --bridgeMessageValue=10000
+    networks:
+      - rabbitmq_go_net
+    profiles:
+      - l1
 
   relayer-api:
     image: nethsurge/taiko-relayer:latest
@@ -250,33 +250,33 @@ services:
     profiles:
       - l2
 
-  # relayer-l2-bridge:
-  #   image: nethsurge/taiko-relayer:latest
-  #   container_name: relayer-l2-bridge
-  #   restart: always
-  #   entrypoint: ["/usr/local/bin/relayer"]
-  #   # ports:
-  #   #   - 4102:4102
-  #   command:
-  #     - bridge
-  #     - --db.host=db
-  #     - --db.name=relayer
-  #     - --db.password=root
-  #     - --db.username=root
-  #     - --queue.host=rabbitmq
-  #     - --queue.password=root
-  #     - --queue.port=5672
-  #     - --queue.username=root
-  #     - --srcBridgeAddress=0x7633740000000000000000000000000000000001
-  #     - --destBridgeAddress=0x72bCbB3f339aF622c28a26488Eed9097a2977404
-  #     - --srcRpcUrl=http://185.3.95.99:8547
-  #     - --destRpcUrl=ws://185.3.95.99:32003
-  #     - --bridgePrivateKey=bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31
-  #     - --bridgeMessageValue=10000
-  #   networks:
-  #     - rabbitmq_go_net
-  #   profiles:
-  #     - l2
+  relayer-l2-bridge:
+    image: nethsurge/taiko-relayer:latest
+    container_name: relayer-l2-bridge
+    restart: always
+    entrypoint: ["/usr/local/bin/relayer"]
+    # ports:
+    #   - 4102:4102
+    command:
+      - bridge
+      - --db.host=db
+      - --db.name=relayer
+      - --db.password=root
+      - --db.username=root
+      - --queue.host=rabbitmq
+      - --queue.password=root
+      - --queue.port=5672
+      - --queue.username=root
+      - --srcBridgeAddress=0x7633740000000000000000000000000000000001
+      - --destBridgeAddress=0x72bCbB3f339aF622c28a26488Eed9097a2977404
+      - --srcRpcUrl=http://185.3.95.99:8547
+      - --destRpcUrl=ws://185.3.95.99:32003
+      - --bridgePrivateKey=bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31
+      - --bridgeMessageValue=10000
+    networks:
+      - rabbitmq_go_net
+    profiles:
+      - l2
 
 volumes:
   mysql_data:
