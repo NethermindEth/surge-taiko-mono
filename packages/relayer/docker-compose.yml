@@ -66,7 +66,7 @@ services:
       - --srcSignalServiceAddress=0x00c042C4D5D913277CE16611a2ce6e9003554aD5
       # - --targetTxHash=0x79b337cc89ffac2610727ae602b94896427fbd265efb4fa692fe1554a8956db6
       - --srcRpcUrl=ws://185.3.95.99:32003
-      - --destRpcUrl=ws://185.3.95.99:8548
+      - --destRpcUrl=ws://185.3.95.99:8550
       - --confirmations=1
       - --headerSyncInterval=2
       - --profitableOnly=false
@@ -107,7 +107,7 @@ services:
       - --srcTaikoAddress=0xaE37C7A711bcab9B0f8655a97B738d6ccaB6560B
       - --srcSignalServiceAddress=0x00c042C4D5D913277CE16611a2ce6e9003554aD5
       - --srcRpcUrl=ws://185.3.95.99:32003
-      - --destRpcUrl=ws://185.3.95.99:8548
+      - --destRpcUrl=ws://185.3.95.99:8550
       # - --metrics.port=6062
       - --queue.host=rabbitmq
       - --queue.password=root
@@ -142,7 +142,7 @@ services:
       - --srcBridgeAddress=0x72bCbB3f339aF622c28a26488Eed9097a2977404
       - --destBridgeAddress=0x7633740000000000000000000000000000000001
       - --srcRpcUrl=ws://185.3.95.99:32003
-      - --destRpcUrl=ws://185.3.95.99:8548
+      - --destRpcUrl=ws://185.3.95.99:8550
       - --bridgePrivateKey=bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31
       - --bridgeMessageValue=10000
     networks:
@@ -167,7 +167,7 @@ services:
       - --db.password=root
       - --db.username=root
       - --srcRpcUrl=ws://185.3.95.99:32003
-      - --destRpcUrl=ws://185.3.95.99:8548
+      - --destRpcUrl=ws://185.3.95.99:8550
       - --destTaikoAddress=0x7633740000000000000000000000000000010001
       - --processingFeeMultiplier=1.75
     networks:
@@ -193,7 +193,7 @@ services:
       - --destTaikoAddress=0xaE37C7A711bcab9B0f8655a97B738d6ccaB6560B
       - --srcSignalServiceAddress=0x7633740000000000000000000000000000000005
       # - --targetTxHash=0x79b337cc89ffac2610727ae602b94896427fbd265efb4fa692fe1554a8956db6
-      - --srcRpcUrl=ws://185.3.95.99:8548
+      - --srcRpcUrl=ws://185.3.95.99:8550
       - --destRpcUrl=ws://185.3.95.99:32003
       - --confirmations=1
       - --headerSyncInterval=2
