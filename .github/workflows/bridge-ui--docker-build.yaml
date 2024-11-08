@@ -1,4 +1,4 @@
-name: "Nethermind - Docker build and push - bridge-ui"
+name: "[Nethermind] Bridge UI - Docker build and push"
 
 on:
   workflow_dispatch:
@@ -67,11 +67,9 @@ jobs:
 
       - name: Promote to Staging
         run: |
-          # Split comma-separated tags into an array
-          IFS=',' read -ra tags <<< "${{ steps.meta.outputs.tags }}"
-
-          # For each source tag, create corresponding staging tag and copy the image
-          for tag in "${tags[@]}"; do
+          # Read tags line by line using a while loop
+          echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
+            echo "Current tag: $tag"
             # Trim any whitespace from the tag
             tag=$(echo "$tag" | xargs)
 
