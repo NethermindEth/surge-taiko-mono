@@ -52,8 +52,8 @@ services:
     container_name: relayer-l1-processor
     restart: always
     entrypoint: ["/usr/local/bin/relayer"]
-    # ports:
-    #   - 6061:6061
+    ports:
+      - 6061:6061
     command:
       - processor
       - --queue.prefetch=1
@@ -91,8 +91,8 @@ services:
     container_name: relayer-l1-indexer
     restart: always
     entrypoint: ["/usr/local/bin/relayer"]
-    # ports:
-    #   - 6062:6062
+    ports:
+      - 6062:6062
     command:
       - indexer
       - --db.host=db
@@ -150,9 +150,9 @@ services:
     profiles:
       - l1
 
-  relayer-api:
+  relayer-l1-api:
     image: nethsurge/taiko-relayer:latest
-    container_name: relayer-api
+    container_name: relayer-l1-api
     restart: always
     entrypoint: ["/usr/local/bin/relayer"]
     ports:
@@ -175,13 +175,38 @@ services:
     profiles:
       - api
 
+  relayer-l2-api:
+    image: nethsurge/taiko-relayer:latest
+    container_name: relayer-l2-api
+    restart: always
+    entrypoint: ["/usr/local/bin/relayer"]
+    ports:
+      - 4103:4102
+    command:
+      - api
+      - --db.host=db
+      - --db.connMaxLifetime=100000
+      - --db.maxIdleConns=50
+      - --db.maxOpenConns=3000
+      - --db.name=relayer
+      - --db.password=root
+      - --db.username=root
+      - --srcRpcUrl=ws://185.3.95.99:8548
+      - --destRpcUrl=ws://185.3.95.99:32003
+      - --destTaikoAddress=0xaE37C7A711bcab9B0f8655a97B738d6ccaB6560B
+      - --processingFeeMultiplier=1.75
+    networks:
+      - rabbitmq_go_net
+    profiles:
+      - api
+
   relayer-l2-processor:
     image: nethsurge/taiko-relayer:latest
     container_name: relayer-l2-processor
     restart: always
     entrypoint: ["/usr/local/bin/relayer"]
-    # ports:
-    #   - 6063:6063
+    ports:
+      - 6063:6063
     command:
       - processor
       - --queue.prefetch=1
@@ -219,8 +244,8 @@ services:
     container_name: relayer-l2-indexer
     restart: always
     entrypoint: ["/usr/local/bin/relayer"]
-    # ports:
-    #   - 6064:6064
+    ports:
+      - 6064:6064
     command:
       - indexer
       - --db.host=db
