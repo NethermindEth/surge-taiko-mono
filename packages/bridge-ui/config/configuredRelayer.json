@@ -2,11 +2,11 @@
   "configuredRelayer": [
     {
       "chainIds": [3151908, 763374],
-      "url": "https://sgx.nethermind.dev/l1-relayer/"
+      "url": "https://relayer:4102"
     },
     {
       "chainIds": [763374, 3151908],
-      "url": "https://sgx.nethermind.dev/l2-relayer/"
+      "url": "https://relayer:4102"
     }
   ]
 }

@@ -52,21 +52,18 @@ services:
     container_name: relayer-l1-processor
     restart: always
     entrypoint: ["/usr/local/bin/relayer"]
-    # ports:
-    #   - 6061:6061
     command:
       - processor
       - --queue.prefetch=100
-      - --processorPrivateKey=bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31
+      - --processorPrivateKey=
       - --destBridgeAddress=0x7633740000000000000000000000000000000001
       - --destERC20VaultAddress=0x7633740000000000000000000000000000000002
       - --destERC721Address=0x7633740000000000000000000000000000000003
       - --destERC1155Address=0x7633740000000000000000000000000000000004
       - --destTaikoAddress=0x7633740000000000000000000000000000010001
       - --srcSignalServiceAddress=0x00c042C4D5D913277CE16611a2ce6e9003554aD5
-      # - --targetTxHash=0x79b337cc89ffac2610727ae602b94896427fbd265efb4fa692fe1554a8956db6
-      - --srcRpcUrl=ws://185.3.95.99:32003
-      - --destRpcUrl=ws://185.3.95.99:8548
+      - --srcRpcUrl=
+      - --destRpcUrl=
       - --confirmations=0
       - --headerSyncInterval=2
       - --profitableOnly=false
@@ -91,8 +88,6 @@ services:
     container_name: relayer-l1-indexer
     restart: always
     entrypoint: ["/usr/local/bin/relayer"]
-    # ports:
-    #   - 6062:6062
     command:
       - indexer
       - --db.host=db
@@ -106,9 +101,8 @@ services:
       - --destBridgeAddress=0x7633740000000000000000000000000000000001
       - --srcTaikoAddress=0xaE37C7A711bcab9B0f8655a97B738d6ccaB6560B
       - --srcSignalServiceAddress=0x00c042C4D5D913277CE16611a2ce6e9003554aD5
-      - --srcRpcUrl=ws://185.3.95.99:32003
-      - --destRpcUrl=ws://185.3.95.99:8548
-      # - --metrics.port=6062
+      - --srcRpcUrl=
+      - --destRpcUrl=
       - --queue.host=rabbitmq
       - --queue.password=root
       - --queue.port=5672
@@ -138,8 +132,8 @@ services:
       - --db.name=relayer
       - --db.password=root
       - --db.username=root
-      - --srcRpcUrl=ws://185.3.95.99:32003
-      - --destRpcUrl=ws://185.3.95.99:8548
+      - --srcRpcUrl=
+      - --destRpcUrl=
       - --destTaikoAddress=0x7633740000000000000000000000000000010001
       - --processingFeeMultiplier=1.75
     networks:
@@ -163,8 +157,8 @@ services:
       - --db.name=relayer
       - --db.password=root
       - --db.username=root
-      - --srcRpcUrl=ws://185.3.95.99:8548
-      - --destRpcUrl=ws://185.3.95.99:32003
+      - --srcRpcUrl=
+      - --destRpcUrl=
       - --destTaikoAddress=0xaE37C7A711bcab9B0f8655a97B738d6ccaB6560B
       - --processingFeeMultiplier=1.75
     networks:
@@ -177,20 +171,18 @@ services:
     container_name: relayer-l2-processor
     restart: always
     entrypoint: ["/usr/local/bin/relayer"]
-    # ports:
-    #   - 6063:6063
     command:
       - processor
       - --queue.prefetch=100
-      - --processorPrivateKey=bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31
+      - --processorPrivateKey=
       - --destBridgeAddress=0x72bCbB3f339aF622c28a26488Eed9097a2977404
       - --destERC20VaultAddress=0x38435Ac0E0e9Bd8737c476F8F39a24b0735e00dc
       - --destERC721Address=0x9ECB6f04D47FA2599449AaA523bF84476f7aD80f
       - --destERC1155Address=0xB29dB8A6b1C596B64f7E1dD5358d59Db73648E17
       - --destTaikoAddress=0xaE37C7A711bcab9B0f8655a97B738d6ccaB6560B
       - --srcSignalServiceAddress=0x7633740000000000000000000000000000000005
-      - --srcRpcUrl=ws://185.3.95.99:8548
-      - --destRpcUrl=ws://185.3.95.99:32003
+      - --srcRpcUrl=
+      - --destRpcUrl=
       - --confirmations=0
       - --headerSyncInterval=2
       - --profitableOnly=false
@@ -215,8 +207,6 @@ services:
     container_name: relayer-l2-indexer
     restart: always
     entrypoint: ["/usr/local/bin/relayer"]
-    # ports:
-    #   - 6064:6064
     command:
       - indexer
       - --db.host=db
@@ -229,9 +219,8 @@ services:
       - --srcBridgeAddress=0x7633740000000000000000000000000000000001
       - --destBridgeAddress=0x72bCbB3f339aF622c28a26488Eed9097a2977404
       - --srcSignalServiceAddress=0x7633740000000000000000000000000000000005
-      - --srcRpcUrl=ws://185.3.95.99:8548
-      - --destRpcUrl=ws://185.3.95.99:32003
-      # - --metrics.port=6062
+      - --srcRpcUrl=
+      - --destRpcUrl=
       - --queue.host=rabbitmq
       - --queue.password=root
       - --queue.port=5672

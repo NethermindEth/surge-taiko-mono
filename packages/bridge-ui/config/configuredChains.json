@@ -8,7 +8,7 @@
         "rpcUrls": {
           "default": {
             "http": [
-              "https://sgx.nethermind.dev/l1-rpc/"
+              "https://l1-rpc/"
             ]
           }
         },
@@ -20,7 +20,7 @@
         "blockExplorers": {
           "default": {
             "name": "Explorer 1",
-            "url": "l1-blocksscout"
+            "url": ""
           }
         }
       }
@@ -33,7 +33,7 @@
         "rpcUrls": {
           "default": {
             "http": [
-              "https://sgx.nethermind.dev/l2-rpc/"
+              "https://l2-rpc/"
             ]
           }
         },
@@ -45,7 +45,7 @@
         "blockExplorers": {
           "default": {
             "name": "Explorer 2",
-            "url": "http://185.3.95.99:35003/"
+            "url": ""
           }
         }
       }
