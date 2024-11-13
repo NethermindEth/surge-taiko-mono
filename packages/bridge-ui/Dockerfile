@@ -8,15 +8,15 @@ WORKDIR /app
 # Install dependencies
 COPY package.json ./
 
-# Install dependencies without the lock file, generating a new one
-RUN pnpm install
-
 # Copy the app source code and build
 COPY . .
 
 RUN cp .env.example .env
-
 RUN pnpm export:config
+
+# Install dependencies without the lock file, generating a new one
+RUN pnpm install
+
 RUN pnpm build
 
 # Step 2: Set up the final production environment
