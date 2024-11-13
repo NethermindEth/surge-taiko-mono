@@ -1,0 +1,54 @@
+{
+  "configuredChains": [
+    {
+      "3151908": {
+        "name": "Kurtosis",
+        "type": "L1",
+        "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
+        "rpcUrls": {
+          "default": {
+            "http": [
+              "https://l1-rpc/"
+            ]
+          }
+        },
+        "nativeCurrency": {
+          "name": "ETH",
+          "symbol": "ETH",
+          "decimals": 18
+        },
+        "blockExplorers": {
+          "default": {
+            "name": "Explorer 1",
+            "url": ""
+          }
+        }
+      }
+    },
+    {
+      "763374": {
+        "name": "Taiko",
+        "type": "L2",
+        "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
+        "rpcUrls": {
+          "default": {
+            "http": [
+              "https://l2-rpc/"
+            ]
+          }
+        },
+        "nativeCurrency": {
+          "name": "TaikoETH",
+          "symbol": "tETH",
+          "decimals": 18
+        },
+        "blockExplorers": {
+          "default": {
+            "name": "Explorer 2",
+            "url": ""
+          }
+        }
+      }
+    }
+  ]
+}
