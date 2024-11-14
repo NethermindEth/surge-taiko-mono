@@ -1,3 +1,6 @@
+# TODO: This workflow is disabled because it's trying to use ark-runner-set instead of
+# ubuntu-latest. Needs checking if it's still needed.
+
 name: Validate PR Title
 
 on:
