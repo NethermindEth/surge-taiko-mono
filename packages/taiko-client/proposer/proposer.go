@@ -260,9 +260,13 @@ func (p *Proposer) fetchPoolContent(filterPoolContent bool) ([]types.Transaction
 
 	log.Info("Transactions lists count", "count", len(txLists))
 
-	var (
-		profitableTxLists []types.Transactions
-	)
+	return txLists, nil
+}
+
+// filterProfitableTxLists filters transaction lists and returns only the profitable ones
+func (p *Proposer) filterProfitableTxLists(txLists []types.Transactions) []types.Transactions {
+	var profitableTxLists []types.Transactions
+
 	for _, txs := range txLists {
 		profitable, err := p.isProfitable(txs)
 		if err != nil {
@@ -274,9 +278,8 @@ func (p *Proposer) fetchPoolContent(filterPoolContent bool) ([]types.Transaction
 			profitableTxLists = append(profitableTxLists, txs)
 		}
 	}
-	txLists = profitableTxLists
 
-	return txLists, nil
+	return profitableTxLists
 }
 
 // ProposeOp performs a proposing operation, fetching transactions
@@ -303,6 +306,30 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 		return err
 	}
 
+	// Check if the current L2 chain is after ontake fork.
+	l2Head, err := p.rpc.L2.BlockNumber(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get L2 chain head number: %w", err)
+	}
+	isOntake := p.chainConfig.IsOntake(new(big.Int).SetUint64(l2Head + 1))
+
+	// check calldata blob profitability
+	calldataProposingCosts, err := p.getCalldataProposingCosts(txLists, isOntake)
+	if err != nil {
+		return err
+	}
+	blobProposingCosts, err := p.getBlobProposingCosts(txLists)
+	if err != nil {
+		return err
+	}
+	if calldataProposingCosts.Cmp(blobProposingCosts) > 0 {
+		// chose blob tx builder
+	} else {
+		// chose calldata tx builder
+	}
+
+	// TODO return compressed txLists so they can be used directly in proposing
+	txLists = p.filterProfitableTxLists(txLists)
 	// If there are no profitable transactions, return without proposing
 	if len(txLists) == 0 {
 		log.Info("No profitable transactions to propose")
@@ -337,32 +364,23 @@ func (p *Proposer) ProposeTxLists(ctx context.Context, txLists []types.Transacti
 	return nil
 }
 
+// getTxListsToPropose returns the transaction lists to propose based on configuration limits
+func (p *Proposer) getTxListsToPropose(txLists []types.Transactions) []types.Transactions {
+	maxTxLists := utils.Min(p.MaxProposedTxListsPerEpoch, uint64(len(txLists)))
+	return txLists[:maxTxLists]
+}
+
 // ProposeTxListOntake proposes the given transactions lists to TaikoL1 smart contract.
 func (p *Proposer) ProposeTxListOntake(
 	ctx context.Context,
 	txLists []types.Transactions,
 ) error {
-	var (
-		proverAddress     = p.proposerAddress
-		txListsBytesArray [][]byte
-		txNums            []int
-		totalTxs          int
-	)
-	for _, txs := range txLists {
-		txListBytes, err := rlp.EncodeToBytes(txs)
-		if err != nil {
-			return fmt.Errorf("failed to encode transactions: %w", err)
-		}
-
-		compressedTxListBytes, err := utils.Compress(txListBytes)
-		if err != nil {
-			return err
-		}
-
-		txListsBytesArray = append(txListsBytesArray, compressedTxListBytes)
-		txNums = append(txNums, len(txs))
-		totalTxs += len(txs)
+	txListsBytesArray, totalTxs, err := p.compressTxLists(txLists)
+	if err != nil {
+		return err
 	}
+
+	var proverAddress = p.proposerAddress
 
 	if p.Config.ClientConfig.ProverSetAddress != rpc.ZeroAddress {
 		proverAddress = p.Config.ClientConfig.ProverSetAddress
@@ -398,7 +416,7 @@ func (p *Proposer) ProposeTxListOntake(
 		return err
 	}
 
-	log.Info("📝 Batch propose transactions succeeded", "txs", txNums)
+	log.Info("📝 Batch propose transactions succeeded", "totalTxs", totalTxs)
 
 	metrics.ProposerProposedTxListsCounter.Add(float64(len(txLists)))
 	metrics.ProposerProposedTxsCounter.Add(float64(totalTxs))
@@ -491,6 +509,35 @@ func (p *Proposer) ProposeTxListPacaya(
 	return nil
 }
 
+// compressOnTakeTxLists compresses transaction lists and returns compressed bytes array and transaction counts
+func (p *Proposer) compressTxLists(txLists []types.Transactions) ([][]byte, int, error) {
+	var (
+		txListsBytesArray [][]byte
+		txNums            []int
+		totalTxs          int
+	)
+
+	for _, txs := range txLists {
+		txListBytes, err := rlp.EncodeToBytes(txs)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to encode transactions: %w", err)
+		}
+
+		compressedTxListBytes, err := utils.Compress(txListBytes)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		txListsBytesArray = append(txListsBytesArray, compressedTxListBytes)
+		txNums = append(txNums, len(txs))
+		totalTxs += len(txs)
+	}
+
+	log.Debug("Compressed transaction lists", "txs", txNums)
+
+	return txListsBytesArray, totalTxs, nil
+}
+
 // updateProposingTicker updates the internal proposing timer.
 func (p *Proposer) updateProposingTicker() {
 	if p.proposingTimer != nil {
@@ -559,12 +606,12 @@ func (p *Proposer) isProfitable(txList types.Transactions) (bool, error) {
 		// TODO: Not sure if this is the best approach here.
 		// Maybe txList.EstimatedGasUsed is useful? Maybe we need to calculate it ourselves?
 		gasConsumed := tx.Gas()
-		priorityGasPrice, err := p.getPriorityGasPrice(tx)
+		priorityGasFee, err := p.getPriorityGasFee(tx)
 		if err != nil {
 			return false, err
 		}
 
-		transactionFees := new(big.Int).Mul(new(big.Int).SetUint64(gasConsumed), priorityGasPrice)
+		transactionFees := new(big.Int).Mul(new(big.Int).SetUint64(gasConsumed), priorityGasFee)
 		totalGasConsumed += gasConsumed
 
 		totalTransactionFees.Add(totalTransactionFees, transactionFees)
@@ -578,7 +625,90 @@ func (p *Proposer) isProfitable(txList types.Transactions) (bool, error) {
 	return totalTransactionFees.Cmp(costs) > 0, nil
 }
 
-func (p *Proposer) getPriorityGasPrice(tx *types.Transaction) (*big.Int, error) {
+func (p *Proposer) getProvingCosts() (*big.Int, error) {
+	return new(big.Int).SetUint64(p.GasNeededForProvingBlock), nil
+}
+
+func (p *Proposer) getCalldataProposingCosts(txLists []types.Transactions, isOntake bool) (*big.Int, error) {
+	calldataGasPrice := new(big.Int)
+
+	// Get the current L1 gas price
+	gasPrice, err := p.rpc.L1.SuggestGasPrice(p.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isOntake {
+		calldataGasPrice, err = p.getLegacyCalldataTxListProposingCosts(p.getTxListsToPropose(txLists), gasPrice)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// For ontake, process all txLists at once
+
+	}
+
+	return calldataGasPrice, nil
+}
+
+func (p *Proposer) getLegacyCalldataTxListProposingCosts(txLists []types.Transactions, gasPrice *big.Int) (*big.Int, error) {
+	// Compress all tx lists
+	compressedLists, _, err := p.compressTxLists(txLists)
+	if err != nil {
+		return nil, err
+	}
+
+	calldataGas := uint64(0)
+	for _, compressedList := range compressedLists {
+		// TODO: add fixed cost for each L1 tx call
+		for _, b := range compressedList {
+			if b == 0 {
+				calldataGas += 4 // Cost for zero byte
+			} else {
+				calldataGas += 16 // Cost for non-zero byte
+			}
+		}
+	}
+
+	return new(big.Int).Mul(new(big.Int).SetUint64(calldataGas), gasPrice), nil
+}
+
+func (p *Proposer) getBlobProposingCosts(txLists []types.Transactions) (*big.Int, error) {
+	// Get current blob base fee
+	blobBaseFee, err := p.rpc.L1.BlobBaseFee(p.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Compress tx lists for the Ontake
+	compressedLists, _, err := p.compressTxLists(p.getTxListsToPropose(txLists))
+	if err != nil {
+		return nil, err
+	}
+
+	// Calculate total blob gas needed
+	totalBlobGas := uint64(0)
+
+	// Each blob can store up to 131072 bytes (128KB)
+	const blobSize = 131072
+
+	for _, compressed := range compressedLists {
+		// TODO: add fixed cost for each L1 tx call
+
+		// Calculate number of blobs needed for this compressed tx list
+		numBlobs := (len(compressed) + blobSize - 1) / blobSize
+		// Each blob costs 1 blob gas
+		totalBlobGas += uint64(numBlobs)
+	}
+
+	// Total cost is blob gas * blob base fee
+	return new(big.Int).Mul(
+		new(big.Int).SetUint64(totalBlobGas),
+		blobBaseFee,
+	), nil
+}
+
+func (p *Proposer) getPriorityGasFee(tx *types.Transaction) (*big.Int, error) {
 	baseFee, err := p.rpc.L2.SuggestGasPrice(p.ctx)
 	if err != nil {
 		return nil, err
