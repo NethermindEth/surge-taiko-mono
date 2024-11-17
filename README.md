@@ -14,7 +14,7 @@
 
 Get started with Taiko:
 
-- [Taiko docs](https://docs.taiko.xyz) — High-level concepts, guides, resources, and reference pages for getting started.
+- [Surge docs](https://docs.surge.wtf) — High-level concepts, guides, resources, and reference pages for getting started.
 - [Protocol specs](./packages/protocol/docs/README.md) — In-depth specifications of the Taiko protocol for deeper understanding.
 - [Smart contracts](./packages/protocol/contracts/) — Taiko protocol smart contracts, fully documented with NatSpec.
 
