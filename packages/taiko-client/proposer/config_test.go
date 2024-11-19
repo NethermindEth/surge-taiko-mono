@@ -61,6 +61,9 @@ func (s *ProposerTestSuite) TestNewConfigFromCliContext() {
 		"--" + flags.TxPoolLocals.Name, goldenTouchAddress.Hex(),
 		"--" + flags.RPCTimeout.Name, rpcTimeout,
 		"--" + flags.TxGasLimit.Name, "100000",
+		"--" + flags.OffChainCosts.Name, offChainCosts,
+		"--" + flags.GasNeededForProvingBlock.Name, "100000",
+		"--" + flags.PriceFluctuationModifier.Name, "100",
 	}))
 }
 
@@ -115,6 +118,9 @@ func (s *ProposerTestSuite) SetupApp() *cli.App {
 		&cli.DurationFlag{Name: flags.ProposeInterval.Name},
 		&cli.StringFlag{Name: flags.TxPoolLocals.Name},
 		&cli.DurationFlag{Name: flags.RPCTimeout.Name},
+		&cli.Uint64Flag{Name: flags.GasNeededForProvingBlock.Name},
+		&cli.Uint64Flag{Name: flags.PriceFluctuationModifier.Name},
+		&cli.StringFlag{Name: flags.OffChainCosts.Name},
 	}
 	app.Flags = append(app.Flags, flags.TxmgrFlags...)
 	app.Action = func(ctx *cli.Context) error {

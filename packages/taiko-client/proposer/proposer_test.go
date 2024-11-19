@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"maps"
+	"math/big"
 	"os"
 	"testing"
 	"time"
@@ -116,6 +117,9 @@ func (s *ProposerTestSuite) SetupTest() {
 			TxSendTimeout:             txmgr.DefaultBatcherFlagValues.TxSendTimeout,
 			TxNotInMempoolTimeout:     txmgr.DefaultBatcherFlagValues.TxNotInMempoolTimeout,
 		},
+		GasNeededForProvingBlock: 0,
+		PriceFluctuationModifier: 50,
+		OffChainCosts:            big.NewInt(0),
 	}, nil, nil))
 
 	s.p = p
@@ -418,4 +422,56 @@ func (s *ProposerTestSuite) TestStartClose() {
 
 func TestProposerTestSuite(t *testing.T) {
 	suite.Run(t, new(ProposerTestSuite))
+}
+
+func (s *ProposerTestSuite) TestEstimateTotalCosts() {
+	tests := []struct {
+		name                  string
+		proposingCosts        *big.Int
+		gasNeededForProving   uint64
+		priceFluctuation      uint64
+		offChainCosts         *big.Int
+		expectedError         bool
+		expectedCostThreshold *big.Int
+	}{
+		{
+			name:                  "normal estimation",
+			proposingCosts:        big.NewInt(300000000000), // 300 Gwei
+			gasNeededForProving:   3000000,                  // 3M gas for proving
+			priceFluctuation:      50,                       // 150% (accounting for price fluctuation)
+			offChainCosts:         big.NewInt(500000000000), // 500 Gwei for off-chain costs
+			expectedError:         false,
+			expectedCostThreshold: big.NewInt(0), // Will depend on network gas price
+		},
+		{
+			name:                  "zero proposing costs",
+			proposingCosts:        big.NewInt(0),
+			gasNeededForProving:   3000000,                  // 3M gas for proving
+			priceFluctuation:      50,                       // 150%
+			offChainCosts:         big.NewInt(500000000000), // 500 Gwei for off-chain costs
+			expectedError:         false,
+			expectedCostThreshold: big.NewInt(0),
+		},
+	}
+
+	for _, test := range tests {
+		s.Run(test.name, func() {
+			// Configure the proposer for this test case
+			s.p.GasNeededForProvingBlock = test.gasNeededForProving
+			s.p.PriceFluctuationModifier = test.priceFluctuation
+			s.p.OffChainCosts = test.offChainCosts
+
+			costs, err := s.p.estimateTotalCosts(test.proposingCosts)
+			log.Debug("Estimated total costs", "costs", costs)
+
+			if test.expectedError {
+				s.Error(err)
+				return
+			}
+
+			s.NoError(err)
+			s.NotNil(costs)
+			s.Greater(costs.Int64(), int64(0))
+		})
+	}
 }

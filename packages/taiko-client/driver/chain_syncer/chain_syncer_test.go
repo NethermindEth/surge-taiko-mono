@@ -97,6 +97,9 @@ func (s *ChainSyncerTestSuite) SetupTest() {
 			TxSendTimeout:             txmgr.DefaultBatcherFlagValues.TxSendTimeout,
 			TxNotInMempoolTimeout:     txmgr.DefaultBatcherFlagValues.TxNotInMempoolTimeout,
 		},
+		GasNeededForProvingBlock: 0,
+		PriceFluctuationModifier: 50,
+		OffChainCosts:            big.NewInt(0),
 	}, nil, nil))
 
 	s.p = prop

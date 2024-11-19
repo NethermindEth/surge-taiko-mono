@@ -9,7 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -263,24 +265,24 @@ func (p *Proposer) fetchPoolContent(filterPoolContent bool) ([]types.Transaction
 	return txLists, nil
 }
 
-// filterProfitableTxLists filters transaction lists and returns only the profitable ones
-func (p *Proposer) filterProfitableTxLists(txLists []types.Transactions) []types.Transactions {
-	var profitableTxLists []types.Transactions
+// // filterProfitableTxLists filters transaction lists and returns only the profitable ones
+// func (p *Proposer) filterProfitableTxLists(txLists []types.Transactions) []types.Transactions {
+// 	var profitableTxLists []types.Transactions
 
-	for _, txs := range txLists {
-		profitable, err := p.isProfitable(txs)
-		if err != nil {
-			log.Error("Failed to check profitability", "error", err)
-			continue
-		}
+// 	for _, txs := range txLists {
+// 		profitable, err := p.isProfitable(txs)
+// 		if err != nil {
+// 			log.Error("Failed to check profitability", "error", err)
+// 			continue
+// 		}
 
-		if profitable {
-			profitableTxLists = append(profitableTxLists, txs)
-		}
-	}
+// 		if profitable {
+// 			profitableTxLists = append(profitableTxLists, txs)
+// 		}
+// 	}
 
-	return profitableTxLists
-}
+// 	return profitableTxLists
+// }
 
 // ProposeOp performs a proposing operation, fetching transactions
 // from L2 execution engine's tx pool, splitting them by proposing constraints,
@@ -306,30 +308,23 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 		return err
 	}
 
-	// Check if the current L2 chain is after ontake fork.
-	l2Head, err := p.rpc.L2.BlockNumber(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get L2 chain head number: %w", err)
-	}
-	isOntake := p.chainConfig.IsOntake(new(big.Int).SetUint64(l2Head + 1))
-
-	// check calldata blob profitability
-	calldataProposingCosts, err := p.getCalldataProposingCosts(txLists, isOntake)
-	if err != nil {
-		return err
-	}
-	blobProposingCosts, err := p.getBlobProposingCosts(txLists)
-	if err != nil {
-		return err
-	}
-	if calldataProposingCosts.Cmp(blobProposingCosts) > 0 {
-		// chose blob tx builder
-	} else {
-		// chose calldata tx builder
-	}
+	// // check calldata blob profitability
+	// calldataProposingCosts, err := p.getCalldataProposingCosts(txLists, isOntake)
+	// if err != nil {
+	// 	return err
+	// }
+	// blobProposingCosts, err := p.getBlobProposingCosts(txLists)
+	// if err != nil {
+	// 	return err
+	// }
+	// if calldataProposingCosts.Cmp(blobProposingCosts) > 0 {
+	// 	// chose blob tx builder
+	// } else {
+	// 	// chose calldata tx builder
+	// }
 
 	// TODO return compressed txLists so they can be used directly in proposing
-	txLists = p.filterProfitableTxLists(txLists)
+	// txLists = p.filterProfitableTxLists(txLists)
 	// If there are no profitable transactions, return without proposing
 	if len(txLists) == 0 {
 		log.Info("No profitable transactions to propose")
@@ -497,6 +492,8 @@ func (p *Proposer) ProposeTxListPacaya(
 		return err
 	}
 
+	// check profitability
+
 	if err := p.SendTx(ctx, txCandidate); err != nil {
 		return err
 	}
@@ -507,6 +504,22 @@ func (p *Proposer) ProposeTxListPacaya(
 	metrics.ProposerProposedTxsCounter.Add(float64(txs))
 
 	return nil
+}
+
+func (p *Proposer) buildCheaperOnTakeTransaction(ctx context.Context,
+	txListsBytesArray [][]byte) (*txmgr.TxCandidate, *big.Int, error) {
+
+	txBlob, err := p.txBuilder.BuildOntake(ctx, txListsBytesArray)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	blobCost, err := p.getBlobCost(txBlob.Blobs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return txBlob, blobCost, nil
 }
 
 // compressOnTakeTxLists compresses transaction lists and returns compressed bytes array and transaction counts
@@ -597,27 +610,13 @@ func (p *Proposer) RegisterTxMgrSelctorToBlobServer(blobServer *testutils.Memory
 
 // Profitability is determined by comparing the revenue from transaction fees
 // to the costs of proposing and proving the block. Specifically:
-
-func (p *Proposer) isProfitable(txList types.Transactions) (bool, error) {
-	totalTransactionFees := new(big.Int)
-	totalGasConsumed := uint64(0)
-
-	for _, tx := range txList {
-		// TODO: Not sure if this is the best approach here.
-		// Maybe txList.EstimatedGasUsed is useful? Maybe we need to calculate it ourselves?
-		gasConsumed := tx.Gas()
-		priorityGasFee, err := p.getPriorityGasFee(tx)
-		if err != nil {
-			return false, err
-		}
-
-		transactionFees := new(big.Int).Mul(new(big.Int).SetUint64(gasConsumed), priorityGasFee)
-		totalGasConsumed += gasConsumed
-
-		totalTransactionFees.Add(totalTransactionFees, transactionFees)
+func (p *Proposer) isProfitable(txList types.Transactions, proposingCosts *big.Int) (bool, error) {
+	totalTransactionFees, err := p.calculateTotalL2TransactionsFees(txList)
+	if err != nil {
+		return false, err
 	}
 
-	costs, err := p.estimateTotalCosts(totalGasConsumed)
+	costs, err := p.estimateTotalCosts(proposingCosts)
 	if err != nil {
 		return false, err
 	}
@@ -625,81 +624,58 @@ func (p *Proposer) isProfitable(txList types.Transactions) (bool, error) {
 	return totalTransactionFees.Cmp(costs) > 0, nil
 }
 
-func (p *Proposer) getProvingCosts() (*big.Int, error) {
-	return new(big.Int).SetUint64(p.GasNeededForProvingBlock), nil
+func (p *Proposer) calculateTotalL2TransactionsFees(txList types.Transactions) (*big.Int, error) {
+	totalTransactionFees := new(big.Int)
+	totalGasConsumed := new(big.Int)
+
+	baseL2Fee, err := p.rpc.L2.SuggestGasPrice(p.ctx)
+	if err != nil {
+		return nil, err
+	}
+	priorityL2Fee, err := p.rpc.L2.SuggestGasTipCap(p.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, tx := range txList {
+		totalGasConsumed.Add(totalGasConsumed, tx.Cost())
+	}
+
+	threeFourthBaseFee := new(big.Int).Div(baseL2Fee, big.NewInt(4))
+	threeFourthBaseFee.Mul(threeFourthBaseFee, big.NewInt(3))
+	multiplier := new(big.Int).Add(threeFourthBaseFee, priorityL2Fee)
+	totalTransactionFees = new(big.Int).Mul(totalGasConsumed, multiplier)
+
+	return totalTransactionFees, nil
 }
 
-func (p *Proposer) getCalldataProposingCosts(txLists []types.Transactions, isOntake bool) (*big.Int, error) {
-	calldataGasPrice := new(big.Int)
-
+func (p *Proposer) getTransactionCost(txCandidate *txmgr.TxCandidate) (*big.Int, error) {
 	// Get the current L1 gas price
 	gasPrice, err := p.rpc.L1.SuggestGasPrice(p.ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get gas price: %w", err)
 	}
 
-	if !isOntake {
-		calldataGasPrice, err = p.getLegacyCalldataTxListProposingCosts(p.getTxListsToPropose(txLists), gasPrice)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// For ontake, process all txLists at once
-
-	}
-
-	return calldataGasPrice, nil
-}
-
-func (p *Proposer) getLegacyCalldataTxListProposingCosts(txLists []types.Transactions, gasPrice *big.Int) (*big.Int, error) {
-	// Compress all tx lists
-	compressedLists, _, err := p.compressTxLists(txLists)
+	estimatedGasUsage, err := p.rpc.L1.EstimateGas(p.ctx, ethereum.CallMsg{
+		To:   txCandidate.To,
+		Data: txCandidate.TxData,
+	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to estimate gas: %w", err)
 	}
 
-	calldataGas := uint64(0)
-	for _, compressedList := range compressedLists {
-		// TODO: add fixed cost for each L1 tx call
-		for _, b := range compressedList {
-			if b == 0 {
-				calldataGas += 4 // Cost for zero byte
-			} else {
-				calldataGas += 16 // Cost for non-zero byte
-			}
-		}
-	}
-
-	return new(big.Int).Mul(new(big.Int).SetUint64(calldataGas), gasPrice), nil
+	return new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(estimatedGasUsage)), nil
 }
 
-func (p *Proposer) getBlobProposingCosts(txLists []types.Transactions) (*big.Int, error) {
+func (p *Proposer) getBlobCost(blobs []*eth.Blob) (*big.Int, error) {
 	// Get current blob base fee
 	blobBaseFee, err := p.rpc.L1.BlobBaseFee(p.ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Compress tx lists for the Ontake
-	compressedLists, _, err := p.compressTxLists(p.getTxListsToPropose(txLists))
-	if err != nil {
-		return nil, err
-	}
-
-	// Calculate total blob gas needed
-	totalBlobGas := uint64(0)
-
-	// Each blob can store up to 131072 bytes (128KB)
-	const blobSize = 131072
-
-	for _, compressed := range compressedLists {
-		// TODO: add fixed cost for each L1 tx call
-
-		// Calculate number of blobs needed for this compressed tx list
-		numBlobs := (len(compressed) + blobSize - 1) / blobSize
-		// Each blob costs 1 blob gas
-		totalBlobGas += uint64(numBlobs)
-	}
+	// Each blob costs 1 blob gas
+	totalBlobGas := uint64(len(blobs))
 
 	// Total cost is blob gas * blob base fee
 	return new(big.Int).Mul(
@@ -708,36 +684,31 @@ func (p *Proposer) getBlobProposingCosts(txLists []types.Transactions) (*big.Int
 	), nil
 }
 
-func (p *Proposer) getPriorityGasFee(tx *types.Transaction) (*big.Int, error) {
-	baseFee, err := p.rpc.L2.SuggestGasPrice(p.ctx)
-	if err != nil {
-		return nil, err
-	}
-	return new(big.Int).Sub(tx.GasPrice(), baseFee), nil
-}
-
 func adjustForPriceFluctuation(gasPrice *big.Int, percentage uint64) *big.Int {
 	temp := new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(uint64(100)+percentage))
 	return new(big.Int).Div(temp, big.NewInt(100))
 }
 
 // Total Costs =
-// (gas needed for block proposal + gas needed for proof verification ) *
-// (gas price on L1 + 50% for price fluctuation) +
-//
-//	off chain proving costs (estimated with a margin for the provers' revenue)
-func (p *Proposer) estimateTotalCosts(gasUsed uint64) (*big.Int, error) {
-	totalL1GasNeeded := new(big.Int).Add(
-		new(big.Int).SetUint64(p.GasNeededForProposingBlock),
-		new(big.Int).SetUint64(p.GasNeededForProvingBlock),
-	)
+// gas needed for proof verification * (150% of gas price on L1) +
+// 150% of block proposal costs +
+// off chain proving costs (estimated with a margin for the provers' revenue)
+func (p *Proposer) estimateTotalCosts(proposingCosts *big.Int) (*big.Int, error) {
+	log.Debug("Proposing cost", "proposingCosts", proposingCosts)
+	log.Debug("Gas needed for proving", "gas", p.GasNeededForProvingBlock)
+	log.Debug("Price fluctuation", "gas", p.PriceFluctuationModifier)
+	log.Debug("Off chain costs", "gas", p.OffChainCosts)
 
 	l1GasPrice, err := p.rpc.L1.SuggestGasPrice(p.ctx)
 	if err != nil {
 		return nil, err
 	}
+	log.Debug("L1 gas price", "gas", l1GasPrice)
+
 	adjustedL1GasPrice := adjustForPriceFluctuation(l1GasPrice, p.PriceFluctuationModifier)
-	l1Costs := new(big.Int).Mul(totalL1GasNeeded, adjustedL1GasPrice)
+	adjustedProposingCosts := adjustForPriceFluctuation(proposingCosts, p.PriceFluctuationModifier)
+	l1Costs := new(big.Int).Mul(new(big.Int).SetUint64(p.GasNeededForProvingBlock), adjustedL1GasPrice)
+	l1Costs = new(big.Int).Add(l1Costs, adjustedProposingCosts)
 
 	totalCosts := new(big.Int).Add(l1Costs, p.OffChainCosts)
 
