@@ -621,6 +621,8 @@ func (p *Proposer) isProfitable(txList types.Transactions, proposingCosts *big.I
 		return false, err
 	}
 
+	log.Debug("isProfitable", "total L2 fees", totalTransactionFees, "total L1 costs", costs)
+
 	return totalTransactionFees.Cmp(costs) > 0, nil
 }
 
@@ -638,7 +640,7 @@ func (p *Proposer) calculateTotalL2TransactionsFees(txList types.Transactions) (
 	}
 
 	for _, tx := range txList {
-		totalGasConsumed.Add(totalGasConsumed, tx.Cost())
+		totalGasConsumed.Add(totalGasConsumed, new(big.Int).SetUint64(tx.Gas()))
 	}
 
 	threeFourthBaseFee := new(big.Int).Div(baseL2Fee, big.NewInt(4))
@@ -694,16 +696,18 @@ func adjustForPriceFluctuation(gasPrice *big.Int, percentage uint64) *big.Int {
 // 150% of block proposal costs +
 // off chain proving costs (estimated with a margin for the provers' revenue)
 func (p *Proposer) estimateTotalCosts(proposingCosts *big.Int) (*big.Int, error) {
-	log.Debug("Proposing cost", "proposingCosts", proposingCosts)
-	log.Debug("Gas needed for proving", "gas", p.GasNeededForProvingBlock)
-	log.Debug("Price fluctuation", "gas", p.PriceFluctuationModifier)
-	log.Debug("Off chain costs", "gas", p.OffChainCosts)
+	log.Debug(
+		"Proposing block costs details",
+		"proposingCosts", proposingCosts,
+		"gasNeededForProving", p.GasNeededForProvingBlock,
+		"priceFluctuation", p.PriceFluctuationModifier,
+		"offChainCosts", p.OffChainCosts,
+	)
 
 	l1GasPrice, err := p.rpc.L1.SuggestGasPrice(p.ctx)
 	if err != nil {
 		return nil, err
 	}
-	log.Debug("L1 gas price", "gas", l1GasPrice)
 
 	adjustedL1GasPrice := adjustForPriceFluctuation(l1GasPrice, p.PriceFluctuationModifier)
 	adjustedProposingCosts := adjustForPriceFluctuation(proposingCosts, p.PriceFluctuationModifier)

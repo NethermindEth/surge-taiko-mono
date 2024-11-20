@@ -117,9 +117,9 @@ func (s *ProposerTestSuite) SetupTest() {
 			TxSendTimeout:             txmgr.DefaultBatcherFlagValues.TxSendTimeout,
 			TxNotInMempoolTimeout:     txmgr.DefaultBatcherFlagValues.TxNotInMempoolTimeout,
 		},
-		GasNeededForProvingBlock: 0,
+		GasNeededForProvingBlock: 40000000,
 		PriceFluctuationModifier: 50,
-		OffChainCosts:            big.NewInt(0),
+		OffChainCosts:            big.NewInt(2487915692605872),
 	}, nil, nil))
 
 	s.p = p
@@ -472,6 +472,78 @@ func (s *ProposerTestSuite) TestEstimateTotalCosts() {
 			s.NoError(err)
 			s.NotNil(costs)
 			s.Greater(costs.Int64(), int64(0))
+		})
+	}
+}
+
+func (s *ProposerTestSuite) TestIsProfitable() {
+	tests := []struct {
+		name           string
+		txList         types.Transactions
+		proposingCosts *big.Int
+		expectedResult bool
+		expectedError  bool
+	}{
+		{
+			name:           "empty tx list",
+			txList:         types.Transactions{},
+			proposingCosts: big.NewInt(100000000000), // 100 Gwei
+			expectedResult: false,
+			expectedError:  false,
+		},
+		{
+			name: "profitable tx list",
+			txList: func() types.Transactions {
+				txs := make(types.Transactions, 500)
+				for i := 0; i < 500; i++ {
+					txs[i] = types.NewTx(&types.DynamicFeeTx{
+						ChainID:   big.NewInt(1),
+						Nonce:     uint64(i),
+						GasTipCap: big.NewInt(40000000000), // 40 Gwei gas tip cap
+						GasFeeCap: big.NewInt(40000000000), // 40 Gwei gas fee cap
+						Gas:       30000000,                // gas limit
+						To:        &common.Address{},
+						Value:     big.NewInt(0),
+						Data:      nil,
+					})
+				}
+				return txs
+			}(),
+			proposingCosts: big.NewInt(10000000000), // 10 Gwei
+			expectedResult: true,
+			expectedError:  false,
+		},
+		{
+			name: "unprofitable tx list",
+			txList: types.Transactions{
+				types.NewTx(&types.DynamicFeeTx{
+					ChainID:   big.NewInt(1),
+					Nonce:     0,
+					GasTipCap: big.NewInt(40000000000), // 40 Gwei gas tip cap
+					GasFeeCap: big.NewInt(40000000000), // 40 Gwei gas fee cap
+					Gas:       30000000,                // gas limit
+					To:        &common.Address{},
+					Value:     big.NewInt(0),
+					Data:      nil,
+				}),
+			},
+			proposingCosts: big.NewInt(10000000000), // 10 Gwei
+			expectedResult: false,
+			expectedError:  false,
+		},
+	}
+
+	for _, test := range tests {
+		s.Run(test.name, func() {
+			profitable, err := s.p.isProfitable(test.txList, test.proposingCosts)
+
+			if test.expectedError {
+				s.Error(err)
+				return
+			}
+
+			s.NoError(err)
+			s.Equal(test.expectedResult, profitable)
 		})
 	}
 }
