@@ -19,6 +19,11 @@ contract Risc0Verifier is EssentialContract, IVerifier {
 
     uint256[49] private __gap;
 
+    /// @dev debug vals
+    bytes public lastSeal;
+    bytes32 public lastImageId;
+    bytes32 public lastJournal;
+
     /// @dev Emitted when a trusted image is set / unset.
     /// @param imageId The id of the image
     /// @param trusted True if trusted, false otherwise
@@ -30,6 +35,7 @@ contract Risc0Verifier is EssentialContract, IVerifier {
     error RISC_ZERO_INVALID_BLOCK_PROOF_IMAGE_ID();
     error RISC_ZERO_INVALID_AGGREGATION_IMAGE_ID();
     error RISC_ZERO_INVALID_PROOF();
+     error RISC_ZERO_INVALID_PROOF_BATCH();
 
     /// @notice Initializes the contract with the provided address manager.
     /// @param _owner The address of the owner.
@@ -54,7 +60,6 @@ contract Risc0Verifier is EssentialContract, IVerifier {
         TaikoData.TierProof calldata _proof
     )
         external
-        view
     {
         // Do not run proof verification to contest an existing proof
         if (_ctx.isContesting) return;
@@ -72,6 +77,11 @@ contract Risc0Verifier is EssentialContract, IVerifier {
 
         // journalDigest is the sha256 hash of the hashed public input
         bytes32 journalDigest = sha256(bytes.concat(FIXED_JOURNAL_HEADER, publicInputHash));
+
+        // save debug values
+        lastSeal = seal;
+        lastImageId = imageId;
+        lastJournal = journalDigest;
 
         // call risc0 verifier contract
         (bool success,) = resolve(LibStrings.B_RISCZERO_GROTH16_VERIFIER, false).staticcall(
@@ -122,12 +132,17 @@ contract Risc0Verifier is EssentialContract, IVerifier {
         // journalDigest is the sha256 hash of the hashed public input
         bytes32 journalDigest = sha256(abi.encodePacked(publicInputs));
 
+        // save debug values
+        lastSeal = seal;
+        lastImageId = aggregationImageId;
+        lastJournal = journalDigest;
+
         // call risc0 verifier contract
         (bool success,) = resolve(LibStrings.B_RISCZERO_GROTH16_VERIFIER, false).staticcall(
             abi.encodeCall(IRiscZeroVerifier.verify, (seal, aggregationImageId, journalDigest))
         );
         if (!success) {
-            revert RISC_ZERO_INVALID_PROOF();
+            revert RISC_ZERO_INVALID_PROOF_BATCH();
         }
     }
 
