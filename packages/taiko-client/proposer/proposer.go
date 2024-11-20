@@ -492,7 +492,17 @@ func (p *Proposer) ProposeTxListPacaya(
 		return err
 	}
 
-	// check profitability
+	/*
+		// check profitability
+		profitable, err := p.isProfitable(txLists, cost)
+		if err != nil {
+			return err
+		}
+		if !profitable {
+			log.Info("Proposing transaction is not profitable", "cost", cost)
+			return nil
+		}
+	*/
 
 	if err := p.SendTx(ctx, txCandidate); err != nil {
 		return err
@@ -610,8 +620,8 @@ func (p *Proposer) RegisterTxMgrSelctorToBlobServer(blobServer *testutils.Memory
 
 // Profitability is determined by comparing the revenue from transaction fees
 // to the costs of proposing and proving the block. Specifically:
-func (p *Proposer) isProfitable(txList types.Transactions, proposingCosts *big.Int) (bool, error) {
-	totalTransactionFees, err := p.calculateTotalL2TransactionsFees(txList)
+func (p *Proposer) isProfitable(txLists []types.Transactions, proposingCosts *big.Int) (bool, error) {
+	totalTransactionFees, err := p.calculateTotalL2TransactionsFees(txLists)
 	if err != nil {
 		return false, err
 	}
@@ -626,7 +636,7 @@ func (p *Proposer) isProfitable(txList types.Transactions, proposingCosts *big.I
 	return totalTransactionFees.Cmp(costs) > 0, nil
 }
 
-func (p *Proposer) calculateTotalL2TransactionsFees(txList types.Transactions) (*big.Int, error) {
+func (p *Proposer) calculateTotalL2TransactionsFees(txLists []types.Transactions) (*big.Int, error) {
 	totalTransactionFees := new(big.Int)
 	totalGasConsumed := new(big.Int)
 
@@ -639,8 +649,10 @@ func (p *Proposer) calculateTotalL2TransactionsFees(txList types.Transactions) (
 		return nil, err
 	}
 
-	for _, tx := range txList {
-		totalGasConsumed.Add(totalGasConsumed, new(big.Int).SetUint64(tx.Gas()))
+	for _, txs := range txLists {
+		for _, tx := range txs {
+			totalGasConsumed.Add(totalGasConsumed, new(big.Int).SetUint64(tx.Gas()))
+		}
 	}
 
 	threeFourthBaseFee := new(big.Int).Div(baseL2Fee, big.NewInt(4))

@@ -117,9 +117,9 @@ func (s *ProposerTestSuite) SetupTest() {
 			TxSendTimeout:             txmgr.DefaultBatcherFlagValues.TxSendTimeout,
 			TxNotInMempoolTimeout:     txmgr.DefaultBatcherFlagValues.TxNotInMempoolTimeout,
 		},
-		GasNeededForProvingBlock: 40000000,
+		GasNeededForProvingBlock: 0,
 		PriceFluctuationModifier: 50,
-		OffChainCosts:            big.NewInt(2487915692605872),
+		OffChainCosts:            big.NewInt(0),
 	}, nil, nil))
 
 	s.p = p
@@ -534,8 +534,11 @@ func (s *ProposerTestSuite) TestIsProfitable() {
 	}
 
 	for _, test := range tests {
+		s.p.GasNeededForProvingBlock = 3000000
+		s.p.OffChainCosts = big.NewInt(2487915692605872)
 		s.Run(test.name, func() {
-			profitable, err := s.p.isProfitable(test.txList, test.proposingCosts)
+			txLists := []types.Transactions{test.txList}
+			profitable, err := s.p.isProfitable(txLists, test.proposingCosts)
 
 			if test.expectedError {
 				s.Error(err)
