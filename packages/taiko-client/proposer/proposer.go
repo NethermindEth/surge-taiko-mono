@@ -659,8 +659,10 @@ func (p *Proposer) getTransactionCost(txCandidate *txmgr.TxCandidate) (*big.Int,
 	}
 
 	estimatedGasUsage, err := p.rpc.L1.EstimateGas(p.ctx, ethereum.CallMsg{
+		From: p.proposerAddress,
 		To:   txCandidate.To,
 		Data: txCandidate.TxData,
+		Gas:  0,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to estimate gas: %w", err)
