@@ -308,26 +308,8 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 		return err
 	}
 
-	// // check calldata blob profitability
-	// calldataProposingCosts, err := p.getCalldataProposingCosts(txLists, isOntake)
-	// if err != nil {
-	// 	return err
-	// }
-	// blobProposingCosts, err := p.getBlobProposingCosts(txLists)
-	// if err != nil {
-	// 	return err
-	// }
-	// if calldataProposingCosts.Cmp(blobProposingCosts) > 0 {
-	// 	// chose blob tx builder
-	// } else {
-	// 	// chose calldata tx builder
-	// }
-
-	// TODO return compressed txLists so they can be used directly in proposing
-	// txLists = p.filterProfitableTxLists(txLists)
-	// If there are no profitable transactions, return without proposing
 	if len(txLists) == 0 {
-		log.Info("No profitable transactions to propose")
+		log.Info("No transactions to propose")
 		return nil
 	}
 
@@ -406,6 +388,18 @@ func (p *Proposer) ProposeTxListOntake(
 		log.Warn("Failed to build TaikoL1.proposeBlocksV2 transaction", "error", encoding.TryParsingCustomError(err))
 		return err
 	}
+
+	/*
+		// check profitability
+		profitable, err := p.isProfitable([]types.Transactions{txList}, cost)
+		if err != nil {
+			return err
+		}
+		if !profitable {
+			log.Info("Proposing legacy transaction is not profitable", "cost", cost)
+			return nil
+		}
+	*/
 
 	if err := p.SendTx(ctx, txCandidate); err != nil {
 		return err
@@ -499,7 +493,7 @@ func (p *Proposer) ProposeTxListPacaya(
 			return err
 		}
 		if !profitable {
-			log.Info("Proposing transaction is not profitable", "cost", cost)
+			log.Info("Proposing Ontake transaction is not profitable", "cost", cost)
 			return nil
 		}
 	*/
@@ -667,7 +661,7 @@ func (p *Proposer) getTransactionCost(txCandidate *txmgr.TxCandidate) (*big.Int,
 	// Get the current L1 gas price
 	gasPrice, err := p.rpc.L1.SuggestGasPrice(p.ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get gas price: %w", err)
+		return nil, fmt.Errorf("getTransactionCost: failed to get gas price: %w", err)
 	}
 
 	estimatedGasUsage, err := p.rpc.L1.EstimateGas(p.ctx, ethereum.CallMsg{
@@ -677,7 +671,7 @@ func (p *Proposer) getTransactionCost(txCandidate *txmgr.TxCandidate) (*big.Int,
 		Gas:  0,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to estimate gas: %w", err)
+		return nil, fmt.Errorf("getTransactionCost: failed to estimate gas: %w", err)
 	}
 
 	return new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(estimatedGasUsage)), nil
