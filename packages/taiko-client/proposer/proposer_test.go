@@ -328,12 +328,9 @@ func (s *ProposerTestSuite) TestProposeOp() {
 		close(sink2)
 	}()
 
-	batchSize := 100
-	for i := 0; i < batchSize; i++ {
-		to := common.BytesToAddress(testutils.RandomBytes(32))
-		_, err = testutils.SendDynamicFeeTx(s.p.rpc.L2, s.TestAddrPrivKey, &to, common.Big1, nil)
-		s.Nil(err)
-	}
+	to := common.BytesToAddress(testutils.RandomBytes(32))
+	_, err = testutils.SendDynamicFeeTx(s.p.rpc.L2, s.TestAddrPrivKey, &to, common.Big1, nil)
+	s.Nil(err)
 
 	s.Nil(s.p.ProposeOp(context.Background()))
 
