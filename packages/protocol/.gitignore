@@ -35,6 +35,7 @@ lcov.info
 
 simulation/out/
 test/genesis/data/genesis.json
+test/genesis/data/genesis_config.json
 test/genesis/data/genesis_alloc.json
 test/genesis/data/genesis_storage_layout.json
 
