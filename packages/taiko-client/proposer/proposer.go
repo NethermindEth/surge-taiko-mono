@@ -222,15 +222,6 @@ func (p *Proposer) fetchPoolContent(filterPoolContent bool) ([]types.Transaction
 		}
 		txLists = append(txLists, txs.TxList)
 	}
-	// If the pool content is empty and the checkPoolContent flag is not set, return an empty list.
-	if !filterPoolContent && len(txLists) == 0 {
-		log.Info(
-			"Pool content is empty, proposing an empty block",
-			"lastProposedAt", p.lastProposedAt,
-			"minProposingInternal", p.MinProposingInternal,
-		)
-		txLists = append(txLists, types.Transactions{})
-	}
 
 	// If LocalAddressesOnly is set, filter the transactions by the local addresses.
 	if p.LocalAddressesOnly {
@@ -290,7 +281,7 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 	}
 
 	if len(txLists) == 0 {
-		log.Info("No transactions to propose")
+		log.Debug("No transactions to propose")
 		return nil
 	}
 
