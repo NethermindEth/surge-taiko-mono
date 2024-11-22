@@ -497,9 +497,9 @@ func (s *ProposerTestSuite) TestIsProfitable() {
 		{
 			name: "profitable tx list",
 			txList: func() types.Transactions {
-				txs_number := 5
-				txs := make(types.Transactions, txs_number)
-				for i := 0; i < txs_number; i++ {
+				txsNumber := 5
+				txs := make(types.Transactions, txsNumber)
+				for i := 0; i < txsNumber; i++ {
 					txs[i] = types.NewTx(&types.DynamicFeeTx{
 						ChainID:   big.NewInt(1),
 						Nonce:     uint64(i),
