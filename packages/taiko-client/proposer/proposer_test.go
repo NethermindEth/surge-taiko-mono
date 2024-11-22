@@ -497,8 +497,9 @@ func (s *ProposerTestSuite) TestIsProfitable() {
 		{
 			name: "profitable tx list",
 			txList: func() types.Transactions {
-				txs := make(types.Transactions, 500)
-				for i := 0; i < 500; i++ {
+				txs_number := 5
+				txs := make(types.Transactions, txs_number)
+				for i := 0; i < txs_number; i++ {
 					txs[i] = types.NewTx(&types.DynamicFeeTx{
 						ChainID:   big.NewInt(1),
 						Nonce:     uint64(i),
@@ -522,15 +523,15 @@ func (s *ProposerTestSuite) TestIsProfitable() {
 				types.NewTx(&types.DynamicFeeTx{
 					ChainID:   big.NewInt(1),
 					Nonce:     0,
-					GasTipCap: big.NewInt(40000000000), // 40 Gwei gas tip cap
-					GasFeeCap: big.NewInt(40000000000), // 40 Gwei gas fee cap
-					Gas:       30000000,                // gas limit
+					GasTipCap: big.NewInt(40000000),
+					GasFeeCap: big.NewInt(40000000),
+					Gas:       3000_000, // gas limit
 					To:        &common.Address{},
 					Value:     big.NewInt(0),
 					Data:      nil,
 				}),
 			},
-			proposingCosts: big.NewInt(10000000000), // 10 Gwei
+			proposingCosts: big.NewInt(100000000000), // 100 Gwei
 			expectedResult: false,
 			expectedError:  false,
 		},

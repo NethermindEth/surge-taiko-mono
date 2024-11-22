@@ -265,25 +265,6 @@ func (p *Proposer) fetchPoolContent(filterPoolContent bool) ([]types.Transaction
 	return txLists, nil
 }
 
-// // filterProfitableTxLists filters transaction lists and returns only the profitable ones
-// func (p *Proposer) filterProfitableTxLists(txLists []types.Transactions) []types.Transactions {
-// 	var profitableTxLists []types.Transactions
-
-// 	for _, txs := range txLists {
-// 		profitable, err := p.isProfitable(txs)
-// 		if err != nil {
-// 			log.Error("Failed to check profitability", "error", err)
-// 			continue
-// 		}
-
-// 		if profitable {
-// 			profitableTxLists = append(profitableTxLists, txs)
-// 		}
-// 	}
-
-// 	return profitableTxLists
-// }
-
 // ProposeOp performs a proposing operation, fetching transactions
 // from L2 execution engine's tx pool, splitting them by proposing constraints,
 // and then proposing them to TaikoL1 contract.
@@ -396,7 +377,7 @@ func (p *Proposer) ProposeTxListOntake(
 			return err
 		}
 		if !profitable {
-			log.Info("Proposing legacy transaction is not profitable", "cost", cost)
+			log.Info("Proposing legacy transaction is not profitable")
 			return nil
 		}
 	*/
@@ -493,7 +474,7 @@ func (p *Proposer) ProposeTxListPacaya(
 			return err
 		}
 		if !profitable {
-			log.Info("Proposing Ontake transaction is not profitable", "cost", cost)
+			log.Info("Proposing Ontake transaction is not profitable")
 			return nil
 		}
 	*/
@@ -631,30 +612,25 @@ func (p *Proposer) isProfitable(txLists []types.Transactions, proposingCosts *bi
 }
 
 func (p *Proposer) calculateTotalL2TransactionsFees(txLists []types.Transactions) (*big.Int, error) {
-	totalTransactionFees := new(big.Int)
 	totalGasConsumed := new(big.Int)
-
-	baseL2Fee, err := p.rpc.L2.SuggestGasPrice(p.ctx)
-	if err != nil {
-		return nil, err
-	}
-	priorityL2Fee, err := p.rpc.L2.SuggestGasTipCap(p.ctx)
-	if err != nil {
-		return nil, err
-	}
 
 	for _, txs := range txLists {
 		for _, tx := range txs {
-			totalGasConsumed.Add(totalGasConsumed, new(big.Int).SetUint64(tx.Gas()))
+			baseFee := get75PercentOf(tx.GasFeeCap())
+			multiplier := new(big.Int).Add(tx.GasTipCap(), baseFee)
+			gasConsumed := new(big.Int).Mul(multiplier, baseFee)
+			totalGasConsumed.Add(totalGasConsumed, gasConsumed)
 		}
 	}
 
-	threeFourthBaseFee := new(big.Int).Div(baseL2Fee, big.NewInt(4))
-	threeFourthBaseFee.Mul(threeFourthBaseFee, big.NewInt(3))
-	multiplier := new(big.Int).Add(threeFourthBaseFee, priorityL2Fee)
-	totalTransactionFees = new(big.Int).Mul(totalGasConsumed, multiplier)
+	return totalGasConsumed, nil
+}
 
-	return totalTransactionFees, nil
+func get75PercentOf(num *big.Int) *big.Int {
+	// First multiply by 3 to get 75% (as 3/4 = 75%)
+	result := new(big.Int).Mul(num, big.NewInt(3))
+	// Then divide by 4
+	return new(big.Int).Div(result, big.NewInt(4))
 }
 
 func (p *Proposer) getTransactionCost(txCandidate *txmgr.TxCandidate) (*big.Int, error) {
