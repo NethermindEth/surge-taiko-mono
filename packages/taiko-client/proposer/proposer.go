@@ -295,11 +295,11 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 	}
 
 	// Propose the profitable transactions lists
-	return p.ProposeTxLists(ctx, txLists)
+	return p.ProposeTxLists(ctx, txLists, true)
 }
 
 // ProposeTxList proposes the given transactions lists to TaikoL1 smart contract.
-func (p *Proposer) ProposeTxLists(ctx context.Context, txLists []types.Transactions) error {
+func (p *Proposer) ProposeTxLists(ctx context.Context, txLists []types.Transactions, checkProfitability bool) error {
 	l2Head, err := p.rpc.L2.BlockNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get L2 chain head number: %w", err)
@@ -315,7 +315,7 @@ func (p *Proposer) ProposeTxLists(ctx context.Context, txLists []types.Transacti
 	}
 
 	// If the current L2 chain is after ontake fork, batch propose all L2 transactions lists.
-	if err := p.ProposeTxListOntake(ctx, txLists); err != nil {
+	if err := p.ProposeTxListOntake(ctx, txLists, checkProfitability); err != nil {
 		return err
 	}
 	p.lastProposedAt = time.Now()
@@ -332,6 +332,7 @@ func (p *Proposer) getTxListsToPropose(txLists []types.Transactions) []types.Tra
 func (p *Proposer) ProposeTxListOntake(
 	ctx context.Context,
 	txLists []types.Transactions,
+	checkProfitability bool,
 ) error {
 	txListsBytesArray, totalTxs, err := p.compressTxLists(txLists)
 	if err != nil {
