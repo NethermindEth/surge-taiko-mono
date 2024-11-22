@@ -3,17 +3,17 @@ name: "[Nethermind] Taiko Protocol - Docker build and push"
 on:
   workflow_dispatch:
   push:
-    branches: [justin/protocol-deployment]
+    branches: [main]
     tags:
-      - "taiko-protocol-v*"
+      - "taiko-client-v*"
     paths:
-      - "packages/protocol/**"
+      - "packages/taiko-client/**"
 
 env:
   DOCKER_REGISTRY: nethermind.jfrog.io
   DOCKER_USERNAME: modular
-  DOCKER_REPOSITORY_DEV: modular-oci-local-dev/taiko-protocol
-  DOCKER_REPOSITORY_STAGING: modular-oci-local-staging/taiko-protocol
+  DOCKER_REPOSITORY_DEV: modular-oci-local-dev/taiko-client
+  DOCKER_REPOSITORY_STAGING: modular-oci-local-staging/taiko-client
 
 jobs:
   build:
@@ -54,7 +54,7 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
           context: .
-          file: packages/protocol/Dockerfile
+          file: packages/taiko-client/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
