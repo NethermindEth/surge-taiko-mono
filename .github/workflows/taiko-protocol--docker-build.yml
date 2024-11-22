@@ -12,8 +12,8 @@ on:
 env:
   DOCKER_REGISTRY: nethermind.jfrog.io
   DOCKER_USERNAME: modular
-  DOCKER_REPOSITORY_DEV: modular-oci-local-dev/taiko-client
-  DOCKER_REPOSITORY_STAGING: modular-oci-local-staging/taiko-client
+  DOCKER_REPOSITORY_DEV: modular-oci-local-dev/taiko-protocol
+  DOCKER_REPOSITORY_STAGING: modular-oci-local-staging/taiko-protocol
 
 jobs:
   build:
