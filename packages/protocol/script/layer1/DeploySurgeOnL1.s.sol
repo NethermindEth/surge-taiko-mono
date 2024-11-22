@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/governance/TimelockController.sol";
 import "@risc0/contracts/groth16/RiscZeroGroth16Verifier.sol";
 import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v3.0.0/SP1VerifierPlonk.sol";
 
@@ -49,6 +50,7 @@ import "test/layer1/automata-attestation/common/AttestationBase.t.sol";
 /// - Automated setup of fields in L1 address manager
 /// - Configurable min-tier for proving
 /// - Removed guardian prover
+/// - Added a timelock controller as the owner enforcing a 45 day delay in owner-only transactions 
 contract DeploySurgeOnL1 is DeployCapability {
     uint256 internal ADDRESS_LENGTH = 40;
 
@@ -70,8 +72,19 @@ contract DeploySurgeOnL1 is DeployCapability {
         address l2SignalServiceAddress = getConstantAddress(vm.toString(l2ChainId), "5");
         address l2BridgeAddress = getConstantAddress(vm.toString(l2ChainId), "1");
 
-        addressNotNull(vm.envAddress("CONTRACT_OWNER"), "CONTRACT_OWNER");
-        address contractOwner = vm.envAddress("CONTRACT_OWNER");
+        address[] memory executors = vm.envAddress("OWNER_MULTISIG_SIGNERS", ",");
+        
+        address ownerMultisig = vm.envAddress("OWNER_MULTISIG");
+        addressNotNull(ownerMultisig, "ownerMultisig");
+        
+        address[] memory proposers = new address[](1);
+        proposers[0] = ownerMultisig; 
+
+        // Setup timelock controller with 45 day (86400 seconds * 45) delay
+        address timelockController = address(
+            new TimelockController(86400 * 45, proposers, executors, address(0))
+        );
+        address contractOwner = timelockController;
 
         // ---------------------------------------------------------------
         // Deploy shared contracts
