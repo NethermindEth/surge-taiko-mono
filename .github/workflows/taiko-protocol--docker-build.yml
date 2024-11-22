@@ -5,9 +5,9 @@ on:
   push:
     branches: [main]
     tags:
-      - "taiko-client-v*"
+      - "taiko-protocol-v*"
     paths:
-      - "packages/taiko-client/**"
+      - "packages/protocol/**"
 
 env:
   DOCKER_REGISTRY: nethermind.jfrog.io
@@ -54,7 +54,7 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
           context: .
-          file: packages/taiko-client/Dockerfile
+          file: packages/protocol/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
