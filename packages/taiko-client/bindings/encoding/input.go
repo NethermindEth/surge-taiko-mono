@@ -273,6 +273,16 @@ var (
 			Type: "uint8",
 		},
 	}
+	subProofComponents = []abi.ArgumentMarshaling{
+		{
+			Name: "verifier",
+			Type: "address",
+		},
+		{
+			Name: "proof",
+			Type: "bytes",
+		},
+	}
 )
 
 var (
@@ -294,6 +304,8 @@ var (
 		{Name: "TaikoData.Transition", Type: transitionComponentsType},
 		{Name: "TaikoData.TierProof", Type: tierProofComponentsType},
 	}
+	subProofComponentsArrayType, _ = abi.NewType("tuple[]", "ComposeVerifier.SubProofs[]", subProofComponents)
+	subProofComponentsArrayArgs    = abi.Arguments{{Type: subProofComponentsArrayType}}
 )
 
 // Contract ABIs.
@@ -448,4 +460,13 @@ func UnpackTxListBytes(txData []byte) ([]byte, error) {
 	}
 
 	return inputs, nil
+}
+
+// EncodeSubProofs performs the solidity `abi.encode` for the given subProofs.
+func EncodeSubProofs(subProofs []SubProof) ([]byte, error) {
+	b, err := subProofComponentsArrayArgs.Pack(subProofs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to abi.encode subProofs, %w", err)
+	}
+	return b, nil
 }

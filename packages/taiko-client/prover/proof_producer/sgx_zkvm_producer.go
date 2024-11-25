@@ -3,6 +3,7 @@ package producer
 import (
 	"bytes"
 	"context"
+	"encoding"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -206,16 +206,7 @@ func (s *SGXAndZkVMProofProducer) callProverDaemon(
 		"producer", "SGXAndZkVMProofProducer",
 	)
 
-	var subProofType, _ = abi.NewType("tuple[]", "", []abi.ArgumentMarshaling{
-		{Name: "Verifier", Type: "address"},
-		{Name: "Proof", Type: "bytes"},
-	})
-
-	arguments := abi.Arguments{
-		{Type: subProofType},
-	}
-
-	subProofs := []encoding.SubProof{
+	proof, err = encoding.EncodeSubProofs([]encoding.SubProof{
 		{
 			Verifier: s.Risc0VerifierAddress,
 			Proof:    zkProof,
@@ -224,8 +215,11 @@ func (s *SGXAndZkVMProofProducer) callProverDaemon(
 			Verifier: s.SgxVerifierAddress,
 			Proof:    sgxProof,
 		},
+	})
+	if err != nil {
+		log.Error("Failed to encode sub proofs", "height", opts.BlockID, "error", err, "endpoint", s.RaikoHostEndpoint)
+		return nil, err
 	}
-	proof, err = arguments.Pack(subProofs)
 
 	return proof, nil
 }
