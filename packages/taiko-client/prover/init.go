@@ -130,15 +130,28 @@ func (p *Prover) initProofSubmitters(
 				RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
 			}
 		case encoding.TierSgxAndZkVMID:
-			producer = &proofProducer.SGXAndZkVMProofProducer{
-				SgxProofType:         proofProducer.ProofTypeSgx,
-				ZKProofType:          proofProducer.ZKProofTypeR0,
-				RaikoHostEndpoint:    p.cfg.RaikoZKVMHostEndpoint,
-				JWT:                  p.cfg.RaikoJWT,
-				Risc0VerifierAddress: p.cfg.Risc0VerifierAddress,
-				SgxVerifierAddress:   p.cfg.SgxVerifierAddress,
-				Dummy:                p.cfg.Dummy,
-				RaikoRequestTimeout:  p.cfg.RaikoRequestTimeout,
+			producer = &proofProducer.CombinedProducer{
+				tier: encoding.TierSgxAndZkVMID,
+				producers: []proofProducer.ProofProducer{
+					&proofProducer.SGXProofProducer{
+						RaikoHostEndpoint:   p.cfg.RaikoHostEndpoint,
+						JWT:                 p.cfg.RaikoJWT,
+						ProofType:           proofProducer.ProofTypeSgx,
+						Dummy:               p.cfg.Dummy,
+						RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
+					},
+					&proofProducer.ZKvmProofProducer{
+						ZKProofType:         proofProducer.ZKProofTypeR0,
+						RaikoHostEndpoint:   p.cfg.RaikoZKVMHostEndpoint,
+						JWT:                 p.cfg.RaikoJWT,
+						Dummy:               p.cfg.Dummy,
+						RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
+					},
+				},
+				verifiers: []common.Address{
+					p.cfg.SgxVerifierAddress,
+					p.cfg.Risc0VerifierAddress,
+				},
 			}
 		case encoding.TierGuardianMinorityID:
 			producer = proofProducer.NewGuardianProofProducer(encoding.TierGuardianMinorityID, p.cfg.EnableLivenessBondProof)
