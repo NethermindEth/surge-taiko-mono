@@ -97,7 +97,7 @@ func (s *ChainSyncerTestSuite) SetupTest() {
 			TxSendTimeout:             txmgr.DefaultBatcherFlagValues.TxSendTimeout,
 			TxNotInMempoolTimeout:     txmgr.DefaultBatcherFlagValues.TxNotInMempoolTimeout,
 		},
-		CheckProfitability:       true,
+		CheckProfitability:       false,
 		GasNeededForProvingBlock: 0,
 		PriceFluctuationModifier: 50,
 		OffChainCosts:            big.NewInt(0),

@@ -42,7 +42,7 @@ type Proposer struct {
 
 	proposingTimer *time.Timer
 
-	// Transaction builder
+	// Transaction builders
 	txBuilder builder.ProposeBlocksTransactionBuilder
 
 	// Protocol configurations
@@ -57,6 +57,8 @@ type Proposer struct {
 
 	ctx context.Context
 	wg  sync.WaitGroup
+
+	checkProfitability bool
 }
 
 // InitFromCli initializes the given proposer instance based on the command line flags.
@@ -79,6 +81,7 @@ func (p *Proposer) InitFromConfig(
 	p.ctx = ctx
 	p.Config = cfg
 	p.lastProposedAt = time.Now()
+	p.checkProfitability = cfg.CheckProfitability
 
 	// RPC clients
 	if p.rpc, err = rpc.NewClient(p.ctx, cfg.ClientConfig); err != nil {
@@ -177,7 +180,7 @@ func (p *Proposer) Close(_ context.Context) {
 }
 
 // fetchPoolContent fetches the transaction pool content from L2 execution engine.
-func (p *Proposer) fetchPoolContent(filterPoolContent bool, checkProfitability bool) ([]types.Transactions, error) {
+func (p *Proposer) fetchPoolContent(filterPoolContent bool) ([]types.Transactions, error) {
 	var (
 		minTip  = p.MinTip
 		startAt = time.Now()
@@ -223,7 +226,7 @@ func (p *Proposer) fetchPoolContent(filterPoolContent bool, checkProfitability b
 		txLists = append(txLists, txs.TxList)
 	}
 	// If the pool is empty and we're not filtering or checking profitability, propose an empty block
-	if !filterPoolContent && !checkProfitability && len(txLists) == 0 {
+	if !filterPoolContent && !p.checkProfitability && len(txLists) == 0 {
 		log.Info(
 			"Pool content is empty, proposing an empty block",
 			"lastProposedAt", p.lastProposedAt,
@@ -284,7 +287,7 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 	)
 
 	// Fetch pending L2 transactions from mempool.
-	txLists, err := p.fetchPoolContent(filterPoolContent, true)
+	txLists, err := p.fetchPoolContent(filterPoolContent)
 	if err != nil {
 		return err
 	}
@@ -295,11 +298,11 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 	}
 
 	// Propose the profitable transactions lists
-	return p.ProposeTxLists(ctx, txLists, true)
+	return p.ProposeTxLists(ctx, txLists)
 }
 
 // ProposeTxList proposes the given transactions lists to TaikoL1 smart contract.
-func (p *Proposer) ProposeTxLists(ctx context.Context, txLists []types.Transactions, checkProfitability bool) error {
+func (p *Proposer) ProposeTxLists(ctx context.Context, txLists []types.Transactions) error {
 	l2Head, err := p.rpc.L2.BlockNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get L2 chain head number: %w", err)
@@ -457,7 +460,7 @@ func (p *Proposer) ProposeTxListPacaya(
 
 	/*
 			// check profitability
-		if checkProfitability {
+		if p.checkProfitability {
 			profitable, err := p.isProfitable(txLists, cost)
 			if err != nil {
 				return err

@@ -376,7 +376,8 @@ func (s *ProposerTestSuite) TestProposeTxListOntake() {
 		close(sink)
 	}()
 
-	s.Nil(s.p.ProposeTxListOntake(context.Background(), []types.Transactions{{}, {}}, false))
+	s.p.checkProfitability = false
+	s.Nil(s.p.ProposeTxListOntake(context.Background(), []types.Transactions{{}, {}}))
 	s.Nil(s.s.ProcessL1Blocks(context.Background()))
 
 	var l1Height *big.Int
