@@ -118,9 +118,9 @@ func (s *ProposerTestSuite) SetupTest() {
 			TxNotInMempoolTimeout:     txmgr.DefaultBatcherFlagValues.TxNotInMempoolTimeout,
 		},
 		CheckProfitability:       true,
-		GasNeededForProvingBlock: 3000000,
+		GasNeededForProvingBlock: 0,
 		PriceFluctuationModifier: 50,
-		OffChainCosts:            big.NewInt(500000000000), // 500 Gwei for off-chain costs
+		OffChainCosts:            big.NewInt(0),
 	}, nil, nil))
 
 	s.p = p
@@ -462,6 +462,9 @@ func TestProposerTestSuite(t *testing.T) {
 }
 
 func (s *ProposerTestSuite) TestEstimateTotalCosts() {
+	s.p.OffChainCosts = big.NewInt(500000000000) // 500 Gwei for off-chain costs
+	s.p.GasNeededForProvingBlock = 3000000
+
 	tests := []struct {
 		name           string
 		proposingCosts *big.Int
@@ -489,6 +492,9 @@ func (s *ProposerTestSuite) TestEstimateTotalCosts() {
 }
 
 func (s *ProposerTestSuite) TestIsProfitable() {
+	s.p.OffChainCosts = big.NewInt(500000000000) // 500 Gwei for off-chain costs
+	s.p.GasNeededForProvingBlock = 3000000
+
 	tests := []struct {
 		name           string
 		txList         types.Transactions
