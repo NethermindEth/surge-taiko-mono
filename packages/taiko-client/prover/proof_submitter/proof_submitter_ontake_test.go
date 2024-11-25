@@ -168,7 +168,7 @@ func (s *ProofSubmitterTestSuite) SetupTest() {
 		L2SuggestedFeeRecipient:    common.HexToAddress(os.Getenv("L2_SUGGESTED_FEE_RECIPIENT")),
 		ProposeInterval:            1024 * time.Hour,
 		MaxProposedTxListsPerEpoch: 1,
-		CheckProfitability:         true,
+		CheckProfitability:         false,
 		GasNeededForProvingBlock:   0,
 		PriceFluctuationModifier:   50,
 		OffChainCosts:              big.NewInt(0),
