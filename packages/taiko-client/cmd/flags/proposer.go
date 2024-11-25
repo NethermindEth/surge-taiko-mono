@@ -178,6 +178,7 @@ var ProposerFlags = MergeFlags(CommonFlags, []cli.Flag{
 	FallbackToCalldata,
 	RevertProtectionEnabled,
 	// surge flags
+	CheckProfitability,
 	GasNeededForProvingBlock,
 	PriceFluctuationModifier,
 	OffChainCosts,
