@@ -147,6 +147,18 @@ var (
 		Category: proverCategory,
 		EnvVars:  []string{"PROVER_GUARDIAN_PROVER_HEALTH_CHECK_SERVER_ENDPOINT"},
 	}
+	Risc0VerifierAddress = &cli.StringFlag{
+		Name:     "risc0Verifier",
+		Usage:    "Address of the Risc0 verifier contract",
+		Category: proverCategory,
+		EnvVars:  []string{"RISC0_VERIFIER"},
+	}
+	SgxVerifierAddress = &cli.StringFlag{
+		Name:     "sgxVerifier",
+		Usage:    "Address of the Risc0 verifier contract",
+		Category: proverCategory,
+		EnvVars:  []string{"SGX_VERIFIER"},
+	}
 	// Guardian prover specific flag
 	GuardianProverMinority = &cli.StringFlag{
 		Name:     "guardianProverMinority",

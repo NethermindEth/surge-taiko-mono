@@ -56,6 +56,11 @@ type TierFee struct {
 	Fee  *big.Int
 }
 
+type SubProof struct {
+	Verifier common.Address
+	Proof    []byte
+}
+
 // ToExecutableData converts a GETH *types.Header to *engine.ExecutableData.
 func ToExecutableData(header *types.Header) *engine.ExecutableData {
 	executableData := &engine.ExecutableData{
