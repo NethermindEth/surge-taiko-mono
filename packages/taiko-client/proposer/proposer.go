@@ -306,7 +306,7 @@ func (p *Proposer) ProposeTxLists(ctx context.Context, txLists []types.Transacti
 	}
 
 	// If the current L2 chain is after ontake fork, batch propose all L2 transactions lists.
-	if err := p.ProposeTxListOntake(ctx, txLists, checkProfitability); err != nil {
+	if err := p.ProposeTxListOntake(ctx, txLists); err != nil {
 		return err
 	}
 	p.lastProposedAt = time.Now()
@@ -323,7 +323,6 @@ func (p *Proposer) getTxListsToPropose(txLists []types.Transactions) []types.Tra
 func (p *Proposer) ProposeTxListOntake(
 	ctx context.Context,
 	txLists []types.Transactions,
-	checkProfitability bool,
 ) error {
 	txListsBytesArray, totalTxs, err := p.compressTxLists(txLists)
 	if err != nil {
@@ -361,18 +360,6 @@ func (p *Proposer) ProposeTxListOntake(
 		log.Warn("Failed to build TaikoL1.proposeBlocksV2 transaction", "error", encoding.TryParsingCustomError(err))
 		return err
 	}
-
-	/*
-		// check profitability
-		profitable, err := p.isProfitable([]types.Transactions{txList}, cost)
-		if err != nil {
-			return err
-		}
-		if !profitable {
-			log.Info("Proposing legacy transaction is not profitable")
-			return nil
-		}
-	*/
 
 	if err := p.SendTx(ctx, txCandidate); err != nil {
 		return err
