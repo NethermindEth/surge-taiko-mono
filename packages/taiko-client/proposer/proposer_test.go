@@ -117,9 +117,10 @@ func (s *ProposerTestSuite) SetupTest() {
 			TxSendTimeout:             txmgr.DefaultBatcherFlagValues.TxSendTimeout,
 			TxNotInMempoolTimeout:     txmgr.DefaultBatcherFlagValues.TxNotInMempoolTimeout,
 		},
-		GasNeededForProvingBlock: 0,
+		CheckProfitability:       true,
+		GasNeededForProvingBlock: 3000000,
 		PriceFluctuationModifier: 50,
-		OffChainCosts:            big.NewInt(0),
+		OffChainCosts:            big.NewInt(500000000000), // 500 Gwei for off-chain costs
 	}, nil, nil))
 
 	s.p = p
@@ -462,48 +463,23 @@ func TestProposerTestSuite(t *testing.T) {
 
 func (s *ProposerTestSuite) TestEstimateTotalCosts() {
 	tests := []struct {
-		name                  string
-		proposingCosts        *big.Int
-		gasNeededForProving   uint64
-		priceFluctuation      uint64
-		offChainCosts         *big.Int
-		expectedError         bool
-		expectedCostThreshold *big.Int
+		name           string
+		proposingCosts *big.Int
 	}{
 		{
-			name:                  "normal estimation",
-			proposingCosts:        big.NewInt(300000000000), // 300 Gwei
-			gasNeededForProving:   3000000,                  // 3M gas for proving
-			priceFluctuation:      50,                       // 150% (accounting for price fluctuation)
-			offChainCosts:         big.NewInt(500000000000), // 500 Gwei for off-chain costs
-			expectedError:         false,
-			expectedCostThreshold: big.NewInt(0), // Will depend on network gas price
+			name:           "normal estimation",
+			proposingCosts: big.NewInt(300000000000), // 300 Gwei
 		},
 		{
-			name:                  "zero proposing costs",
-			proposingCosts:        big.NewInt(0),
-			gasNeededForProving:   3000000,                  // 3M gas for proving
-			priceFluctuation:      50,                       // 150%
-			offChainCosts:         big.NewInt(500000000000), // 500 Gwei for off-chain costs
-			expectedError:         false,
-			expectedCostThreshold: big.NewInt(0),
+			name:           "zero proposing costs",
+			proposingCosts: big.NewInt(0),
 		},
 	}
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
-			// Configure the proposer for this test case
-			s.p.GasNeededForProvingBlock = test.gasNeededForProving
-			s.p.PriceFluctuationModifier = test.priceFluctuation
-			s.p.OffChainCosts = test.offChainCosts
-
 			costs, err := s.p.estimateTotalCosts(test.proposingCosts)
 			log.Debug("Estimated total costs", "costs", costs)
-
-			if test.expectedError {
-				s.Error(err)
-				return
-			}
 
 			s.NoError(err)
 			s.NotNil(costs)
@@ -571,8 +547,6 @@ func (s *ProposerTestSuite) TestIsProfitable() {
 	}
 
 	for _, test := range tests {
-		s.p.GasNeededForProvingBlock = 3000000
-		s.p.OffChainCosts = big.NewInt(2487915692605872)
 		s.Run(test.name, func() {
 			txLists := []types.Transactions{test.txList}
 			profitable, err := s.p.isProfitable(txLists, test.proposingCosts)

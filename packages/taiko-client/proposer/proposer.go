@@ -456,14 +456,16 @@ func (p *Proposer) ProposeTxListPacaya(
 	}
 
 	/*
-		// check profitability
-		profitable, err := p.isProfitable(txLists, cost)
-		if err != nil {
-			return err
-		}
-		if !profitable {
-			log.Info("Proposing Ontake transaction is not profitable")
-			return nil
+			// check profitability
+		if checkProfitability {
+			profitable, err := p.isProfitable(txLists, cost)
+			if err != nil {
+				return err
+			}
+			if !profitable {
+				log.Info("Proposing Ontake transaction is not profitable")
+				return nil
+			}
 		}
 	*/
 

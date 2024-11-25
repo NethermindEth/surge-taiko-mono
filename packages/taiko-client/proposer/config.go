@@ -40,10 +40,10 @@ type Config struct {
 	RevertProtectionEnabled    bool
 	TxmgrConfigs               *txmgr.CLIConfig
 	PrivateTxmgrConfigs        *txmgr.CLIConfig
-
-	GasNeededForProvingBlock uint64
-	PriceFluctuationModifier uint64
-	OffChainCosts            *big.Int
+	CheckProfitability         bool
+	GasNeededForProvingBlock   uint64
+	PriceFluctuationModifier   uint64
+	OffChainCosts              *big.Int
 }
 
 // NewConfigFromCliContext initializes a Config instance from
@@ -84,6 +84,7 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		return nil, fmt.Errorf("max proposed tx lists per epoch should not exceed 2, got: %d", maxProposedTxListsPerEpoch)
 	}
 
+	checkProfitability := c.Bool(flags.CheckProfitability.Name)
 	gasNeededForProvingBlock := c.Uint64(flags.GasNeededForProvingBlock.Name)
 	priceFluctuationModifier := c.Uint64(flags.PriceFluctuationModifier.Name)
 
@@ -135,6 +136,7 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			l1ProposerPrivKey,
 			c,
 		),
+		CheckProfitability:       checkProfitability,
 		GasNeededForProvingBlock: gasNeededForProvingBlock,
 		PriceFluctuationModifier: priceFluctuationModifier,
 		OffChainCosts:            offChainCosts,
