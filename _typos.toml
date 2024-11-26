@@ -1,30 +1,31 @@
 [default]
 # False positives
 extend-ignore-identifiers-re = [
-  "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG",
-  "bafybeiegdqpwx3he5dvoxqklspdjekjepjcobfaakyficksratn73qbbyy",
-  "TGE",
-  "tge",
-  "preconf",
+    "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG",
+    "bafybeiegdqpwx3he5dvoxqklspdjekjepjcobfaakyficksratn73qbbyy",
+    "TGE",
+    "tge",
+    "preconf",
   "preconfer",
   "baed",
-  "Groth",
-  "groth",
-  "GROTH"
+    "Groth",
+    "groth",
+    "GROTH",
 ]
 
 [files]
 extend-exclude = [
-  "*.png",
-  "*.svg",
-  "go.mod",
-  "go.sum",
+    "*.png",
+    "*.svg",
+    "go.mod",
+    "go.sum",
   "pnpm-lock.yaml",
   "**/**/pnpm-lock.yaml",
   "CHANGELOG.md",
-  "packages/protocol/audit/code4rena-2024-03-taiko-final-report.md",
-  "packages/protocol/contracts/layer1/automata-attestation/**",
-  "packages/protocol/deployments/**",
-  # TODO: fix typos and remove these
-  "packages/taiko-client/**",
+    "packages/protocol/audit/code4rena-2024-03-taiko-final-report.md",
+    "packages/protocol/contracts/layer1/automata-attestation/**",
+    "packages/protocol/deployments/**",
+    # TODO: fix typos and remove these
+    "packages/taiko-client/**",
+    "pnpm-lock.yaml",
 ]
