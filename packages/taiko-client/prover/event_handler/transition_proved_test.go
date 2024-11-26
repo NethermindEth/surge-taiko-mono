@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"math/big"
 	"os"
 	"testing"
 	"time"
