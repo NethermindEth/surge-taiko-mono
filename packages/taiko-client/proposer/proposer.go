@@ -673,6 +673,11 @@ func adjustForPriceFluctuation(gasPrice *big.Int, percentage uint64) *big.Int {
 // 150% of block proposal costs +
 // off chain proving costs (estimated with a margin for the provers' revenue)
 func (p *Proposer) estimateTotalCosts(proposingCosts *big.Int) (*big.Int, error) {
+	if p.OffChainCosts == nil {
+		log.Warn("Off-chain costs is not set, using 0")
+		p.OffChainCosts = big.NewInt(0)
+	}
+
 	log.Debug(
 		"Proposing block costs details",
 		"proposingCosts", proposingCosts,
