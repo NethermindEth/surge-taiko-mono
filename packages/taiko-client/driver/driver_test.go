@@ -714,7 +714,7 @@ func (s *DriverTestSuite) InitProposer() {
 		},
 		CheckProfitability:       false,
 		GasNeededForProvingBlock: 0,
-		PriceFluctuationModifier: 50,
+		PriceFluctuationModifier: 0,
 		OffChainCosts:            big.NewInt(0),
 	}, nil, nil))
 	s.p = p

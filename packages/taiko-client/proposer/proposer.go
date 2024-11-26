@@ -466,7 +466,7 @@ func (p *Proposer) ProposeTxListPacaya(
 				return err
 			}
 			if !profitable {
-				log.Info("Proposing Ontake transaction is not profitable")
+				log.Info("Proposing transaction is not profitable")
 				return nil
 			}
 		}
@@ -500,7 +500,7 @@ func (p *Proposer) buildCheaperOnTakeTransaction(ctx context.Context,
 	return txBlob, blobCost, nil
 }
 
-// compressOnTakeTxLists compresses transaction lists and returns compressed bytes array and transaction counts
+// compressTxLists compresses transaction lists and returns compressed bytes array and transaction counts
 func (p *Proposer) compressTxLists(txLists []types.Transactions) ([][]byte, int, error) {
 	var (
 		txListsBytesArray [][]byte
