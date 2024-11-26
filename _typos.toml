@@ -24,4 +24,5 @@ extend-exclude = [
   "packages/taiko-client/**",
   "pnpm-lock.yaml",
   "_typos.toml",
+  "go.sum",
 ]
