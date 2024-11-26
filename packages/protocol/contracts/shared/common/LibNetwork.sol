@@ -11,7 +11,7 @@ library LibNetwork {
     uint256 internal constant ETHEREUM_HOLESKY = 17_000;
     uint256 internal constant ETHEREUM_SEPOLIA = 11_155_111;
 
-    uint64 internal constant TAIKO_MAINNET = 167_000;
+    uint64 internal constant TAIKO_MAINNET = 763_374;
     uint64 internal constant TAIKO_HEKLA = 167_009;
 
     /// @dev Checks if the chain ID represents an Ethereum testnet.

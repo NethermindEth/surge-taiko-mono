@@ -1,8 +1,6 @@
-ARG PACKAGE=relayer
-
 FROM golang:1.23.0 as builder
 
-ARG PACKAGE
+ARG PACKAGE=relayer
 
 RUN apt install git curl
 
@@ -20,8 +18,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /taiko-mono/packages/${PACKAGE}/bin/${P
 
 FROM alpine:latest
 
-ARG PACKAGE
-ENV PACKAGE=${PACKAGE}
+ARG PACKAGE=relayer
 
 RUN apk add --no-cache ca-certificates
 
