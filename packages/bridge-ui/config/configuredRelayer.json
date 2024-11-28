@@ -2,11 +2,11 @@
   "configuredRelayer": [
     {
       "chainIds": [3151908, 763374],
-      "url": "https://relayer:4102"
+      "url": "https://relayer/l1-relayer/"
     },
     {
       "chainIds": [763374, 3151908],
-      "url": "https://relayer:4102"
+      "url": "https://relayer/l2-relayer/"
     }
   ]
 }
