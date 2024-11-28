@@ -72,12 +72,12 @@ func TestCombinedProducerRequestCancel(t *testing.T) {
 	optimisticProducer2 := &OptimisticProofProducer{}
 
 	producer := &CombinedProducer{
-		producers: []ProofProducer{optimisticProducer1, optimisticProducer2},
-		verifiers: []common.Address{
+		ProofTier: encoding.TierSgxAndZkVMID,
+		Producers: []ProofProducer{optimisticProducer1, optimisticProducer2},
+		Verifiers: []common.Address{
 			common.HexToAddress("0x1234567890123456789012345678901234567890"),
 			common.HexToAddress("0x0987654321098765432109876543210987654321"),
 		},
-		tier: encoding.TierSgxAndZkVMID,
 	}
 
 	opts := &ProofRequestOptions{
@@ -91,7 +91,7 @@ func TestCombinedProducerRequestCancel(t *testing.T) {
 
 func TestCombinedProducerTier(t *testing.T) {
 	producer := &CombinedProducer{
-		tier: encoding.TierSgxAndZkVMID,
+		ProofTier: encoding.TierSgxAndZkVMID,
 	}
 
 	require.Equal(t, encoding.TierSgxAndZkVMID, producer.Tier())
