@@ -17,9 +17,9 @@ import (
 
 // CombinedProducer generates proofs from multiple producers in parallel and combines them.
 type CombinedProducer struct {
-	producers []ProofProducer
-	verifiers []common.Address
-	tier      uint16
+	ProofTier uint16
+	Producers []ProofProducer
+	Verifiers []common.Address
 }
 
 // RequestProof implements the ProofProducer interface.
@@ -33,14 +33,14 @@ func (c *CombinedProducer) RequestProof(
 ) (*ProofWithHeader, error) {
 	var (
 		wg         sync.WaitGroup
-		proofChan  = make(chan []byte, len(c.producers))
-		errChan    = make(chan error, len(c.producers))
-		proofs     = make([][]byte, len(c.producers))
-		subProofs  = make([]encoding.SubProof, len(c.producers))
+		proofChan  = make(chan []byte, len(c.Producers))
+		errChan    = make(chan error, len(c.Producers))
+		proofs     = make([][]byte, len(c.Producers))
+		subProofs  = make([]encoding.SubProof, len(c.Producers))
 		finalError error
 	)
 
-	for i, producer := range c.producers {
+	for i, producer := range c.Producers {
 		wg.Add(1)
 		go func(idx int, p ProofProducer) {
 			defer wg.Done()
@@ -77,7 +77,7 @@ func (c *CombinedProducer) RequestProof(
 
 	for i := range proofs {
 		subProofs[i] = encoding.SubProof{
-			Verifier: c.verifiers[i],
+			Verifier: c.Verifiers[i],
 			Proof:    proofs[i],
 		}
 	}
@@ -110,7 +110,7 @@ func (c *CombinedProducer) RequestCancel(
 	opts *ProofRequestOptions,
 ) error {
 	var finalError error
-	for _, producer := range c.producers {
+	for _, producer := range c.Producers {
 		if err := producer.RequestCancel(ctx, opts); err != nil {
 			if finalError == nil {
 				finalError = err
@@ -122,5 +122,5 @@ func (c *CombinedProducer) RequestCancel(
 
 // Tier implements the ProofProducer interface.
 func (c *CombinedProducer) Tier() uint16 {
-	return c.tier
+	return c.ProofTier
 }

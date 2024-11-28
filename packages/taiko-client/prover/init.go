@@ -131,8 +131,8 @@ func (p *Prover) initProofSubmitters(
 			}
 		case encoding.TierSgxAndZkVMID:
 			producer = &proofProducer.CombinedProducer{
-				tier: encoding.TierSgxAndZkVMID,
-				producers: []proofProducer.ProofProducer{
+				ProofTier: encoding.TierSgxAndZkVMID,
+				Producers: []proofProducer.ProofProducer{
 					&proofProducer.SGXProofProducer{
 						RaikoHostEndpoint:   p.cfg.RaikoHostEndpoint,
 						JWT:                 p.cfg.RaikoJWT,
@@ -148,7 +148,7 @@ func (p *Prover) initProofSubmitters(
 						RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
 					},
 				},
-				verifiers: []common.Address{
+				Verifiers: []common.Address{
 					p.cfg.SgxVerifierAddress,
 					p.cfg.Risc0VerifierAddress,
 				},

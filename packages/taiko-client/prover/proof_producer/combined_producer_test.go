@@ -36,12 +36,12 @@ func TestCombinedProducerRequestProof(t *testing.T) {
 	optimisticProducer2 := &OptimisticProofProducer{}
 
 	producer := &CombinedProducer{
-		producers: []ProofProducer{optimisticProducer1, optimisticProducer2},
-		verifiers: []common.Address{
+		ProofTier: encoding.TierSgxAndZkVMID,
+		Producers: []ProofProducer{optimisticProducer1, optimisticProducer2},
+		Verifiers: []common.Address{
 			common.HexToAddress("0x1234567890123456789012345678901234567890"),
 			common.HexToAddress("0x0987654321098765432109876543210987654321"),
 		},
-		tier: encoding.TierSgxAndZkVMID,
 	}
 
 	blockID := big.NewInt(1)
