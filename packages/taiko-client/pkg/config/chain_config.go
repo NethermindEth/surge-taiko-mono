@@ -6,10 +6,15 @@ import (
 	"strings"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings"
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+)
+
+// TODO: temporary here, need to be moved into taiko-geth
+const (
+	SurgeNetworkID     = 763373 // 0xba5ed
+	SurgeTestNetworkID = 763374 // 0xba5ee
 )
 
 // ChainConfig is the core config which determines the blockchain settings.
@@ -38,8 +43,8 @@ var NetworkNames = map[uint64]string{
 	params.TaikoMainnetNetworkID.Uint64():     "Taiko Mainnet",
 	params.HeklaNetworkID.Uint64():            "Taiko Hekla Testnet",
 	params.TaikoInternalL2ANetworkID.Uint64(): "Taiko Internal Devnet",
-	encoding.SurgeNetworkID:                   "Surge Mainnet",
-	encoding.SurgeTestNetworkID:               "Surge Testnet",
+	SurgeNetworkID:     "Surge Mainnet",
+	SurgeTestNetworkID: "Surge Testnet",
 }
 
 // Description returns a human-readable description of ChainConfig.
