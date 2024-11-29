@@ -141,7 +141,7 @@ func (p *Prover) initProofSubmitters(
 						RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
 					},
 					&proofProducer.ZKvmProofProducer{
-						ZKProofType:         proofProducer.ZKProofTypeR0,
+						ZKProofType:         proofProducer.ZKProofTypeR0Local,
 						RaikoHostEndpoint:   p.cfg.RaikoZKVMHostEndpoint,
 						JWT:                 p.cfg.RaikoJWT,
 						Dummy:               p.cfg.Dummy,
