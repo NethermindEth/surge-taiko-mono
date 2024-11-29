@@ -23,10 +23,10 @@ import (
 )
 
 const (
-	ZKProofTypeR0  = "risc0"
-	ZKProofTypeSP1 = "sp1"
+	ZKProofTypeR0       = "risc0"
+	ZKProofTypeSP1      = "sp1"
 	ZKProofTypeSP1Local = "sp1_local"
-	ZKProofTypeR0Local = "risc0_local"
+	ZKProofTypeR0Local  = "risc0_local"
 )
 
 var (
