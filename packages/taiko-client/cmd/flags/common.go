@@ -85,7 +85,6 @@ var (
 	TaikoTokenAddress = &cli.StringFlag{
 		Name:     "taikoToken",
 		Usage:    "TaikoToken contract `address`",
-		Required: true,
 		Category: commonCategory,
 		EnvVars:  []string{"TAIKO_TOKEN"},
 	}
