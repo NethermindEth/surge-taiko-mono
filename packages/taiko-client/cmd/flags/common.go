@@ -85,6 +85,7 @@ var (
 	TaikoTokenAddress = &cli.StringFlag{
 		Name:     "taikoToken",
 		Usage:    "TaikoToken contract `address`",
+		Value:    rpc.ZeroAddress.Hex(),
 		Category: commonCategory,
 		EnvVars:  []string{"TAIKO_TOKEN"},
 	}
