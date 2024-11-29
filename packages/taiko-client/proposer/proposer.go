@@ -270,6 +270,22 @@ func (p *Proposer) fetchPoolContent(filterPoolContent bool) ([]types.Transaction
 
 	log.Info("Transactions lists count", "count", len(txLists))
 
+	var (
+		profitableTxLists []types.Transactions
+	)
+	for _, txs := range txLists {
+		profitable, err := p.isProfitable(txs)
+		if err != nil {
+			log.Error("Failed to check profitability", "error", err)
+			continue
+		}
+
+		if profitable {
+			profitableTxLists = append(profitableTxLists, txs)
+		}
+	}
+	txLists = profitableTxLists
+
 	return txLists, nil
 }
 
@@ -296,12 +312,13 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 		return err
 	}
 
-	// If the pool content is empty, return.
+	// If there are no profitable transactions, return without proposing
 	if len(txLists) == 0 {
+		log.Info("No profitable transactions to propose")
 		return nil
 	}
 
-	// Propose the transactions lists.
+	// Propose the profitable transactions lists
 	return p.ProposeTxLists(ctx, txLists)
 }
 
@@ -517,4 +534,76 @@ func (p *Proposer) sendTx(ctx context.Context, txCandidate *txmgr.TxCandidate) e
 // Name returns the application name.
 func (p *Proposer) Name() string {
 	return "proposer"
+}
+
+// isProfitable checks if a transaction list is profitable to propose
+
+// Profitability is determined by comparing the revenue from transaction fees
+// to the costs of proposing and proving the block. Specifically:
+
+func (p *Proposer) isProfitable(txList types.Transactions) (bool, error) {
+	totalTransactionFees := new(big.Int)
+	totalGasConsumed := uint64(0)
+
+	for _, tx := range txList {
+		// TODO: Not sure if this is the best approach here.
+		// Maybe txList.EstimatedGasUsed is useful? Maybe we need to calculate it ourselves?
+		gasConsumed := tx.Gas()
+		priorityGasPrice, err := p.getPriorityGasPrice(tx)
+		if err != nil {
+			return false, err
+		}
+
+		transactionFees := new(big.Int).Mul(new(big.Int).SetUint64(gasConsumed), priorityGasPrice)
+		totalGasConsumed += gasConsumed
+
+		totalTransactionFees.Add(totalTransactionFees, transactionFees)
+	}
+
+	costs, err := p.estimateTotalCosts(totalGasConsumed)
+	if err != nil {
+		return false, err
+	}
+
+	return totalTransactionFees.Cmp(costs) > 0, nil
+}
+
+func (p *Proposer) getPriorityGasPrice(tx *types.Transaction) (*big.Int, error) {
+	baseFee, err := p.rpc.L2.SuggestGasPrice(p.ctx)
+	if err != nil {
+		return nil, err
+	}
+	return new(big.Int).Sub(tx.GasPrice(), baseFee), nil
+}
+
+func adjustForPriceFluctuation(gasPrice *big.Int, percentage uint64) *big.Int {
+	temp := new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(uint64(100)+percentage))
+	return new(big.Int).Div(temp, big.NewInt(100))
+}
+
+// Total Costs =
+// (gas needed for block proposal + gas needed for proof verification ) *
+// (gas price on L1 + 50% for price fluctuation) +
+//
+//	off chain proving costs (estimated with a margin for the provers' revenue)
+func (p *Proposer) estimateTotalCosts(_ uint64) (*big.Int, error) {
+	log.Info("Gas needed for proposing", "gas", p.GasNeededForProposingBlock)
+	log.Info("Gas needed for proving", "gas", p.GasNeededForProvingBlock)
+	log.Info("Price fluctuation", "gas", p.PriceFluctuationModifier)
+	log.Info("Off chain costs", "gas", p.OffChainCosts)
+	totalL1GasNeeded := new(big.Int).Add(
+		new(big.Int).SetUint64(p.GasNeededForProposingBlock),
+		new(big.Int).SetUint64(p.GasNeededForProvingBlock),
+	)
+
+	l1GasPrice, err := p.rpc.L1.SuggestGasPrice(p.ctx)
+	if err != nil {
+		return nil, err
+	}
+	adjustedL1GasPrice := adjustForPriceFluctuation(l1GasPrice, p.PriceFluctuationModifier)
+	l1Costs := new(big.Int).Mul(totalL1GasNeeded, adjustedL1GasPrice)
+
+	totalCosts := new(big.Int).Add(l1Costs, p.OffChainCosts)
+
+	return totalCosts, nil
 }

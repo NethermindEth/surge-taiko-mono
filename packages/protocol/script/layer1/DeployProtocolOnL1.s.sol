@@ -393,14 +393,6 @@ contract DeployProtocolOnL1 is DeployCapability {
         console2.log("PemCertChainLib", address(pemCertChainLib));
         console2.log("AutomataDcapVaAttestation", automataProxy);
 
-        deployProxy({
-            name: "prover_set",
-            impl: address(new ProverSet()),
-            data: abi.encodeCall(
-                ProverSet.init, (owner, vm.envAddress("PROVER_SET_ADMIN"), rollupAddressManager)
-            )
-        });
-
         deployZKVerifiers(owner, rollupAddressManager);
     }
 

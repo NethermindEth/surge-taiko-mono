@@ -1,0 +1,12 @@
+{
+  "configuredEventIndexer": [
+    {
+      "chainIds": [3151908, 763374],
+      "url": ""
+    },
+    {
+      "chainIds": [763374, 3151908],
+      "url": ""
+    }
+  ]
+}

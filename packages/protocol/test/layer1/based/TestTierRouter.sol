@@ -22,8 +22,8 @@ contract TestTierRouter is ITierProvider, ITierRouter {
         if (_tierId == LibTiers.TIER_OPTIMISTIC) {
             return ITierProvider.Tier({
                 verifierName: "",
-                validityBond: 250 ether, // TKO
-                contestBond: 500 ether, // TKO
+                validityBond: 0.14 ether,
+                contestBond: 0.28 ether,
                 cooldownWindow: 1440, //24 hours
                 provingWindow: 30, // 0.5 hours
                 maxBlocksToVerifyPerProof: 0 // DEPRECATED
@@ -33,8 +33,8 @@ contract TestTierRouter is ITierProvider, ITierRouter {
         if (_tierId == LibTiers.TIER_SGX) {
             return ITierProvider.Tier({
                 verifierName: LibStrings.B_TIER_SGX,
-                validityBond: 250 ether, // TKO
-                contestBond: 1640 ether, // =250TKO * 6.5625
+                validityBond: 0.14 ether,
+                contestBond: 0.91875 ether, // =0.14 * 6.5625
                 cooldownWindow: 1440, //24 hours
                 provingWindow: 60, // 1 hours
                 maxBlocksToVerifyPerProof: 0 // DEPRECATED

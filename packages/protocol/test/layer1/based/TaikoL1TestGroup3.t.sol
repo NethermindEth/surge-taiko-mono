@@ -13,7 +13,7 @@ contract TaikoL1TestGroup3 is TaikoL1TestGroupBase {
     function test_taikoL1_group_3_case_1() external {
         vm.warp(1_000_000);
 
-        giveEthAndTko(Alice, 10_000 ether, 1000 ether);
+        giveEthAndDepositBond(Alice, 1000 ether, 1000 ether);
 
         giveEthAndTko(James, 10_000 ether, 1000 ether);
         giveEthAndTko(Taylor, 10_000 ether, 1000 ether);
@@ -57,12 +57,11 @@ contract TaikoL1TestGroup3 is TaikoL1TestGroupBase {
             assertEq(ts.prover, James);
             assertEq(ts.timestamp, block.timestamp);
 
-            assertEq(totalTkoBalance(tko, L1, Alice), 10_000 ether - livenessBond);
+            assertEq(L1.bondBalanceOf(Alice), 1000 ether - livenessBond);
             assertEq(
-                totalTkoBalance(tko, L1, James),
-                10_000 ether - tierOp.validityBond + livenessBond * 7 / 8
+                L1.bondBalanceOf(James), 1000 ether - tierOp.validityBond + livenessBond * 7 / 8
             );
-            assertEq(totalTkoBalance(tko, L1, Taylor), 10_000 ether - tierOp.contestBond);
+            assertEq(L1.bondBalanceOf(Taylor), 1000 ether - tierOp.contestBond);
         }
 
         console2.log("====== William proves James is right");
@@ -85,11 +84,11 @@ contract TaikoL1TestGroup3 is TaikoL1TestGroupBase {
             assertEq(ts.prover, William);
             assertEq(ts.timestamp, block.timestamp); // not zero
 
-            assertEq(totalTkoBalance(tko, L1, Alice), 10_000 ether - livenessBond);
-            assertEq(totalTkoBalance(tko, L1, Taylor), 10_000 ether - tierOp.contestBond);
+            assertEq(L1.bondBalanceOf(Alice), 1000 ether - livenessBond);
+            assertEq(L1.bondBalanceOf(Taylor), 1000 ether - tierOp.contestBond);
             assertEq(
-                totalTkoBalance(tko, L1, William),
-                10_000 ether - tierSgx.validityBond + tierOp.contestBond * 7 / 8
+                L1.bondBalanceOf(William),
+                1000 ether - tierSgx.validityBond + tierOp.contestBond * 7 / 8
             );
         }
 
@@ -111,7 +110,7 @@ contract TaikoL1TestGroup3 is TaikoL1TestGroupBase {
             assertEq(ts.tier, LibTiers.TIER_SGX);
             assertEq(ts.prover, William);
 
-            assertEq(totalTkoBalance(tko, L1, William), 10_000 ether + tierOp.contestBond * 7 / 8);
+            assertEq(L1.bondBalanceOf(William), 1000 ether + tierOp.contestBond * 7 / 8);
         }
     }
 
@@ -124,7 +123,7 @@ contract TaikoL1TestGroup3 is TaikoL1TestGroupBase {
     function test_taikoL1_group_3_case_2() external {
         vm.warp(1_000_000);
 
-        giveEthAndTko(Alice, 10_000 ether, 1000 ether);
+        giveEthAndDepositBond(Alice, 1000 ether, 1000 ether);
 
         giveEthAndTko(James, 10_000 ether, 1000 ether);
         giveEthAndTko(Taylor, 10_000 ether, 1000 ether);
@@ -168,12 +167,11 @@ contract TaikoL1TestGroup3 is TaikoL1TestGroupBase {
             assertEq(ts.prover, James);
             assertEq(ts.timestamp, block.timestamp);
 
-            assertEq(totalTkoBalance(tko, L1, Alice), 10_000 ether - livenessBond);
+            assertEq(L1.bondBalanceOf(Alice), 1000 ether - livenessBond);
             assertEq(
-                totalTkoBalance(tko, L1, James),
-                10_000 ether - tierOp.validityBond + livenessBond * 7 / 8
+                L1.bondBalanceOf(James), 1000 ether - tierOp.validityBond + livenessBond * 7 / 8
             );
-            assertEq(totalTkoBalance(tko, L1, Taylor), 10_000 ether - tierOp.contestBond);
+            assertEq(L1.bondBalanceOf(Taylor), 1000 ether - tierOp.contestBond);
         }
 
         console2.log("====== William proves Tayler is right");
@@ -196,18 +194,14 @@ contract TaikoL1TestGroup3 is TaikoL1TestGroupBase {
             assertEq(ts.prover, William);
             assertEq(ts.timestamp, block.timestamp);
 
-            assertEq(totalTkoBalance(tko, L1, Alice), 10_000 ether - livenessBond);
+            assertEq(L1.bondBalanceOf(Alice), 1000 ether - livenessBond);
             assertEq(
-                totalTkoBalance(tko, L1, James),
-                10_000 ether - tierOp.validityBond + livenessBond * 7 / 8
+                L1.bondBalanceOf(James), 1000 ether - tierOp.validityBond + livenessBond * 7 / 8
             );
 
             uint256 quarterReward = tierOp.validityBond * 7 / 8 / 4;
-            assertEq(totalTkoBalance(tko, L1, Taylor), 10_000 ether + quarterReward * 3);
-            assertEq(
-                totalTkoBalance(tko, L1, William),
-                10_000 ether - tierSgx.validityBond + quarterReward
-            );
+            assertEq(L1.bondBalanceOf(Taylor), 1000 ether + quarterReward * 3);
+            assertEq(L1.bondBalanceOf(William), 1000 ether - tierSgx.validityBond + quarterReward);
         }
 
         console2.log("====== Verify the block");
@@ -229,15 +223,14 @@ contract TaikoL1TestGroup3 is TaikoL1TestGroupBase {
             assertEq(ts.validityBond, tierSgx.validityBond);
             assertEq(ts.prover, William);
 
-            assertEq(totalTkoBalance(tko, L1, Alice), 10_000 ether - livenessBond);
+            assertEq(L1.bondBalanceOf(Alice), 1000 ether - livenessBond);
 
             uint256 quarterReward = tierOp.validityBond * 7 / 8 / 4;
             assertEq(
-                totalTkoBalance(tko, L1, James),
-                10_000 ether - tierOp.validityBond + livenessBond * 7 / 8
+                L1.bondBalanceOf(James), 1000 ether - tierOp.validityBond + livenessBond * 7 / 8
             );
-            assertEq(totalTkoBalance(tko, L1, Taylor), 10_000 ether + quarterReward * 3);
-            assertEq(totalTkoBalance(tko, L1, William), 10_000 ether + quarterReward);
+            assertEq(L1.bondBalanceOf(Taylor), 1000 ether + quarterReward * 3);
+            assertEq(L1.bondBalanceOf(William), 1000 ether + quarterReward);
         }
     }
 }

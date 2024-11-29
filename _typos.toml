@@ -24,4 +24,7 @@ extend-exclude = [
   "packages/protocol/deployments/**",
   # TODO: fix typos and remove these
   "packages/taiko-client/**",
+  "pnpm-lock.yaml",
+  "_typos.toml",
+  "go.sum",
 ]

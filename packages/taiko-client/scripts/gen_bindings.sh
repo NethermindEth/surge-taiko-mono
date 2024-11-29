@@ -50,9 +50,9 @@ cat ../protocol/out/layer2/TaikoL2.sol/TaikoL2.json |
 	jq .abi |
 	${ABIGEN_BIN} --abi - --type TaikoL2Client --pkg bindings --out $DIR/../bindings/gen_taiko_l2.go
 
-cat ../protocol/out/layer1/TaikoToken.sol/TaikoToken.json |
-	jq .abi |
-	${ABIGEN_BIN} --abi - --type TaikoToken --pkg bindings --out $DIR/../bindings/gen_taiko_token.go
+# cat ../protocol/out/layer1/TaikoToken.sol/TaikoToken.json |
+# 	jq .abi |
+# 	${ABIGEN_BIN} --abi - --type TaikoToken --pkg bindings --out $DIR/../bindings/gen_taiko_token.go
 
 cat ../protocol/out/layer1/AddressManager.sol/AddressManager.json |
 	jq .abi |
@@ -62,9 +62,9 @@ cat ../protocol/out/layer1/GuardianProver.sol/GuardianProver.json |
 	jq .abi |
 	${ABIGEN_BIN} --abi - --type GuardianProver --pkg bindings --out $DIR/../bindings/gen_guardian_prover.go
 
-cat ../protocol/out/layer1/ProverSet.sol/ProverSet.json |
-	jq .abi |
-	${ABIGEN_BIN} --abi - --type ProverSet --pkg bindings --out $DIR/../bindings/gen_prover_set.go
+# cat ../protocol/out/layer1/ProverSet.sol/ProverSet.json |
+# 	jq .abi |
+# 	${ABIGEN_BIN} --abi - --type ProverSet --pkg bindings --out $DIR/../bindings/gen_prover_set.go
 
 cat ../protocol/out/layer1/MainnetTierRouter.sol/MainnetTierRouter.json |
 	jq .abi |

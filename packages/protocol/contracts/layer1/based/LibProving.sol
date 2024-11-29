@@ -315,7 +315,7 @@ library LibProving {
             // Handles the case when an incoming tier is higher than the current transition's tier.
             // Reverts when the incoming proof tries to prove the same transition
             // (L1_ALREADY_PROVED).
-            _overrideWithHigherProof(_state, _resolver, blk, ts, ctx_.tran, local.proof, local);
+            _overrideWithHigherProof(_state, blk, ts, ctx_.tran, local.proof, local);
 
             emit TransitionProvedV2({
                 blockId: local.blockId,
@@ -468,7 +468,6 @@ library LibProving {
     /// @param _local Current Local struct.
     function _overrideWithHigherProof(
         TaikoData.State storage _state,
-        IAddressResolver _resolver,
         TaikoData.BlockV2 storage _blk,
         TaikoData.TransitionState memory _ts,
         TaikoData.Transition memory _tran,

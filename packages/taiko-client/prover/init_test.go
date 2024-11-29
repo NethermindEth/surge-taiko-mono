@@ -11,6 +11,10 @@ import (
 )
 
 func (s *ProverTestSuite) TestSetApprovalAmount() {
+	if s.p.rpc.TaikoToken == nil {
+		s.T().Skip()
+	}
+
 	data, err := encoding.TaikoTokenABI.Pack(
 		"approve",
 		s.p.cfg.TaikoL1Address,

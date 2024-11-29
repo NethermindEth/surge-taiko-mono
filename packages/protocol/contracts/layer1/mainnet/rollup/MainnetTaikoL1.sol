@@ -25,7 +25,7 @@ contract MainnetTaikoL1 is TaikoL1, RollupAddressCache {
             blockRingBufferSize: 360_000, // DO NOT CHANGE!!!
             maxBlocksToVerify: 16,
             blockMaxGasLimit: 240_000_000,
-            livenessBond: 125e18, // 125 Taiko token
+            livenessBond: 0.07 ether,
             stateRootSyncInternal: 16,
             maxAnchorHeightOffset: 64,
             baseFeeConfig: LibSharedData.BaseFeeConfig({
@@ -35,7 +35,7 @@ contract MainnetTaikoL1 is TaikoL1, RollupAddressCache {
                 minGasExcess: 1_340_000_000, // correspond to 0.008847185 gwei basefee
                 maxGasIssuancePerBlock: 600_000_000 // two minutes: 5_000_000 * 120
              }),
-            ontakeForkHeight: 538_304
+            ontakeForkHeight: 1
         });
     }
 

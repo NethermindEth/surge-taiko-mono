@@ -1118,21 +1118,21 @@ func (_TaikoL1Client *TaikoL1ClientTransactorSession) AcceptOwnership() (*types.
 	return _TaikoL1Client.Contract.AcceptOwnership(&_TaikoL1Client.TransactOpts)
 }
 
-// DepositBond is a paid mutator transaction binding the contract method 0x4dcb05f9.
+// DepositBond is a paid mutator transaction binding the contract method 0x741b3c39.
 //
 // Solidity: function depositBond(uint256 _amount) payable returns()
 func (_TaikoL1Client *TaikoL1ClientTransactor) DepositBond(opts *bind.TransactOpts, _amount *big.Int) (*types.Transaction, error) {
 	return _TaikoL1Client.contract.Transact(opts, "depositBond", _amount)
 }
 
-// DepositBond is a paid mutator transaction binding the contract method 0x4dcb05f9.
+// DepositBond is a paid mutator transaction binding the contract method 0x741b3c39.
 //
 // Solidity: function depositBond(uint256 _amount) payable returns()
 func (_TaikoL1Client *TaikoL1ClientSession) DepositBond(_amount *big.Int) (*types.Transaction, error) {
 	return _TaikoL1Client.Contract.DepositBond(&_TaikoL1Client.TransactOpts, _amount)
 }
 
-// DepositBond is a paid mutator transaction binding the contract method 0x4dcb05f9.
+// DepositBond is a paid mutator transaction binding the contract method 0x741b3c39.
 //
 // Solidity: function depositBond(uint256 _amount) payable returns()
 func (_TaikoL1Client *TaikoL1ClientTransactorSession) DepositBond(_amount *big.Int) (*types.Transaction, error) {

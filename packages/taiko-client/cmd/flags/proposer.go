@@ -112,6 +112,38 @@ var (
 		Value:   false,
 		EnvVars: []string{"L1_BLOB_ALLOWED"},
 	}
+	// Surge related.
+	GasNeededForProposingBlock = &cli.Uint64Flag{
+		Name:     "surge.gasNeededForProposingBlock",
+		Usage:    "Gas needed for proposing a block",
+		Value:    0,
+		Category: proposerCategory,
+		EnvVars:  []string{"SURGE_GAS_NEEDED_FOR_PROPOSING_BLOCK"},
+	}
+
+	GasNeededForProvingBlock = &cli.Uint64Flag{
+		Name:     "surge.gasNeededForProvingBlock",
+		Usage:    "Gas needed for proving a block",
+		Value:    0,
+		Category: proposerCategory,
+		EnvVars:  []string{"SURGE_GAS_NEEDED_FOR_PROVING_BLOCK"},
+	}
+
+	PriceFluctuationModifier = &cli.Uint64Flag{
+		Name:     "surge.priceFluctuationModifier",
+		Usage:    "Price fluctuation modifier in percentage",
+		Value:    50,
+		Category: proposerCategory,
+		EnvVars:  []string{"SURGE_PRICE_FLUCTUATION_MODIFIER"},
+	}
+
+	OffChainCosts = &cli.StringFlag{
+		Name:     "surge.offChainCosts",
+		Usage:    "Off chain costs in WEI",
+		Value:    "0",
+		Category: proposerCategory,
+		EnvVars:  []string{"SURGE_OFF_CHAIN_COSTS"},
+	}
 )
 
 // ProposerFlags All proposer flags.
@@ -134,4 +166,9 @@ var ProposerFlags = MergeFlags(CommonFlags, []cli.Flag{
 	MaxProposedTxListsPerEpoch,
 	ProposeBlockIncludeParentMetaHash,
 	BlobAllowed,
+	// surge flags
+	GasNeededForProposingBlock,
+	GasNeededForProvingBlock,
+	PriceFluctuationModifier,
+	OffChainCosts,
 }, TxmgrFlags)

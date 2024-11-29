@@ -23,7 +23,6 @@ library LibStrings {
     bytes32 internal constant B_SIGNAL_SERVICE = bytes32("signal_service");
     bytes32 internal constant B_SP1_REMOTE_VERIFIER = bytes32("sp1_remote_verifier");
     bytes32 internal constant B_TAIKO = bytes32("taiko");
-    bytes32 internal constant B_TAIKO_TOKEN = bytes32("taiko_token");
     bytes32 internal constant B_TIER_GUARDIAN = bytes32("tier_guardian");
     bytes32 internal constant B_TIER_GUARDIAN_MINORITY = bytes32("tier_guardian_minority");
     bytes32 internal constant B_TIER_OPTIMISTIC = bytes32("");

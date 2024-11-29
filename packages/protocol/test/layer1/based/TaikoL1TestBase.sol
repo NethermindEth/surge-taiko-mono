@@ -5,7 +5,6 @@ import "../TaikoL1Test.sol";
 
 abstract contract TaikoL1TestBase is TaikoTest {
     AddressManager public addressManager;
-    TaikoToken public tko;
     SignalService public ss;
     TaikoL1 public L1;
     TaikoData.Config conf;
@@ -248,14 +247,11 @@ abstract contract TaikoL1TestBase is TaikoTest {
         signature = abi.encodePacked(r, s, v);
     }
 
-    function giveEthAndTko(address to, uint256 amountTko, uint256 amountEth) internal {
-        vm.deal(to, amountEth);
-        tko.transfer(to, amountTko);
+    function giveEthAndDepositBond(address to, uint256 bondEth, uint256 proposalsEth) internal {
+        vm.deal(to, bondEth + proposalsEth);
+        vm.prank(to);
+        L1.depositBond{ value: bondEth }();
 
-        vm.prank(to, to);
-        tko.approve(address(L1), amountTko);
-
-        console2.log("TKO balance:", to, tko.balanceOf(to));
         console2.log("ETH balance:", to, to.balance);
     }
 

@@ -33,14 +33,12 @@ contract TaikoL1Tests is TaikoL1TestBase {
     /// @dev Test we can propose, prove, then verify more blocks than
     /// 'blockMaxProposals'
     function test_L1_more_blocks_than_ring_buffer_size() external {
-        giveEthAndTko(Alice, 1e8 ether, 100 ether);
+        giveEthAndDepositBond(Alice, 1000 ether, 1000 ether);
         // This is a very weird test (code?) issue here.
         // If this line (or Bob's query balance) is uncommented,
         // Alice/Bob has no balance.. (Causing reverts !!!)
-        console2.log("Alice balance:", tko.balanceOf(Alice));
-        giveEthAndTko(Bob, 1e8 ether, 100 ether);
-        console2.log("Bob balance:", tko.balanceOf(Bob));
-        giveEthAndTko(Carol, 1e8 ether, 100 ether);
+        giveEthAndDepositBond(Bob, 1000 ether, 1000 ether);
+        giveEthAndDepositBond(Carol, 1000 ether, 1000 ether);
 
         bytes32 parentHash = GENESIS_BLOCK_HASH;
 
@@ -68,9 +66,9 @@ contract TaikoL1Tests is TaikoL1TestBase {
     /// @dev Test more than one block can be proposed, proven, & verified in the
     ///      same L1 block.
     function test_L1_multiple_blocks_in_one_L1_block() external {
-        giveEthAndTko(Alice, 1e8 ether, 1000 ether);
-        console2.log("Alice balance:", tko.balanceOf(Alice));
-        giveEthAndTko(Carol, 1e8 ether, 100 ether);
+        giveEthAndDepositBond(Alice, 1000 ether, 1000 ether);
+
+        giveEthAndDepositBond(Carol, 1000 ether, 1000 ether);
 
         bytes32 parentHash = GENESIS_BLOCK_HASH;
 
@@ -103,9 +101,8 @@ contract TaikoL1Tests is TaikoL1TestBase {
 
     /// @dev Test verifying multiple blocks in one transaction
     function test_L1_verifying_multiple_blocks_once() external {
-        giveEthAndTko(Alice, 1e8 ether, 1000 ether);
-        console2.log("Alice balance:", tko.balanceOf(Alice));
-        giveEthAndTko(Carol, 1e8 ether, 100 ether);
+        giveEthAndDepositBond(Alice, 1000 ether, 1000 ether);
+        giveEthAndDepositBond(Carol, 1000 ether, 1000 ether);
 
         bytes32 parentHash = GENESIS_BLOCK_HASH;
 
@@ -131,9 +128,8 @@ contract TaikoL1Tests is TaikoL1TestBase {
 
     /// @dev Test if a given transition deadline is based on proposal time
     function test_L1_in_proving_window_logic() external {
-        giveEthAndTko(Alice, 1000 ether, 1000 ether);
-        console2.log("Alice balance:", tko.balanceOf(Alice));
-        giveEthAndTko(Carol, 1e8 ether, 100 ether);
+        giveEthAndDepositBond(Alice, 1000 ether, 1000 ether);
+        giveEthAndDepositBond(Carol, 1000 ether, 1000 ether);
 
         bytes32 parentHash = GENESIS_BLOCK_HASH;
 
@@ -213,10 +209,9 @@ contract TaikoL1Tests is TaikoL1TestBase {
     }
 
     function test_unpause() external {
-        L1.pause();
+        giveEthAndDepositBond(Alice, 1000 ether, 1000 ether);
 
-        giveEthAndTko(Alice, 1000 ether, 1000 ether);
-        giveEthAndTko(Bob, 1e8 ether, 100 ether);
+        L1.pause();
 
         // Proposing is also not possible
         proposeButRevert(Alice, 1024, EssentialContract.INVALID_PAUSE_STATUS.selector);

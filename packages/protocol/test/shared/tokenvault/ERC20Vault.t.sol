@@ -68,7 +68,6 @@ contract UpdatedBridgedERC20 is BridgedERC20V2 {
 }
 
 contract TestERC20Vault is TaikoTest {
-    TaikoToken tko;
     AddressManager addressManager;
     Bridge bridge;
     ERC20Vault erc20Vault;
@@ -97,16 +96,6 @@ contract TestERC20Vault is TaikoTest {
                 data: abi.encodeCall(AddressManager.init, (address(0)))
             })
         );
-
-        tko = TaikoToken(
-            deployProxy({
-                name: "taiko_token",
-                impl: address(new TaikoToken()),
-                data: abi.encodeCall(TaikoToken.init, (address(0), address(this)))
-            })
-        );
-
-        addressManager.setAddress(uint64(block.chainid), "taiko_token", address(tko));
 
         erc20Vault = ERC20Vault(
             deployProxy({

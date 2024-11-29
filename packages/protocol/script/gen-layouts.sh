@@ -21,7 +21,6 @@ contracts_shared=(
 
 # Layer 1 contracts
 contracts_layer1=(
-"contracts/layer1/token/TaikoToken.sol:TaikoToken"
 "contracts/layer1/verifiers/compose/ComposeVerifier.sol:ComposeVerifier"
 "contracts/layer1/verifiers/compose/TeeAnyVerifier.sol:TeeAnyVerifier"
 "contracts/layer1/verifiers/compose/ZkAndTeeVerifier.sol:ZkAndTeeVerifier"
@@ -52,15 +51,12 @@ contracts_layer1=(
 "contracts/layer1/mainnet/rollup/MainnetTaikoL1.sol:MainnetTaikoL1"
 "contracts/layer1/mainnet/rollup/MainnetRollupAddressManager.sol:MainnetRollupAddressManager"
 "contracts/layer1/mainnet/rollup/MainnetTierRouter.sol:MainnetTierRouter"
-"contracts/layer1/mainnet/rollup/MainnetProverSet.sol:MainnetProverSet"
 "contracts/layer1/team/tokenunlock/TokenUnlock.sol:TokenUnlock"
-"contracts/layer1/provers/ProverSet.sol:ProverSet"
 "contracts/layer1/provers/GuardianProver.sol:GuardianProver"
 )
 
 # Layer 2 contracts
 contracts_layer2=(
-"contracts/layer2/token/BridgedTaikoToken.sol:BridgedTaikoToken"
 "contracts/layer2/DelegateOwner.sol:DelegateOwner"
 "contracts/layer2/based/TaikoL2.sol:TaikoL2"
 "contracts/layer2/hekla/HeklaTaikoL2.sol:HeklaTaikoL2"

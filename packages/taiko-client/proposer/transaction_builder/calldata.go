@@ -58,10 +58,19 @@ func (b *CalldataTransactionBuilder) BuildLegacy(
 	includeParentMetaHash bool,
 	txListBytes []byte,
 ) (*txmgr.TxCandidate, error) {
+	// Check if the current L2 chain is before ontake fork.
+	state, err := rpc.GetProtocolStateVariables(b.rpc.TaikoL1, &bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, err
+	}
+
+	if b.chainConfig.IsOntake(new(big.Int).SetUint64(state.B.NumBlocks)) {
+		return nil, fmt.Errorf("legacy transaction builder is not supported after ontake fork")
+	}
+
 	// If the current proposer wants to include the parent meta hash, then fetch it from the protocol.
 	var (
 		parentMetaHash = [32]byte{}
-		err            error
 	)
 	if includeParentMetaHash {
 		if parentMetaHash, err = getParentMetaHash(

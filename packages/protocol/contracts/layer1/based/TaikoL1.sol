@@ -171,7 +171,7 @@ contract TaikoL1 is EssentialContract, ITaikoL1, TaikoEvents {
 
     /// @inheritdoc ITaikoL1
     function withdrawBond(uint256 _amount) external whenNotPaused {
-        LibBonds.withdrawBond(state, this, _amount);
+        LibBonds.withdrawBond(state, _amount);
     }
 
     /// @notice Unpauses the contract.
@@ -318,7 +318,7 @@ contract TaikoL1 is EssentialContract, ITaikoL1, TaikoEvents {
             blockRingBufferSize: 360_000, // = 7200 * 50
             maxBlocksToVerify: 16,
             blockMaxGasLimit: 240_000_000,
-            livenessBond: 125e18, // 125 Taiko token
+            livenessBond: 0.07 ether,
             stateRootSyncInternal: 16,
             maxAnchorHeightOffset: 64,
             baseFeeConfig: LibSharedData.BaseFeeConfig({

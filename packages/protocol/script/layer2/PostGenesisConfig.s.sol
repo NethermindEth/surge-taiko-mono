@@ -16,7 +16,6 @@ interface USDCProxy {
 //  forge script --rpc-url  https://rpc.mainnet.taiko.xyz script/PostGenesisConfig.s.sol
 contract PostGenesisConfig is Script {
     // All following addresses are L2 addresses
-    address public bridgedTKO = 0xA9d23408b9bA935c230493c40C73824Df71A0975;
     address public bridgedUSDC = 0x07d83526730c7438048D55A4fc0b850e2aaB6f0b;
 
     address public erc20Vault = 0x1670000000000000000000000000000000000002;
@@ -70,19 +69,6 @@ contract PostGenesisConfig is Script {
 
         ERC20Vault.CanonicalERC20 memory canonical;
         canonical.chainId = 1;
-
-        if (bridgedTKO != address(0)) {
-            canonical.addr = 0x10dea67478c5F8C5E2D90e5E9B26dBe60c54d800;
-            canonical.decimals = 18;
-            canonical.symbol = "TKO";
-            canonical.name = "Taiko Token";
-
-            // ERC20Vault(erc20Vault).changeBridgedToken(canonical, bridgedTKO);
-            call = abi.encodeCall(ERC20Vault.changeBridgedToken, (canonical, bridgedTKO));
-            console2.log("--- erc20 change bridged TKO token");
-            console2.log(erc20Vault);
-            console.logBytes(call);
-        }
 
         if (bridgedUSDC != address(0)) {
             canonical.addr = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;

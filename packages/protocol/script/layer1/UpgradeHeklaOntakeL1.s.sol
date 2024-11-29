@@ -6,7 +6,6 @@ import "test/shared/DeployCapability.sol";
 import "src/layer1/hekla/HeklaTaikoL1.sol";
 import "src/shared/bridge/Bridge.sol";
 import "src/shared/common/AddressManager.sol";
-import "src/layer1/provers/ProverSet.sol";
 import "src/layer1/provers/GuardianProver.sol";
 
 contract UpgradeHeklaOntakeL1 is DeployCapability {
@@ -33,13 +32,6 @@ contract UpgradeHeklaOntakeL1 is DeployCapability {
         // Shared address manager
         UUPSUpgradeable(0x7D3338FD5e654CAC5B10028088624CA1D64e74f7).upgradeTo(
             address(new AddressManager())
-        );
-        // Prover set
-        UUPSUpgradeable(0xD3f681bD6B49887A48cC9C9953720903967E9DC0).upgradeTo(
-            address(new ProverSet())
-        );
-        UUPSUpgradeable(0x335103c4fa2F55451975082136F1478eCFeB84B9).upgradeTo(
-            address(new ProverSet())
         );
         // Guardian Prover
         UUPSUpgradeable(0x92F195a8702da2104aE8E3E10779176E7C35d6BC).upgradeTo(

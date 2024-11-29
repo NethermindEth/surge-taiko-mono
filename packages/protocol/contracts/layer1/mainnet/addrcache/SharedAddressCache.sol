@@ -18,9 +18,6 @@ contract SharedAddressCache is AddressCache {
         returns (bool found, address addr)
     {
         if (_chainId == LibNetwork.ETHEREUM_MAINNET) {
-            if (_name == LibStrings.B_TAIKO_TOKEN) {
-                return (true, 0x10dea67478c5F8C5E2D90e5E9B26dBe60c54d800);
-            }
             if (_name == LibStrings.B_QUOTA_MANAGER) {
                 return (true, 0x91f67118DD47d502B1f0C354D0611997B022f29E);
             }

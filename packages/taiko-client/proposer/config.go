@@ -3,10 +3,12 @@ package proposer
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/urfave/cli/v2"
@@ -39,6 +41,11 @@ type Config struct {
 	BlobAllowed                bool
 	TxmgrConfigs               *txmgr.CLIConfig
 	PrivateTxmgrConfigs        *txmgr.CLIConfig
+
+	GasNeededForProposingBlock uint64
+	GasNeededForProvingBlock   uint64
+	PriceFluctuationModifier   uint64
+	OffChainCosts              *big.Int
 }
 
 // NewConfigFromCliContext initializes a Config instance from
@@ -79,6 +86,19 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		return nil, fmt.Errorf("max proposed tx lists per epoch should not exceed 2, got: %d", maxProposedTxListsPerEpoch)
 	}
 
+	gasNeededForProposingBlock := c.Uint64(flags.GasNeededForProposingBlock.Name)
+	gasNeededForProvingBlock := c.Uint64(flags.GasNeededForProvingBlock.Name)
+	priceFluctuationModifier := c.Uint64(flags.PriceFluctuationModifier.Name)
+
+	offChainCosts, ok := new(big.Int).SetString(c.String(flags.OffChainCosts.Name), 10)
+	if !ok {
+		return nil, fmt.Errorf("invalid off-chain costs: %s", c.String(flags.OffChainCosts.Name))
+	}
+
+	if offChainCosts.Cmp(abi.MaxUint256) == 1 {
+		return nil, fmt.Errorf("off-chain costs value larger than max uint256")
+	}
+
 	return &Config{
 		ClientConfig: &rpc.ClientConfig{
 			L1Endpoint:        c.String(flags.L1WSEndpoint.Name),
@@ -116,5 +136,9 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			l1ProposerPrivKey,
 			c,
 		),
+		GasNeededForProposingBlock: gasNeededForProposingBlock,
+		GasNeededForProvingBlock:   gasNeededForProvingBlock,
+		PriceFluctuationModifier:   priceFluctuationModifier,
+		OffChainCosts:              offChainCosts,
 	}, nil
 }

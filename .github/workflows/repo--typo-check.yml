@@ -5,7 +5,7 @@ on: [pull_request]
 jobs:
   check-for-typos:
     if: contains(github.event.pull_request.labels.*.name, 'option.workflow_on') || github.event.pull_request.draft == false && github.head_ref != 'release-please-*'
-    runs-on: [arc-runner-set]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout the repository
