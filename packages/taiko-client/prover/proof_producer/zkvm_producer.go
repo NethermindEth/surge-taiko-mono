@@ -25,6 +25,8 @@ import (
 const (
 	ZKProofTypeR0  = "risc0"
 	ZKProofTypeSP1 = "sp1"
+	ZKProofTypeSP1Local = "sp1_local"
+	ZKProofTypeR0Local = "risc0_local"
 )
 
 var (
@@ -166,6 +168,30 @@ func (s *ZKvmProofProducer) requestProof(
 			SP1: &SP1RequestProofBodyParam{
 				Recursion: "plonk",
 				Prover:    "network",
+			},
+		}
+	case ZKProofTypeSP1Local:
+		reqBody = RaikoRequestProofBody{
+			Type:     s.ZKProofType,
+			Block:    opts.BlockID,
+			Prover:   opts.ProverAddress.Hex()[2:],
+			Graffiti: opts.Graffiti,
+			SP1: &SP1RequestProofBodyParam{
+				Recursion: "plonk",
+				Prover:    "local",
+			},
+		}
+	case ZKProofTypeR0Local:
+		reqBody = RaikoRequestProofBody{
+			Type:     s.ZKProofType,
+			Block:    opts.BlockID,
+			Prover:   opts.ProverAddress.Hex()[2:],
+			Graffiti: opts.Graffiti,
+			RISC0: &RISC0RequestProofBodyParam{
+				Bonsai:       false,
+				Snark:        true,
+				Profile:      false,
+				ExecutionPo2: big.NewInt(20),
 			},
 		}
 	default:
