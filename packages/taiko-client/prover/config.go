@@ -26,6 +26,8 @@ type Config struct {
 	L2HttpEndpoint                          string
 	TaikoL1Address                          common.Address
 	TaikoL2Address                          common.Address
+	Risc0VerifierAddress                    common.Address
+	SgxVerifierAddress                      common.Address
 	TaikoTokenAddress                       common.Address
 	ProverSetAddress                        common.Address
 	L1ProverPrivKey                         *ecdsa.PrivateKey
@@ -141,6 +143,8 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		L2HttpEndpoint:                          c.String(flags.L2HTTPEndpoint.Name),
 		TaikoL1Address:                          common.HexToAddress(c.String(flags.TaikoL1Address.Name)),
 		TaikoL2Address:                          common.HexToAddress(c.String(flags.TaikoL2Address.Name)),
+		Risc0VerifierAddress:                    common.HexToAddress(c.String(flags.Risc0VerifierAddress.Name)),
+		SgxVerifierAddress:                      common.HexToAddress(c.String(flags.SgxVerifierAddress.Name)),
 		TaikoTokenAddress:                       common.HexToAddress(c.String(flags.TaikoTokenAddress.Name)),
 		ProverSetAddress:                        common.HexToAddress(c.String(flags.ProverSetAddress.Name)),
 		L1ProverPrivKey:                         l1ProverPrivKey,

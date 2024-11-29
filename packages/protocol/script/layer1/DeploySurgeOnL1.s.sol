@@ -50,11 +50,13 @@ import "test/layer1/automata-attestation/common/AttestationBase.t.sol";
 /// - Automated setup of fields in L1 address manager
 /// - Configurable min-tier for proving
 /// - Removed guardian prover
-/// - Added a timelock controller as the owner enforcing a 45 day delay in owner-only transactions 
+/// - Added a timelock controller as the owner enforcing a 45 day delay in owner-only transactions
 contract DeploySurgeOnL1 is DeployCapability {
     uint256 internal ADDRESS_LENGTH = 40;
 
     uint64 internal l2ChainId = uint64(vm.envUint("L2_CHAINID"));
+    address internal attestationContractOwner = vm.envAddress("ATTESTATION_CONTRACT_OWNER");
+    address internal risc0VerifierOwner = vm.envAddress("RISC0_VERIFIER_OWNER");
 
     modifier broadcast() {
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
@@ -73,17 +75,18 @@ contract DeploySurgeOnL1 is DeployCapability {
         address l2BridgeAddress = getConstantAddress(vm.toString(l2ChainId), "1");
 
         address[] memory executors = vm.envAddress("OWNER_MULTISIG_SIGNERS", ",");
-        
+
         address ownerMultisig = vm.envAddress("OWNER_MULTISIG");
         addressNotNull(ownerMultisig, "ownerMultisig");
-        
+
+        addressNotNull(attestationContractOwner, "attestationContractOwner");
+
         address[] memory proposers = new address[](1);
-        proposers[0] = ownerMultisig; 
+        proposers[0] = ownerMultisig;
 
         // Setup timelock controller with 45 day (86400 seconds * 45) delay
-        address timelockController = address(
-            new TimelockController(86400 * 45, proposers, executors, address(0))
-        );
+        address timelockController =
+            address(new TimelockController(86_400 * 45, proposers, executors, address(0)));
         address contractOwner = timelockController;
 
         // ---------------------------------------------------------------
@@ -129,9 +132,7 @@ contract DeploySurgeOnL1 is DeployCapability {
         // ---------------------------------------------------------------
         // Register L2 addresses
         register(rollupAddressManager, "taiko", taikoL2Address, l2ChainId);
-        register(
-            rollupAddressManager, "signal_service", l2SignalServiceAddress, l2ChainId
-        );
+        register(rollupAddressManager, "signal_service", l2SignalServiceAddress, l2ChainId);
         register(sharedAddressManager, "signal_service", l2SignalServiceAddress, l2ChainId);
         register(sharedAddressManager, "bridge", l2BridgeAddress, l2ChainId);
 
@@ -249,20 +250,13 @@ contract DeploySurgeOnL1 is DeployCapability {
         copyRegister(rollupAddressManager, _sharedAddressManager, "signal_service");
         copyRegister(rollupAddressManager, _sharedAddressManager, "bridge");
 
-
         TaikoL1 taikoL1 = TaikoL1(address(new SurgeTaikoL1(l2ChainId)));
 
         deployProxy({
             name: "taiko",
             impl: address(taikoL1),
             data: abi.encodeCall(
-                TaikoL1.init,
-                (
-                    owner,
-                    rollupAddressManager,
-                    vm.envBytes32("L2_GENESIS_HASH"),
-                    false
-                )
+                TaikoL1.init, (owner, rollupAddressManager, vm.envBytes32("L2_GENESIS_HASH"), false)
             ),
             registerTo: rollupAddressManager
         });
@@ -274,11 +268,7 @@ contract DeploySurgeOnL1 is DeployCapability {
             registerTo: rollupAddressManager
         });
 
-        register(
-            rollupAddressManager,
-            "tier_router",
-            address(deployTierRouter())
-        );
+        register(rollupAddressManager, "tier_router", address(deployTierRouter()));
 
         // No need to proxy these, because they are 3rd party. If we want to modify, we simply
         // change the registerAddress("automata_dcap_attestation", address(attestation));
@@ -291,7 +281,8 @@ contract DeploySurgeOnL1 is DeployCapability {
             name: "automata_dcap_attestation",
             impl: automateDcapV3AttestationImpl,
             data: abi.encodeCall(
-                AutomataDcapV3Attestation.init, (owner, address(sigVerifyLib), address(pemCertChainLib))
+                AutomataDcapV3Attestation.init,
+                (attestationContractOwner, address(sigVerifyLib), address(pemCertChainLib))
             ),
             registerTo: rollupAddressManager
         });
@@ -317,7 +308,7 @@ contract DeploySurgeOnL1 is DeployCapability {
         deployProxy({
             name: "tier_zkvm_risc0",
             impl: address(new Risc0Verifier()),
-            data: abi.encodeCall(Risc0Verifier.init, (owner, rollupAddressManager)),
+            data: abi.encodeCall(Risc0Verifier.init, (risc0VerifierOwner, rollupAddressManager)),
             registerTo: rollupAddressManager
         });
 
@@ -372,29 +363,31 @@ contract DeploySurgeOnL1 is DeployCapability {
         require(addr != address(0), err);
     }
 
-    function getConstantAddress(string memory prefix, string memory suffix) internal view returns (address) {
+    function getConstantAddress(
+        string memory prefix,
+        string memory suffix
+    )
+        internal
+        view
+        returns (address)
+    {
         bytes memory prefixBytes = bytes(prefix);
         bytes memory suffixBytes = bytes(suffix);
-        
-        require(prefixBytes.length + suffixBytes.length <= ADDRESS_LENGTH, "Prefix + suffix too long");
-        
+
+        require(
+            prefixBytes.length + suffixBytes.length <= ADDRESS_LENGTH, "Prefix + suffix too long"
+        );
+
         // Create the middle padding of zeros
         uint256 paddingLength = ADDRESS_LENGTH - prefixBytes.length - suffixBytes.length;
         bytes memory padding = new bytes(paddingLength);
-        for(uint i = 0; i < paddingLength; i++) {
+        for (uint256 i = 0; i < paddingLength; i++) {
             padding[i] = "0";
         }
-        
+
         // Concatenate the parts
-        string memory hexString = string(
-            abi.encodePacked(
-                "0x",
-                prefix,
-                string(padding),
-                suffix
-            )
-        );
-        
+        string memory hexString = string(abi.encodePacked("0x", prefix, string(padding), suffix));
+
         return vm.parseAddress(hexString);
     }
 }
