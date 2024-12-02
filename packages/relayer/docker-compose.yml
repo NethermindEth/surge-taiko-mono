@@ -56,14 +56,14 @@ services:
       - processor
       - --queue.prefetch=100
       - --processorPrivateKey=bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31
-      - --destBridgeAddress=0x7633740000000000000000000000000000000001
-      - --destERC20VaultAddress=0x7633740000000000000000000000000000000002
-      - --destERC721Address=0x7633740000000000000000000000000000000003
-      - --destERC1155Address=0x7633740000000000000000000000000000000004
-      - --destTaikoAddress=0x7633740000000000000000000000000000010001
-      - --srcSignalServiceAddress=0x00c042C4D5D913277CE16611a2ce6e9003554aD5
-      - --srcRpcUrl=
-      - --destRpcUrl=
+      - --destBridgeAddress=${L2_BRIDGE_ADDRESS}
+      - --destERC20VaultAddress=${L2_ERC20_VAULT_ADDRESS}
+      - --destERC721Address=${L2_ERC721_VAULT_ADDRESS}
+      - --destERC1155Address=${L2_ERC1155_VAULT_ADDRESS}
+      - --destTaikoAddress=${L2_TAIKO_ADDRESS}
+      - --srcSignalServiceAddress=${L1_SIGNAL_SERVICE_ADDRESS}
+      - --srcRpcUrl=${L1_RPC_URL}
+      - --destRpcUrl=${L2_RPC_URL}
       - --confirmations=0
       - --headerSyncInterval=2
       - --profitableOnly=false
@@ -97,12 +97,12 @@ services:
       - --db.name=relayer
       - --db.password=root
       - --db.username=root
-      - --srcBridgeAddress=0x72bCbB3f339aF622c28a26488Eed9097a2977404
-      - --destBridgeAddress=0x7633740000000000000000000000000000000001
-      - --srcTaikoAddress=0xaE37C7A711bcab9B0f8655a97B738d6ccaB6560B
-      - --srcSignalServiceAddress=0x00c042C4D5D913277CE16611a2ce6e9003554aD5
-      - --srcRpcUrl=
-      - --destRpcUrl=
+      - --srcBridgeAddress=${L1_BRIDGE_ADDRESS}
+      - --destBridgeAddress=${L2_BRIDGE_ADDRESS}
+      - --srcTaikoAddress=${L1_TAIKO_ADDRESS}
+      - --srcSignalServiceAddress=${L1_SIGNAL_SERVICE_ADDRESS}
+      - --srcRpcUrl=${L1_RPC_URL}
+      - --destRpcUrl=${L2_RPC_URL}
       - --queue.host=rabbitmq
       - --queue.password=root
       - --queue.port=5672
@@ -132,9 +132,9 @@ services:
       - --db.name=relayer
       - --db.password=root
       - --db.username=root
-      - --srcRpcUrl=
-      - --destRpcUrl=
-      - --destTaikoAddress=0x7633740000000000000000000000000000010001
+      - --srcRpcUrl=${L1_RPC_URL}
+      - --destRpcUrl=${L2_RPC_URL}
+      - --destTaikoAddress=${L2_TAIKO_ADDRESS}
       - --processingFeeMultiplier=1.75
     networks:
       - rabbitmq_go_net
@@ -157,9 +157,9 @@ services:
       - --db.name=relayer
       - --db.password=root
       - --db.username=root
-      - --srcRpcUrl=
-      - --destRpcUrl=
-      - --destTaikoAddress=0xaE37C7A711bcab9B0f8655a97B738d6ccaB6560B
+      - --srcRpcUrl=${L1_RPC_URL}
+      - --destRpcUrl=${L2_RPC_URL}
+      - --destTaikoAddress=${L1_TAIKO_ADDRESS}
       - --processingFeeMultiplier=1.75
     networks:
       - rabbitmq_go_net
@@ -174,15 +174,15 @@ services:
     command:
       - processor
       - --queue.prefetch=100
-      - --processorPrivateKey=bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31
-      - --destBridgeAddress=0x72bCbB3f339aF622c28a26488Eed9097a2977404
-      - --destERC20VaultAddress=0x38435Ac0E0e9Bd8737c476F8F39a24b0735e00dc
-      - --destERC721Address=0x9ECB6f04D47FA2599449AaA523bF84476f7aD80f
-      - --destERC1155Address=0xB29dB8A6b1C596B64f7E1dD5358d59Db73648E17
-      - --destTaikoAddress=0xaE37C7A711bcab9B0f8655a97B738d6ccaB6560B
-      - --srcSignalServiceAddress=0x7633740000000000000000000000000000000005
-      - --srcRpcUrl=
-      - --destRpcUrl=
+      - --processorPrivateKey=${PROCESSOR_PRIVATE_KEY}
+      - --destBridgeAddress=${L1_BRIDGE_ADDRESS}
+      - --destERC20VaultAddress=${L1_ERC20_VAULT_ADDRESS}
+      - --destERC721Address=${L1_ERC721_VAULT_ADDRESS}
+      - --destERC1155Address=${L1_ERC1155_VAULT_ADDRESS}
+      - --destTaikoAddress=${L1_TAIKO_ADDRESS}
+      - --srcSignalServiceAddress=${L2_SIGNAL_SERVICE_ADDRESS}
+      - --srcRpcUrl=${L1_RPC_URL}
+      - --destRpcUrl=${L2_RPC_URL}
       - --confirmations=0
       - --headerSyncInterval=2
       - --profitableOnly=false
@@ -216,11 +216,11 @@ services:
       - --db.name=relayer
       - --db.password=root
       - --db.username=root
-      - --srcBridgeAddress=0x7633740000000000000000000000000000000001
-      - --destBridgeAddress=0x72bCbB3f339aF622c28a26488Eed9097a2977404
-      - --srcSignalServiceAddress=0x7633740000000000000000000000000000000005
-      - --srcRpcUrl=
-      - --destRpcUrl=
+      - --srcBridgeAddress=${L2_BRIDGE_ADDRESS}
+      - --destBridgeAddress=${L1_BRIDGE_ADDRESS}
+      - --srcSignalServiceAddress=${L2_SIGNAL_SERVICE_ADDRESS}
+      - --srcRpcUrl=${L1_RPC_URL}
+      - --destRpcUrl=${L2_RPC_URL}
       - --queue.host=rabbitmq
       - --queue.password=root
       - --queue.port=5672

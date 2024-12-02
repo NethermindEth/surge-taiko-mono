@@ -7,9 +7,7 @@
         "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
           "default": {
-            "http": [
-              "https://l1-rpc/"
-            ]
+            "http": ["https://host/l1-rpc/"]
           }
         },
         "nativeCurrency": {
@@ -32,9 +30,7 @@
         "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
           "default": {
-            "http": [
-              "https://l2-rpc/"
-            ]
+            "http": ["https://host/l2-rpc/"]
           }
         },
         "nativeCurrency": {
