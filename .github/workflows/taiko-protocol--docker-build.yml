@@ -54,7 +54,7 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
           context: ./packages/protocol
-          file: Dockerfile
+          file: ./packages/protocol/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
