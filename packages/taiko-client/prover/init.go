@@ -135,6 +135,39 @@ func (p *Prover) initProofSubmitters(
 				Dummy:               p.cfg.Dummy,
 				RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
 			}
+		case encoding.TierTwoOfThreeID:
+			producer = &proofProducer.CombinedProducer{
+				ProofTier:      encoding.TierTwoOfThreeID,
+				RequiredProofs: 2,
+				Producers: []proofProducer.ProofProducer{
+					&proofProducer.SGXProofProducer{
+						RaikoHostEndpoint:   p.cfg.RaikoHostEndpoint,
+						JWT:                 p.cfg.RaikoJWT,
+						ProofType:           proofProducer.ProofTypeSgx,
+						Dummy:               p.cfg.Dummy,
+						RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
+					},
+					&proofProducer.ZKvmProofProducer{
+						ZKProofType:         proofProducer.ZKProofTypeR0,
+						RaikoHostEndpoint:   p.cfg.RaikoZKVMHostEndpoint,
+						JWT:                 p.cfg.RaikoJWT,
+						Dummy:               p.cfg.Dummy,
+						RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
+					},
+					&proofProducer.ZKvmProofProducer{
+						ZKProofType:         proofProducer.ZKProofTypeSP1,
+						RaikoHostEndpoint:   p.cfg.RaikoZKVMHostEndpoint,
+						JWT:                 p.cfg.RaikoJWT,
+						Dummy:               p.cfg.Dummy,
+						RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
+					},
+				},
+				Verifiers: []common.Address{
+					p.cfg.SgxVerifierAddress,
+					p.cfg.Risc0VerifierAddress,
+					p.cfg.Sp1VerifierAddress,
+				},
+			}
 		case encoding.TierGuardianMinorityID:
 			producer = proofProducer.NewGuardianProofProducer(encoding.TierGuardianMinorityID, p.cfg.EnableLivenessBondProof)
 		case encoding.TierGuardianMajorityID:
