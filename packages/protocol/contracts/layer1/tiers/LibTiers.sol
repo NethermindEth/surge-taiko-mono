@@ -28,4 +28,7 @@ library LibTiers {
 
     /// @notice Guardian tier ID with majority approval.
     uint16 public constant TIER_GUARDIAN = 1000;
+
+    /// @notice Requires 2/3 proofs from SGX/RISC/SP1
+    uint16 public constant TIER_TWO_OF_THREE = 1100;
 }
