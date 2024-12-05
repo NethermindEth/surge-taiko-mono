@@ -350,6 +350,12 @@ contract DeployProtocolOnL1 is DeployCapability {
         P256Verifier p256Verifier = new P256Verifier();
         SigVerifyLib sigVerifyLib = new SigVerifyLib(address(p256Verifier));
         PEMCertChainLib pemCertChainLib = new PEMCertChainLib();
+
+        addAddress({
+            name: "PemCertChainLib",
+            proxy: address(pemCertChainLib)
+        });
+
         address automateDcapV3AttestationImpl = address(new AutomataDcapV3Attestation());
 
         address automataProxy = deployProxy({
