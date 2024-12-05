@@ -55,10 +55,17 @@ type ProofDataV2 struct {
 
 // ZKvmProofProducer generates a ZK proof for the given block.
 type ZKvmProofProducer struct {
-	RaikoHostEndpoint   string
-	RaikoRequestTimeout time.Duration
-	JWT                 string // JWT provided by Raiko
-	Dummy               bool
+	ZKProofType            string // ZK Proof type
+	RaikoHostEndpoint      string
+	RaikoRequestTimeout    time.Duration
+	JWT                    string // JWT provided by Raiko
+	Dummy                  bool
+	RaikoSP1Recursion      string
+	RaikoSP1Prover         string
+	RaikoRISC0Bonsai       bool
+	RaikoRISC0Snark        bool
+	RaikoRISC0Profile      bool
+	RaikoRISC0ExecutionPo2 *big.Int
 	DummyProofProducer
 }
 
@@ -212,14 +219,32 @@ func (s *ZKvmProofProducer) requestProof(
 	ctx context.Context,
 	opts ProofRequestOptions,
 ) (*RaikoRequestProofBodyResponseV2, error) {
-	reqBody := RaikoRequestProofBody{
-		Type:     ZKProofTypeAny,
-		Block:    opts.OntakeOptions().BlockID,
-		Prover:   opts.OntakeOptions().ProverAddress.Hex()[2:],
-		Graffiti: opts.OntakeOptions().Graffiti,
-		ZkAny: &ZkAnyRequestProofBodyParam{
-			Aggregation: opts.OntakeOptions().Compressed,
-		},
+	var reqBody RaikoRequestProofBody
+	switch s.ZKProofType {
+	case ZKProofTypeSP1:
+		reqBody = RaikoRequestProofBody{
+			Type:     s.ZKProofType,
+			Block:    opts.OntakeOptions().BlockID,
+			Prover:   opts.OntakeOptions().ProverAddress.Hex()[2:],
+			Graffiti: opts.OntakeOptions().Graffiti,
+			SP1: &SP1RequestProofBodyParam{
+				Recursion: s.RaikoSP1Recursion,
+				Prover:    s.RaikoSP1Prover,
+			},
+		}
+	default:
+		reqBody = RaikoRequestProofBody{
+			Type:     s.ZKProofType,
+			Block:    opts.OntakeOptions().BlockID,
+			Prover:   opts.OntakeOptions().ProverAddress.Hex()[2:],
+			Graffiti: opts.OntakeOptions().Graffiti,
+			RISC0: &RISC0RequestProofBodyParam{
+				Bonsai:       s.RaikoRISC0Bonsai,
+				Snark:        s.RaikoRISC0Snark,
+				Profile:      s.RaikoRISC0Profile,
+				ExecutionPo2: s.RaikoRISC0ExecutionPo2,
+			},
+		}
 	}
 
 	client := &http.Client{}
