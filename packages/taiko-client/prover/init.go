@@ -121,19 +121,31 @@ func (p *Prover) initProofSubmitters(
 			}
 		case encoding.TierZkVMRisc0ID:
 			producer = &proofProducer.ZKvmProofProducer{
-				ZKProofType:         proofProducer.ZKProofTypeR0,
-				RaikoHostEndpoint:   p.cfg.RaikoZKVMHostEndpoint,
-				JWT:                 p.cfg.RaikoJWT,
-				Dummy:               p.cfg.Dummy,
-				RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
+				ZKProofType:            proofProducer.ZKProofTypeR0,
+				RaikoHostEndpoint:      p.cfg.RaikoZKVMHostEndpoint,
+				JWT:                    p.cfg.RaikoJWT,
+				Dummy:                  p.cfg.Dummy,
+				RaikoRequestTimeout:    p.cfg.RaikoRequestTimeout,
+				RaikoSP1Recursion:      p.cfg.RaikoSP1Recursion,
+				RaikoSP1Prover:         p.cfg.RaikoSP1Prover,
+				RaikoRISC0Bonsai:       p.cfg.RaikoRISC0Bonsai,
+				RaikoRISC0Snark:        p.cfg.RaikoRISC0Snark,
+				RaikoRISC0Profile:      p.cfg.RaikoRISC0Profile,
+				RaikoRISC0ExecutionPo2: p.cfg.RaikoRISC0ExecutionPo2,
 			}
 		case encoding.TierZkVMSp1ID:
 			producer = &proofProducer.ZKvmProofProducer{
-				ZKProofType:         proofProducer.ZKProofTypeSP1,
-				RaikoHostEndpoint:   p.cfg.RaikoZKVMHostEndpoint,
-				JWT:                 p.cfg.RaikoJWT,
-				Dummy:               p.cfg.Dummy,
-				RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
+				ZKProofType:            proofProducer.ZKProofTypeSP1,
+				RaikoHostEndpoint:      p.cfg.RaikoZKVMHostEndpoint,
+				JWT:                    p.cfg.RaikoJWT,
+				Dummy:                  p.cfg.Dummy,
+				RaikoRequestTimeout:    p.cfg.RaikoRequestTimeout,
+				RaikoSP1Recursion:      p.cfg.RaikoSP1Recursion,
+				RaikoSP1Prover:         p.cfg.RaikoSP1Prover,
+				RaikoRISC0Bonsai:       p.cfg.RaikoRISC0Bonsai,
+				RaikoRISC0Snark:        p.cfg.RaikoRISC0Snark,
+				RaikoRISC0Profile:      p.cfg.RaikoRISC0Profile,
+				RaikoRISC0ExecutionPo2: p.cfg.RaikoRISC0ExecutionPo2,
 			}
 		case encoding.TierGuardianMinorityID:
 			producer = proofProducer.NewGuardianProofProducer(encoding.TierGuardianMinorityID, p.cfg.EnableLivenessBondProof)

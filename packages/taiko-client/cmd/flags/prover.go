@@ -53,6 +53,48 @@ var (
 		Value:    10 * time.Minute,
 		EnvVars:  []string{"RAIKO_REQUEST_TIMEOUT"},
 	}
+	RaikoSP1Recursion = &cli.StringFlag{
+		Name:     "raiko.sp1Recursion",
+		Usage:    "SP1 recursion type",
+		Value:    "plonk",
+		Category: proverCategory,
+		EnvVars:  []string{"RAIKO_SP1_RECURSION"},
+	}
+	RaikoSP1Prover = &cli.StringFlag{
+		Name:     "raiko.sp1Prover",
+		Usage:    "SP1 prover type",
+		Value:    "network",
+		Category: proverCategory,
+		EnvVars:  []string{"RAIKO_SP1_PROVER"},
+	}
+	RaikoRISC0Bonsai = &cli.BoolFlag{
+		Name:     "raiko.risc0Bonsai",
+		Usage:    "Use RISC0 bonsai prover",
+		Category: proverCategory,
+		Value:    true,
+		EnvVars:  []string{"RAIKO_RISC0_BONSAI"},
+	}
+	RaikoRISC0Snark = &cli.BoolFlag{
+		Name:     "raiko.risc0Snark",
+		Usage:    "Use snark for RISC0 proof generation",
+		Category: proverCategory,
+		Value:    true,
+		EnvVars:  []string{"RAIKO_RISC0_SNARK"},
+	}
+	RaikoRISC0Profile = &cli.BoolFlag{
+		Name:     "raiko.risc0Profile",
+		Usage:    "Use profile for RISC0 proof generation",
+		Category: proverCategory,
+		Value:    false,
+		EnvVars:  []string{"RAIKO_RISC0_PROFILE"},
+	}
+	RaikoRISC0ExecutionPo2 = &cli.Uint64Flag{
+		Name:     "raiko.risc0ExecutionPo2",
+		Usage:    "Execution steps for RISC0 proof generation",
+		Category: proverCategory,
+		Value:    20,
+		EnvVars:  []string{"RAIKO_RISC0_EXECUTION_PO2"},
+	}
 	StartingBlockID = &cli.Uint64Flag{
 		Name:     "prover.startingBlockID",
 		Usage:    "If set, prover will start proving blocks from the block with this ID",
@@ -227,4 +269,10 @@ var ProverFlags = MergeFlags(CommonFlags, []cli.Flag{
 	BlockConfirmations,
 	RaikoRequestTimeout,
 	RaikoZKVMHostEndpoint,
+	RaikoSP1Recursion,
+	RaikoSP1Prover,
+	RaikoRISC0Bonsai,
+	RaikoRISC0Snark,
+	RaikoRISC0Profile,
+	RaikoRISC0ExecutionPo2,
 }, TxmgrFlags)

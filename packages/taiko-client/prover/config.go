@@ -55,6 +55,12 @@ type Config struct {
 	RaikoZKVMHostEndpoint                   string
 	RaikoJWT                                string
 	RaikoRequestTimeout                     time.Duration
+	RaikoSP1Recursion                       string
+	RaikoSP1Prover                          string
+	RaikoRISC0Bonsai                        bool
+	RaikoRISC0Snark                         bool
+	RaikoRISC0Profile                       bool
+	RaikoRISC0ExecutionPo2                  *big.Int
 	L1NodeVersion                           string
 	L2NodeVersion                           string
 	BlockConfirmations                      uint64
@@ -148,6 +154,12 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		RaikoZKVMHostEndpoint:                   c.String(flags.RaikoZKVMHostEndpoint.Name),
 		RaikoJWT:                                common.Bytes2Hex(jwtSecret),
 		RaikoRequestTimeout:                     c.Duration(flags.RaikoRequestTimeout.Name),
+		RaikoSP1Recursion:                       c.String(flags.RaikoSP1Recursion.Name),
+		RaikoSP1Prover:                          c.String(flags.RaikoSP1Prover.Name),
+		RaikoRISC0Bonsai:                        c.Bool(flags.RaikoRISC0Bonsai.Name),
+		RaikoRISC0Snark:                         c.Bool(flags.RaikoRISC0Snark.Name),
+		RaikoRISC0Profile:                       c.Bool(flags.RaikoRISC0Profile.Name),
+		RaikoRISC0ExecutionPo2:                  new(big.Int).SetUint64(c.Uint64(flags.RaikoRISC0ExecutionPo2.Name)),
 		StartingBlockID:                         startingBlockID,
 		Dummy:                                   c.Bool(flags.Dummy.Name),
 		GuardianProverMinorityAddress:           common.HexToAddress(c.String(flags.GuardianProverMinority.Name)),
