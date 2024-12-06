@@ -130,55 +130,6 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		}
 	}
 
-	if !c.IsSet(flags.RaikoSP1Recursion.Name) {
-		if err := c.Set(flags.RaikoSP1Recursion.Name, "plonk"); err != nil {
-			return nil, err
-		}
-	}
-
-	if !c.IsSet(flags.RaikoSP1Prover.Name) {
-		if err := c.Set(flags.RaikoSP1Prover.Name, "network"); err != nil {
-			return nil, err
-		}
-	}
-
-	if c.IsSet(flags.RaikoRISC0Bonsai.Name) {
-		if err := c.Set(flags.RaikoRISC0Bonsai.Name, "true"); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := c.Set(flags.RaikoRISC0Bonsai.Name, "false"); err != nil {
-			return nil, err
-		}
-	}
-
-	if c.IsSet(flags.RaikoRISC0Snark.Name) {
-		if err := c.Set(flags.RaikoRISC0Snark.Name, "true"); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := c.Set(flags.RaikoRISC0Snark.Name, "false"); err != nil {
-			return nil, err
-		}
-	}
-
-	if c.IsSet(flags.RaikoRISC0Profile.Name) {
-		if err := c.Set(flags.RaikoRISC0Profile.Name, "true"); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := c.Set(flags.RaikoRISC0Profile.Name, "false"); err != nil {
-			return nil, err
-		}
-	}
-
-	raikoRISC0ExecutionPo2 := big.NewInt(20)
-	var raikoRISC0ExecutionPo2Ptr *big.Int = &raikoRISC0ExecutionPo2
-
-	if c.IsSet(flags.RaikoRISC0ExecutionPo2.Name) {
-		raikoRISC0ExecutionPo2Ptr = new(big.Int).SetUint64(c.Uint64(flags.RaikoRISC0ExecutionPo2.Name))
-	}
-
 	return &Config{
 		L1WsEndpoint:                            c.String(flags.L1WSEndpoint.Name),
 		L2WsEndpoint:                            c.String(flags.L2WSEndpoint.Name),
@@ -197,7 +148,7 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		RaikoRISC0Bonsai:                        c.Bool(flags.RaikoRISC0Bonsai.Name),
 		RaikoRISC0Snark:                         c.Bool(flags.RaikoRISC0Snark.Name),
 		RaikoRISC0Profile:                       c.Bool(flags.RaikoRISC0Profile.Name),
-		RaikoRISC0ExecutionPo2:                  raikoRISC0ExecutionPo2Ptr,
+		RaikoRISC0ExecutionPo2:                  new(big.Int).SetUint64(c.Uint64(flags.RaikoRISC0ExecutionPo2.Name)),
 		StartingBlockID:                         startingBlockID,
 		Dummy:                                   c.Bool(flags.Dummy.Name),
 		GuardianProverMinorityAddress:           common.HexToAddress(c.String(flags.GuardianProverMinority.Name)),
