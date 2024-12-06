@@ -41,6 +41,7 @@ func (c *CombinedProducer) RequestProof(
 	)
 
 	taskCtx, taskCtxCancel := context.WithCancel(ctx)
+	defer taskCtxCancel()
 
 	for i, producer := range c.Producers {
 		verifier := c.Verifiers[i]
@@ -79,7 +80,10 @@ func (c *CombinedProducer) RequestProof(
 	if uint8(len(proofs)) < c.RequiredProofs {
 		var errMsgs []string
 
-		errMsgs = append(errMsgs, fmt.Sprintf("not enough proofs collected: required %d, got %d", c.RequiredProofs, len(proofs)))
+		errMsgs = append(
+			errMsgs,
+			fmt.Sprintf("not enough proofs collected: required %d, got %d", c.RequiredProofs, len(proofs)),
+		)
 
 		for err := range errorsChan {
 			errMsgs = append(errMsgs, err.Error())
