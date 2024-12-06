@@ -279,6 +279,7 @@ func (s *ProposerTestSuite) TestProposeOp() {
 			s.Nil(err)
 
 			s.Nil(s.p.ProposeOp(context.Background()))
+			s.Nil(s.s.ProcessL1Blocks(context.Background()))
 
 			var (
 				meta metadata.TaikoBlockMetaData
