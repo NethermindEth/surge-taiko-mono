@@ -61,28 +61,28 @@ var (
 		EnvVars:  []string{"RAIKO_SP1_PROVER"},
 	}
 	RaikoRISC0Bonsai = &cli.BoolFlag{
-		Name:     "raiko.raikoRISC0Bonsai",
+		Name:     "raiko.risc0Bonsai",
 		Usage:    "Use RISC0 bonsai prover",
 		Category: proverCategory,
 		Value:    true,
 		EnvVars:  []string{"RAIKO_RISC0_BONSAI"},
 	}
 	RaikoRISC0Snark = &cli.BoolFlag{
-		Name:     "raiko.raikoRISC0Snark",
+		Name:     "raiko.risc0Snark",
 		Usage:    "Use snark for RISC0 proof generation",
 		Category: proverCategory,
 		Value:    true,
 		EnvVars:  []string{"RAIKO_RISC0_SNARK"},
 	}
 	RaikoRISC0Profile = &cli.BoolFlag{
-		Name:     "raiko.raikoRISC0Profile",
+		Name:     "raiko.risc0Profile",
 		Usage:    "Use profile for RISC0 proof generation",
 		Category: proverCategory,
 		Value:    false,
 		EnvVars:  []string{"RAIKO_RISC0_PROFILE"},
 	}
 	RaikoRISC0ExecutionPo2 = &cli.Uint64Flag{
-		Name:     "raiko.raikoRISC0ExecutionPo2",
+		Name:     "raiko.risc0ExecutionPo2",
 		Usage:    "Execution steps for RISC0 proof generation",
 		Category: proverCategory,
 		Value:    20,
