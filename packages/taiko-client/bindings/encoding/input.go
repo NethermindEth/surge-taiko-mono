@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings"
@@ -273,6 +274,16 @@ var (
 			Type: "uint8",
 		},
 	}
+	subProofComponents = []abi.ArgumentMarshaling{
+		{
+			Name: "verifier",
+			Type: "address",
+		},
+		{
+			Name: "proof",
+			Type: "bytes",
+		},
+	}
 )
 
 var (
@@ -294,6 +305,8 @@ var (
 		{Name: "TaikoData.Transition", Type: transitionComponentsType},
 		{Name: "TaikoData.TierProof", Type: tierProofComponentsType},
 	}
+	subProofComponentsArrayType, _ = abi.NewType("tuple[]", "ComposeVerifier.SubProofs[]", subProofComponents)
+	subProofComponentsArrayArgs    = abi.Arguments{{Type: subProofComponentsArrayType}}
 )
 
 // Contract ABIs.
@@ -448,4 +461,34 @@ func UnpackTxListBytes(txData []byte) ([]byte, error) {
 	}
 
 	return inputs, nil
+}
+
+// EncodeSubProofs performs the solidity `abi.encode` for the given subProofs.
+func EncodeSubProofs(subProofs []SubProof) ([]byte, error) {
+	b, err := subProofComponentsArrayArgs.Pack(subProofs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to abi.encode subProofs, %w", err)
+	}
+	return b, nil
+}
+
+func DecodeSubProofs(data []byte) ([]SubProof, error) {
+	unpacked, err := subProofComponentsArrayArgs.Unpack(data)
+	if err != nil {
+		return nil, err
+	}
+
+	type internalSubProof struct {
+		Verifier common.Address
+		Proof    []byte
+	}
+
+	var internal = unpacked[0].([]internalSubProof)
+	var subProofs []SubProof
+
+	for _, i := range internal {
+		subProofs = append(subProofs, SubProof{Verifier: i.Verifier, Proof: i.Proof})
+	}
+
+	return subProofs, nil
 }
