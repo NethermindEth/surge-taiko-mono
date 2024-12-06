@@ -14,6 +14,13 @@ import "src/shared/common/AddressManager.sol";
 abstract contract DeployCapability is Script {
     error ADDRESS_NULL();
 
+    function addAddress(string memory name, address proxy) internal {
+        vm.writeJson(
+            vm.serializeAddress("deployment", name, proxy),
+            string.concat(vm.projectRoot(), "/deployments/deploy_l1.json")
+        );
+    }
+
     function deployProxy(
         string memory name,
         address impl,
