@@ -245,4 +245,7 @@ var ProverFlags = MergeFlags(CommonFlags, []cli.Flag{
 	BlockConfirmations,
 	RaikoRequestTimeout,
 	RaikoZKVMHostEndpoint,
+	Risc0VerifierAddress,
+	Sp1VerifierAddress,
+	SgxVerifierAddress,
 }, TxmgrFlags)
