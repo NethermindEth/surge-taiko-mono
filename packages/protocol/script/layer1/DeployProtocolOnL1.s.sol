@@ -412,8 +412,17 @@ contract DeployProtocolOnL1 is DeployCapability {
         });
     }
 
-    function deployTierProvider(string memory) private returns (address) {
-        return address(new TierProviderV2());
+
+    function deployTierProvider(string memory tierProviderName) private returns (address) {
+        if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("devnet"))) {
+            return address(new DevnetTierProvider());
+        } else if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("testnet"))) {
+            return address(new TestTierProvider());
+        } else if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("composite"))) {
+            return address(new TierProviderV2());
+        } else {
+            revert("invalid tier provider");
+        }
     }
 
     function deployAuxContracts() private {
