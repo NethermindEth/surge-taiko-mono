@@ -52,11 +52,17 @@ type ProofDataV2 struct {
 
 // ZKvmProofProducer generates a ZK proof for the given block.
 type ZKvmProofProducer struct {
-	ZKProofType         string // ZK Proof type
-	RaikoHostEndpoint   string
-	RaikoRequestTimeout time.Duration
-	JWT                 string // JWT provided by Raiko
-	Dummy               bool
+	ZKProofType            string // ZK Proof type
+	RaikoHostEndpoint      string
+	RaikoRequestTimeout    time.Duration
+	JWT                    string // JWT provided by Raiko
+	Dummy                  bool
+	RaikoSP1Recursion      string
+	RaikoSP1Prover         string
+	RaikoRISC0Bonsai       bool
+	RaikoRISC0Snark        bool
+	RaikoRISC0Profile      bool
+	RaikoRISC0ExecutionPo2 *big.Int
 	DummyProofProducer
 }
 
@@ -164,8 +170,8 @@ func (s *ZKvmProofProducer) requestProof(
 			Prover:   opts.ProverAddress.Hex()[2:],
 			Graffiti: opts.Graffiti,
 			SP1: &SP1RequestProofBodyParam{
-				Recursion: "plonk",
-				Prover:    "network",
+				Recursion: s.RaikoSP1Recursion,
+				Prover:    s.RaikoSP1Prover,
 			},
 		}
 	default:
@@ -175,10 +181,10 @@ func (s *ZKvmProofProducer) requestProof(
 			Prover:   opts.ProverAddress.Hex()[2:],
 			Graffiti: opts.Graffiti,
 			RISC0: &RISC0RequestProofBodyParam{
-				Bonsai:       true,
-				Snark:        true,
-				Profile:      false,
-				ExecutionPo2: big.NewInt(20),
+				Bonsai:       s.RaikoRISC0Bonsai,
+				Snark:        s.RaikoRISC0Snark,
+				Profile:      s.RaikoRISC0Profile,
+				ExecutionPo2: s.RaikoRISC0ExecutionPo2,
 			},
 		}
 	}
