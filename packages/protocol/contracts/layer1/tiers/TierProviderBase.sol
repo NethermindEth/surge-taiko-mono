@@ -52,6 +52,11 @@ abstract contract TierProviderBase is ITierProvider {
             return _buildTier(LibStrings.B_TIER_GUARDIAN, 0, 1440, 2880);
         }
 
+        if (_tierId == LibTiers.TIER_TWO_OF_THREE) {
+            // No validity bond or cooldown.
+            return _buildTier(LibStrings.B_TIER_TWO_OF_THREE, 0, 0, 180);
+        }
+
         revert TIER_NOT_FOUND();
     }
 
