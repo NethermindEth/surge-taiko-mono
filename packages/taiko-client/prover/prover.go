@@ -10,7 +10,6 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/log"
@@ -20,7 +19,6 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/version"
 	eventIterator "github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/chain_iterator/event_iterator"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	handler "github.com/taikoxyz/taiko-mono/packages/taiko-client/prover/event_handler"
@@ -196,27 +194,6 @@ func InitFromConfig(
 		txBuilder,
 	)
 
-	// Guardian prover heartbeat sender
-	if p.IsGuardianProver() && p.cfg.GuardianProverHealthCheckServerEndpoint != nil {
-		// Check guardian prover contract address is correct.
-		if _, err := p.rpc.GuardianProverMajority.MinGuardians(&bind.CallOpts{Context: ctx}); err != nil {
-			return fmt.Errorf("failed to get MinGuardians from majority guardian prover contract: %w", err)
-		}
-
-		if p.rpc.GuardianProverMinority != nil {
-			if _, err := p.rpc.GuardianProverMinority.MinGuardians(&bind.CallOpts{Context: ctx}); err != nil {
-				return fmt.Errorf("failed to get MinGuardians from minority guardian prover contract: %w", err)
-			}
-		}
-
-		p.guardianProverHeartbeater = guardianProverHeartbeater.New(
-			p.cfg.L1ProverPrivKey,
-			p.cfg.GuardianProverHealthCheckServerEndpoint,
-			p.rpc,
-			p.ProverAddress(),
-		)
-	}
-
 	// Initialize event handlers.
 	if err := p.initEventHandlers(); err != nil {
 		return err
@@ -227,6 +204,7 @@ func InitFromConfig(
 
 // Start starts the main loop of the L2 block prover.
 func (p *Prover) Start() error {
+	log.Info("Starting prover")
 	// 1. Set approval amount for the contracts.
 	for _, contract := range []common.Address{p.cfg.TaikoL1Address} {
 		if err := p.setApprovalAmount(p.ctx, contract); err != nil {
@@ -234,24 +212,7 @@ func (p *Prover) Start() error {
 		}
 	}
 
-	// 3. Start the guardian prover heartbeat sender if the current prover is a guardian prover.
-	if p.IsGuardianProver() && p.cfg.GuardianProverHealthCheckServerEndpoint != nil {
-		// Send the startup message to the guardian prover health check server.
-		if err := p.guardianProverHeartbeater.SendStartupMessage(
-			p.ctx,
-			version.CommitVersion(),
-			version.CommitVersion(),
-			p.cfg.L1NodeVersion,
-			p.cfg.L2NodeVersion,
-		); err != nil {
-			log.Error("Failed to send guardian prover startup message", "error", err)
-		}
-
-		// Start the guardian prover heartbeat loop.
-		go p.guardianProverHeartbeatLoop(p.ctx)
-	}
-
-	// 4. Start the main event loop of the prover.
+	// 2. Start the main event loop of the prover.
 	go p.eventLoop()
 
 	return nil
@@ -421,13 +382,6 @@ func (p *Prover) contestProofOp(req *proofProducer.ContestRequestBody) error {
 
 // requestProofOp requests a new proof generation operation.
 func (p *Prover) requestProofOp(meta metadata.TaikoBlockMetaData, minTier uint16) error {
-	if p.IsGuardianProver() {
-		if minTier > encoding.TierGuardianMinorityID {
-			minTier = encoding.TierGuardianMajorityID
-		} else {
-			minTier = encoding.TierGuardianMinorityID
-		}
-	}
 	if submitter := p.selectSubmitter(minTier); submitter != nil {
 		if err := submitter.RequestProof(p.ctx, meta); err != nil {
 			log.Error("Request new proof error", "blockID", meta.GetBlockID(), "minTier", meta.GetMinTier(), "error", err)
@@ -479,9 +433,6 @@ func (p *Prover) Name() string {
 func (p *Prover) selectSubmitter(minTier uint16) proofSubmitter.Submitter {
 	for _, s := range p.proofSubmitters {
 		if s.Tier() >= minTier {
-			if !p.IsGuardianProver() && s.Tier() >= encoding.TierGuardianMinorityID {
-				continue
-			}
 			log.Debug("Proof submitter selected", "tier", s.Tier(), "minTier", minTier)
 			return s
 		}
@@ -496,10 +447,6 @@ func (p *Prover) selectSubmitter(minTier uint16) proofSubmitter.Submitter {
 func (p *Prover) getSubmitterByTier(tier uint16) proofSubmitter.Submitter {
 	for _, s := range p.proofSubmitters {
 		if s.Tier() == tier {
-			if !p.IsGuardianProver() && s.Tier() >= encoding.TierGuardianMinorityID {
-				continue
-			}
-
 			return s
 		}
 	}
