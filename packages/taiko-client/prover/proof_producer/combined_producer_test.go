@@ -95,7 +95,7 @@ func TestCombinedProducerRequestCancel(t *testing.T) {
 
 func TestCombinedProducerTier(t *testing.T) {
 	producer := &CombinedProducer{
-		ProofTier: encoding.TierSgxAndZkVMID,
+		ProofTier:   encoding.TierSgxAndZkVMID,
 		ProofStates: make(map[*big.Int]BlockProofState),
 	}
 
