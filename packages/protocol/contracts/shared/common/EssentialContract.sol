@@ -31,6 +31,7 @@ abstract contract EssentialContract is UUPSUpgradeable, Ownable2StepUpgradeable,
     error REENTRANT_CALL();
     error ZERO_ADDRESS();
     error ZERO_VALUE();
+    error FUNCTION_DISABLED();
 
     /// @dev Modifier that ensures the caller is the owner or resolved address of a given name.
     /// @param _name The name to check against.
@@ -78,6 +79,7 @@ abstract contract EssentialContract is UUPSUpgradeable, Ownable2StepUpgradeable,
 
     /// @notice Pauses the contract.
     function pause() public virtual {
+        _disable();
         _pause();
         // We call the authorize function here to avoid:
         // Warning (5740): Unreachable code.
@@ -135,6 +137,10 @@ abstract contract EssentialContract is UUPSUpgradeable, Ownable2StepUpgradeable,
         __paused = _FALSE;
         lastUnpausedAt = uint64(block.timestamp);
         emit Unpaused(msg.sender);
+    }
+
+    function _disable() internal pure {
+        revert FUNCTION_DISABLED();
     }
 
     function _authorizeUpgrade(address) internal virtual override onlyOwner { }

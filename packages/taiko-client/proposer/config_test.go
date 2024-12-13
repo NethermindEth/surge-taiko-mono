@@ -66,6 +66,7 @@ func (s *ProposerTestSuite) TestNewConfigFromCliContext() {
 		"--" + flags.OffChainCosts.Name, offChainCosts,
 		"--" + flags.ProposeBlockIncludeParentMetaHash.Name, "true",
 		"--" + flags.CheckProfitability.Name, "true",
+		"--" + flags.AllowEmptyBlocks.Name, "true",
 		"--" + flags.GasNeededForProvingBlock.Name, "100000",
 		"--" + flags.PriceFluctuationModifier.Name, "100",
 	}))
@@ -124,6 +125,7 @@ func (s *ProposerTestSuite) SetupApp() *cli.App {
 		&cli.DurationFlag{Name: flags.RPCTimeout.Name},
 		&cli.BoolFlag{Name: flags.ProposeBlockIncludeParentMetaHash.Name},
 		&cli.BoolFlag{Name: flags.CheckProfitability.Name},
+		&cli.BoolFlag{Name: flags.AllowEmptyBlocks.Name},
 		&cli.Uint64Flag{Name: flags.GasNeededForProvingBlock.Name},
 		&cli.Uint64Flag{Name: flags.PriceFluctuationModifier.Name},
 		&cli.StringFlag{Name: flags.OffChainCosts.Name},
