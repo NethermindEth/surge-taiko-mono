@@ -62,6 +62,8 @@ type Proposer struct {
 	wg  sync.WaitGroup
 
 	checkProfitability bool
+
+	allowEmptyBlocks bool
 }
 
 // InitFromCli initializes the given proposer instance based on the command line flags.
@@ -85,6 +87,7 @@ func (p *Proposer) InitFromConfig(
 	p.Config = cfg
 	p.lastProposedAt = time.Now()
 	p.checkProfitability = cfg.CheckProfitability
+	p.allowEmptyBlocks = cfg.AllowEmptyBlocks
 
 	// RPC clients
 	if p.rpc, err = rpc.NewClient(p.ctx, cfg.ClientConfig); err != nil {
@@ -237,8 +240,9 @@ func (p *Proposer) fetchPoolContent(filterPoolContent bool) ([]types.Transaction
 		}
 		txLists = append(txLists, txs.TxList)
 	}
-	// If the pool is empty and we're not filtering or checking profitability, propose an empty block
-	if !filterPoolContent && !p.checkProfitability && len(txLists) == 0 {
+	// If the pool is empty and we're not filtering or checking profitability and proposing empty
+	// blocks is allowed, propose an empty block
+	if !filterPoolContent && !p.checkProfitability && p.allowEmptyBlocks && len(txLists) == 0 {
 		log.Info(
 			"Pool content is empty, proposing an empty block",
 			"lastProposedAt", p.lastProposedAt,
