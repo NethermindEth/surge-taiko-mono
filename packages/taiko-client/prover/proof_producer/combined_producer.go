@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +23,13 @@ type CombinedProducer struct {
 	RequiredProofs uint8
 	Producers      []ProofProducer
 	Verifiers      []common.Address
+	// Map blockID to its proof state
+	ProofStates map[*big.Int]BlockProofState
+}
+
+type BlockProofState struct {
+	verifiedTiers []uint16
+	proofs        []encoding.SubProof
 }
 
 // RequestProof implements the ProofProducer interface.
@@ -33,17 +41,32 @@ func (c *CombinedProducer) RequestProof(
 	header *types.Header,
 	requestAt time.Time,
 ) (*ProofWithHeader, error) {
+	log.Debug("CombinedProducer: RequestProof", "blockID", blockID)
 	var (
 		wg         sync.WaitGroup
 		mu         sync.Mutex
-		proofs     = make([]encoding.SubProof, 0, len(c.Producers))
 		errorsChan = make(chan error, len(c.Producers))
 	)
+
+	// Get or initialize proof state
+	proofState, ok := c.ProofStates[blockID]
+	if !ok {
+		proofState = BlockProofState{
+			verifiedTiers: []uint16{},
+			proofs:        []encoding.SubProof{},
+		}
+		c.ProofStates[blockID] = proofState
+	}
 
 	taskCtx, taskCtxCancel := context.WithCancel(ctx)
 	defer taskCtxCancel()
 
 	for i, producer := range c.Producers {
+		if slices.Contains(proofState.verifiedTiers, producer.Tier()) {
+			log.Debug("Skipping producer, proof already verified", "tier", producer.Tier())
+			continue
+		}
+
 		verifier := c.Verifiers[i]
 
 		wg.Add(1)
@@ -59,9 +82,10 @@ func (c *CombinedProducer) RequestProof(
 			mu.Lock()
 			defer mu.Unlock()
 
-			if uint8(len(proofs)) < c.RequiredProofs {
-				proofs = append(
-					proofs,
+			proofState.verifiedTiers = append(proofState.verifiedTiers, p.Tier())
+			if uint8(len(proofState.proofs)) < c.RequiredProofs {
+				proofState.proofs = append(
+					proofState.proofs,
 					encoding.SubProof{
 						Proof:    proofWithHeader.Proof,
 						Verifier: verifier,
@@ -69,7 +93,7 @@ func (c *CombinedProducer) RequestProof(
 				)
 			}
 
-			if uint8(len(proofs)) == c.RequiredProofs {
+			if uint8(len(proofState.proofs)) == c.RequiredProofs {
 				taskCtxCancel()
 			}
 		}(i, producer, verifier)
@@ -77,14 +101,15 @@ func (c *CombinedProducer) RequestProof(
 
 	wg.Wait()
 
-	if uint8(len(proofs)) < c.RequiredProofs {
+	if uint8(len(proofState.proofs)) < c.RequiredProofs {
 		var errMsgs []string
 
 		errMsgs = append(
 			errMsgs,
-			fmt.Sprintf("not enough proofs collected: required %d, got %d", c.RequiredProofs, len(proofs)),
+			fmt.Sprintf("not enough proofs collected: required %d, got %d", c.RequiredProofs, len(proofState.proofs)),
 		)
 
+		close(errorsChan)
 		for err := range errorsChan {
 			errMsgs = append(errMsgs, err.Error())
 		}
@@ -92,7 +117,7 @@ func (c *CombinedProducer) RequestProof(
 		return nil, fmt.Errorf("combined proof production failed: %s", strings.Join(errMsgs, "; "))
 	}
 
-	combinedProof, err := encoding.EncodeSubProofs(proofs)
+	combinedProof, err := encoding.EncodeSubProofs(proofState.proofs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode sub proofs: %w", err)
 	}
@@ -104,6 +129,8 @@ func (c *CombinedProducer) RequestProof(
 		"producer", "CombinedProducer",
 	)
 
+	c.CleanOldProofStates(blockID, &mu)
+
 	return &ProofWithHeader{
 		BlockID: blockID,
 		Header:  header,
@@ -112,6 +139,25 @@ func (c *CombinedProducer) RequestProof(
 		Opts:    opts,
 		Tier:    c.Tier(),
 	}, nil
+}
+
+// CleanOldProofStates removes proof states for blocks older than 256 blocks.
+func (c *CombinedProducer) CleanOldProofStates(latestBlockID *big.Int, mutex *sync.Mutex) {
+	if len(c.ProofStates) == 0 {
+		return
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	delete(c.ProofStates, latestBlockID)
+
+	threshold := new(big.Int).Sub(latestBlockID, big.NewInt(256))
+	for blockID := range c.ProofStates {
+		if blockID.Cmp(threshold) < 0 {
+			delete(c.ProofStates, blockID)
+		}
+	}
 }
 
 // RequestCancel implements the ProofProducer interface.

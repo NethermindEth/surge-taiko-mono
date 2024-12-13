@@ -43,6 +43,7 @@ func TestCombinedProducerRequestProof(t *testing.T) {
 			common.HexToAddress("0x1234567890123456789012345678901234567890"),
 			common.HexToAddress("0x0987654321098765432109876543210987654321"),
 		},
+		ProofStates: make(map[*big.Int]BlockProofState),
 	}
 
 	blockID := big.NewInt(1)
@@ -80,6 +81,7 @@ func TestCombinedProducerRequestCancel(t *testing.T) {
 			common.HexToAddress("0x1234567890123456789012345678901234567890"),
 			common.HexToAddress("0x0987654321098765432109876543210987654321"),
 		},
+		ProofStates: make(map[*big.Int]BlockProofState),
 	}
 
 	opts := &ProofRequestOptions{
@@ -94,6 +96,7 @@ func TestCombinedProducerRequestCancel(t *testing.T) {
 func TestCombinedProducerTier(t *testing.T) {
 	producer := &CombinedProducer{
 		ProofTier: encoding.TierSgxAndZkVMID,
+		ProofStates: make(map[*big.Int]BlockProofState),
 	}
 
 	require.Equal(t, encoding.TierSgxAndZkVMID, producer.Tier())
