@@ -119,6 +119,13 @@ var (
 		Category: proposerCategory,
 		EnvVars:  []string{"CHECK_PROFITABILITY"},
 	}
+	AllowEmptyBlocks = &cli.BoolFlag{
+		Name:     "allowEmptyBlocks",
+		Usage:    "Allow proposing blocks with zero transactions",
+		Value:    true,
+		Category: proposerCategory,
+		EnvVars:  []string{"ALLOW_EMPTY_BLOCKS"},
+	}
 	GasNeededForProvingBlock = &cli.Uint64Flag{
 		Name:     "gasNeededForProvingBlock",
 		Usage:    "Gas needed for proving a block",
@@ -165,6 +172,7 @@ var ProposerFlags = MergeFlags(CommonFlags, []cli.Flag{
 	ProposeBlockIncludeParentMetaHash,
 	BlobAllowed,
 	CheckProfitability,
+	AllowEmptyBlocks,
 	GasNeededForProvingBlock,
 	PriceFluctuationModifier,
 	OffChainCosts,

@@ -122,3 +122,26 @@ func randomHash() common.Hash {
 	}
 	return hash
 }
+
+func TestGetTiers(t *testing.T) {
+	client := newTestClient(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tiers, err := client.GetTiers(ctx)
+
+	require.Nil(t, err)
+	require.NotNil(t, tiers)
+	require.Greater(t, len(tiers), 0, "should have at least one tier")
+
+	// Check for tier with ID 1100 (TIER_TWO_OF_THREE)
+	found := false
+	for _, tier := range tiers {
+		if tier.ID == 1100 {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "tier with ID 1100 (TIER_TWO_OF_THREE) should exist")
+}

@@ -42,6 +42,7 @@ type Config struct {
 	TxmgrConfigs               *txmgr.CLIConfig
 	PrivateTxmgrConfigs        *txmgr.CLIConfig
 	CheckProfitability         bool
+	AllowEmptyBlocks           bool
 	GasNeededForProvingBlock   uint64
 	PriceFluctuationModifier   uint64
 	OffChainCosts              *big.Int
@@ -86,6 +87,7 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 	}
 
 	checkProfitability := c.Bool(flags.CheckProfitability.Name)
+	allowEmptyBlocks := c.Bool(flags.AllowEmptyBlocks.Name)
 	gasNeededForProvingBlock := c.Uint64(flags.GasNeededForProvingBlock.Name)
 	priceFluctuationModifier := c.Uint64(flags.PriceFluctuationModifier.Name)
 
@@ -136,6 +138,7 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			c,
 		),
 		CheckProfitability:       checkProfitability,
+		AllowEmptyBlocks:         allowEmptyBlocks,
 		GasNeededForProvingBlock: gasNeededForProvingBlock,
 		PriceFluctuationModifier: priceFluctuationModifier,
 		OffChainCosts:            offChainCosts,

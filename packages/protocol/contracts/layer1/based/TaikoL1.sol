@@ -159,6 +159,7 @@ contract TaikoL1 is EssentialContract, ITaikoL1, TaikoEvents {
 
     /// @inheritdoc ITaikoL1
     function pauseProving(bool _pause) external {
+        _disable();
         _authorizePause(msg.sender, _pause);
         LibProving.pauseProving(state, _pause);
     }
