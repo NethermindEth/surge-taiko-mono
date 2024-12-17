@@ -43,7 +43,7 @@ func TestCombinedProducerRequestProof(t *testing.T) {
 			common.HexToAddress("0x1234567890123456789012345678901234567890"),
 			common.HexToAddress("0x0987654321098765432109876543210987654321"),
 		},
-		ProofStates: make(map[*big.Int]BlockProofState),
+		ProofStates: make(map[uint64]*BlockProofState),
 	}
 
 	blockID := big.NewInt(1)
@@ -81,7 +81,7 @@ func TestCombinedProducerRequestCancel(t *testing.T) {
 			common.HexToAddress("0x1234567890123456789012345678901234567890"),
 			common.HexToAddress("0x0987654321098765432109876543210987654321"),
 		},
-		ProofStates: make(map[*big.Int]BlockProofState),
+		ProofStates: make(map[uint64]*BlockProofState),
 	}
 
 	opts := &ProofRequestOptions{
@@ -93,10 +93,60 @@ func TestCombinedProducerRequestCancel(t *testing.T) {
 	require.Nil(t, err)
 }
 
+func TestGetProofState(t *testing.T) {
+	producer := &CombinedProducer{
+		ProofTier:   encoding.TierTwoOfThreeID,
+		ProofStates: make(map[uint64]*BlockProofState),
+	}
+
+	blockID := big.NewInt(1)
+
+	// First call should create new state
+	state1 := producer.getProofState(blockID)
+	require.NotNil(t, state1)
+	require.Empty(t, state1.verifiedTiers)
+	require.Empty(t, state1.proofs)
+
+	// Modify state
+	state1.verifiedTiers = append(state1.verifiedTiers, uint16(1))
+	state1.proofs = append(state1.proofs, encoding.SubProof{
+		Verifier: common.HexToAddress("0x1234"),
+	})
+
+	// Second call should return same state
+	state2 := producer.getProofState(blockID)
+	require.Equal(t, state1, state2)
+	require.Equal(t, []uint16{1}, state2.verifiedTiers)
+	require.Len(t, state2.proofs, 1)
+
+	// Different blockID should get new state
+	blockID2 := big.NewInt(2)
+	state3 := producer.getProofState(blockID2)
+	require.NotNil(t, state3)
+	require.Empty(t, state3.verifiedTiers)
+	require.Empty(t, state3.proofs)
+}
+
+func TestCleanOldProofStates(t *testing.T) {
+	producer := &CombinedProducer{
+		ProofTier:   encoding.TierTwoOfThreeID,
+		ProofStates: make(map[uint64]*BlockProofState),
+	}
+
+	producer.getProofState(big.NewInt(1))
+	producer.getProofState(big.NewInt(2))
+	producer.getProofState(big.NewInt(3))
+	producer.getProofState(big.NewInt(4))
+	producer.getProofState(big.NewInt(5))
+
+	producer.CleanOldProofStates(big.NewInt(258))
+	require.Len(t, producer.ProofStates, 4)
+}
+
 func TestCombinedProducerTier(t *testing.T) {
 	producer := &CombinedProducer{
 		ProofTier:   encoding.TierSgxAndZkVMID,
-		ProofStates: make(map[*big.Int]BlockProofState),
+		ProofStates: make(map[uint64]*BlockProofState),
 	}
 
 	require.Equal(t, encoding.TierSgxAndZkVMID, producer.Tier())
