@@ -55,7 +55,7 @@ services:
     command:
       - processor
       - --queue.prefetch=100
-      - --processorPrivateKey=bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31
+      - --processorPrivateKey=${PROCESSOR_PRIVATE_KEY}
       - --destBridgeAddress=${L2_BRIDGE_ADDRESS}
       - --destERC20VaultAddress=${L2_ERC20_VAULT_ADDRESS}
       - --destERC721Address=${L2_ERC721_VAULT_ADDRESS}
@@ -157,8 +157,8 @@ services:
       - --db.name=relayer
       - --db.password=root
       - --db.username=root
-      - --srcRpcUrl=${L1_RPC_URL}
-      - --destRpcUrl=${L2_RPC_URL}
+      - --srcRpcUrl=${L2_RPC_URL}
+      - --destRpcUrl=${L1_RPC_URL}
       - --destTaikoAddress=${L1_TAIKO_ADDRESS}
       - --processingFeeMultiplier=1.75
     networks:
@@ -181,8 +181,8 @@ services:
       - --destERC1155Address=${L1_ERC1155_VAULT_ADDRESS}
       - --destTaikoAddress=${L1_TAIKO_ADDRESS}
       - --srcSignalServiceAddress=${L2_SIGNAL_SERVICE_ADDRESS}
-      - --srcRpcUrl=${L1_RPC_URL}
-      - --destRpcUrl=${L2_RPC_URL}
+      - --srcRpcUrl=${L2_RPC_URL}
+      - --destRpcUrl=${L1_RPC_URL}
       - --confirmations=0
       - --headerSyncInterval=2
       - --profitableOnly=false
@@ -219,8 +219,8 @@ services:
       - --srcBridgeAddress=${L2_BRIDGE_ADDRESS}
       - --destBridgeAddress=${L1_BRIDGE_ADDRESS}
       - --srcSignalServiceAddress=${L2_SIGNAL_SERVICE_ADDRESS}
-      - --srcRpcUrl=${L1_RPC_URL}
-      - --destRpcUrl=${L2_RPC_URL}
+      - --srcRpcUrl=${L2_RPC_URL}
+      - --destRpcUrl=${L1_RPC_URL}
       - --queue.host=rabbitmq
       - --queue.password=root
       - --queue.port=5672
