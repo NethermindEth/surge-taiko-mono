@@ -181,8 +181,8 @@ services:
       - --destERC1155Address=${L1_ERC1155_VAULT_ADDRESS}
       - --destTaikoAddress=${L1_TAIKO_ADDRESS}
       - --srcSignalServiceAddress=${L2_SIGNAL_SERVICE_ADDRESS}
-      - --srcRpcUrl=${L1_RPC_URL}
-      - --destRpcUrl=${L2_RPC_URL}
+      - --srcRpcUrl=${L2_RPC_URL}
+      - --destRpcUrl=${L1_RPC_URL}
       - --confirmations=0
       - --headerSyncInterval=2
       - --profitableOnly=false
