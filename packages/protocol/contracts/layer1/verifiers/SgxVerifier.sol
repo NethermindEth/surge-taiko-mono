@@ -144,8 +144,9 @@ contract SgxVerifier is EssentialContract, IVerifier {
         TaikoData.TierProof calldata _proof
     )
         external
-        onlyFromNamedEither(LibStrings.B_TAIKO, LibStrings.B_TIER_TEE_ANY)
     {
+        // ^ Access controls removed for testnet.
+
         // Do not run proof verification to contest an existing proof
         if (_ctx.isContesting) return;
 

@@ -378,7 +378,7 @@ contract DeployProtocolOnL1 is DeployCapability {
 
         // Deploy composite verifier
         deployProxy({
-            name: "two_of_three_verifier",
+            name: "tier_two_of_three",
             impl: address(new TwoOfThreeVerifier()),
             data: abi.encodeCall(ComposeVerifier.init, (owner, rollupAddressManager)),
             registerTo: rollupAddressManager

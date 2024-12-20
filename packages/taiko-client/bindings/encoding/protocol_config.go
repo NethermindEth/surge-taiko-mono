@@ -22,7 +22,7 @@ var (
 		MaxBlocksToVerify:     16,
 		BlockMaxGasLimit:      240_000_000,
 		LivenessBond:          livenessBond,
-		StateRootSyncInternal: 16,
+		StateRootSyncInternal: 1,
 		MaxAnchorHeightOffset: 64,
 		OntakeForkHeight:      1,
 		BaseFeeConfig: bindings.LibSharedDataBaseFeeConfig{
@@ -40,7 +40,7 @@ var (
 		MaxBlocksToVerify:     16,
 		BlockMaxGasLimit:      240_000_000,
 		LivenessBond:          livenessBond,
-		StateRootSyncInternal: 16,
+		StateRootSyncInternal: 1,
 		MaxAnchorHeightOffset: 64,
 		OntakeForkHeight:      1,
 		BaseFeeConfig: bindings.LibSharedDataBaseFeeConfig{
@@ -58,7 +58,7 @@ var (
 		MaxBlocksToVerify:     16,
 		BlockMaxGasLimit:      240_000_000,
 		LivenessBond:          livenessBond,
-		StateRootSyncInternal: 16,
+		StateRootSyncInternal: 1,
 		MaxAnchorHeightOffset: 64,
 		OntakeForkHeight:      1,
 		BaseFeeConfig: bindings.LibSharedDataBaseFeeConfig{
@@ -75,7 +75,7 @@ var (
 		MaxBlocksToVerify:     16,
 		BlockMaxGasLimit:      240_000_000,
 		LivenessBond:          livenessBond,
-		StateRootSyncInternal: 16,
+		StateRootSyncInternal: 1,
 		MaxAnchorHeightOffset: 64,
 		OntakeForkHeight:      1,
 		BaseFeeConfig: bindings.LibSharedDataBaseFeeConfig{
@@ -92,7 +92,7 @@ var (
 		MaxBlocksToVerify:     16,
 		BlockMaxGasLimit:      240_000_000,
 		LivenessBond:          livenessBond,
-		StateRootSyncInternal: 16,
+		StateRootSyncInternal: 1,
 		MaxAnchorHeightOffset: 64,
 		OntakeForkHeight:      1,
 		BaseFeeConfig: bindings.LibSharedDataBaseFeeConfig{
