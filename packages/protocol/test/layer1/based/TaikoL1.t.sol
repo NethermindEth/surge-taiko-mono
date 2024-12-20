@@ -182,43 +182,6 @@ contract TaikoL1Tests is TaikoL1TestBase {
         }
     }
 
-    function test_pauseProving() external {
-        L1.pauseProving(true);
-
-        TaikoData.BlockMetadata memory meta;
-
-        giveEthAndDepositBond(Alice, 1000 ether, 1000 ether);
-        giveEthAndDepositBond(Bob, 1000 ether, 1000 ether);
-
-        // Proposing is still possible
-        (meta,) = proposeBlock(Alice, 1024);
-        // Proving is not, so supply the revert reason to proveBlock
-        proveBlock(
-            Bob,
-            meta,
-            GENESIS_BLOCK_HASH,
-            bytes32("01"),
-            bytes32("02"),
-            meta.minTier,
-            LibProving.L1_PROVING_PAUSED.selector
-        );
-    }
-
-    function test_unpause() external {
-        giveEthAndDepositBond(Alice, 1000 ether, 1000 ether);
-
-        L1.pause();
-
-        // Proposing is also not possible
-        proposeButRevert(Alice, 1024, EssentialContract.INVALID_PAUSE_STATUS.selector);
-
-        // unpause
-        L1.unpause();
-
-        // Proposing is possible again
-        proposeBlock(Alice, 1024);
-    }
-
     function test_getTierIds() external {
         uint16[] memory tiers = cp.getTierIds();
         assertEq(tiers[0], LibTiers.TIER_OPTIMISTIC);

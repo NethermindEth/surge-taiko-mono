@@ -32,6 +32,8 @@ import "src/layer1/provers/GuardianProver.sol";
 import "src/layer1/tiers/TierProviderV2.sol";
 import "src/layer1/verifiers/Risc0Verifier.sol";
 import "src/layer1/verifiers/SP1Verifier.sol";
+import "src/layer1/verifiers/compose/TwoOfThreeVerifier.sol";
+import "src/layer1/verifiers/compose/ComposeVerifier.sol";
 import "test/layer1/based/TestTierProvider.sol";
 import "test/shared/token/FreeMintERC20.sol";
 import "test/shared/token/MayFailFreeMintERC20.sol";
@@ -373,6 +375,14 @@ contract DeployProtocolOnL1 is DeployCapability {
         console2.log("AutomataDcapVaAttestation", automataProxy);
 
         deployZKVerifiers(owner, rollupAddressManager);
+
+        // Deploy composite verifier
+        deployProxy({
+            name: "two_of_three_verifier",
+            impl: address(new TwoOfThreeVerifier()),
+            data: abi.encodeCall(ComposeVerifier.init, (owner, rollupAddressManager)),
+            registerTo: rollupAddressManager
+        });
     }
 
     // deploy both sp1 & risc0 verifiers.
@@ -402,12 +412,13 @@ contract DeployProtocolOnL1 is DeployCapability {
         });
     }
 
+
     function deployTierProvider(string memory tierProviderName) private returns (address) {
         if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("devnet"))) {
             return address(new DevnetTierProvider());
         } else if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("testnet"))) {
             return address(new TestTierProvider());
-        } else if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("mainnet"))) {
+        } else if (keccak256(abi.encode(tierProviderName)) == keccak256(abi.encode("composite"))) {
             return address(new TierProviderV2());
         } else {
             revert("invalid tier provider");

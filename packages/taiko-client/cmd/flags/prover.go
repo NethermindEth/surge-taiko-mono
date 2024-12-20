@@ -40,6 +40,24 @@ var (
 		Category: proverCategory,
 		EnvVars:  []string{"RAIKO_HOST_ZKVM"},
 	}
+	Risc0VerifierAddress = &cli.StringFlag{
+		Name:     "risc0Verifier",
+		Usage:    "Address of the Risc0 verifier contract",
+		Category: proverCategory,
+		EnvVars:  []string{"RISC0_VERIFIER"},
+	}
+	Sp1VerifierAddress = &cli.StringFlag{
+		Name:     "sp1Verifier",
+		Usage:    "Address of the SP1 verifier contract",
+		Category: proverCategory,
+		EnvVars:  []string{"SP1_VERIFIER"},
+	}
+	SgxVerifierAddress = &cli.StringFlag{
+		Name:     "sgxVerifier",
+		Usage:    "Address of the Risc0 verifier contract",
+		Category: proverCategory,
+		EnvVars:  []string{"SGX_VERIFIER"},
+	}
 	RaikoJWTPath = &cli.StringFlag{
 		Name:     "raiko.jwtPath",
 		Usage:    "Path to a JWT secret for the Raiko service",
@@ -269,6 +287,9 @@ var ProverFlags = MergeFlags(CommonFlags, []cli.Flag{
 	BlockConfirmations,
 	RaikoRequestTimeout,
 	RaikoZKVMHostEndpoint,
+	Risc0VerifierAddress,
+	Sp1VerifierAddress,
+	SgxVerifierAddress,
 	RaikoSP1Recursion,
 	RaikoSP1Prover,
 	RaikoRISC0Bonsai,

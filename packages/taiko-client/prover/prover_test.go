@@ -111,6 +111,7 @@ func (s *ProverTestSuite) SetupTest() {
 		ProposeInterval:            1024 * time.Hour,
 		MaxProposedTxListsPerEpoch: 1,
 		CheckProfitability:         false,
+		AllowEmptyBlocks:           true,
 		GasNeededForProvingBlock:   0,
 		PriceFluctuationModifier:   50,
 		OffChainCosts:              big.NewInt(0),
@@ -366,7 +367,7 @@ func (s *ProverTestSuite) TestSelectSubmitter() {
 }
 
 func (s *ProverTestSuite) TestSelectSubmitterNotFound() {
-	submitter := s.p.selectSubmitter(encoding.TierGuardianMajorityID + 1)
+	submitter := s.p.selectSubmitter(encoding.TierGuardianMajorityID + 1000)
 	s.Nil(submitter)
 }
 
