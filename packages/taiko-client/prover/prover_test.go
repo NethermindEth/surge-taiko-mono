@@ -367,7 +367,7 @@ func (s *ProverTestSuite) TestSelectSubmitter() {
 }
 
 func (s *ProverTestSuite) TestSelectSubmitterNotFound() {
-	submitter := s.p.selectSubmitter(encoding.TierGuardianMajorityID + 1)
+	submitter := s.p.selectSubmitter(encoding.TierGuardianMajorityID + 1000)
 	s.Nil(submitter)
 }
 

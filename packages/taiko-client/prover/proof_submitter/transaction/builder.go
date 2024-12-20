@@ -63,7 +63,7 @@ func (a *ProveBlockTxBuilder) Build(
 			data     []byte
 			to       common.Address
 			err      error
-			guardian = tier >= encoding.TierGuardianMinorityID
+			guardian = false
 		)
 
 		log.Info(
