@@ -2,7 +2,7 @@
   "configuredChains": [
     {
       "3151908": {
-        "name": "Kurtosis",
+        "name": "Holesky",
         "type": "L1",
         "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
@@ -25,7 +25,7 @@
     },
     {
       "763374": {
-        "name": "Taiko",
+        "name": "Surge",
         "type": "L2",
         "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
@@ -34,8 +34,8 @@
           }
         },
         "nativeCurrency": {
-          "name": "TaikoETH",
-          "symbol": "tETH",
+          "name": "SurgeETH",
+          "symbol": "sETH",
           "decimals": 18
         },
         "blockExplorers": {
