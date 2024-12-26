@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/governance/TimelockController.sol";
 import "@risc0/contracts/groth16/RiscZeroGroth16Verifier.sol";
 import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v3.0.0-rc3/SP1VerifierPlonk.sol";
 
@@ -59,10 +60,25 @@ contract DeployProtocolOnL1 is DeployCapability {
     function run() external broadcast {
         addressNotNull(vm.envAddress("TAIKO_L2_ADDRESS"), "TAIKO_L2_ADDRESS");
         addressNotNull(vm.envAddress("L2_SIGNAL_SERVICE"), "L2_SIGNAL_SERVICE");
-        addressNotNull(vm.envAddress("CONTRACT_OWNER"), "CONTRACT_OWNER");
 
         require(vm.envBytes32("L2_GENESIS_HASH") != 0, "L2_GENESIS_HASH");
-        address contractOwner = vm.envAddress("CONTRACT_OWNER");
+
+        address[] memory executors = vm.envAddress("OWNER_MULTISIG_SIGNERS", ",");
+        
+        address ownerMultisig = vm.envAddress("OWNER_MULTISIG");
+        addressNotNull(ownerMultisig, "ownerMultisig");
+        
+        address[] memory proposers = new address[](1);
+        proposers[0] = ownerMultisig; 
+        
+        // Setup timelock controller with 45 day (86400 seconds * 45) delay
+        address timelockController = address(
+            new TimelockController(86400 * 45, proposers, executors, address(0))
+        );
+        address contractOwner = timelockController;
+
+        address verifierOwner = vm.envAddress("VERIFIER_OWNER");
+        addressNotNull(verifierOwner, "verifierOwner");
 
         // ---------------------------------------------------------------
         // Deploy shared contracts
@@ -70,7 +86,7 @@ contract DeployProtocolOnL1 is DeployCapability {
         console2.log("sharedAddressManager: ", sharedAddressManager);
         // ---------------------------------------------------------------
         // Deploy rollup contracts
-        address rollupAddressManager = deployRollupContracts(sharedAddressManager, contractOwner);
+        address rollupAddressManager = deployRollupContracts(sharedAddressManager, contractOwner, verifierOwner);
 
         // ---------------------------------------------------------------
         // Signal service need to authorize the new rollup
@@ -244,7 +260,8 @@ contract DeployProtocolOnL1 is DeployCapability {
 
     function deployRollupContracts(
         address _sharedAddressManager,
-        address owner
+        address owner,
+        address verifierOwner
     )
         internal
         returns (address rollupAddressManager)
@@ -303,7 +320,7 @@ contract DeployProtocolOnL1 is DeployCapability {
         deployProxy({
             name: "tier_sgx",
             impl: address(new SgxVerifier()),
-            data: abi.encodeCall(SgxVerifier.init, (owner, rollupAddressManager)),
+            data: abi.encodeCall(SgxVerifier.init, (verifierOwner, rollupAddressManager)),
             registerTo: rollupAddressManager
         });
 
@@ -364,7 +381,7 @@ contract DeployProtocolOnL1 is DeployCapability {
             name: "automata_dcap_attestation",
             impl: automateDcapV3AttestationImpl,
             data: abi.encodeCall(
-                AutomataDcapV3Attestation.init, (owner, address(sigVerifyLib), address(pemCertChainLib))
+                AutomataDcapV3Attestation.init, (verifierOwner, address(sigVerifyLib), address(pemCertChainLib))
             ),
             registerTo: rollupAddressManager
         });
@@ -374,20 +391,20 @@ contract DeployProtocolOnL1 is DeployCapability {
         console2.log("PemCertChainLib", address(pemCertChainLib));
         console2.log("AutomataDcapVaAttestation", automataProxy);
 
-        deployZKVerifiers(owner, rollupAddressManager);
+        deployZKVerifiers(verifierOwner, rollupAddressManager);
 
         // Deploy composite verifier
         deployProxy({
             name: "tier_two_of_three",
             impl: address(new TwoOfThreeVerifier()),
-            data: abi.encodeCall(ComposeVerifier.init, (owner, rollupAddressManager)),
+            data: abi.encodeCall(ComposeVerifier.init, (verifierOwner, rollupAddressManager)),
             registerTo: rollupAddressManager
         });
     }
 
     // deploy both sp1 & risc0 verifiers.
     // using function to avoid stack too deep error
-    function deployZKVerifiers(address owner, address rollupAddressManager) private {
+    function deployZKVerifiers(address verifierOwner, address rollupAddressManager) private {
         // Deploy r0 groth16 verifier
         RiscZeroGroth16Verifier verifier =
             new RiscZeroGroth16Verifier(ControlID.CONTROL_ROOT, ControlID.BN254_CONTROL_ID);
@@ -396,7 +413,7 @@ contract DeployProtocolOnL1 is DeployCapability {
         deployProxy({
             name: "tier_zkvm_risc0",
             impl: address(new Risc0Verifier()),
-            data: abi.encodeCall(Risc0Verifier.init, (owner, rollupAddressManager)),
+            data: abi.encodeCall(Risc0Verifier.init, (verifierOwner, rollupAddressManager)),
             registerTo: rollupAddressManager
         });
 
@@ -407,7 +424,7 @@ contract DeployProtocolOnL1 is DeployCapability {
         deployProxy({
             name: "tier_zkvm_sp1",
             impl: address(new SP1Verifier()),
-            data: abi.encodeCall(SP1Verifier.init, (owner, rollupAddressManager)),
+            data: abi.encodeCall(SP1Verifier.init, (verifierOwner, rollupAddressManager)),
             registerTo: rollupAddressManager
         });
     }
