@@ -18,6 +18,8 @@ library LibNetwork {
 
     uint256 internal constant ETHEREUM_BLOCK_TIME = 12 seconds;
 
+    uint64 internal constant KURTOSIS_DEVNET = 3_151_908;
+
     /// @dev Checks if the chain ID represents an Ethereum testnet.
     /// @param _chainId The chain ID.
     /// @return true if the chain ID represents an Ethereum testnet, false otherwise.
@@ -58,6 +60,6 @@ library LibNetwork {
     function isDencunSupported(uint256 _chainId) internal pure returns (bool) {
         return _chainId == LibNetwork.ETHEREUM_MAINNET || _chainId == LibNetwork.ETHEREUM_HOLESKY
             || _chainId == LibNetwork.ETHEREUM_SEPOLIA || _chainId == LibNetwork.ETHEREUM_HELDER
-            || isTaikoDevnet(_chainId);
+            || _chainId == LibNetwork.KURTOSIS_DEVNET || isTaikoDevnet(_chainId);
     }
 }
