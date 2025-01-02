@@ -59,6 +59,9 @@ type Proposer struct {
 	wg  sync.WaitGroup
 
 	checkProfitability bool
+
+	allowEmptyBlocks bool
+	initDone         bool
 }
 
 // InitFromCli initializes the given proposer instance based on the command line flags.
@@ -485,7 +488,7 @@ func (p *Proposer) ProposeTxListPacaya(
 }
 
 func (p *Proposer) buildCheaperOnTakeTransaction(ctx context.Context,
-	txListsBytesArray [][]byte) (*txmgr.TxCandidate, *big.Int, error) {
+	txListsBytesArray [][]byte, isEmptyBlock bool) (*txmgr.TxCandidate, *big.Int, error) {
 
 	txBlob, err := p.txBuilder.BuildOntake(ctx, txListsBytesArray)
 	if err != nil {
