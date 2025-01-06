@@ -551,11 +551,13 @@ func (p *Proposer) chooseCheaperTransaction(
 	}
 	totalBlobCost := new(big.Int).Add(blobTxCost, blobCost)
 
-	if calldataTxCost.Cmp(totalBlobCost) > 0 {
+	// if calldataTxCost.Cmp(totalBlobCost) > 0 {
+		log.Info("Using blob tx", "blobTxCost", blobTxCost, "blobCost", blobCost)
 		return txBlob, totalBlobCost, nil
-	}
+	// }
 
-	return txCallData, calldataTxCost, nil
+	// log.Info("Using calldata tx", "calldataTxCost", calldataTxCost)
+	// return txCallData, calldataTxCost, nil
 }
 
 // compressTxLists compresses transaction lists and returns compressed bytes array and transaction counts
