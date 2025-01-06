@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
@@ -134,6 +135,7 @@ func (b *CalldataTransactionBuilder) BuildOntake(
 	ctx context.Context,
 	txListBytesArray [][]byte,
 ) (*txmgr.TxCandidate, error) {
+	log.Debug("Building calldata tx ontake")
 	// Check if the current L2 chain is after ontake fork.
 	state, err := rpc.GetProtocolStateVariables(b.rpc.TaikoL1, &bind.CallOpts{Context: ctx})
 	if err != nil {

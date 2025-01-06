@@ -536,10 +536,11 @@ func (p *Proposer) chooseCheaperTransaction(
 	txCallData *txmgr.TxCandidate,
 	txBlob *txmgr.TxCandidate,
 ) (*txmgr.TxCandidate, *big.Int, error) {
-	calldataTxCost, err := p.getTransactionCost(txCallData)
-	if err != nil {
-		return nil, nil, err
-	}
+	log.Debug("Choosing cheaper transaction")
+	// calldataTxCost, err := p.getTransactionCost(txCallData)
+	// if err != nil {
+	// 	return nil, nil, err
+	// }
 
 	blobTxCost, err := p.getTransactionCost(txBlob)
 	if err != nil {
