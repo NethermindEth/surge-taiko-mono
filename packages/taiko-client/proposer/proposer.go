@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
@@ -539,23 +540,23 @@ func (p *Proposer) chooseCheaperTransaction(
 	txBlob *txmgr.TxCandidate,
 ) (*txmgr.TxCandidate, *big.Int, error) {
 	log.Debug("Choosing cheaper transaction")
-	// calldataTxCost, err := p.getTransactionCost(txCallData)
-	// if err != nil {
-	// 	return nil, nil, err
-	// }
+	calldataTxCost, err := p.getTransactionCost(txCallData, nil)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	totalBlobCost, err := p.getBlobTxCost(txBlob)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// if calldataTxCost.Cmp(totalBlobCost) > 0 {
-	log.Info("Using blob tx", "totalBlobCost", totalBlobCost)
-	return txBlob, totalBlobCost, nil
-	// }
+	if calldataTxCost.Cmp(totalBlobCost) > 0 {
+		log.Info("Using blob tx", "totalBlobCost", totalBlobCost)
+		return txBlob, totalBlobCost, nil
+	}
 
-	// log.Info("Using calldata tx", "calldataTxCost", calldataTxCost)
-	// return txCallData, calldataTxCost, nil
+	log.Info("Using calldata tx", "calldataTxCost", calldataTxCost)
+	return txCallData, calldataTxCost, nil
 }
 
 // compressTxLists compresses transaction lists and returns compressed bytes array and transaction counts
@@ -706,13 +707,16 @@ func (p *Proposer) getTransactionCost(txCandidate *txmgr.TxCandidate, blobBaseFe
 		if err != nil {
 			return nil, fmt.Errorf("getTransactionCost: failed to calculate blob hashes: %w", err)
 		}
-		log.Debug("getTransactionCost", "blobHashes", blobHashes)
+		// log.Debug("getTransactionCost", "blobHashes", blobHashes)
 		msg = ethereum.CallMsg{
 			From:          p.proposerAddress,
 			To:            txCandidate.To,
 			Data:          txCandidate.TxData,
 			Gas:           0,
 			Value:         nil,
+			// GasPrice:      gasPrice	,
+			// GasFeeCap:     big.NewInt(1000000000000),
+			// GasTipCap:     big.NewInt(1000000000000),
 			BlobGasFeeCap: blobBaseFee,
 			BlobHashes:    blobHashes,
 		}
@@ -726,13 +730,57 @@ func (p *Proposer) getTransactionCost(txCandidate *txmgr.TxCandidate, blobBaseFe
 		}
 	}
 
-	log.Debug("getTransactionCost", "msg", msg)
-	estimatedGasUsage, err := p.rpc.L1.EstimateGas(p.ctx, msg)
+	// log.Debug("getTransactionCost", "msg", msg)
+	// estimatedGasUsage, err := p.rpc.L1.EstimateGas(p.ctx, msg)
+
+	log.Debug("getTransactionCost", "converted msg", toCallArg(msg))
+
+	var hex hexutil.Uint64
+	err = p.rpc.L1.CallContext(p.ctx, &hex, "eth_estimateGas", toCallArg(msg))
 	if err != nil {
 		return nil, fmt.Errorf("getTransactionCost: failed to estimate gas: %w", err)
 	}
+	estimatedGasUsage := uint64(hex)
+
+	log.Debug("getTransactionCost", "estimatedGasUsage", estimatedGasUsage)
 
 	return new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(estimatedGasUsage)), nil
+}
+
+func toCallArg(msg ethereum.CallMsg) interface{} {
+	arg := map[string]interface{}{
+		"from": msg.From,
+		"to":   msg.To,
+	}
+	if len(msg.Data) > 0 {
+		arg["input"] = hexutil.Bytes(msg.Data)
+	}
+	if msg.Value != nil {
+		arg["value"] = (*hexutil.Big)(msg.Value)
+	}
+	if msg.Gas != 0 {
+		arg["gas"] = hexutil.Uint64(msg.Gas)
+	}
+	if msg.GasPrice != nil {
+		arg["gasPrice"] = (*hexutil.Big)(msg.GasPrice)
+	}
+	if msg.GasFeeCap != nil {
+		arg["maxFeePerGas"] = (*hexutil.Big)(msg.GasFeeCap)
+	}
+	if msg.GasTipCap != nil {
+		arg["maxPriorityFeePerGas"] = (*hexutil.Big)(msg.GasTipCap)
+	}
+	if msg.AccessList != nil {
+		arg["accessList"] = msg.AccessList
+	}
+	if msg.BlobGasFeeCap != nil {
+		arg["maxFeePerBlobGas"] = (*hexutil.Big)(msg.BlobGasFeeCap)
+		arg["type"] = "0x3"
+	}
+	if msg.BlobHashes != nil {
+		arg["blobVersionedHashes"] = msg.BlobHashes
+	}
+	return arg
 }
 
 func calculateBlobHashes(blobs []*eth.Blob) ([]common.Hash, error) {
