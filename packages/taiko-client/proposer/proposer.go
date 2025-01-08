@@ -539,23 +539,23 @@ func (p *Proposer) chooseCheaperTransaction(
 	txBlob *txmgr.TxCandidate,
 ) (*txmgr.TxCandidate, *big.Int, error) {
 	log.Debug("Choosing cheaper transaction")
-	// calldataTxCost, err := p.getTransactionCost(txCallData)
-	// if err != nil {
-	// 	return nil, nil, err
-	// }
+	calldataTxCost, err := p.getTransactionCost(txCallData, nil)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	totalBlobCost, err := p.getBlobTxCost(txBlob)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// if calldataTxCost.Cmp(totalBlobCost) > 0 {
-	log.Info("Using blob tx", "totalBlobCost", totalBlobCost)
-	return txBlob, totalBlobCost, nil
-	// }
+	if calldataTxCost.Cmp(totalBlobCost) > 0 {
+		log.Info("Using blob tx", "totalBlobCost", totalBlobCost)
+		return txBlob, totalBlobCost, nil
+	}
 
-	// log.Info("Using calldata tx", "calldataTxCost", calldataTxCost)
-	// return txCallData, calldataTxCost, nil
+	log.Info("Using calldata tx", "calldataTxCost", calldataTxCost)
+	return txCallData, calldataTxCost, nil
 }
 
 // compressTxLists compresses transaction lists and returns compressed bytes array and transaction counts
@@ -706,7 +706,6 @@ func (p *Proposer) getTransactionCost(txCandidate *txmgr.TxCandidate, blobBaseFe
 		if err != nil {
 			return nil, fmt.Errorf("getTransactionCost: failed to calculate blob hashes: %w", err)
 		}
-		log.Debug("getTransactionCost", "blobHashes", blobHashes)
 		msg = ethereum.CallMsg{
 			From:          p.proposerAddress,
 			To:            txCandidate.To,
@@ -726,11 +725,12 @@ func (p *Proposer) getTransactionCost(txCandidate *txmgr.TxCandidate, blobBaseFe
 		}
 	}
 
-	log.Debug("getTransactionCost", "msg", msg)
 	estimatedGasUsage, err := p.rpc.L1.EstimateGas(p.ctx, msg)
 	if err != nil {
 		return nil, fmt.Errorf("getTransactionCost: failed to estimate gas: %w", err)
 	}
+
+	log.Debug("getTransactionCost", "estimatedGasUsage", estimatedGasUsage)
 
 	return new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(estimatedGasUsage)), nil
 }
