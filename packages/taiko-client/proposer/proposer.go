@@ -2,6 +2,7 @@ package proposer
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math/big"
@@ -16,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/urfave/cli/v2"
@@ -495,7 +497,13 @@ func (p *Proposer) buildCheaperOnTakeTransaction(ctx context.Context,
 		return nil, nil, err
 	}
 
-	blobCost, err := p.getBlobCost(txBlob.Blobs)
+	// Get current blob base fee
+	blobBaseFee, err := p.rpc.L1.BlobBaseFee(p.ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	blobCost, err := p.getBlobCost(txBlob.Blobs, blobBaseFee)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -629,34 +637,83 @@ func get75PercentOf(num *big.Int) *big.Int {
 	return new(big.Int).Div(result, big.NewInt(4))
 }
 
-func (p *Proposer) getTransactionCost(txCandidate *txmgr.TxCandidate) (*big.Int, error) {
-	// Get the current L1 gas price
-	gasPrice, err := p.rpc.L1.SuggestGasPrice(p.ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getTransactionCost: failed to get gas price: %w", err)
-	}
-
-	estimatedGasUsage, err := p.rpc.L1.EstimateGas(p.ctx, ethereum.CallMsg{
-		From:  p.proposerAddress,
-		To:    txCandidate.To,
-		Data:  txCandidate.TxData,
-		Gas:   0,
-		Value: nil,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("getTransactionCost: failed to estimate gas: %w", err)
-	}
-
-	return new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(estimatedGasUsage)), nil
-}
-
-func (p *Proposer) getBlobCost(blobs []*eth.Blob) (*big.Int, error) {
+func (p *Proposer) getBlobTxCost(txCandidate *txmgr.TxCandidate) (*big.Int, error) {
 	// Get current blob base fee
 	blobBaseFee, err := p.rpc.L1.BlobBaseFee(p.ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	blobTxCost, err := p.getTransactionCost(txCandidate, blobBaseFee)
+	if err != nil {
+		return nil, err
+	}
+	blobCost, err := p.getBlobCost(txCandidate.Blobs, blobBaseFee)
+	if err != nil {
+		return nil, err
+	}
+	return new(big.Int).Add(blobTxCost, blobCost), nil
+}
+
+func (p *Proposer) getTransactionCost(txCandidate *txmgr.TxCandidate, blobBaseFee *big.Int) (*big.Int, error) {
+	log.Debug("getTransactionCost", "blobBaseFee", blobBaseFee)
+	// Get the current L1 gas price
+	gasPrice, err := p.rpc.L1.SuggestGasPrice(p.ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getTransactionCost: failed to get gas price: %w", err)
+	}
+
+	var msg ethereum.CallMsg
+	if blobBaseFee != nil {
+		blobHashes, err := calculateBlobHashes(txCandidate.Blobs)
+		if err != nil {
+			return nil, fmt.Errorf("getTransactionCost: failed to calculate blob hashes: %w", err)
+		}
+		msg = ethereum.CallMsg{
+			From:          p.proposerAddress,
+			To:            txCandidate.To,
+			Data:          txCandidate.TxData,
+			Gas:           0,
+			Value:         nil,
+			BlobGasFeeCap: blobBaseFee,
+			BlobHashes:    blobHashes,
+		}
+	} else {
+		msg = ethereum.CallMsg{
+			From:  p.proposerAddress,
+			To:    txCandidate.To,
+			Data:  txCandidate.TxData,
+			Gas:   0,
+			Value: nil,
+		}
+	}
+
+	estimatedGasUsage, err := p.rpc.L1.EstimateGas(p.ctx, msg)
+	if err != nil {
+		return nil, fmt.Errorf("getTransactionCost: failed to estimate gas: %w", err)
+	}
+
+	log.Debug("getTransactionCost", "estimatedGasUsage", estimatedGasUsage)
+
+	return new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(estimatedGasUsage)), nil
+}
+
+func calculateBlobHashes(blobs []*eth.Blob) ([]common.Hash, error) {
+	log.Debug("Calculating blob hashes")
+
+	var blobHashes []common.Hash
+	for _, blob := range blobs {
+		commitment, err := blob.ComputeKZGCommitment()
+		if err != nil {
+			return nil, err
+		}
+		blobHash := kzg4844.CalcBlobHashV1(sha256.New(), &commitment)
+		blobHashes = append(blobHashes, blobHash)
+	}
+	return blobHashes, nil
+}
+
+func (p *Proposer) getBlobCost(blobs []*eth.Blob, blobBaseFee *big.Int) (*big.Int, error) {
 	// Each blob costs 1 blob gas
 	totalBlobGas := uint64(len(blobs))
 

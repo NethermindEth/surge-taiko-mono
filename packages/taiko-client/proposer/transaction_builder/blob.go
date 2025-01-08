@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
@@ -64,6 +65,7 @@ func (b *BlobTransactionBuilder) BuildOntake(
 	ctx context.Context,
 	txListBytesArray [][]byte,
 ) (*txmgr.TxCandidate, error) {
+	log.Debug("Building blob tx ontake")
 	// Check if the current L2 chain is after ontake fork.
 	_, slotB, err := b.rpc.GetProtocolStateVariablesOntake(&bind.CallOpts{Context: ctx})
 	if err != nil {
