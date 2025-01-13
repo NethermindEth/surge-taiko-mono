@@ -215,27 +215,37 @@ func (p *Prover) initProofSubmitters(
 
 // initL1Current initializes prover's L1Current cursor.
 func (p *Prover) initL1Current(startingBlockID *big.Int) error {
+	log.Debug("Initializing L1Current cursor", "startingBlockID", startingBlockID)
+
 	if err := p.rpc.WaitTillL2ExecutionEngineSynced(p.ctx); err != nil {
+		log.Debug("Failed to wait for L2 execution engine sync", "error", err)
 		return err
 	}
 
 	stateVars, err := p.rpc.GetProtocolStateVariables(&bind.CallOpts{Context: p.ctx})
 	if err != nil {
+		log.Debug("Failed to get protocol state variables", "error", err)
 		return err
 	}
+	log.Debug("Got protocol state variables", "lastVerifiedBlockId", stateVars.B.LastVerifiedBlockId)
 
 	if startingBlockID == nil {
 		if stateVars.B.LastVerifiedBlockId == 0 {
+			log.Debug("Last verified block ID is 0, using genesis height", "genesisHeight", stateVars.A.GenesisHeight)
+
 			genesisL1Header, err := p.rpc.L1.HeaderByNumber(p.ctx, new(big.Int).SetUint64(stateVars.A.GenesisHeight))
 			if err != nil {
+				log.Debug("Failed to get genesis L1 header", "error", err)
 				return err
 			}
 
 			p.sharedState.SetL1Current(genesisL1Header)
+			log.Debug("Set L1Current to genesis header", "blockNumber", genesisL1Header.Number)
 			return nil
 		}
 
 		startingBlockID = new(big.Int).SetUint64(stateVars.B.LastVerifiedBlockId)
+		log.Debug("Using last verified block ID as starting point", "startingBlockID", startingBlockID)
 	}
 
 	log.Info("Init L1Current cursor", "startingBlockID", startingBlockID)
@@ -249,26 +259,35 @@ func (p *Prover) initL1Current(startingBlockID *big.Int) error {
 			)
 			l1Head, err := p.rpc.L1.HeaderByNumber(p.ctx, nil)
 			if err != nil {
+				log.Debug("Failed to get latest L1 header", "error", err)
 				return err
 			}
 
 			p.sharedState.SetL1Current(l1Head)
+			log.Debug("Set L1Current to latest L1 head", "blockNumber", l1Head.Number)
 			return nil
 		}
+		log.Debug("Failed to get L1Origin by ID", "error", err)
 		return err
 	}
+	log.Debug("Got latest verified header L1 origin", "l1BlockHash", latestVerifiedHeaderL1Origin.L1BlockHash)
 
 	l1Current, err := p.rpc.L1.HeaderByHash(p.ctx, latestVerifiedHeaderL1Origin.L1BlockHash)
 	if err != nil {
+		log.Debug("Failed to get L1 header by hash", "error", err)
 		return err
 	}
+
 	p.sharedState.SetL1Current(l1Current)
+	log.Debug("Successfully set L1Current", "blockNumber", l1Current.Number)
 
 	return nil
 }
 
 // initEventHandlers initialize all event handlers which will be used by the current prover.
 func (p *Prover) initEventHandlers() error {
+	log.Debug("Initializing event handlers")
+
 	// ------- BlockProposed -------
 	opts := &handler.NewBlockProposedEventHandlerOps{
 		SharedState:           p.sharedState,
@@ -285,6 +304,7 @@ func (p *Prover) initEventHandlers() error {
 		ProveUnassignedBlocks: p.cfg.ProveUnassignedBlocks,
 	}
 	if p.IsGuardianProver() {
+		log.Debug("Initializing guardian BlockProposed handler")
 		p.blockProposedHandler = handler.NewBlockProposedEventGuardianHandler(
 			&handler.NewBlockProposedGuardianEventHandlerOps{
 				NewBlockProposedEventHandlerOps: opts,
@@ -292,6 +312,7 @@ func (p *Prover) initEventHandlers() error {
 			},
 		)
 	} else {
+		log.Debug("Initializing regular BlockProposed handler")
 		p.blockProposedHandler = handler.NewBlockProposedEventHandler(opts)
 	}
 	// ------- TransitionProved -------
@@ -320,11 +341,9 @@ func (p *Prover) initEventHandlers() error {
 	)
 
 	// ------- BlockVerified -------
-	guardianProverAddress, err := p.rpc.GetGuardianProverAddress(p.ctx)
-	if err != nil {
-		return err
-	}
-	p.blockVerifiedHandler = handler.NewBlockVerifiedEventHandler(guardianProverAddress)
+	log.Debug("Setting up BlockVerified event handler")
+	p.blockVerifiedHandler = handler.NewBlockVerifiedEventHandler()
 
+	log.Debug("Successfully initialized all event handlers")
 	return nil
 }
