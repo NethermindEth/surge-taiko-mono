@@ -163,7 +163,12 @@ func (s *ZKvmProofProducer) requestProof(
 ) (*RaikoRequestProofBodyResponseV2, error) {
 	var reqBody RaikoRequestProofBody
 	switch s.ZKProofType {
-	case ZKProofTypeSP1:
+	case ZKProofTypeSP1: {
+		log.Debug(
+			"Raiko SP1 Request Proof Body",
+			"Recursion", s.RaikoSP1Recursion,
+			"Prover", s.RaikoSP1Prover,
+		)
 		reqBody = RaikoRequestProofBody{
 			Type:     s.ZKProofType,
 			Block:    opts.BlockID,
@@ -174,6 +179,7 @@ func (s *ZKvmProofProducer) requestProof(
 				Prover:    s.RaikoSP1Prover,
 			},
 		}
+	}
 	default:
 		reqBody = RaikoRequestProofBody{
 			Type:     s.ZKProofType,
