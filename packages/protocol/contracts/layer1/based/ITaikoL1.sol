@@ -100,5 +100,6 @@ interface ITaikoL1 {
 
     /// @notice Gets the configuration of the TaikoL1 contract.
     /// @return Config struct containing configuration parameters.
-    function getConfig() external pure returns (TaikoData.Config memory);
+    // Surge: switch to `view` to allow for dynamic chainid
+    function getConfig() external view returns (TaikoData.Config memory);
 }

@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/governance/TimelockController.sol";
 import "test/shared/DeployCapability.sol";
 
+/// @title DeployTimelockedOwner
+/// @notice This script is used to deploy a timelocked owner on the L2
 contract DeployTimelockedOwner is DeployCapability {
     uint256 public deployerPrivKey = vm.envUint("PRIVATE_KEY");
     function run() external {

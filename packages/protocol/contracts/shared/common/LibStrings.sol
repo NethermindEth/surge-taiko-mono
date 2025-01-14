@@ -32,6 +32,7 @@ library LibStrings {
     bytes32 internal constant B_TIER_ZKVM_SP1 = bytes32("tier_zkvm_sp1");
     bytes32 internal constant B_TIER_ZKVM_ANY = bytes32("tier_zkvm_any");
     bytes32 internal constant B_TIER_ZKVM_AND_TEE = bytes32("tier_zkvm_and_tee");
+    // Surge: Tier to choose two of three from SGX / RISC0 / SP1
     bytes32 internal constant B_TIER_TWO_OF_THREE = bytes32("tier_two_of_three");
     bytes32 internal constant B_RISCZERO_GROTH16_VERIFIER = bytes32("risc0_groth16_verifier");
     bytes32 internal constant B_WITHDRAWER = bytes32("withdrawer");

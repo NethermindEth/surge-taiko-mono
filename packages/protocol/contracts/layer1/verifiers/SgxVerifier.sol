@@ -144,8 +144,9 @@ contract SgxVerifier is EssentialContract, IVerifier {
         TaikoData.TierProof calldata _proof
     )
         external
+        // Surge: Allow either TaikoL1 or the composite verifier to call this
+        onlyFromNamedEither(LibStrings.B_TAIKO, LibStrings.B_TIER_TWO_OF_THREE)
     {
-        // ^ Access controls removed for testnet.
 
         // Do not run proof verification to contest an existing proof
         if (_ctx.isContesting) return;
@@ -177,7 +178,8 @@ contract SgxVerifier is EssentialContract, IVerifier {
         TaikoData.TierProof calldata _proof
     )
         external
-        onlyFromNamedEither(LibStrings.B_TAIKO, LibStrings.B_TIER_TEE_ANY)
+        // Surge: Allow either TaikoL1 or the composite verifier to call this
+        onlyFromNamedEither(LibStrings.B_TAIKO, LibStrings.B_TIER_TWO_OF_THREE)
     {
         // Size is: 109 bytes
         // 4 bytes + 20 bytes + 20 bytes + 65 bytes (signature) = 109

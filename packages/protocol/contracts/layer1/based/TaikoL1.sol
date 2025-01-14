@@ -159,6 +159,7 @@ contract TaikoL1 is EssentialContract, ITaikoL1, TaikoEvents {
 
     /// @inheritdoc ITaikoL1
     function pauseProving(bool _pause) external {
+        // Surge: disable pausing of proving
         _disable();
         _authorizePause(msg.sender, _pause);
         LibProving.pauseProving(state, _pause);
@@ -289,7 +290,8 @@ contract TaikoL1 is EssentialContract, ITaikoL1, TaikoEvents {
     }
 
     /// @inheritdoc ITaikoL1
-    function getConfig() public pure virtual returns (TaikoData.Config memory) {
+    // Surge: switch to `view` to allow for dynamic chainid
+    function getConfig() public view virtual returns (TaikoData.Config memory) {
         return TaikoData.Config({
             chainId: LibNetwork.TAIKO_MAINNET,
             blockMaxProposals: 324_000, // = 7200 * 45

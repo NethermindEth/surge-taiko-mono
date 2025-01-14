@@ -10,12 +10,11 @@ import (
 
 // BlockVerifiedEventHandler is responsible for handling the BlockVerified event.
 type BlockVerifiedEventHandler struct {
-	guardianProverAddress common.Address
 }
 
 // NewBlockVerifiedEventHandler creates a new BlockVerifiedEventHandler instance.
-func NewBlockVerifiedEventHandler(guardianProverAddress common.Address) *BlockVerifiedEventHandler {
-	return &BlockVerifiedEventHandler{guardianProverAddress: guardianProverAddress}
+func NewBlockVerifiedEventHandler() *BlockVerifiedEventHandler {
+	return &BlockVerifiedEventHandler{}
 }
 
 // Handle handles the BlockVerified event.

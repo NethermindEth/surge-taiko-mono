@@ -31,6 +31,8 @@ abstract contract EssentialContract is UUPSUpgradeable, Ownable2StepUpgradeable,
     error REENTRANT_CALL();
     error ZERO_ADDRESS();
     error ZERO_VALUE();
+
+    // Surge: revert message for when a function is disable for a surge chain
     error FUNCTION_DISABLED();
 
     /// @dev Modifier that ensures the caller is the owner or resolved address of a given name.
@@ -79,7 +81,7 @@ abstract contract EssentialContract is UUPSUpgradeable, Ownable2StepUpgradeable,
 
     /// @notice Pauses the contract.
     function pause() public virtual {
-        _disable();
+        _disable(); // Surge: disable pausing of contracts
         _pause();
         // We call the authorize function here to avoid:
         // Warning (5740): Unreachable code.
@@ -139,6 +141,7 @@ abstract contract EssentialContract is UUPSUpgradeable, Ownable2StepUpgradeable,
         emit Unpaused(msg.sender);
     }
 
+    // Surge: use this to block entry to a function in Taiko stack
     function _disable() internal pure {
         revert FUNCTION_DISABLED();
     }

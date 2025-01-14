@@ -91,6 +91,7 @@ func InitFromConfig(
 	txMgr *txmgr.SimpleTxManager,
 	privateTxMgr *txmgr.SimpleTxManager,
 ) (err error) {
+	log.Debug("Initializing prover from config")
 	p.cfg = cfg
 	p.ctx = ctx
 	// Initialize state which will be shared by event handlers.
@@ -104,6 +105,9 @@ func InitFromConfig(
 	)
 
 	// Clients
+	log.Debug("Initializing RPC client",
+		"l1Endpoint", cfg.L1WsEndpoint,
+		"l2Endpoint", cfg.L2WsEndpoint)
 	if p.rpc, err = rpc.NewClient(p.ctx, &rpc.ClientConfig{
 		L1Endpoint:                    cfg.L1WsEndpoint,
 		L2Endpoint:                    cfg.L2WsEndpoint,
@@ -119,9 +123,11 @@ func InitFromConfig(
 	}
 
 	// Configs
+	log.Debug("Getting protocol config")
 	p.protocolConfig = encoding.GetProtocolConfig(p.rpc.L2.ChainID.Uint64())
 	log.Info("Protocol configs", "configs", p.protocolConfig)
 
+	log.Debug("Initializing channels", "bufferSize", p.protocolConfig.BlockMaxProposals)
 	chBufferSize := p.protocolConfig.BlockMaxProposals
 	p.proofGenerationCh = make(chan *proofProducer.ProofWithHeader, chBufferSize)
 	p.assignmentExpiredCh = make(chan metadata.TaikoBlockMetaData, chBufferSize)
@@ -129,17 +135,21 @@ func InitFromConfig(
 	p.proofContestCh = make(chan *proofProducer.ContestRequestBody, p.cfg.Capacity)
 	p.proveNotify = make(chan struct{}, 1)
 
+	log.Debug("Initializing L1 current cursor", "startingBlockID", cfg.StartingBlockID)
 	if err := p.initL1Current(cfg.StartingBlockID); err != nil {
 		return fmt.Errorf("initialize L1 current cursor error: %w", err)
 	}
 
 	// Protocol proof tiers
+	log.Debug("Getting protocol tiers")
 	tiers, err := p.rpc.GetTiers(ctx)
 	if err != nil {
 		return err
 	}
 	p.sharedState.SetTiers(tiers)
+	log.Debug("Protocol tiers set", "tiers", tiers)
 
+	log.Debug("Initializing transaction builder")
 	txBuilder := transaction.NewProveBlockTxBuilder(
 		p.rpc,
 		p.cfg.TaikoL1Address,
@@ -148,9 +158,12 @@ func InitFromConfig(
 		p.cfg.GuardianProverMinorityAddress,
 	)
 
+	log.Debug("Setting up transaction managers")
 	if txMgr != nil {
 		p.txmgr = txMgr
+		log.Debug("Using provided transaction manager")
 	} else {
+		log.Debug("Creating new transaction manager")
 		if p.txmgr, err = txmgr.NewSimpleTxManager(
 			"prover",
 			log.Root(),
@@ -162,9 +175,12 @@ func InitFromConfig(
 	}
 
 	if privateTxMgr != nil {
+		log.Debug("Using provided private transaction manager")
 		p.privateTxmgr = privateTxMgr
 	} else {
+		log.Debug("Checking private transaction manager config")
 		if cfg.PrivateTxmgrConfigs != nil && len(cfg.PrivateTxmgrConfigs.L1RPCURL) > 0 {
+			log.Debug("Creating new private transaction manager")
 			if p.privateTxmgr, err = txmgr.NewSimpleTxManager(
 				"privateMempoolProver",
 				log.Root(),
@@ -174,16 +190,19 @@ func InitFromConfig(
 				return err
 			}
 		} else {
+			log.Debug("No private transaction manager configured")
 			p.privateTxmgr = nil
 		}
 	}
 
 	// Proof submitters
+	log.Debug("Initializing proof submitters")
 	if err := p.initProofSubmitters(txBuilder, tiers); err != nil {
 		return err
 	}
 
 	// Proof contester
+	log.Debug("Initializing proof contester")
 	p.proofContester = proofSubmitter.NewProofContester(
 		p.rpc,
 		p.cfg.ProveBlockGasLimit,
@@ -195,10 +214,12 @@ func InitFromConfig(
 	)
 
 	// Initialize event handlers.
+	log.Debug("Initializing event handlers")
 	if err := p.initEventHandlers(); err != nil {
 		return err
 	}
 
+	log.Debug("Prover initialization completed successfully")
 	return nil
 }
 

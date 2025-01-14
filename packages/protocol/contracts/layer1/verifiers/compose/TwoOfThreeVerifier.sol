@@ -5,7 +5,8 @@ import "src/shared/common/LibStrings.sol";
 import "./ComposeVerifier.sol";
 
 /// @title TwoOfThreeVerifier
-/// @custom:security-contact security@taiko.xyz
+/// @dev Surge: Allows using any two of the three verifier from SGX / RISC0 / SP1
+/// @custom:security-contact security@nethermind.io
 contract TwoOfThreeVerifier is ComposeVerifier {
     uint256[50] private __gap;
 
