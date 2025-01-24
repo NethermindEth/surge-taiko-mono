@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/governance/TimelockController.sol";
 import "@risc0/contracts/groth16/RiscZeroGroth16Verifier.sol";
-import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v3.0.0-rc3/SP1VerifierPlonk.sol";
+import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v4.0.0-rc.3/SP1VerifierPlonk.sol";
 
 // Actually this one is deployed already on mainnet, but we are now deploying our own (non via-ir)
 // version. For mainnet, it is easier to go with one of:
@@ -64,13 +64,13 @@ contract DeployProtocolOnL1 is DeployCapability {
         require(vm.envBytes32("L2_GENESIS_HASH") != 0, "L2_GENESIS_HASH");
 
         address[] memory executors = vm.envAddress("OWNER_MULTISIG_SIGNERS", ",");
-        
+
         address ownerMultisig = vm.envAddress("OWNER_MULTISIG");
         addressNotNull(ownerMultisig, "ownerMultisig");
-        
+
         address[] memory proposers = new address[](1);
-        proposers[0] = ownerMultisig; 
-        
+        proposers[0] = ownerMultisig;
+
         // Setup timelock controller with 45 day (86400 seconds * 45) delay
         address timelockController = address(
             new TimelockController(86400 * 45, proposers, executors, address(0))

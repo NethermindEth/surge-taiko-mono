@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/governance/TimelockController.sol";
 import "@risc0/contracts/groth16/RiscZeroGroth16Verifier.sol";
-import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v3.0.0-rc3/SP1VerifierPlonk.sol";
+import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v4.0.0-rc.3/SP1VerifierPlonk.sol";
 
 // Actually this one is deployed already on mainnet, but we are now deploying our own (non via-ir)
 // version. For mainnet, it is easier to go with one of:
@@ -63,13 +63,13 @@ contract DeploySurgeOnL1 is DeployCapability {
         //---------------------------------------------------------------
         // Timelocked owner setup
         address[] memory executors = vm.envAddress("OWNER_MULTISIG_SIGNERS", ",");
-        
+
         address ownerMultisig = vm.envAddress("OWNER_MULTISIG");
         addressNotNull(ownerMultisig, "ownerMultisig");
-        
+
         address[] memory proposers = new address[](1);
-        proposers[0] = ownerMultisig; 
-        
+        proposers[0] = ownerMultisig;
+
         uint256 timelockPeriod = uint64(vm.envUint("TIMELOCK_PERIOD"));
         address timelockController = address(
             new TimelockController(timelockPeriod, proposers, executors, address(0))
@@ -82,7 +82,7 @@ contract DeploySurgeOnL1 is DeployCapability {
         // Deploy shared contracts
         (address sharedAddressManager) = deploySharedContracts(contractOwner);
         console2.log("sharedAddressManager: ", sharedAddressManager);
-        
+
         // ---------------------------------------------------------------
         // Deploy rollup contracts
         address verifierOwner = vm.envAddress("VERIFIER_OWNER");
@@ -160,7 +160,7 @@ contract DeploySurgeOnL1 is DeployCapability {
             name: "shared_address_manager",
             impl: address(new AddressManager()),
             data: abi.encodeCall(AddressManager.init, (address(0)))
-        });    
+        });
 
         // Deploy Bridging contracts
         deployProxy({
@@ -361,16 +361,16 @@ contract DeploySurgeOnL1 is DeployCapability {
     function getConstantAddress(string memory prefix, string memory suffix) internal pure returns (address) {
         bytes memory prefixBytes = bytes(prefix);
         bytes memory suffixBytes = bytes(suffix);
-        
+
         require(prefixBytes.length + suffixBytes.length <= ADDRESS_LENGTH, "Prefix + suffix too long");
-        
+
         // Create the middle padding of zeros
         uint256 paddingLength = ADDRESS_LENGTH - prefixBytes.length - suffixBytes.length;
         bytes memory padding = new bytes(paddingLength);
         for(uint i = 0; i < paddingLength; i++) {
             padding[i] = "0";
         }
-        
+
         // Concatenate the parts
         string memory hexString = string(
             abi.encodePacked(
@@ -380,7 +380,7 @@ contract DeploySurgeOnL1 is DeployCapability {
                 suffix
             )
         );
-        
+
         return vm.parseAddress(hexString);
     }
 }
