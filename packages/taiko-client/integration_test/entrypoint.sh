@@ -39,6 +39,10 @@ check_env "L1_PROVER_PRIVATE_KEY"
 check_env "TREASURY"
 check_env "JWT_SECRET"
 check_env "VERBOSITY"
+check_env "OWNER_MULTISIG_SIGNERS"
+check_env "OWNER_MULTISIG"
+check_env "TIMELOCK_PERIOD"
+check_env "VERIFIER_OWNER"
 
 RUN_TESTS=${RUN_TESTS:-false}
 PACKAGE=${PACKAGE:-...}
