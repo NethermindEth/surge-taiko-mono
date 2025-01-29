@@ -36,13 +36,9 @@ from eth_account import Account
 
 load_dotenv()
 
-l1_proposer_private_key = os.getenv('L1_PROPOSER_PRIVATE_KEY')
-if not l1_proposer_private_key:
-    raise Exception("Environment variable L1_PROPOSER_PRIVATE_KEY not set")
-
-l1_prover_private_key = os.getenv('L1_PROVER_PRIVATE_KEY')
-if not l1_prover_private_key:
-    raise Exception("Environment variable L1_PROVER_PRIVATE_KEY not set")
+account_private_key = os.getenv('ACCOUNT_PRIVATE_KEY')
+if not account_private_key:
+    raise Exception("Environment variable ACCOUNT_PRIVATE_KEY not set")
 
 taiko_l1_contract_address = os.getenv('TAIKO_L1_CONTRACT_ADDRESS')
 if not taiko_l1_contract_address:
@@ -80,8 +76,7 @@ if not w3.is_connected():
     raise Exception("Failed to connect to the L1 network")
 
 # Get the account from the private key
-proposer_account = Account.from_key(l1_proposer_private_key)
-prover_account = Account.from_key(l1_prover_private_key)
+deposit_account = Account.from_key(account_private_key)
 deposit_amount = w3.to_wei(args.amount, 'ether')
 
 ABI = "{\"type\":\"function\",\"name\":\"depositBond\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"payable\"}"
@@ -110,16 +105,8 @@ def send_deposit_bond_transaction(nonce: int, private_key : str, account: Accoun
     tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
     print(f'Transaction sent: {tx_hash.hex()}')
 
-def deposit_for_proposer():
-    nonce = w3.eth.get_transaction_count(proposer_account.address)
-    send_deposit_bond_transaction(nonce, l1_proposer_private_key, proposer_account)
-
-def deposit_for_prover():
-    nonce = w3.eth.get_transaction_count(prover_account.address)
-    send_deposit_bond_transaction(nonce, l1_prover_private_key, prover_account)
-
 def deposit_bonds():
-    deposit_for_proposer()
-    deposit_for_prover()
+    nonce = w3.eth.get_transaction_count(deposit_account.address)
+    send_deposit_bond_transaction(nonce, account_private_key, deposit_account)
 
 deposit_bonds()
