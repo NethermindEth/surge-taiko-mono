@@ -290,6 +290,12 @@ contract TaikoL1 is EssentialContract, ITaikoL1, TaikoEvents {
     }
 
     /// @inheritdoc ITaikoL1
+    // Surge: Stage-2 requirement
+    function getLastVerificationTimestamp() external view returns(uint256) {
+        return state.lastVerificationTimestamp;
+    }
+
+    /// @inheritdoc ITaikoL1
     // Surge: switch to `view` to allow for dynamic chainid
     function getConfig() public view virtual returns (TaikoData.Config memory) {
         return TaikoData.Config({

@@ -98,6 +98,11 @@ interface ITaikoL1 {
     /// @return The prover's address. If the block is not verified yet, address(0) will be returned.
     function getVerifiedBlockProver(uint64 _blockId) external view returns (address);
 
+    /// @notice Returns the timestamp of the last verification.
+    /// @return The timestamp of the last verification.
+    // Surge: Returns `lastVerificationTimestamp` added as stage-2 requirements for surge
+    function getLastVerificationTimestamp() external view returns(uint256);
+
     /// @notice Gets the configuration of the TaikoL1 contract.
     /// @return Config struct containing configuration parameters.
     // Surge: switch to `view` to allow for dynamic chainid

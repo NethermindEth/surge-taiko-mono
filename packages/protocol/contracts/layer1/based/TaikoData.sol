@@ -235,6 +235,13 @@ library TaikoData {
         SlotA slotA; // slot 5
         SlotB slotB; // slot 6
         mapping(address account => uint256 bond) bondBalance;
-        uint256[43] __gap;
+
+        // Surge: Record the timestamp at which the last block verification happened to enforce
+        // stage-2 rollup requirement of blocking all owner operations if no block verified
+        // in the last 2 hours
+        uint256 lastVerificationTimestamp; // Slot 7
+
+        // Surge: Gap reduced by 1
+        uint256[42] __gap;
     }
 }

@@ -159,6 +159,9 @@ library LibVerifying {
             }
 
             if (local.numBlocksVerified != 0) {
+                // Surge: Update last verification timestamp if a block has been verified
+                _state.lastVerificationTimestamp = block.timestamp;
+
                 uint64 lastVerifiedBlockId = local.b.lastVerifiedBlockId + local.numBlocksVerified;
                 local.slot = lastVerifiedBlockId % _config.blockRingBufferSize;
 

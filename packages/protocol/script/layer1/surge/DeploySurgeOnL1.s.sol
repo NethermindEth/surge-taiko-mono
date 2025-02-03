@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "@openzeppelin/contracts/governance/TimelockController.sol";
 import "@risc0/contracts/groth16/RiscZeroGroth16Verifier.sol";
 import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v4.0.0-rc.3/SP1VerifierPlonk.sol";
 
@@ -21,6 +20,7 @@ import "src/shared/tokenvault/BridgedERC721.sol";
 import "src/shared/tokenvault/ERC1155Vault.sol";
 import "src/shared/tokenvault/ERC20Vault.sol";
 import "src/shared/tokenvault/ERC721Vault.sol";
+import "src/layer1/surge/SurgeTimelockController.sol";
 import "src/layer1/automata-attestation/AutomataDcapV3Attestation.sol";
 import "src/layer1/automata-attestation/lib/PEMCertChainLib.sol";
 import "src/layer1/automata-attestation/utils/SigVerifyLib.sol";
@@ -72,7 +72,7 @@ contract DeploySurgeOnL1 is DeployCapability {
 
         uint256 timelockPeriod = uint64(vm.envUint("TIMELOCK_PERIOD"));
         address timelockController = address(
-            new TimelockController(timelockPeriod, proposers, executors, address(0))
+            new SurgeTimelockedController(timelockPeriod, proposers, executors, address(0))
         );
         address contractOwner = timelockController;
 
@@ -102,6 +102,8 @@ contract DeploySurgeOnL1 is DeployCapability {
             uint64(block.chainid), LibStrings.B_TAIKO
         );
         addressNotNull(taikoL1Addr, "taikoL1Addr");
+
+        SurgeTimelockedController(payable(timelockController)).init(taikoL1Addr);
 
         SignalService(signalServiceAddr).authorize(taikoL1Addr, true);
 
