@@ -24,6 +24,9 @@
     "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39": {
       "balance": "0x3635c9adc5dea00000"
     },
+    "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266": {
+      "balance": "0x3635c9adc5dea00000"
+    },
     "0x0167001000000000000000000000000000000006": {
       "contractName": "SharedAddressManagerImpl",
       "storage": {
