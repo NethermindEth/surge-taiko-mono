@@ -72,6 +72,18 @@ jobs:
           registry: ${{ env.DOCKER_REGISTRY }}
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ secrets.ARTIFACTORY_MODULAR_TOKEN_DEVELOPER }}
+      
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}
+          tags: |
+            type=raw,value=latest
+            type=ref,event=branch
+            type=ref,event=pr
+            type=ref,event=tag
+            type=sha      
 
       - name: Build and push ARM64 image
         run: |
@@ -125,21 +137,22 @@ jobs:
 
       - name: Promote to Staging
         run: |
-          # Read tags line by line using a while loop
           echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
-            echo "Current tag: $tag"
             # Trim any whitespace from the tag
             tag=$(echo "$tag" | xargs)
-
-            # Extract the tag suffix (everything after the last colon)
-            tag_suffix="${tag##*:}"
-
-            # Construct source and destination tags
-            source_image="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY_DEV}:${tag_suffix}"
-            staging_image="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY_STAGING}:${tag_suffix}"
-
-            echo "Promoting ${source_image} to ${staging_image}"
-            oras cp -r "${source_image}" "${staging_image}"
+            if [ -n "$tag" ]; then
+              # Extract the tag suffix (everything after the last colon)
+              tag_suffix="${tag##*:}"
+      
+              # Construct source and destination tags
+              source_image="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY_DEV}:${tag_suffix}"
+              staging_image="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY_STAGING}:${tag_suffix}"
+      
+              echo "Promoting ${source_image} to ${staging_image}"
+              oras cp -r "${source_image}" "${staging_image}"
+            else
+              echo "Skipping empty tag"
+            fi
           done
 
       - name: Summary
