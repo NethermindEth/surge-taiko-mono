@@ -728,6 +728,8 @@ func (p *Proposer) getTransactionCost(txCandidate *txmgr.TxCandidate, blobBaseFe
 
 	estimatedGasUsage, err := p.rpc.L1.EstimateGas(p.ctx, msg)
 	if err != nil {
+		log.Info("getTransactionCost: estimate gas ethereum.CallMsg", "from", msg.From,
+			"to", msg.To, "Gas", msg.Gas, "Value", msg.Value, "BlobGasFeeCap", msg.BlobGasFeeCap, "BlobHashes", msg.BlobHashes)
 		return nil, fmt.Errorf("getTransactionCost: failed to estimate gas: %w", err)
 	}
 
