@@ -50,11 +50,12 @@ jobs:
 
       - name: Build and push image to Docker Hub
         run: |
+          BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}")
           docker buildx build --file packages/taiko-client/Dockerfile \
             --platform linux/amd64,linux/arm64 \
-            --tag nethermind.jfrog.io/modular-oci-local-dev/taiko-client:${{ steps.meta.outputs.branch }}-${{ steps.meta.outputs.tags }} \
+            --tag nethermind.jfrog.io/modular-oci-local-dev/taiko-client:${BRANCH_NAME} \
             --tag nethermind.jfrog.io/modular-oci-local-dev/taiko-client:latest \
-            --tag nethermind.jfrog.io/modular-oci-local-dev/taiko-client:${{ github.sha }} \
+            --tag nethermind.jfrog.io/modular-oci-local-dev/taiko-client:${GITHUB_SHA} \
             --push .
 
       - uses: oras-project/setup-oras@v1
