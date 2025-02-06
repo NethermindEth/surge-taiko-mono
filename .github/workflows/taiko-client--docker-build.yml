@@ -77,23 +77,9 @@ jobs:
 
       - name: Promote to Staging
         run: |
-          echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
-            # Trim any whitespace from the tag
-            tag=$(echo "$tag" | xargs)
-            if [ -n "$tag" ]; then
-              # Extract the tag suffix (everything after the last colon)
-              tag_suffix="${tag##*:}"
-
-              # Construct source and destination tags
-              source_image="${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${tag_suffix}"
-              staging_image="${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:${tag_suffix}"
-
-              echo "Promoting ${source_image} to ${staging_image}"
-              oras cp -r "${source_image}" "${staging_image}"
-            else
-              echo "Skipping empty tag"
-            fi
-          done
+          oras cp -r "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${BRANCH_NAME}" "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:${BRANCH_NAME}"
+          oras cp -r "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:latest" "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:latest"
+          oras cp -r "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${GITHUB_SHA}" "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:${GITHUB_SHA}"
 
       - name: Summary
         run: |
