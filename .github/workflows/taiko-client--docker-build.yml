@@ -48,9 +48,9 @@ jobs:
             type=ref,event=tag
             type=sha
 
-      - name: Build and push image to Docker Hub
+      - name: Build and push image to jfrog
         run: |
-          BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}")
+          BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}" | tr '/' '-')
           docker buildx build --file packages/taiko-client/Dockerfile \
             --platform linux/amd64,linux/arm64 \
             --tag nethermind.jfrog.io/modular-oci-local-dev/taiko-client:${BRANCH_NAME} \
