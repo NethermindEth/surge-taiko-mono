@@ -48,15 +48,16 @@ jobs:
             type=ref,event=tag
             type=sha
 
-      - name: Build and push image to jfrog
-        run: |
-          BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}" | tr '/' '-')
-          docker buildx build --file packages/taiko-client/Dockerfile \
-            --platform linux/amd64,linux/arm64 \
-            --tag nethermind.jfrog.io/modular-oci-local-dev/taiko-client:${BRANCH_NAME} \
-            --tag nethermind.jfrog.io/modular-oci-local-dev/taiko-client:latest \
-            --tag nethermind.jfrog.io/modular-oci-local-dev/taiko-client:${GITHUB_SHA} \
-            --push .
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6.13.0
+        with:
+          platforms: linux/amd64,linux/arm64
+          context: .
+          file: ./packages/taiko-client/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
       - uses: oras-project/setup-oras@v1
       - run: oras version
