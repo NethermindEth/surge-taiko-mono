@@ -49,16 +49,16 @@ jobs:
             type=ref,event=tag
             type=sha
 
-      # - name: Build and push multi-arch image
-      #   run: |
-      #     BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}" | tr '/' '-')
-      #     docker buildx build --file packages/taiko-client/Dockerfile \
-      #       --platform linux/amd64,linux/arm64 \
-      #       --provenance=false \
-      #       --tag ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${BRANCH_NAME} \
-      #       --tag ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:latest \
-      #       --tag ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${GITHUB_SHA} \
-      #       --push .
+      - name: Build and push multi-arch image
+        run: |
+          BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}" | tr '/' '-')
+          docker buildx build --file packages/taiko-client/Dockerfile \
+            --platform linux/amd64,linux/arm64 \
+            --provenance=false \
+            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${BRANCH_NAME} \
+            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:latest \
+            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${GITHUB_SHA} \
+            --push .
 
   promote:
     name: Promote to Staging
@@ -77,15 +77,9 @@ jobs:
 
       - name: Promote to Staging
         run: |
-          BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}" | tr '/' '-')
           oras cp -r "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${BRANCH_NAME}" "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:${BRANCH_NAME}"
           oras cp -r "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:latest" "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:latest"
-      
-      # - name: Promote to Staging
-      # run: |
-      #   oras cp -r "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${BRANCH_NAME}" "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:${BRANCH_NAME}"
-      #   oras cp -r "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:latest" "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:latest"
-      #   oras cp -r "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${GITHUB_SHA}" "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:${GITHUB_SHA}"
+          oras cp -r "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${GITHUB_SHA}" "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:${GITHUB_SHA}"
 
             
       - name: Summary
