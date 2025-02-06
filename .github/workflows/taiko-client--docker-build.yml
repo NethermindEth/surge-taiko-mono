@@ -48,16 +48,14 @@ jobs:
             type=ref,event=tag
             type=sha
 
-      - name: Build and push by digest
-        id: build
-        uses: docker/build-push-action@v5
-        with:
-          platforms: linux/amd64
-          context: .
-          file: packages/taiko-client/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+      - name: Build and push image to Docker Hub
+        run: |
+          docker buildx build --file packages/taiko-client/Dockerfile \
+            --platform linux/amd64,linux/arm64 \
+            --tag nethermind.jfrog.io/modular-oci-local-dev/taiko-client:${{ steps.meta.outputs.branch }}-${{ steps.meta.outputs.tags }} \
+            --tag nethermind.jfrog.io/modular-oci-local-dev/taiko-client:latest \
+            --tag nethermind.jfrog.io/modular-oci-local-dev/taiko-client:${{ github.sha }} \
+            --push .
 
       - uses: oras-project/setup-oras@v1
       - run: oras version
