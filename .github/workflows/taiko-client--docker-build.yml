@@ -48,46 +48,51 @@ jobs:
             type=ref,event=pr
             type=ref,event=tag
             type=sha
-
-      - name: Build and push multi-arch image
+      
+      - name: Print tags
         run: |
-          BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}" | tr '/' '-')
-          docker buildx build --file packages/taiko-client/Dockerfile \
-            --platform linux/amd64,linux/arm64 \
-            --provenance=false \
-            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${BRANCH_NAME} \
-            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:latest \
-            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${GITHUB_SHA} \
-            --push .
+          echo "Tags: ${{ steps.meta.outputs.tags }}" \
+          echo "First tag: ${{ steps.meta.outputs.tags[0] }}"
 
-  promote:
-    name: Promote to Staging
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Log in to Docker Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.DOCKER_REGISTRY }}
-          username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ secrets.ARTIFACTORY_MODULAR_TOKEN_DEVELOPER }}
+  #     - name: Build and push multi-arch image
+  #       run: |
+  #         BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}" | tr '/' '-')
+  #         docker buildx build --file packages/taiko-client/Dockerfile \
+  #           --platform linux/amd64,linux/arm64 \
+  #           --provenance=false \
+  #           --tag ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${BRANCH_NAME} \
+  #           --tag ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:latest \
+  #           --tag ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${GITHUB_SHA} \
+  #           --push .
 
-      - name: Set up ORAS
-        uses: oras-project/setup-oras@v1
+  # promote:
+  #   name: Promote to Staging
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Log in to Docker Registry
+  #       uses: docker/login-action@v3
+  #       with:
+  #         registry: ${{ env.DOCKER_REGISTRY }}
+  #         username: ${{ env.DOCKER_USERNAME }}
+  #         password: ${{ secrets.ARTIFACTORY_MODULAR_TOKEN_DEVELOPER }}
 
-      - name: Promote to Staging
-        run: |
-          oras cp -r "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${BRANCH_NAME}" "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:${BRANCH_NAME}"
-          oras cp -r "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:latest" "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:latest"
-          oras cp -r "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${GITHUB_SHA}" "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:${GITHUB_SHA}"
+  #     - name: Set up ORAS
+  #       uses: oras-project/setup-oras@v1
+
+  #     - name: Promote to Staging
+  #       run: |
+  #         oras cp -r "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${BRANCH_NAME}" "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:${BRANCH_NAME}"
+  #         oras cp -r "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:latest" "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:latest"
+  #         oras cp -r "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:${GITHUB_SHA}" "${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_STAGING }}:${GITHUB_SHA}"
 
             
-      - name: Summary
-        run: |
-          echo "## Docker build completed :green_circle:" >> $GITHUB_STEP_SUMMARY
-          echo "### Tags" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r TAG; do
-            echo "- $TAG" >> $GITHUB_STEP_SUMMARY
-          done
-          echo "### Notes" >> $GITHUB_STEP_SUMMARY
-          echo "- The images have also been pushed to ${DOCKER_REPOSITORY_STAGING} repo" >> $GITHUB_STEP_SUMMARY
+  #     - name: Summary
+  #       run: |
+  #         echo "## Docker build completed :green_circle:" >> $GITHUB_STEP_SUMMARY
+  #         echo "### Tags" >> $GITHUB_STEP_SUMMARY
+  #         echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r TAG; do
+  #           echo "- $TAG" >> $GITHUB_STEP_SUMMARY
+  #         done
+  #         echo "### Notes" >> $GITHUB_STEP_SUMMARY
+  #         echo "- The images have also been pushed to ${DOCKER_REPOSITORY_STAGING} repo" >> $GITHUB_STEP_SUMMARY
