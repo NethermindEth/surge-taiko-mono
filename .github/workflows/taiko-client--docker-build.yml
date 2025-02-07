@@ -18,8 +18,15 @@ env:
 jobs:
   build:
     name: Build and push docker image
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     if: github.repository == 'NethermindEth/surge-taiko-mono'
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux/amd64
+          - os: ubuntu-24.04-arm
+            platform: linux/arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,15 +55,16 @@ jobs:
             type=ref,event=tag
             type=sha
 
-      - name: Build and push image to jfrog
-        run: |
-          BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}" | tr '/' '-')
-          docker buildx build --file packages/taiko-client/Dockerfile \
-            --platform linux/amd64,linux/arm64 \
-            --tag nethermind.jfrog.io/modular-oci-local-dev/taiko-client:${BRANCH_NAME} \
-            --tag nethermind.jfrog.io/modular-oci-local-dev/taiko-client:latest \
-            --tag nethermind.jfrog.io/modular-oci-local-dev/taiko-client:${GITHUB_SHA} \
-            --push .
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          platforms: ${{ matrix.platform }}
+          context: .
+          file: ./packages/taiko-client/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
       - uses: oras-project/setup-oras@v1
       - run: oras version
@@ -68,26 +76,19 @@ jobs:
 
       - name: Promote to Staging
         run: |
-          # Read tags line by line using a while loop
           echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
             echo "Current tag: $tag"
-            # Trim any whitespace from the tag
             tag=$(echo "$tag" | xargs)
-
-            # Extract the tag suffix (everything after the last colon)
             tag_suffix="${tag##*:}"
-
-            # Construct source and destination tags
             source_image="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY_DEV}:${tag_suffix}"
             staging_image="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY_STAGING}:${tag_suffix}"
-
             echo "Promoting ${source_image} to ${staging_image}"
             oras cp -r "${source_image}" "${staging_image}"
           done
 
       - name: Summary
         run: |
-          echo "## Docker build completed :green_circle:" >> $GITHUB_STEP_SUMMARY
+          echo "## Docker build for ${{ matrix.platform }} completed :green_circle:" >> $GITHUB_STEP_SUMMARY
           echo "### Tags" >> $GITHUB_STEP_SUMMARY
           echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r TAG; do
             echo "- $TAG" >> $GITHUB_STEP_SUMMARY
