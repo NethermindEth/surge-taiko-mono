@@ -254,7 +254,6 @@ func (p *Proposer) fetchPoolContent(filterPoolContent bool) ([]types.Transaction
 			"minProposingInternal", p.MinProposingInternal,
 		)
 		txLists = append(txLists, types.Transactions{})
-		p.initDone = true
 	}
 
 	// If LocalAddressesOnly is set, filter the transactions by the local addresses.
@@ -464,21 +463,36 @@ func (p *Proposer) ProposeTxListOntake(
 		return errors.New("insufficient prover balance")
 	}
 
-	txCandidate, cost, err := p.buildCheaperOnTakeTransaction(ctx, txListsBytesArray, p.isEmptyBlock(txLists))
-	if err != nil {
-		log.Warn("Failed to build TaikoL1.proposeBlocksV2 transaction", "error", encoding.TryParsingCustomError(err))
-		return err
-	}
+	var (
+		txCandidate *txmgr.TxCandidate
+		cost        *big.Int
+	)
 
-	if p.checkProfitability {
-		profitable, err := p.isProfitable(txLists, cost)
+	if p.initDone {
+		txCandidate, cost, err = p.buildCheaperOnTakeTransaction(ctx, txListsBytesArray, p.isEmptyBlock(txLists))
+		if err != nil {
+			log.Warn("Failed to build TaikoL1.proposeBlocksV2 transaction", "error", encoding.TryParsingCustomError(err))
+			return err
+		}
+
+		if p.checkProfitability {
+			profitable, err := p.isProfitable(txLists, cost)
+			if err != nil {
+				return err
+			}
+			if !profitable {
+				log.Info("Proposing transaction is not profitable")
+				return nil
+			}
+		}
+	} else {
+		log.Info("Building TaikoL1.proposeBlocksV2 initial transaction")
+		txCandidate, err = p.txCallDataBuilder.BuildOntake(ctx, txListsBytesArray)
 		if err != nil {
 			return err
 		}
-		if !profitable {
-			log.Info("Proposing transaction is not profitable")
-			return nil
-		}
+		p.initDone = true
+		log.Info("Initialization tx built")
 	}
 
 	if err := p.sendTx(ctx, txCandidate); err != nil {
