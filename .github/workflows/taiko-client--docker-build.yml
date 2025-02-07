@@ -22,8 +22,11 @@ jobs:
     if: github.repository == 'NethermindEth/surge-taiko-mono'
     strategy:
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm]
-        platform: [linux/amd64, linux/arm64]
+        include:
+          - os: ubuntu-latest
+            platform: linux/amd64
+          - os: ubuntu-24.04-arm
+            platform: linux/arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
