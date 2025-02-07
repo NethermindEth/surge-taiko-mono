@@ -52,8 +52,7 @@ jobs:
       - name: Print tags
         run: |
           echo "Tags: ${{ steps.meta.outputs.tags }}"
-          echo "First tag: ${{ steps.meta.outputs.tags[0] }}"
-          echo "ENV tag: ${{ env.DOCKER_METADATA_OUTPUT_JSON.tag[0] }}] "
+          echo "First tag: $(echo "${{ steps.meta.outputs.tags }}" | cut -d ' ' -f 1)"
 
   #     - name: Build and push multi-arch image
   #       run: |
