@@ -46,6 +46,7 @@ type Config struct {
 	GasNeededForProvingBlock   uint64
 	PriceFluctuationModifier   uint64
 	OffChainCosts              *big.Int
+	UseEthEstimateForBlob      bool
 }
 
 // NewConfigFromCliContext initializes a Config instance from
@@ -142,5 +143,6 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		GasNeededForProvingBlock: gasNeededForProvingBlock,
 		PriceFluctuationModifier: priceFluctuationModifier,
 		OffChainCosts:            offChainCosts,
+		UseEthEstimateForBlob:    c.Bool(flags.UseEthEstimateForBlob.Name),
 	}, nil
 }

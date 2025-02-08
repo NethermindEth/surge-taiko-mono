@@ -512,11 +512,15 @@ func (p *Proposer) buildCheaperOnTakeTransaction(ctx context.Context,
 	txListsBytesArray [][]byte, isEmptyBlock bool) (*txmgr.TxCandidate, *big.Int, error) {
 	var err error
 	// Reinitialize transaction cost calculator to refresh the gas price
+	calculationMethod := LocalCalculationMethod
+	if p.UseEthEstimateForBlob {
+		calculationMethod = EthEstimateMethod
+	}
 	p.txCostCalculator, err = NewTxCostCalculator(
 		p.ctx,
 		p.rpc.L1,
 		p.proposerAddress,
-		LocalCalculationMethod,
+		calculationMethod,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("buildCheaperOnTakeTransaction: initialize tx cost calculator error: %w", err)

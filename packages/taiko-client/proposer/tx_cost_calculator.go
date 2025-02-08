@@ -44,6 +44,7 @@ func NewTxCostCalculator(
 	proposerAddress common.Address,
 	method BlobCostCalculationMethod,
 ) (*TxCostCalculator, error) {
+	log.Debug("NewTxCostCalculator", "method", method)
 	gasPrice, err := l1Client.SuggestGasPrice(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("NewTxCostCalculator: failed to get gas price: %w", err)

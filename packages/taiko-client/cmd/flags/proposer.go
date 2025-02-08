@@ -149,6 +149,13 @@ var (
 		Category: proposerCategory,
 		EnvVars:  []string{"OFF_CHAIN_COSTS"},
 	}
+	UseEthEstimateForBlob = &cli.BoolFlag{
+		Name:     "useEthEstimateForBlob",
+		Usage:    "Use eth_estimateGas for blob cost calculation",
+		Value:    false,
+		Category: proposerCategory,
+		EnvVars:  []string{"USE_ETH_ESTIMATE_FOR_BLOB"},
+	}
 )
 
 // ProposerFlags All proposer flags.
@@ -176,4 +183,5 @@ var ProposerFlags = MergeFlags(CommonFlags, []cli.Flag{
 	GasNeededForProvingBlock,
 	PriceFluctuationModifier,
 	OffChainCosts,
+	UseEthEstimateForBlob,
 }, TxmgrFlags)
