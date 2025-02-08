@@ -103,30 +103,39 @@ func (c *TxCostCalculator) calculateLocally(
 		return nil, err
 	}
 
-	keccakGas, totalTxListsSize := keccakTxListsGasUsage(txLists)
-	callDataOverhead := callDataGasUsage - callDataCostOfTxLists(totalTxListsSize) - keccakGas
+	keccakGas := keccakTxListsGasUsage(txLists)
+	callDataOverhead := callDataGasUsage - callDataCostOfTxLists(txLists) - keccakGas
 
 	totalBlobCost := blobCost.Add(blobCost, new(big.Int).Mul(new(big.Int).SetUint64(callDataOverhead), c.gasPrice))
 	return totalBlobCost, nil
 }
 
-func keccakTxListsGasUsage(txLists [][]byte) (uint64, uint64) {
+func keccakTxListsGasUsage(txLists [][]byte) uint64 {
 	gasUsage := uint64(0)
 	totalSize := uint64(0)
 	for _, txList := range txLists {
-		size := uint64(len(txList))
-		minimumWordSize := (size + uint64(31)) / uint64(32)
-		staticGas := uint64(30)
-		dynamicGas := uint64(6) * minimumWordSize
-		gasUsage += staticGas + dynamicGas
-		totalSize += size
+		totalSize += uint64(len(txList))
 	}
-	return gasUsage, totalSize
+	minimumWordSize := (totalSize + uint64(31)) / uint64(32)
+	staticGas := uint64(30)
+	dynamicGas := uint64(6) * minimumWordSize
+	gasUsage += staticGas + dynamicGas
+
+	return gasUsage
 }
 
-func callDataCostOfTxLists(txListsSize uint64) uint64 {
-	// the block is not empty when we evaluate it
-	return 32 + 16*txListsSize
+func callDataCostOfTxLists(txLists [][]byte) uint64 {
+	var cost uint64
+	for _, txList := range txLists {
+		for _, b := range txList {
+			if b == 0 {
+				cost += 4
+			} else {
+				cost += 16
+			}
+		}
+	}
+	return cost
 }
 
 // GetTransactionCost calculates the cost of a transaction
@@ -204,8 +213,9 @@ func calculateBlobHashes(blobs []*eth.Blob) ([]common.Hash, error) {
 }
 
 func getBlobCost(blobs []*eth.Blob, blobBaseFee *big.Int) (*big.Int, error) {
-	// Each blob costs 1 blob gas
-	totalBlobGas := uint64(len(blobs))
+	// Each blob costs exactly 131072 (0x20000) blob gas
+	blobGasPerBlob := uint64(131072)
+	totalBlobGas := blobGasPerBlob * uint64(len(blobs))
 
 	// Total cost is blob gas * blob base fee
 	return new(big.Int).Mul(

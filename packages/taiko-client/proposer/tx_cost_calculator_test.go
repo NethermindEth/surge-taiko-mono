@@ -26,39 +26,43 @@ func TestCalculateLocally(t *testing.T) {
 	}
 
 	txLists := [][]byte{
-		[]byte("test data 1"), // 11 bytes
-		[]byte("test data 2"), // 11 bytes
+		[]byte("test\x00data\x001"), // 11 bytes with null bytes
+		[]byte("test\x00data\x002"), // 11 bytes with null bytes
 	}
 
 	callDataGasUsage := uint64(1000)
 
 	cost, err := calculator.calculateLocally(txCandidate, txLists, callDataGasUsage)
 
-	// blobCost = 2 * 1000 = 2000
-	// keccakGas = 72
+	// blobCost = 2 * 1000 * 131072 = 262144000
+	// keccakGas = 36
 	// totalSize = 22
-	// callDataOverhead = 1000 - 384 - 72 = 544
-	// overheadCost = 544 * 100 = 54400
-	// totalCost = 2000 + 54400 = 56400
+	// callDataOverhead = 1000 - 304 - 36 = 660
+	// overheadCost = 660 * 100 = 66000
+	// totalCost = 262144000 + 66000 = 262210000
 
 	require.NoError(t, err)
-	require.Equal(t, big.NewInt(56400), cost)
+	require.Equal(t, big.NewInt(262210000), cost)
 }
 
 func TestCalculateKeccakTxListsGasUsage(t *testing.T) {
 	txLists := [][]byte{
-		[]byte("test data 1"), // 11 bytes
-		[]byte("test data 2"), // 11 bytes
+		[]byte("test\x00data\x001"), // 11 bytes with null bytes
+		[]byte("test\x00data\x002"), // 11 bytes with null bytes
 	}
 
-	keccakGas, totalSize := keccakTxListsGasUsage(txLists)
+	keccakGas := keccakTxListsGasUsage(txLists)
 
-	require.Equal(t, uint64(72), keccakGas)
-	require.Equal(t, uint64(22), totalSize)
+	require.Equal(t, uint64(36), keccakGas)
 }
 
 func TestCalculateCallDataCostOfTxLists(t *testing.T) {
-	cost := callDataCostOfTxLists(uint64(22))
+	txLists := [][]byte{
+		[]byte("test\x00data\x001"), // 11 bytes with null bytes
+		[]byte("test\x00data\x002"), // 11 bytes with null bytes
+	}
 
-	require.Equal(t, uint64(384), cost)
+	cost := callDataCostOfTxLists(txLists)
+
+	require.Equal(t, uint64(304), cost)
 }
