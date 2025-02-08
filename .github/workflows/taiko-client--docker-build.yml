@@ -89,7 +89,6 @@ jobs:
             type=sha
 
       - name: Create manifest list and push
-        working-directory: ${{ runner.temp }}/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:temp-ubuntu-latest \
