@@ -69,13 +69,13 @@ jobs:
       - name: Export digest
         run: |
           mkdir -p ${{ runner.temp }}/digests
-          echo "${{ steps.build.outputs.digest }}" > "${{ runner.temp }}/digests/digest-${{ matrix.platform }}"
+          echo "${{ steps.build.outputs.digest }}" > "${{ runner.temp }}/digests/digest-${{ matrix.os}}"
 
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
-          name: digests-${{ matrix.platform }}
-          path: ${{ runner.temp }}/digests/digest-${{ matrix.platform }}
+          name: digests-${{ matrix.os }}
+          path: ${{ runner.temp }}/digests/digest-${{ matrix.os }}
 
   merge:
     runs-on: ubuntu-latest
