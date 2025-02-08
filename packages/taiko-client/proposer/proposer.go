@@ -545,6 +545,7 @@ func (p *Proposer) buildCheaperOnTakeTransaction(ctx context.Context,
 		if err != nil {
 			return nil, nil, err
 		}
+		log.Debug("txCallData cost", "cost", cost)
 		tx = txCallData
 	}
 
@@ -567,6 +568,8 @@ func (p *Proposer) chooseCheaperTransaction(
 	if err != nil {
 		return nil, nil, err
 	}
+
+	log.Debug("totalBlobCost", "totalBlobCost", totalBlobCost, "calldataTxCost", calldataTxCost)
 
 	if calldataTxCost.Cmp(totalBlobCost) > 0 {
 		log.Info("Using blob tx", "totalBlobCost", totalBlobCost)
