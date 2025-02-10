@@ -445,7 +445,8 @@ contract ERC20Vault is BaseVault {
             )
         );
 
-        btoken = address(new ERC1967Proxy(resolve(LibStrings.B_BRIDGED_ERC20, false), data));
+        bytes32 salt = keccak256(abi.encodePacked(ctoken.addr));
+        btoken = address(new ERC1967Proxy{salt: salt}(resolve(LibStrings.B_BRIDGED_ERC20, false), data));
         bridgedToCanonical[btoken] = ctoken;
         canonicalToBridged[ctoken.chainId][ctoken.addr] = btoken;
 
