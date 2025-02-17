@@ -239,7 +239,9 @@ func (p *Proposer) fetchPoolContent(filterPoolContent bool) ([]types.Transaction
 		if lastL2Header.Number == big.NewInt(0) {
 			log.Info("Proposing init block!")
 			txLists = append(txLists, types.Transactions{})
+			return txLists, nil
 		}
+		p.initDone = true
 	}
 
 	for i, txs := range preBuiltTxList {
@@ -485,32 +487,24 @@ func (p *Proposer) ProposeTxListOntake(
 		cost        *big.Int
 	)
 
-	if p.initDone {
-		txCandidate, cost, err = p.buildCheaperOnTakeTransaction(ctx, txListsBytesArray, p.isEmptyBlock(txLists))
-		if err != nil {
-			log.Warn("Failed to build TaikoL1.proposeBlocksV2 transaction", "error", encoding.TryParsingCustomError(err))
-			return err
-		}
-
-		if p.checkProfitability {
-			profitable, err := p.isProfitable(totalTransactionFees, cost)
-			if err != nil {
-				return err
-			}
-			if !profitable {
-				log.Info("Proposing transaction is not profitable")
-				return nil
-			}
-		}
-	} else {
-		log.Info("Building TaikoL1.proposeBlocksV2 initial transaction")
-		txCandidate, err = p.txCallDataBuilder.BuildOntake(ctx, txListsBytesArray)
-		if err != nil {
-			return err
-		}
-		p.initDone = true
-		log.Info("Initialization tx built")
+	txCandidate, cost, err = p.buildCheaperOnTakeTransaction(ctx, txListsBytesArray, isEmptyBlock(txLists))
+	if err != nil {
+		log.Warn("Failed to build TaikoL1.proposeBlocksV2 transaction", "error", encoding.TryParsingCustomError(err))
+		return err
 	}
+
+	if p.checkProfitability && p.initDone {
+		profitable, err := p.isProfitable(totalTransactionFees, cost)
+		if err != nil {
+			return err
+		}
+		if !profitable {
+			log.Info("Proposing transaction is not profitable")
+			return nil
+		}
+	}
+
+	p.initDone = true
 
 	if err := p.sendTx(ctx, txCandidate); err != nil {
 		return err
@@ -555,7 +549,7 @@ func (p *Proposer) buildCheaperOnTakeTransaction(ctx context.Context,
 	return tx, cost, nil
 }
 
-func (p *Proposer) isEmptyBlock(txLists []types.Transactions) bool {
+func isEmptyBlock(txLists []types.Transactions) bool {
 	for _, txs := range txLists {
 		for _, tx := range txs {
 			if tx.To() != nil {
