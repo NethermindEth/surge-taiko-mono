@@ -447,7 +447,6 @@ func (p *Proposer) ProposeTxListOntake(
 	ctx context.Context,
 	txLists []types.Transactions,
 ) error {
-
 	totalTransactionFees, err := p.calculateTotalL2TransactionsFees(txLists)
 	if err != nil {
 		return err
@@ -670,7 +669,6 @@ func (p *Proposer) Name() string {
 // Profitability is determined by comparing the revenue from transaction fees
 // to the costs of proposing and proving the block. Specifically:
 func (p *Proposer) isProfitable(totalTransactionFees *big.Int, proposingCosts *big.Int) (bool, error) {
-
 	costs, err := p.estimateTotalCosts(proposingCosts)
 	if err != nil {
 		return false, err
