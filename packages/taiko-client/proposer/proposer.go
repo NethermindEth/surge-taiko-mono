@@ -658,7 +658,7 @@ func (p *Proposer) calculateTotalL2TransactionsFees(txLists []types.Transactions
 
 	for _, txs := range txLists {
 		for _, tx := range txs {
-			baseFee := p.getPercentageFromBaseFeeToTheProposer(tx.GasFeeCap())
+			baseFee := p.getPercentageFromBaseFeeToTheProposer(tx.GasPrice())
 			tipFeeWithBaseFee := new(big.Int).Add(tx.GasTipCap(), baseFee)
 			gasConsumed := big.NewInt(int64(tx.Gas()))
 			feesFromTx := new(big.Int).Mul(gasConsumed, tipFeeWithBaseFee)
