@@ -230,6 +230,18 @@ func (p *Proposer) fetchPoolContent(filterPoolContent bool) ([]types.Transaction
 	metrics.ProposerPoolContentFetchTime.Set(time.Since(startAt).Seconds())
 
 	txLists := []types.Transactions{}
+
+	if !p.initDone {
+		lastL2Header, err := p.rpc.L2.HeaderByNumber(p.ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get last L2 header: %w", err)
+		}
+		if lastL2Header.Number == big.NewInt(0) {
+			log.Info("Proposing init block!")
+			txLists = append(txLists, types.Transactions{})
+		}
+	}
+
 	for i, txs := range preBuiltTxList {
 		// Filter the pool content if the filterPoolContent flag is set.
 		if txs.EstimatedGasUsed < p.MinGasUsed && txs.BytesLength < p.MinTxListBytes && filterPoolContent {
@@ -247,7 +259,7 @@ func (p *Proposer) fetchPoolContent(filterPoolContent bool) ([]types.Transaction
 	}
 	// If the pool is empty and we're not filtering or checking profitability and proposing empty
 	// blocks is allowed, propose an empty block
-	if (!filterPoolContent && !p.checkProfitability && p.allowEmptyBlocks && len(txLists) == 0) || !p.initDone {
+	if !filterPoolContent && !p.checkProfitability && p.allowEmptyBlocks && len(txLists) == 0 {
 		log.Info(
 			"Pool content is empty, proposing an empty block",
 			"lastProposedAt", p.lastProposedAt,
@@ -435,6 +447,12 @@ func (p *Proposer) ProposeTxListOntake(
 	ctx context.Context,
 	txLists []types.Transactions,
 ) error {
+
+	totalTransactionFees, err := p.calculateTotalL2TransactionsFees(txLists)
+	if err != nil {
+		return err
+	}
+
 	txListsBytesArray, totalTxs, err := p.compressTxLists(txLists)
 	if err != nil {
 		return err
@@ -476,7 +494,7 @@ func (p *Proposer) ProposeTxListOntake(
 		}
 
 		if p.checkProfitability {
-			profitable, err := p.isProfitable(txLists, cost)
+			profitable, err := p.isProfitable(totalTransactionFees, cost)
 			if err != nil {
 				return err
 			}
@@ -651,11 +669,7 @@ func (p *Proposer) Name() string {
 
 // Profitability is determined by comparing the revenue from transaction fees
 // to the costs of proposing and proving the block. Specifically:
-func (p *Proposer) isProfitable(txLists []types.Transactions, proposingCosts *big.Int) (bool, error) {
-	totalTransactionFees, err := p.calculateTotalL2TransactionsFees(txLists)
-	if err != nil {
-		return false, err
-	}
+func (p *Proposer) isProfitable(totalTransactionFees *big.Int, proposingCosts *big.Int) (bool, error) {
 
 	costs, err := p.estimateTotalCosts(proposingCosts)
 	if err != nil {
@@ -669,15 +683,44 @@ func (p *Proposer) isProfitable(txLists []types.Transactions, proposingCosts *bi
 
 func (p *Proposer) calculateTotalL2TransactionsFees(txLists []types.Transactions) (*big.Int, error) {
 	totalFeesCollected := new(big.Int)
+	previousHeader, err := p.rpc.L2.HeaderByNumber(p.ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	// Calculate baseFee for the next block using 1559 rules
+	gasUsed := big.NewInt(int64(previousHeader.GasUsed))
+	gasLimit := big.NewInt(int64(previousHeader.GasLimit))
+	previousBlockBaseFee := previousHeader.BaseFee
 
-	for _, txs := range txLists {
+	targetGasLimit := new(big.Int).Div(gasLimit, big.NewInt(2))
+	gasDelta := new(big.Int).Sub(gasUsed, targetGasLimit)
+
+	scalingFactor := new(big.Int).Mul(gasDelta, big.NewInt(100))
+	scalingFactor.Div(scalingFactor, targetGasLimit)
+	scalingFactor.Div(scalingFactor, big.NewInt(8))
+
+	// Apply scaling factor to previous base fee
+	newBaseFee := new(big.Int).Mul(previousBlockBaseFee, big.NewInt(100)) // Multiply by 100 for precision
+	newBaseFee.Mul(newBaseFee, big.NewInt(100+scalingFactor.Int64()))     // Multiply by (1 + scaling factor)
+	newBaseFee.Div(newBaseFee, big.NewInt(10000))
+
+	for i, txs := range txLists {
+		var filteredTxs types.Transactions
+
 		for _, tx := range txs {
-			baseFee := p.getPercentageFromBaseFeeToTheProposer(tx.GasFeeCap())
-			tipFeeWithBaseFee := new(big.Int).Add(tx.GasTipCap(), baseFee)
+			effectiveTip, err := tx.EffectiveGasTip(newBaseFee)
+			if err != nil {
+				continue
+			}
+			baseFeeForProposer := p.getPercentageFromBaseFeeToTheProposer(newBaseFee)
+			tipFeeWithBaseFee := new(big.Int).Add(effectiveTip, baseFeeForProposer)
 			gasConsumed := big.NewInt(int64(tx.Gas()))
 			feesFromTx := new(big.Int).Mul(gasConsumed, tipFeeWithBaseFee)
 			totalFeesCollected.Add(totalFeesCollected, feesFromTx)
+			filteredTxs = append(filteredTxs, tx)
 		}
+
+		txLists[i] = filteredTxs
 	}
 	return totalFeesCollected, nil
 }

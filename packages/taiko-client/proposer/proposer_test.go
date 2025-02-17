@@ -457,7 +457,9 @@ func (s *ProposerTestSuite) TestIsProfitable() {
 	for _, test := range tests {
 		s.Run(test.name, func() {
 			txLists := []types.Transactions{test.txList}
-			profitable, err := s.p.isProfitable(txLists, test.proposingCosts)
+			fees, err := s.p.calculateTotalL2TransactionsFees(txLists)
+			s.NoError(err)
+			profitable, err := s.p.isProfitable(fees, test.proposingCosts)
 
 			if test.expectedError {
 				s.Error(err)
