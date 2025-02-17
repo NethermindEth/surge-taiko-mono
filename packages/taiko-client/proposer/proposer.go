@@ -230,6 +230,19 @@ func (p *Proposer) fetchPoolContent(filterPoolContent bool) ([]types.Transaction
 	metrics.ProposerPoolContentFetchTime.Set(time.Since(startAt).Seconds())
 
 	txLists := []types.Transactions{}
+
+	if !p.initDone {
+		lastL2Header, err := p.rpc.L2.HeaderByNumber(p.ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get last L2 header: %w", err)
+		}
+		if lastL2Header.Number == big.NewInt(0) {
+			log.Info("Proposing init block!")
+			txLists = append(txLists, types.Transactions{})
+		}
+		p.initDone = true
+	}
+
 	for i, txs := range preBuiltTxList {
 		// Filter the pool content if the filterPoolContent flag is set.
 		if txs.EstimatedGasUsed < p.MinGasUsed && txs.BytesLength < p.MinTxListBytes && filterPoolContent {
@@ -247,14 +260,13 @@ func (p *Proposer) fetchPoolContent(filterPoolContent bool) ([]types.Transaction
 	}
 	// If the pool is empty and we're not filtering or checking profitability and proposing empty
 	// blocks is allowed, propose an empty block
-	if (!filterPoolContent && !p.checkProfitability && p.allowEmptyBlocks && len(txLists) == 0) || !p.initDone {
+	if !filterPoolContent && !p.checkProfitability && p.allowEmptyBlocks && len(txLists) == 0 {
 		log.Info(
 			"Pool content is empty, proposing an empty block",
 			"lastProposedAt", p.lastProposedAt,
 			"minProposingInternal", p.MinProposingInternal,
 		)
 		txLists = append(txLists, types.Transactions{})
-		p.initDone = true
 	}
 
 	// If LocalAddressesOnly is set, filter the transactions by the local addresses.
