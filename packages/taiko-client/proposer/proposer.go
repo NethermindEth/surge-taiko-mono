@@ -482,12 +482,7 @@ func (p *Proposer) ProposeTxListOntake(
 		return errors.New("insufficient prover balance")
 	}
 
-	var (
-		txCandidate *txmgr.TxCandidate
-		cost        *big.Int
-	)
-
-	txCandidate, cost, err = p.buildCheaperOnTakeTransaction(ctx, txListsBytesArray, isEmptyBlock(txLists))
+	txCandidate, cost, err := p.buildCheaperOnTakeTransaction(ctx, txListsBytesArray, isEmptyBlock(txLists))
 	if err != nil {
 		log.Warn("Failed to build TaikoL1.proposeBlocksV2 transaction", "error", encoding.TryParsingCustomError(err))
 		return err
