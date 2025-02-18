@@ -8,9 +8,11 @@ import "../based/TaikoL1.sol";
 /// @custom:security-contact security@nethermind.io
 contract SurgeTaikoL1 is TaikoL1 {
     uint64 private immutable chainId;
+    uint64 private immutable maxLivenessDisruptionPeriod;
 
-    constructor(uint64 _chainId) {
+    constructor(uint64 _chainId, uint64 _maxLivenessDisruptionPeriod) {
         chainId = _chainId;
+        maxLivenessDisruptionPeriod = _maxLivenessDisruptionPeriod;
     }
 
     /// @inheritdoc ITaikoL1
@@ -31,7 +33,8 @@ contract SurgeTaikoL1 is TaikoL1 {
                 minGasExcess: 31_136_000_000, // Resolves to ~0.09992 Gwei
                 maxGasIssuancePerBlock: 6_000_000_000
             }),
-            ontakeForkHeight: 1
+            ontakeForkHeight: 1,
+            maxLivenessDisruptionPeriod: maxLivenessDisruptionPeriod
         });
     }
 }

@@ -12,10 +12,16 @@ contract SurgeTimelockedController is TimelockController {
     /// @notice Address of taiko's inbox contract
     ITaikoL1 internal taikoL1;
 
+    /// @notice Minimum period for which the liveness disruption must not have exceeded the 
+    /// `maxLivenessDisruption` period in the L1 config
+    uint64 internal minLivenessStreak;
+
     error ALREADY_INITIALIZED();
     error LIVENESS_DISRUPTED();
     
-    constructor(uint256 minDelay, address[] memory proposers, address[] memory executors, address admin) TimelockController(minDelay, proposers, executors, admin) {}
+    constructor(uint64 _minLivenessStreak, uint256 minDelay, address[] memory proposers, address[] memory executors, address admin) TimelockController(minDelay, proposers, executors, admin) {
+        minLivenessStreak = _minLivenessStreak;
+    }
 
     function init(address _taikoL1) external {
         if(address(taikoL1) != address(0)) {
@@ -52,10 +58,14 @@ contract SurgeTimelockedController is TimelockController {
         super.executeBatch(targets, values, payloads, predecessor, salt);
     }
 
-    /// @dev Returns `true` if an L2 block has not been proposed + verified in a gap of greater than 7 days
-    /// within the last 45 days
+    function updateMinLivenessStreak(uint64 _minLivenessStreak) external onlyRole(TIMELOCK_ADMIN_ROLE) {
+        minLivenessStreak = _minLivenessStreak;
+    }
+
+    /// @dev Returns `true` if an L2 block has not been proposed + verified in a gap of greater 
+    // than `Config.maxLivenessDisruptionPeriod` seconds within the last `minLivenessStreak`
     function _isLivenessDisrupted() internal view returns(bool) {
         uint256 verificationStreakStartedAt = taikoL1.getVerificationStreakStartAt();
-        return (block.timestamp - verificationStreakStartedAt) < 45 days;
+        return (block.timestamp - verificationStreakStartedAt) < minLivenessStreak;
     }
 }

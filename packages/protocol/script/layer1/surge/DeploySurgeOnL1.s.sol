@@ -47,6 +47,8 @@ contract DeploySurgeOnL1 is DeployCapability {
     uint256 internal immutable ADDRESS_LENGTH = 40;
 
     uint64 internal l2ChainId = uint64(vm.envUint("L2_CHAINID"));
+    uint64 internal maxLivenessDisruptionPeriod = uint64(vm.envUint("MAX_LIVENESS_DISRUPTION_PERIOD"));
+    uint64 internal minLivenessStreak = uint64(vm.envUint("MIN_LIVENESS_STREAK"));
 
     modifier broadcast() {
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
@@ -72,7 +74,7 @@ contract DeploySurgeOnL1 is DeployCapability {
 
         uint256 timelockPeriod = uint64(vm.envUint("TIMELOCK_PERIOD"));
         address timelockController = address(
-            new SurgeTimelockedController(timelockPeriod, proposers, executors, address(0))
+            new SurgeTimelockedController(minLivenessStreak, timelockPeriod, proposers, executors, address(0))
         );
         address contractOwner = timelockController;
 
@@ -253,7 +255,7 @@ contract DeploySurgeOnL1 is DeployCapability {
         copyRegister(rollupAddressManager, _sharedAddressManager, "signal_service");
         copyRegister(rollupAddressManager, _sharedAddressManager, "bridge");
 
-        TaikoL1 taikoL1 = TaikoL1(address(new SurgeTaikoL1(l2ChainId)));
+        TaikoL1 taikoL1 = TaikoL1(address(new SurgeTaikoL1(l2ChainId, maxLivenessDisruptionPeriod)));
 
         deployProxy({
             name: "taiko",

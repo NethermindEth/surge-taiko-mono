@@ -46,6 +46,11 @@ library TaikoData {
         // Group 6: Others
         // ---------------------------------------------------------------------
         uint64 ontakeForkHeight;
+        // Surge
+        // ---------------------------------------------------------------------
+        // Group 7: Surge related
+        // ---------------------------------------------------------------------
+        uint64 maxLivenessDisruptionPeriod;
     }
 
     /// @dev A proof and the tier of proof it belongs to
