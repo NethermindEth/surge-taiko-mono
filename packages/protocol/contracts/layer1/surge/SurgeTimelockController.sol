@@ -52,7 +52,7 @@ contract SurgeTimelockedController is TimelockController {
         super.executeBatch(targets, values, payloads, predecessor, salt);
     }
 
-    /// @dev Returns `true` if an L2 block has not been proposed + verified in a gap of grater 7 days
+    /// @dev Returns `true` if an L2 block has not been proposed + verified in a gap of greater than 7 days
     /// within the last 45 days
     function _isLivenessDisrupted() internal view returns(bool) {
         uint256 verificationStreakStartedAt = taikoL1.getVerificationStreakStartAt();
