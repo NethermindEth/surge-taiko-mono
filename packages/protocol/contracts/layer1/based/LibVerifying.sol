@@ -159,11 +159,14 @@ library LibVerifying {
             }
 
             if (local.numBlocksVerified != 0) {
-                // Surge: Update last verification timestamp if a block has been verified
-                _state.lastVerificationTimestamp = block.timestamp;
-
                 uint64 lastVerifiedBlockId = local.b.lastVerifiedBlockId + local.numBlocksVerified;
                 local.slot = lastVerifiedBlockId % _config.blockRingBufferSize;
+
+                // Surge: Restart verfication streak if the last verified block was proposed more than 7 days
+                // in the past
+                if((block.timestamp - _state.blocks[local.slot].proposedAt) > 7 days) { 
+                    _state.verificationStreakStartedAt = block.timestamp;
+                }
 
                 _state.slotB.lastVerifiedBlockId = lastVerifiedBlockId;
                 _state.blocks[local.slot].verifiedTransitionId = local.lastVerifiedTransitionId;
