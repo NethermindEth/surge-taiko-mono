@@ -33,6 +33,7 @@ var (
 			MinGasExcess:           1_340_000_000,
 			MaxGasIssuancePerBlock: 600_000_000,
 		},
+		MaxLivenessDisruptionPeriod: 604800,
 	}
 	HeklaProtocolConfig = &bindings.TaikoDataConfig{
 		ChainId:               params.HeklaNetworkID.Uint64(),
@@ -51,6 +52,7 @@ var (
 			MinGasExcess:           1_340_000_000,
 			MaxGasIssuancePerBlock: 600_000_000,
 		},
+		MaxLivenessDisruptionPeriod: 604800,
 	}
 	MainnetProtocolConfig = &bindings.TaikoDataConfig{
 		ChainId:               params.TaikoMainnetNetworkID.Uint64(),
@@ -68,6 +70,7 @@ var (
 			MinGasExcess:           1_340_000_000,
 			MaxGasIssuancePerBlock: 600_000_000,
 		},
+		MaxLivenessDisruptionPeriod: 604800,
 	}
 	SurgeProtocolConfig = &bindings.TaikoDataConfig{
 		ChainId:               SurgeNetworkID,
@@ -85,6 +88,7 @@ var (
 			MinGasExcess:           31_136_000_000,
 			MaxGasIssuancePerBlock: 6_000_000_000,
 		},
+		MaxLivenessDisruptionPeriod: 604800,
 	}
 	SurgeTestnetProtocolConfig = &bindings.TaikoDataConfig{
 		ChainId:               SurgeTestNetworkID,
@@ -102,6 +106,7 @@ var (
 			MinGasExcess:           31_136_000_000,
 			MaxGasIssuancePerBlock: 6_000_000_000,
 		},
+		MaxLivenessDisruptionPeriod: 604800,
 	}
 )
 
