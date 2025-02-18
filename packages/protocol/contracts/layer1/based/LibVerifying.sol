@@ -162,7 +162,7 @@ library LibVerifying {
                 uint64 lastVerifiedBlockId = local.b.lastVerifiedBlockId + local.numBlocksVerified;
                 local.slot = lastVerifiedBlockId % _config.blockRingBufferSize;
 
-                // Surge: Restart verfication streak if the last verified block was proposed more than 7 days
+                // Surge: Reset verification streak if the last verified block was proposed more than 7 days
                 // in the past
                 if((block.timestamp - _state.blocks[local.slot].proposedAt) > 7 days) { 
                     _state.verificationStreakStartedAt = block.timestamp;
