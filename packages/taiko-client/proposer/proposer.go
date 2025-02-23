@@ -536,6 +536,7 @@ func (p *Proposer) ProposeTxListPacaya(
 	if err := p.SendTx(ctx, txCandidate); err != nil {
 		return err
 	}
+	p.forceProposeOnce = false
 
 	log.Info("📝 Propose blocks batch succeeded", "blocksInBatch", len(txBatch), "txs", txs)
 
