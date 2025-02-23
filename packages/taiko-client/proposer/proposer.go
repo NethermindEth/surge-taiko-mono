@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
@@ -533,7 +534,14 @@ func (p *Proposer) ProposeTxListPacaya(
 		return err
 	}
 
-	if err := p.SendTx(ctx, txCandidate); err != nil {
+	err = retryOnError(
+		func() error {
+			return p.SendTx(ctx, txCandidate)
+		},
+		"nonce too low",
+		3,
+		1*time.Second)
+	if err != nil {
 		return err
 	}
 	p.forceProposeOnce = false
@@ -544,6 +552,22 @@ func (p *Proposer) ProposeTxListPacaya(
 	metrics.ProposerProposedTxsCounter.Add(float64(txs))
 
 	return nil
+}
+
+func retryOnError(operation func() error, retryon string, maxRetries int, delay time.Duration) error {
+	for i := 0; i < maxRetries; i++ {
+		err := operation()
+		if err == nil {
+			return nil // Success
+		}
+		if !strings.Contains(err.Error(), retryon) {
+			return err // Stop retrying on unexpected errors
+		}
+
+		fmt.Printf("Retrying due to: %v (attempt %d/%d)\n", err, i+1, maxRetries)
+		time.Sleep(delay)
+	}
+	return fmt.Errorf("operation failed after %d retries", maxRetries)
 }
 
 // updateProposingTicker updates the internal proposing timer.
