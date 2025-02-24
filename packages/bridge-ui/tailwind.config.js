@@ -52,12 +52,12 @@ export default {
           0: '#FFFFFF',
           5: '#FFF8FC',
           10: '#FFE7F6',
-          50: '#FFC6E9',
+          50: '#9676D7',
           100: '#FF98D8',
-          200: '#FF6FC8',
+          200: '#9676D7',
           300: '#FF40B6',
-          400: '#E81899',
-          500: '#C8047D',
+          400: '#9676D7',
+          500: '#9676D7',
           600: '#9A0060',
           700: '#7D004E',
           800: '#4B002F',
@@ -216,22 +216,22 @@ export default {
           '--btn-text-case': 'capitalize',
           // '--rounded-box': '0.625rem', // 10px
 
-          '--primary-brand': '#C8047D', // pink-500
+          '--primary-brand': '#9676D7', // pink-500
           '--primary-content': '#F3F3F3', // grey-10
-          '--primary-link': '#FF6FC8', // pink-200
-          '--primary-link-hover': '#FFC6E9', // pink-50
+          '--primary-link': '#9676D7', // pink-200
+          '--primary-link-hover': '#9676D7', // pink-50
           '--primary-icon': '#CACBCE', // grey-100
           '--primary-background': '#0B101B', // grey-900
-          '--primary-interactive': '#C8047D', // pink-500
-          '--primary-interactive-accent': '#E81899', // pink-400
-          '--primary-interactive-hover': '#E81899', // pink-400
-          '--primary-border-hover': '#FF6FC8', // pink-200
+          '--primary-interactive': '#9676D7', // pink-500
+          '--primary-interactive-accent': '#9676D7', // pink-400
+          '--primary-interactive-hover': '#9676D7', // pink-400
+          '--primary-border-hover': '#9676D7', // pink-200
           '--primary-border-dark': '#5D636F', // grey-500
-          '--primary-border-accent': '#E81899', // pink-400
+          '--primary-border-accent': '#9676D7', // pink-400
           '--primary-base-background': '#FFFFFF', // grey-0
           '--primary-base-content': '#191E28', // grey-800
 
-          '--secondary-brand': '#E81899', // pink-400
+          '--secondary-brand': '#9676D7', // pink-400
           '--secondary-content': '#ADB1B8', // grey-200
           '--secondary-icon': '#2B303B', // grey-700
 
@@ -267,11 +267,11 @@ export default {
 
           // ================================ //
 
-          primary: '#C8047D', // pink-500,
-          'primary-focus': '#E81899', // pink-400
+          primary: '#9676D7', // pink-500,
+          'primary-focus': '#9676D7', // pink-400
           'primary-content': '#F3F3F3', // grey-10
 
-          secondary: '#E81899', // pink-400
+          secondary: '#9676D7', // pink-400
           // 'secondary-focus': '',
           'secondary-content': '#ADB1B8', // grey-200
 
@@ -296,23 +296,23 @@ export default {
           'color-scheme': 'light',
           '--btn-text-case': 'capitalize',
 
-          '--primary-brand': '#C8047D', // pink-500
+          '--primary-brand': '#9676D7', // pink-500
           '--primary-content': '#191E28', // grey-800
-          '--primary-link': '#C8047D', // pink-500
-          '--primary-link-hover': '#E81899', // pink-400
+          '--primary-link': '#9676D7', // pink-500
+          '--primary-link-hover': '#9676D7', // pink-400
           '--primary-icon': '#5D636F', // grey-500
           '--primary-background': '#FAFAFA', // grey-5
-          '--primary-interactive': '#C8047D', // pink-500
-          '--primary-interactive-accent': '#E81899', // pink-400
+          '--primary-interactive': '#9676D7', // pink-500
+          '--primary-interactive-accent': '#9676D7', // pink-400
           '--primary-interactive-hover': '#E3E3E3', //grey-50
-          '--primary-border-hover': '#FF6FC8', // pink-200
-          '--primary-border-accent': '#E81899', // pink-400
+          '--primary-border-hover': '#9676D7', // pink-200
+          '--primary-border-accent': '#9676D7', // pink-400
 
           // TODO: these two are yet to be decided
           '--primary-base-background': '#FFFFFF', // grey-0
           '--primary-base-content': '#191E28', // grey-800
 
-          '--secondary-brand': '#E81899', // pink-400
+          '--secondary-brand': '#9676D7', // pink-400
           '--secondary-content': '#444A55', // grey-600
           '--secondary-icon': '#2B303B', // grey-700
           '--secondary-interactive-accent': '#E3E3E3', // grey-50
@@ -347,11 +347,11 @@ export default {
 
           // ================================ //
 
-          primary: '#C8047D', // pink-500,
-          'primary-focus': '#E81899', // pink-400
+          primary: '#9676D7', // pink-500,
+          'primary-focus': '#9676D7', // pink-400
           'primary-content': '#191E28', // grey-800
 
-          secondary: '#E81899', // pink-400
+          secondary: '#9676D7', // pink-400
           // 'secondary-focus': '',
           'secondary-content': '#444A55', // grey-600
 

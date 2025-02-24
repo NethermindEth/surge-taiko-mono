@@ -33,7 +33,6 @@
   import { StatusInfoDialog } from './Status';
   import { connectedSourceChain } from '$stores/network';
 
-
   let transactions: BridgeTransaction[] = [];
 
   let currentPage = 1;
