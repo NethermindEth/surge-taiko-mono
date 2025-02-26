@@ -1,13 +1,13 @@
 {
   "configuredChains": [
     {
-      "17000": {
-        "name": "Holesky",
+      "3151908": {
+        "name": "L1 Devnet",
         "type": "L1",
         "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
           "default": {
-            "http": ["https://l1-rpc.surge.staging-nethermind.xyz/execution"]
+            "http": ["http://host.docker.internal:32002"]
           }
         },
         "nativeCurrency": {
@@ -17,20 +17,20 @@
         },
         "blockExplorers": {
           "default": {
-            "name": "Holesky Explorer",
-            "url": "https://holesky.etherscan.io"
+            "name": "L1 Devnet Explorer",
+            "url": "http://host.docker.internal:35003"
           }
         }
       }
     },
     {
       "763374": {
-        "name": "Surge Testnet",
+        "name": "Surge Devnet",
         "type": "L2",
         "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
           "default": {
-            "http": ["https://l2-rpc.surge.staging-nethermind.xyz"]
+            "http": ["http://host.docker.internal:8547"]
           }
         },
         "nativeCurrency": {
@@ -41,7 +41,7 @@
         "blockExplorers": {
           "default": {
             "name": "Surge Explorer",
-            "url": "https://explorer.holesky.surge.wtf"
+            "url": "http://host.docker.internal:4000"
           }
         }
       }
