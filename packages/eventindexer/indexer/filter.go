@@ -125,7 +125,6 @@ func filterFunc(
 
 func (i *Indexer) filter(
 	ctx context.Context,
-	filter FilterFunc,
 ) error {
 	endBlockID, err := i.ethClient.BlockNumber(ctx)
 	if err != nil {
@@ -138,12 +137,51 @@ func (i *Indexer) filter(
 		"batchSize", i.blockBatchSize,
 	)
 
+	if i.latestIndexedBlockNumber >= i.ontakeForkHeight {
+		i.isPostOntakeForkHeightReached = true
+	}
+
+	if i.latestIndexedBlockNumber >= i.pacayaForkHeight {
+		i.isPostPacayaForkHeightReached = true
+	}
+
 	for j := i.latestIndexedBlockNumber + 1; j <= endBlockID; j += i.blockBatchSize {
-		end := i.latestIndexedBlockNumber + i.blockBatchSize
+		end := j + i.blockBatchSize - 1
+
 		// if the end of the batch is greater than the latest block number, set end
 		// to the latest block number
 		if end > endBlockID {
 			end = endBlockID
+		}
+
+		if !i.isPostPacayaForkHeightReached && i.taikol1 != nil && i.pacayaForkHeight > i.latestIndexedBlockNumber && i.pacayaForkHeight < end {
+			slog.Info("pacaya fork height reached", "height", i.pacayaForkHeight)
+
+			i.isPostPacayaForkHeightReached = true
+
+			end = i.pacayaForkHeight - 1
+
+			slog.Info("setting end block ID to pacayaForkheight - 1",
+				"latestIndexedBlockNumber",
+				i.latestIndexedBlockNumber,
+				"pacayaForkHeight", i.pacayaForkHeight,
+				"endBlockID", end,
+				"isPostPacayaForkHeightReached", i.isPostPacayaForkHeightReached,
+			)
+		} else if !i.isPostOntakeForkHeightReached && i.taikol1 != nil && i.ontakeForkHeight > i.latestIndexedBlockNumber && i.ontakeForkHeight < end {
+			slog.Info("ontake fork height reached", "height", i.ontakeForkHeight)
+
+			i.isPostOntakeForkHeightReached = true
+
+			end = i.ontakeForkHeight - 1
+
+			slog.Info("setting end block ID to ontakeForkHeight - 1",
+				"latestIndexedBlockNumber",
+				i.latestIndexedBlockNumber,
+				"ontakeForkHeight", i.ontakeForkHeight,
+				"endBlockID", end,
+				"isPostOntakeForkHeightReached", i.isPostOntakeForkHeightReached,
+			)
 		}
 
 		slog.Info("block batch", "start", j, "end", end)
@@ -152,6 +190,17 @@ func (i *Indexer) filter(
 			Start:   j,
 			End:     &end,
 			Context: ctx,
+		}
+
+		var filter FilterFunc
+
+		switch {
+		case i.isPostPacayaForkHeightReached:
+			filter = filterFuncPacaya
+		case i.isPostOntakeForkHeightReached:
+			filter = filterFuncOntake
+		default:
+			filter = filterFunc
 		}
 
 		if err := filter(ctx, new(big.Int).SetUint64(i.srcChainID), i, filterOpts); err != nil {

@@ -2,13 +2,76 @@ package builder
 
 import (
 	"context"
+	"os"
+	"testing"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/stretchr/testify/suite"
+
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
 )
 
-func (s *TransactionBuilderTestSuite) TestBuildCalldata() {
-	tx, err := s.calldataTxBuilder.BuildLegacy(context.Background(), false, []byte{1})
-	s.Nil(err)
-	s.Nil(tx.Blobs)
+type TransactionBuilderTestSuite struct {
+	testutils.ClientTestSuite
+	calldataTxBuilder *CalldataTransactionBuilder
+	blobTxBuiler      *BlobTransactionBuilder
+	txsToPropose      []types.Transactions
+}
 
-	_, err = s.calldataTxBuilder.BuildOntake(context.Background(), [][]byte{{1}, {2}})
-	s.Error(err, "ontake transaction builder is not supported before ontake fork")
+func (s *TransactionBuilderTestSuite) SetupTest() {
+	s.ClientTestSuite.SetupTest()
+
+	var (
+		l1ProposerPrivKey = s.KeyFromEnv("L1_PROPOSER_PRIVATE_KEY")
+		chainConfig       = config.NewChainConfig(
+			s.RPCClient.L2.ChainID,
+			s.RPCClient.OntakeClients.ForkHeight,
+			s.RPCClient.PacayaClients.ForkHeight,
+		)
+	)
+
+	s.calldataTxBuilder = NewCalldataTransactionBuilder(
+		s.RPCClient,
+		l1ProposerPrivKey,
+		common.HexToAddress(os.Getenv("TAIKO_ANCHOR")),
+		common.HexToAddress(os.Getenv("TAIKO_INBOX")),
+		common.HexToAddress(os.Getenv("TAIKO_WRAPPER")),
+		common.Address{},
+		0,
+		chainConfig,
+		false,
+	)
+	s.blobTxBuiler = NewBlobTransactionBuilder(
+		s.RPCClient,
+		l1ProposerPrivKey,
+		common.HexToAddress(os.Getenv("TAIKO_INBOX")),
+		common.HexToAddress(os.Getenv("TAIKO_WRAPPER")),
+		common.HexToAddress(os.Getenv("PROVER_SET")),
+		common.HexToAddress(os.Getenv("TAIKO_ANCHOR")),
+		10_000_000,
+		chainConfig,
+		false,
+	)
+
+	for i := 0; i < 100; i++ {
+		s.txsToPropose = append(s.txsToPropose, []*types.Transaction{types.NewTransaction(
+			uint64(i),
+			common.Address{},
+			common.Big0,
+			0,
+			common.Big0,
+			nil,
+		)})
+	}
+}
+
+func (s *TransactionBuilderTestSuite) TestBuildCalldata() {
+	_, err := s.calldataTxBuilder.BuildOntake(context.Background(), [][]byte{{1}, {2}})
+	s.Nil(err)
+}
+
+func TestTransactionBuilderTestSuite(t *testing.T) {
+	suite.Run(t, new(TransactionBuilderTestSuite))
 }

@@ -16,11 +16,28 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/phayes/freeport"
 
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings"
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
+	ontakeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/ontake"
+	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 )
+
+func (s *ClientTestSuite) ForkIntoPacaya(proposer Proposer, syncer ChainSyncer) {
+	head, err := s.RPCClient.L2.HeaderByNumber(context.Background(), nil)
+	s.Nil(err)
+
+	var n = 0
+	if head.Number.Uint64() < s.RPCClient.PacayaClients.ForkHeight {
+		n = int(s.RPCClient.PacayaClients.ForkHeight - head.Number.Uint64())
+	}
+
+	for i := 0; i < n; i++ {
+		s.ProposeAndInsertValidBlock(proposer, syncer)
+	}
+	head, err = s.RPCClient.L2.HeaderByNumber(context.Background(), nil)
+	s.Nil(err)
+	s.GreaterOrEqual(head.Number.Uint64(), s.RPCClient.PacayaClients.ForkHeight)
+}
 
 func (s *ClientTestSuite) proposeEmptyBlockOp(ctx context.Context, proposer Proposer) {
 	s.Nil(proposer.ProposeTxLists(ctx, []types.Transactions{{}}))
@@ -28,46 +45,52 @@ func (s *ClientTestSuite) proposeEmptyBlockOp(ctx context.Context, proposer Prop
 
 func (s *ClientTestSuite) ProposeAndInsertEmptyBlocks(
 	proposer Proposer,
-	blobSyncer BlobSyncer,
-) []metadata.TaikoBlockMetaData {
-	var metadataList []metadata.TaikoBlockMetaData
+	chainSyncer ChainSyncer,
+) []metadata.TaikoProposalMetaData {
+	// Sync all pending L2 blocks at first.
+	s.NotPanics(func() {
+		if err := chainSyncer.ProcessL1Blocks(context.Background()); err != nil {
+			log.Warn("Failed to process L1 blocks", "error", err)
+		}
+	})
+
+	var metadataList []metadata.TaikoProposalMetaData
 
 	l1Head, err := s.RPCClient.L1.HeaderByNumber(context.Background(), nil)
 	s.Nil(err)
 
-	sink := make(chan *bindings.TaikoL1ClientBlockProposed)
-	sub, err := s.RPCClient.TaikoL1.WatchBlockProposed(nil, sink, nil, nil)
+	// Propose txs in L2 execution engine's mempool
+	sink1 := make(chan *pacayaBindings.TaikoInboxClientBatchProposed)
+	sink2 := make(chan *ontakeBindings.TaikoL1ClientBlockProposedV2)
+	sub1, err := s.RPCClient.PacayaClients.TaikoInbox.WatchBatchProposed(nil, sink1)
 	s.Nil(err)
-	defer func() {
-		sub.Unsubscribe()
-		close(sink)
-	}()
+	sub2, err := s.RPCClient.OntakeClients.TaikoL1.WatchBlockProposedV2(nil, sink2, nil)
+	s.Nil(err)
 
-	sink2 := make(chan *bindings.TaikoL1ClientBlockProposedV2)
-	sub2, err := s.RPCClient.TaikoL1.WatchBlockProposedV2(nil, sink2, nil)
-	s.Nil(err)
 	defer func() {
+		sub1.Unsubscribe()
 		sub2.Unsubscribe()
+		close(sink1)
 		close(sink2)
 	}()
 
 	// RLP encoded empty list
 	s.Nil(proposer.ProposeTxLists(context.Background(), []types.Transactions{{}}))
-	s.Nil(blobSyncer.ProcessL1Blocks(context.Background()))
+	s.Nil(chainSyncer.ProcessL1Blocks(context.Background()))
 
 	// Valid transactions lists.
 	s.ProposeValidBlock(proposer)
-	s.Nil(blobSyncer.ProcessL1Blocks(context.Background()))
+	s.Nil(chainSyncer.ProcessL1Blocks(context.Background()))
 
 	// Random bytes txList
 	s.proposeEmptyBlockOp(context.Background(), proposer)
-	s.Nil(blobSyncer.ProcessL1Blocks(context.Background()))
+	s.Nil(chainSyncer.ProcessL1Blocks(context.Background()))
 
 	var txHash common.Hash
 	for i := 0; i < 3; i++ {
 		select {
-		case event := <-sink:
-			metadataList = append(metadataList, metadata.NewTaikoDataBlockMetadataLegacy(event))
+		case event := <-sink1:
+			metadataList = append(metadataList, metadata.NewTaikoDataBlockMetadataPacaya(event))
 			txHash = event.Raw.TxHash
 		case event := <-sink2:
 			metadataList = append(metadataList, metadata.NewTaikoDataBlockMetadataOntake(event))
@@ -88,32 +111,38 @@ func (s *ClientTestSuite) ProposeAndInsertEmptyBlocks(
 	return metadataList
 }
 
-// ProposeAndInsertValidBlock proposes an valid tx list and then insert it
+// ProposeAndInsertValidBlock proposes a valid tx list and then insert it
 // into L2 execution engine's local chain.
 func (s *ClientTestSuite) ProposeAndInsertValidBlock(
 	proposer Proposer,
-	blobSyncer BlobSyncer,
-) metadata.TaikoBlockMetaData {
+	chainSyncer ChainSyncer,
+) metadata.TaikoProposalMetaData {
+	// Sync all pending L2 blocks at first.
+	s.NotPanics(func() {
+		if err := chainSyncer.ProcessL1Blocks(context.Background()); err != nil {
+			log.Warn("Failed to process L1 blocks", "error", err)
+		}
+	})
+
 	l1Head, err := s.RPCClient.L1.HeaderByNumber(context.Background(), nil)
 	s.Nil(err)
 
 	// Propose txs in L2 execution engine's mempool
-	sink := make(chan *bindings.TaikoL1ClientBlockProposed)
-	sub, err := s.RPCClient.TaikoL1.WatchBlockProposed(nil, sink, nil, nil)
+	sink1 := make(chan *pacayaBindings.TaikoInboxClientBatchProposed)
+	sink2 := make(chan *ontakeBindings.TaikoL1ClientBlockProposedV2)
+	sub1, err := s.RPCClient.PacayaClients.TaikoInbox.WatchBatchProposed(nil, sink1)
 	s.Nil(err)
-
-	sink2 := make(chan *bindings.TaikoL1ClientBlockProposedV2)
-	sub2, err := s.RPCClient.TaikoL1.WatchBlockProposedV2(nil, sink2, nil)
+	sub2, err := s.RPCClient.OntakeClients.TaikoL1.WatchBlockProposedV2(nil, sink2, nil)
 	s.Nil(err)
 
 	defer func() {
-		sub.Unsubscribe()
+		sub1.Unsubscribe()
 		sub2.Unsubscribe()
-		close(sink)
+		close(sink1)
 		close(sink2)
 	}()
 
-	nonce, err := s.RPCClient.L2.PendingNonceAt(context.Background(), s.TestAddr)
+	nonce, err := s.RPCClient.L2.NonceAt(context.Background(), s.TestAddr, nil)
 	s.Nil(err)
 
 	tx := types.NewTransaction(
@@ -126,21 +155,24 @@ func (s *ClientTestSuite) ProposeAndInsertValidBlock(
 	)
 	signedTx, err := types.SignTx(tx, types.LatestSignerForChainID(s.RPCClient.L2.ChainID), s.TestAddrPrivKey)
 	s.Nil(err)
-	s.Nil(s.RPCClient.L2.SendTransaction(context.Background(), signedTx))
-
+	err = s.RPCClient.L2.SendTransaction(context.Background(), signedTx)
+	if err != nil {
+		// If the transaction is underpriced, we just ingore it.
+		s.Equal("replacement transaction underpriced", err.Error())
+	}
 	s.Nil(proposer.ProposeOp(context.Background()))
 
 	var (
 		txHash common.Hash
-		meta   metadata.TaikoBlockMetaData
+		meta   metadata.TaikoProposalMetaData
 	)
 	select {
-	case event := <-sink:
+	case event := <-sink1:
+		meta = metadata.NewTaikoDataBlockMetadataPacaya(event)
 		txHash = event.Raw.TxHash
-		meta = metadata.NewTaikoDataBlockMetadataLegacy(event)
 	case event := <-sink2:
-		txHash = event.Raw.TxHash
 		meta = metadata.NewTaikoDataBlockMetadataOntake(event)
+		txHash = event.Raw.TxHash
 	}
 
 	_, isPending, err := s.RPCClient.L1.TransactionByHash(context.Background(), txHash)
@@ -158,9 +190,7 @@ func (s *ClientTestSuite) ProposeAndInsertValidBlock(
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	s.Nil(backoff.Retry(func() error {
-		return blobSyncer.ProcessL1Blocks(ctx)
-	}, backoff.NewExponentialBackOff()))
+	s.Nil(backoff.Retry(func() error { return chainSyncer.ProcessL1Blocks(ctx) }, backoff.NewExponentialBackOff()))
 
 	s.Nil(s.RPCClient.WaitTillL2ExecutionEngineSynced(context.Background()))
 
@@ -170,47 +200,27 @@ func (s *ClientTestSuite) ProposeAndInsertValidBlock(
 	return meta
 }
 
-func (s *ClientTestSuite) ProposeValidBlock(
-	proposer Proposer,
-) {
+func (s *ClientTestSuite) ProposeValidBlock(proposer Proposer) {
 	l1Head, err := s.RPCClient.L1.HeaderByNumber(context.Background(), nil)
 	s.Nil(err)
 
-	state, err := s.RPCClient.GetProtocolStateVariables(nil)
-	s.Nil(err)
-
-	l2Head, err := s.RPCClient.L2.HeaderByNumber(context.Background(), new(big.Int).SetUint64(state.B.NumBlocks-1))
+	l2Head, err := s.RPCClient.L2.HeaderByNumber(context.Background(), nil)
 	s.Nil(err)
 
 	// Propose txs in L2 execution engine's mempool
-	sink := make(chan *bindings.TaikoL1ClientBlockProposed)
-	sink2 := make(chan *bindings.TaikoL1ClientBlockProposedV2)
-
-	sub, err := s.RPCClient.TaikoL1.WatchBlockProposed(nil, sink, nil, nil)
+	sink1 := make(chan *pacayaBindings.TaikoInboxClientBatchProposed)
+	sink2 := make(chan *ontakeBindings.TaikoL1ClientBlockProposedV2)
+	sub1, err := s.RPCClient.PacayaClients.TaikoInbox.WatchBatchProposed(nil, sink1)
 	s.Nil(err)
-
-	sub2, err := s.RPCClient.TaikoL1.WatchBlockProposedV2(nil, sink2, nil)
+	sub2, err := s.RPCClient.OntakeClients.TaikoL1.WatchBlockProposedV2(nil, sink2, nil)
 	s.Nil(err)
 
 	defer func() {
-		sub.Unsubscribe()
+		sub1.Unsubscribe()
 		sub2.Unsubscribe()
-		close(sink)
+		close(sink1)
 		close(sink2)
 	}()
-
-	ontakeForkHeight, err := s.RPCClient.TaikoL2.OntakeForkHeight(nil)
-	s.Nil(err)
-
-	baseFee, err := s.RPCClient.CalculateBaseFee(
-		context.Background(),
-		l2Head,
-		l1Head.Number,
-		l2Head.Number.Uint64()+1 >= ontakeForkHeight,
-		&encoding.InternlDevnetProtocolConfig.BaseFeeConfig,
-		l1Head.Time,
-	)
-	s.Nil(err)
 
 	nonce, err := s.RPCClient.L2.PendingNonceAt(context.Background(), s.TestAddr)
 	s.Nil(err)
@@ -220,7 +230,7 @@ func (s *ClientTestSuite) ProposeValidBlock(
 		common.BytesToAddress(RandomBytes(32)),
 		common.Big0,
 		100_000,
-		new(big.Int).SetUint64(uint64(10*params.GWei)+baseFee.Uint64()),
+		new(big.Int).SetUint64(uint64(10*params.GWei)+l2Head.BaseFee.Uint64()),
 		[]byte{},
 	)
 	signedTx, err := types.SignTx(tx, types.LatestSignerForChainID(s.RPCClient.L2.ChainID), s.TestAddrPrivKey)
@@ -231,7 +241,7 @@ func (s *ClientTestSuite) ProposeValidBlock(
 
 	var txHash common.Hash
 	select {
-	case event := <-sink:
+	case event := <-sink1:
 		txHash = event.Raw.TxHash
 	case event := <-sink2:
 		txHash = event.Raw.TxHash
@@ -280,6 +290,36 @@ func RandomPort() int {
 // SignatureFromRSV creates the signature bytes from r,s,v.
 func SignatureFromRSV(r, s string, v byte) []byte {
 	return append(append(hexutil.MustDecode(r), hexutil.MustDecode(s)...), v)
+}
+
+// AssembleTestTx assembles a test transaction.
+func AssembleTestTx(
+	client *rpc.EthClient,
+	priv *ecdsa.PrivateKey,
+	nonce uint64,
+	to *common.Address,
+	value *big.Int,
+	data []byte,
+) (*types.Transaction, error) {
+	auth, err := bind.NewKeyedTransactorWithChainID(priv, client.ChainID)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := auth.Signer(auth.From, types.NewTx(&types.DynamicFeeTx{
+		To:        to,
+		Nonce:     nonce,
+		Value:     value,
+		GasTipCap: new(big.Int).SetUint64(10 * params.GWei),
+		GasFeeCap: new(big.Int).SetUint64(20 * params.GWei),
+		Gas:       2_100_000,
+		Data:      data,
+	}))
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, client.SendTransaction(context.Background(), tx)
 }
 
 // SendDynamicFeeTx sends a dynamic transaction, used for tests.

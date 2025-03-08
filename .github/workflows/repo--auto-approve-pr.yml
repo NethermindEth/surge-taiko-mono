@@ -3,6 +3,12 @@ name: Auto Approve PR
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    branches-ignore:
+      - release-please--branches--**
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   auto-approve:

@@ -3,6 +3,7 @@ package flags
 import (
 	"time"
 
+	p2pFlags "github.com/ethereum-optimism/optimism/op-node/flags"
 	"github.com/urfave/cli/v2"
 )
 
@@ -30,15 +31,6 @@ var (
 		Category: driverCategory,
 		EnvVars:  []string{"P2P_CHECK_POINT_SYNC_URL"},
 	}
-	// syncer specific flag
-	MaxExponent = &cli.Uint64Flag{
-		Name: "syncer.maxExponent",
-		Usage: "Maximum exponent of retrieving L1 blocks when there is a mismatch between protocol and L2 EE," +
-			"0 means that it is reset to the genesis height",
-		Value:    0,
-		Category: driverCategory,
-		EnvVars:  []string{"SYNCER_MAX_EXPONENT"},
-	}
 	// blob server endpoint
 	BlobServerEndpoint = &cli.StringFlag{
 		Name:     "blob.server",
@@ -46,11 +38,32 @@ var (
 		Category: driverCategory,
 		EnvVars:  []string{"BLOB_SERVER"},
 	}
-	SocialScanEndpoint = &cli.StringFlag{
-		Name:     "blob.socialScanEndpoint",
-		Usage:    "Social Scan's blob storage server",
+	// preconf block server
+	PreconfBlockServerPort = &cli.Uint64Flag{
+		Name:     "preconfirmation.serverPort",
+		Usage:    "HTTP port of the preconfirmation block server, 0 means disabled",
 		Category: driverCategory,
-		EnvVars:  []string{"BLOB_SOCIAL_SCAN_ENDPOINT"},
+		EnvVars:  []string{"PRECONFIRMATION_SERVER_PORT"},
+	}
+	PreconfBlockServerJWTSecret = &cli.StringFlag{
+		Name:     "preconfirmation.jwtSecret",
+		Usage:    "Path to a JWT secret to use for the preconfirmation block server",
+		Category: driverCategory,
+		EnvVars:  []string{"PRECONFIRMATION_SERVER_JWT_SECRET"},
+	}
+	PreconfBlockServerCORSOrigins = &cli.StringFlag{
+		Name:     "preconfirmation.corsOrigins",
+		Usage:    "CORS Origins settings for the preconfirmation block server",
+		Category: driverCategory,
+		Value:    "*",
+		EnvVars:  []string{"PRECONFIRMATION_SERVER_CORS_ORIGINS"},
+	}
+	PreconfWhitelistAddress = &cli.StringFlag{
+		Name:     "preconfirmation.whitelist",
+		Usage:    "PreconfWhitelist contract L1 `address`",
+		Required: false,
+		Category: driverCategory,
+		EnvVars:  []string{"PRECONFIRMATION_WHITELIST"},
 	}
 )
 
@@ -63,7 +76,9 @@ var DriverFlags = MergeFlags(CommonFlags, []cli.Flag{
 	P2PSync,
 	P2PSyncTimeout,
 	CheckPointSyncURL,
-	MaxExponent,
 	BlobServerEndpoint,
-	SocialScanEndpoint,
-})
+	PreconfBlockServerPort,
+	PreconfBlockServerJWTSecret,
+	PreconfBlockServerCORSOrigins,
+	PreconfWhitelistAddress,
+}, p2pFlags.P2PFlags("PRECONFIRMATION"))
