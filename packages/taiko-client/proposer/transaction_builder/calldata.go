@@ -7,13 +7,15 @@ import (
 	"math/big"
 
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
+	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
 
 // CalldataTransactionBuilder is responsible for building a TaikoL1.proposeBlock transaction with txList
@@ -23,10 +25,11 @@ type CalldataTransactionBuilder struct {
 	proposerPrivateKey      *ecdsa.PrivateKey
 	l2SuggestedFeeRecipient common.Address
 	taikoL1Address          common.Address
+	taikoWrapperAddress     common.Address
 	proverSetAddress        common.Address
 	gasLimit                uint64
-	extraData               string
 	chainConfig             *config.ChainConfig
+	revertProtectionEnabled bool
 }
 
 // NewCalldataTransactionBuilder creates a new CalldataTransactionBuilder instance based on giving configurations.
@@ -35,78 +38,88 @@ func NewCalldataTransactionBuilder(
 	proposerPrivateKey *ecdsa.PrivateKey,
 	l2SuggestedFeeRecipient common.Address,
 	taikoL1Address common.Address,
+	taikoWrapperAddress common.Address,
 	proverSetAddress common.Address,
 	gasLimit uint64,
-	extraData string,
 	chainConfig *config.ChainConfig,
+	revertProtectionEnabled bool,
 ) *CalldataTransactionBuilder {
 	return &CalldataTransactionBuilder{
 		rpc,
 		proposerPrivateKey,
 		l2SuggestedFeeRecipient,
 		taikoL1Address,
+		taikoWrapperAddress,
 		proverSetAddress,
 		gasLimit,
-		extraData,
 		chainConfig,
+		revertProtectionEnabled,
 	}
 }
 
-// BuildLegacy implements the ProposeBlockTransactionBuilder interface.
-func (b *CalldataTransactionBuilder) BuildLegacy(
+// BuildOntake implements the ProposeBlockTransactionBuilder interface.
+func (b *CalldataTransactionBuilder) BuildOntake(
 	ctx context.Context,
-	includeParentMetaHash bool,
-	txListBytes []byte,
+	txListBytesArray [][]byte,
 ) (*txmgr.TxCandidate, error) {
-	// If the current proposer wants to include the parent meta hash, then fetch it from the protocol.
+	// Check if the current L2 chain is after ontake fork.
+	l2Head, err := b.rpc.L2.BlockNumber(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if !b.chainConfig.IsOntake(new(big.Int).SetUint64(l2Head)) {
+		return nil, fmt.Errorf("ontake transaction builder is not supported before ontake fork")
+	}
+
+	// ABI encode the TaikoL1.proposeBlocksV2 / ProverSet.proposeBlocksV2 parameters.
 	var (
-		parentMetaHash = [32]byte{}
-		err            error
+		to                 = &b.taikoL1Address
+		data               []byte
+		encodedParamsArray [][]byte
 	)
-	if includeParentMetaHash {
-		if parentMetaHash, err = getParentMetaHash(
-			ctx,
-			b.rpc,
-			new(big.Int).SetUint64(b.chainConfig.ProtocolConfigs.OntakeForkHeight),
-		); err != nil {
+
+	for i := range txListBytesArray {
+		params := &encoding.BlockParamsV2{
+			Coinbase:       b.l2SuggestedFeeRecipient,
+			ParentMetaHash: [32]byte{},
+			AnchorBlockId:  0,
+			Timestamp:      0,
+		}
+
+		if i == 0 && b.revertProtectionEnabled {
+			_, slotB, err := b.rpc.GetProtocolStateVariablesOntake(nil)
+			if err != nil {
+				return nil, err
+			}
+
+			blockInfo, err := b.rpc.GetL2BlockInfoV2(ctx, new(big.Int).SetUint64(slotB.NumBlocks-1))
+			if err != nil {
+				return nil, err
+			}
+
+			params.ParentMetaHash = blockInfo.MetaHash
+		}
+
+		encodedParams, err := encoding.EncodeBlockParamsOntake(params)
+		if err != nil {
 			return nil, err
 		}
-	}
-
-	signature, err := crypto.Sign(crypto.Keccak256(txListBytes), b.proposerPrivateKey)
-	if err != nil {
-		return nil, err
-	}
-	signature[64] = signature[64] + 27
-
-	var (
-		to   = &b.taikoL1Address
-		data []byte
-	)
-	if b.proverSetAddress != rpc.ZeroAddress {
-		to = &b.proverSetAddress
-	}
-
-	// ABI encode the TaikoL1.proposeBlock / ProverSet.proposeBlock parameters.
-	encodedParams, err := encoding.EncodeBlockParams(&encoding.BlockParams{
-		Coinbase:       b.l2SuggestedFeeRecipient,
-		ExtraData:      rpc.StringToBytes32(b.extraData),
-		ParentMetaHash: parentMetaHash,
-		Signature:      signature,
-	})
-	if err != nil {
-		return nil, err
+		encodedParamsArray = append(encodedParamsArray, encodedParams)
 	}
 
 	if b.proverSetAddress != rpc.ZeroAddress {
 		to = &b.proverSetAddress
-
-		data, err = encoding.ProverSetABI.Pack("proposeBlock", encodedParams, txListBytes)
+		if b.revertProtectionEnabled {
+			data, err = encoding.ProverSetABI.Pack("proposeBlocksV2Conditionally", encodedParamsArray, txListBytesArray)
+		} else {
+			data, err = encoding.ProverSetABI.Pack("proposeBlocksV2", encodedParamsArray, txListBytesArray)
+		}
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		data, err = encoding.TaikoL1ABI.Pack("proposeBlock", encodedParams, txListBytes)
+		data, err = encoding.TaikoL1ABI.Pack("proposeBlocksV2", encodedParamsArray, txListBytesArray)
 		if err != nil {
 			return nil, err
 		}
@@ -120,51 +133,75 @@ func (b *CalldataTransactionBuilder) BuildLegacy(
 	}, nil
 }
 
-// BuildOntake implements the ProposeBlockTransactionBuilder interface.
-func (b *CalldataTransactionBuilder) BuildOntake(
+// BuildPacaya implements the ProposeBlocksTransactionBuilder interface.
+func (b *CalldataTransactionBuilder) BuildPacaya(
 	ctx context.Context,
-	txListBytesArray [][]byte,
+	txBatch []types.Transactions,
+	forcedInclusion *pacayaBindings.IForcedInclusionStoreForcedInclusion,
+	minTxsPerForcedInclusion *big.Int,
 ) (*txmgr.TxCandidate, error) {
-	// Check if the current L2 chain is after ontake fork.
-	state, err := rpc.GetProtocolStateVariables(b.rpc.TaikoL1, &bind.CallOpts{Context: ctx})
+	// ABI encode the TaikoWrapper.proposeBatch / ProverSet.proposeBatch parameters.
+	var (
+		to                    = &b.taikoWrapperAddress
+		proposer              = crypto.PubkeyToAddress(b.proposerPrivateKey.PublicKey)
+		data                  []byte
+		encodedParams         []byte
+		blockParams           []pacayaBindings.ITaikoInboxBlockParams
+		forcedInclusionParams *encoding.BatchParams
+		allTxs                types.Transactions
+	)
+
+	if b.proverSetAddress != rpc.ZeroAddress {
+		to = &b.proverSetAddress
+		proposer = b.proverSetAddress
+	}
+
+	if forcedInclusion != nil {
+		blobParams, blockParams := buildParamsForForcedInclusion(forcedInclusion, minTxsPerForcedInclusion)
+		forcedInclusionParams = &encoding.BatchParams{
+			Proposer:                 proposer,
+			Coinbase:                 b.l2SuggestedFeeRecipient,
+			RevertIfNotFirstProposal: b.revertProtectionEnabled,
+			BlobParams:               *blobParams,
+			Blocks:                   blockParams,
+		}
+	}
+
+	for _, txs := range txBatch {
+		allTxs = append(allTxs, txs...)
+		blockParams = append(blockParams, pacayaBindings.ITaikoInboxBlockParams{
+			NumTransactions: uint16(len(txs)),
+			TimeShift:       0,
+			SignalSlots:     make([][32]byte, 0),
+		})
+	}
+
+	txListsBytes, err := utils.EncodeAndCompressTxList(allTxs)
 	if err != nil {
 		return nil, err
 	}
 
-	if !b.chainConfig.IsOntake(new(big.Int).SetUint64(state.B.NumBlocks)) {
-		return nil, fmt.Errorf("ontake transaction builder is not supported before ontake fork")
-	}
-
-	// ABI encode the TaikoL1.proposeBlocksV2 / ProverSet.proposeBlocksV2 parameters.
-	var (
-		to                 = &b.taikoL1Address
-		data               []byte
-		encodedParamsArray [][]byte
-	)
-
-	for range txListBytesArray {
-		encodedParams, err := encoding.EncodeBlockParamsOntake(&encoding.BlockParamsV2{
-			Coinbase:       b.l2SuggestedFeeRecipient,
-			ParentMetaHash: [32]byte{},
-			AnchorBlockId:  0,
-			Timestamp:      0,
-		})
-		if err != nil {
-			return nil, err
-		}
-		encodedParamsArray = append(encodedParamsArray, encodedParams)
+	if encodedParams, err = encoding.EncodeBatchParamsWithForcedInclusion(
+		forcedInclusionParams,
+		&encoding.BatchParams{
+			Proposer:                 proposer,
+			Coinbase:                 b.l2SuggestedFeeRecipient,
+			RevertIfNotFirstProposal: b.revertProtectionEnabled,
+			BlobParams: encoding.BlobParams{
+				ByteOffset: 0,
+				ByteSize:   uint32(len(txListsBytes)),
+			},
+			Blocks: blockParams,
+		}); err != nil {
+		return nil, err
 	}
 
 	if b.proverSetAddress != rpc.ZeroAddress {
-		to = &b.proverSetAddress
-
-		data, err = encoding.ProverSetABI.Pack("proposeBlocksV2", encodedParamsArray, txListBytesArray)
-		if err != nil {
+		if data, err = encoding.ProverSetPacayaABI.Pack("proposeBatch", encodedParams, txListsBytes); err != nil {
 			return nil, err
 		}
 	} else {
-		data, err = encoding.TaikoL1ABI.Pack("proposeBlocksV2", encodedParamsArray, txListBytesArray)
-		if err != nil {
+		if data, err = encoding.TaikoWrapperABI.Pack("proposeBatch", encodedParams, txListsBytes); err != nil {
 			return nil, err
 		}
 	}

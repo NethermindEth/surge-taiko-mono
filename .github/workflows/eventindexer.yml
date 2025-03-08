@@ -5,19 +5,21 @@ on:
     branches: [main]
     paths:
       - "packages/eventindexer/**"
-      - "go.mod"
-      - "go.sum"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "packages/eventindexer/**"
-      - "go.mod"
-      - "go.sum"
+    branches-ignore:
+      - release-please--branches--**
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint-eventindexer:
     name: lint-eventindexer
-    if: github.event_name == 'pull_request'
+    if: ${{ github.event.pull_request.draft == false  && !startsWith(github.head_ref, 'release-please' && !startsWith(github.head_ref, 'refs/heads/dependabot/')) }}
     runs-on: [arc-runner-set]
     steps:
       - uses: actions/setup-go@v5
@@ -32,11 +34,11 @@ jobs:
 
           # Optional: working directory, useful for monorepos
           working-directory: ./packages/eventindexer
-          args: --config=.golangci.yml --timeout=4m
+          args: --config=.golangci.yml --timeout=10m
 
   test-eventindexer:
     runs-on: [arc-runner-set]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.draft == false  && !startsWith(github.head_ref, 'release-please' && !startsWith(github.head_ref, 'refs/heads/dependabot/')) }}
     needs: lint-eventindexer
     steps:
       - name: Cancel Previous Runs
@@ -57,14 +59,14 @@ jobs:
         run: go test `go list ./... | grep -v ./contracts | grep -v ./mock | grep -v ./cmd` -coverprofile=coverage.txt -covermode=atomic
 
       - name: eventindexer - Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ./packages/eventindexer/coverage.txt
           flags: eventindexer
 
   push-eventindexer-docker-image:
     # Skip dependabot PRs
-    if: ${{ github.event_name == 'pull_request' && ! startsWith(github.ref, 'refs/heads/dependabot/') }}
+    if: ${{ github.event_name == 'pull_request' && ! startsWith(github.head_ref, 'refs/heads/dependabot/') && !startsWith(github.head_ref, 'release-please') && github.event.pull_request.head.repo.fork == false }}
     name: Build and push docker image
     runs-on: [arc-runner-set]
 
@@ -103,7 +105,7 @@ jobs:
             type=sha
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           push: true
           context: .

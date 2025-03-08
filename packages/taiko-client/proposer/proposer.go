@@ -17,14 +17,13 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/sync/errgroup"
 
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/utils"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 	builder "github.com/taikoxyz/taiko-mono/packages/taiko-client/proposer/transaction_builder"
 	// "github.com/ethereum/go-ethereum/params"
 )
@@ -43,10 +42,10 @@ type Proposer struct {
 	proposingTimer *time.Timer
 
 	// Transaction builder
-	txBuilder builder.ProposeBlockTransactionBuilder
+	txBuilder builder.ProposeBlocksTransactionBuilder
 
 	// Protocol configurations
-	protocolConfigs *bindings.TaikoDataConfig
+	protocolConfigs config.ProtocolConfigs
 
 	chainConfig *config.ChainConfig
 
@@ -86,9 +85,10 @@ func (p *Proposer) InitFromConfig(
 	}
 
 	// Protocol configs
-	p.protocolConfigs = encoding.GetProtocolConfig(p.rpc.L2.ChainID.Uint64())
-
-	log.Info("Protocol configs", "configs", p.protocolConfigs)
+	if p.protocolConfigs, err = p.rpc.GetProtocolConfigs(&bind.CallOpts{Context: p.ctx}); err != nil {
+		return fmt.Errorf("failed to get protocol configs: %w", err)
+	}
+	config.ReportProtocolConfigs(p.protocolConfigs)
 
 	if txMgr == nil {
 		if txMgr, err = txmgr.NewSimpleTxManager(
@@ -113,33 +113,25 @@ func (p *Proposer) InitFromConfig(
 	}
 
 	p.txmgrSelector = utils.NewTxMgrSelector(txMgr, privateTxMgr, nil)
-
-	chainConfig := config.NewChainConfig(p.protocolConfigs)
-	p.chainConfig = chainConfig
-
-	if cfg.BlobAllowed {
-		p.txBuilder = builder.NewBlobTransactionBuilder(
-			p.rpc,
-			p.L1ProposerPrivKey,
-			cfg.TaikoL1Address,
-			cfg.ProverSetAddress,
-			cfg.L2SuggestedFeeRecipient,
-			cfg.ProposeBlockTxGasLimit,
-			cfg.ExtraData,
-			chainConfig,
-		)
-	} else {
-		p.txBuilder = builder.NewCalldataTransactionBuilder(
-			p.rpc,
-			p.L1ProposerPrivKey,
-			cfg.L2SuggestedFeeRecipient,
-			cfg.TaikoL1Address,
-			cfg.ProverSetAddress,
-			cfg.ProposeBlockTxGasLimit,
-			cfg.ExtraData,
-			chainConfig,
-		)
-	}
+	p.chainConfig = config.NewChainConfig(
+		p.rpc.L2.ChainID,
+		p.rpc.OntakeClients.ForkHeight,
+		p.rpc.PacayaClients.ForkHeight,
+	)
+	p.txBuilder = builder.NewBuilderWithFallback(
+		p.rpc,
+		p.L1ProposerPrivKey,
+		cfg.L2SuggestedFeeRecipient,
+		cfg.TaikoL1Address,
+		cfg.TaikoWrapperAddress,
+		cfg.ProverSetAddress,
+		cfg.ProposeBlockTxGasLimit,
+		p.chainConfig,
+		p.txmgrSelector,
+		cfg.RevertProtectionEnabled,
+		cfg.BlobAllowed,
+		cfg.FallbackToCalldata,
+	)
 
 	return nil
 }
@@ -199,12 +191,13 @@ func (p *Proposer) fetchPoolContent(filterPoolContent bool) ([]types.Transaction
 	preBuiltTxList, err := p.rpc.GetPoolContent(
 		p.ctx,
 		p.proposerAddress,
-		p.protocolConfigs.BlockMaxGasLimit,
+		p.protocolConfigs.BlockMaxGasLimit(),
 		rpc.BlockMaxTxListBytes,
 		p.LocalAddresses,
 		p.MaxProposedTxListsPerEpoch,
 		minTip,
 		p.chainConfig,
+		p.protocolConfigs.BaseFeeConfig(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch transaction pool content: %w", err)
@@ -305,6 +298,7 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 		"lastProposedAt", p.lastProposedAt,
 	)
 
+	// Fetch pending L2 transactions from mempool.
 	txLists, err := p.fetchPoolContent(filterPoolContent)
 	if err != nil {
 		return err
@@ -322,38 +316,18 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 
 // ProposeTxList proposes the given transactions lists to TaikoL1 smart contract.
 func (p *Proposer) ProposeTxLists(ctx context.Context, txLists []types.Transactions) error {
-	// Check if the current L2 chain is after ontake fork.
-	state, err := rpc.GetProtocolStateVariables(p.rpc.TaikoL1, &bind.CallOpts{Context: ctx})
+	l2Head, err := p.rpc.L2.BlockNumber(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get L2 chain head number: %w", err)
 	}
 
-	// If the current L2 chain is before ontake fork, propose the transactions lists one by one.
-	if !p.chainConfig.IsOntake(new(big.Int).SetUint64(state.B.NumBlocks)) {
-		g, gCtx := errgroup.WithContext(ctx)
-		for _, txs := range txLists[:utils.Min(p.MaxProposedTxListsPerEpoch, uint64(len(txLists)))] {
-			nonce, err := p.rpc.L1.PendingNonceAt(ctx, p.proposerAddress)
-			if err != nil {
-				log.Error("Failed to get proposer nonce", "error", err)
-				break
-			}
-
-			log.Info("Proposer current pending nonce", "nonce", nonce)
-
-			g.Go(func() error {
-				if err := p.ProposeTxListLegacy(gCtx, txs); err != nil {
-					return err
-				}
-				p.lastProposedAt = time.Now()
-				return nil
-			})
-
-			if err := p.rpc.WaitL1NewPendingTransaction(ctx, p.proposerAddress, nonce); err != nil {
-				log.Error("Failed to wait for new pending transaction", "error", err)
-			}
+	// Check if the current L2 chain is after Pacaya fork, propose blocks batch.
+	if p.chainConfig.IsPacaya(new(big.Int).SetUint64(l2Head + 1)) {
+		if err := p.ProposeTxListPacaya(ctx, txLists); err != nil {
+			return err
 		}
-
-		return g.Wait()
+		p.lastProposedAt = time.Now()
+		return nil
 	}
 
 	// If the current L2 chain is after ontake fork, batch propose all L2 transactions lists.
@@ -361,65 +335,6 @@ func (p *Proposer) ProposeTxLists(ctx context.Context, txLists []types.Transacti
 		return err
 	}
 	p.lastProposedAt = time.Now()
-	return nil
-}
-
-// ProposeTxListLegacy proposes the given transactions list to TaikoL1 smart contract.
-func (p *Proposer) ProposeTxListLegacy(
-	ctx context.Context,
-	txList types.Transactions,
-) error {
-	txListBytes, err := rlp.EncodeToBytes(txList)
-	if err != nil {
-		return fmt.Errorf("failed to encode transactions: %w", err)
-	}
-
-	compressedTxListBytes, err := utils.Compress(txListBytes)
-	if err != nil {
-		return err
-	}
-
-	proverAddress := p.proposerAddress
-	if p.Config.ClientConfig.ProverSetAddress != rpc.ZeroAddress {
-		proverAddress = p.Config.ClientConfig.ProverSetAddress
-	}
-
-	ok, err := rpc.CheckProverBalance(
-		ctx,
-		p.rpc,
-		proverAddress,
-		p.TaikoL1Address,
-		p.protocolConfigs.LivenessBond,
-	)
-
-	if err != nil {
-		log.Warn("Failed to check prover balance", "error", err)
-		return err
-	}
-
-	if !ok {
-		return errors.New("insufficient prover balance")
-	}
-
-	txCandidate, err := p.txBuilder.BuildLegacy(
-		ctx,
-		p.IncludeParentMetaHash,
-		compressedTxListBytes,
-	)
-	if err != nil {
-		log.Warn("Failed to build TaikoL1.proposeBlock transaction", "error", encoding.TryParsingCustomError(err))
-		return err
-	}
-
-	if err := p.sendTx(ctx, txCandidate); err != nil {
-		return err
-	}
-
-	log.Info("📝 Propose transactions succeeded", "txs", len(txList))
-
-	metrics.ProposerProposedTxListsCounter.Add(1)
-	metrics.ProposerProposedTxsCounter.Add(float64(len(txList)))
-
 	return nil
 }
 
@@ -459,7 +374,10 @@ func (p *Proposer) ProposeTxListOntake(
 		p.rpc,
 		proverAddress,
 		p.TaikoL1Address,
-		new(big.Int).Mul(p.protocolConfigs.LivenessBond, new(big.Int).SetUint64(uint64(len(txLists)))),
+		new(big.Int).Mul(
+			p.protocolConfigs.LivenessBond(),
+			new(big.Int).SetUint64(uint64(len(txLists))),
+		),
 	)
 
 	if err != nil {
@@ -477,7 +395,7 @@ func (p *Proposer) ProposeTxListOntake(
 		return err
 	}
 
-	if err := p.sendTx(ctx, txCandidate); err != nil {
+	if err := p.SendTx(ctx, txCandidate); err != nil {
 		return err
 	}
 
@@ -485,6 +403,91 @@ func (p *Proposer) ProposeTxListOntake(
 
 	metrics.ProposerProposedTxListsCounter.Add(float64(len(txLists)))
 	metrics.ProposerProposedTxsCounter.Add(float64(totalTxs))
+
+	return nil
+}
+
+// ProposeTxListPacaya proposes the given transactions lists to TaikoInbox smart contract.
+func (p *Proposer) ProposeTxListPacaya(
+	ctx context.Context,
+	txBatch []types.Transactions,
+) error {
+	var (
+		proposerAddress = p.proposerAddress
+		txs             uint64
+	)
+
+	// Make sure the tx list is not bigger than the maxBlocksPerBatch.
+	if len(txBatch) > p.protocolConfigs.MaxBlocksPerBatch() {
+		return fmt.Errorf("tx batch size is larger than the maxBlocksPerBatch")
+	}
+
+	for _, txList := range txBatch {
+		txs += uint64(len(txList))
+	}
+
+	// Check balance.
+	if p.Config.ClientConfig.ProverSetAddress != rpc.ZeroAddress {
+		proposerAddress = p.Config.ClientConfig.ProverSetAddress
+	}
+
+	ok, err := rpc.CheckProverBalance(
+		ctx,
+		p.rpc,
+		proposerAddress,
+		p.TaikoL1Address,
+		new(big.Int).Add(
+			p.protocolConfigs.LivenessBond(),
+			new(big.Int).Mul(
+				p.protocolConfigs.LivenessBondPerBlock(),
+				new(big.Int).SetUint64(uint64(len(txBatch))),
+			),
+		),
+	)
+
+	if err != nil {
+		log.Warn("Failed to check prover balance", "proposer", proposerAddress, "error", err)
+		return err
+	}
+
+	if !ok {
+		return fmt.Errorf("insufficient proposer (%s) balance", proposerAddress.Hex())
+	}
+
+	forcedInclusion, minTxsPerForcedInclusion, err := p.rpc.GetForcedInclusionPacaya(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to fetch forced inclusion: %w", err)
+	}
+
+	if forcedInclusion == nil {
+		log.Info("No forced inclusion", "proposer", proposerAddress.Hex())
+	} else {
+		log.Info(
+			"Forced inclusion",
+			"proposer", proposerAddress.Hex(),
+			"blobHash", common.BytesToHash(forcedInclusion.BlobHash[:]),
+			"feeInGwei", forcedInclusion.FeeInGwei,
+			"createdAtBatchId", forcedInclusion.CreatedAtBatchId,
+			"blobByteOffset", forcedInclusion.BlobByteOffset,
+			"blobByteSize", forcedInclusion.BlobByteSize,
+			"minTxsPerForcedInclusion", minTxsPerForcedInclusion,
+		)
+	}
+
+	txCandidate, err := p.txBuilder.BuildPacaya(ctx, txBatch, forcedInclusion, minTxsPerForcedInclusion)
+	if err != nil {
+		log.Warn("Failed to build TaikoInbox.proposeBatch transaction", "error", encoding.TryParsingCustomError(err))
+		return err
+	}
+
+	if err := p.SendTx(ctx, txCandidate); err != nil {
+		return err
+	}
+
+	log.Info("📝 Propose blocks batch succeeded", "blocksInBatch", len(txBatch), "txs", txs)
+
+	metrics.ProposerProposedTxListsCounter.Add(float64(len(txBatch)))
+	metrics.ProposerProposedTxsCounter.Add(float64(txs))
 
 	return nil
 }
@@ -507,13 +510,13 @@ func (p *Proposer) updateProposingTicker() {
 	p.proposingTimer = time.NewTimer(duration)
 }
 
-// sendTx is the internal function to send a transaction with a selected tx manager.
-func (p *Proposer) sendTx(ctx context.Context, txCandidate *txmgr.TxCandidate) error {
+// SendTx is the function to send a transaction with a selected tx manager.
+func (p *Proposer) SendTx(ctx context.Context, txCandidate *txmgr.TxCandidate) error {
 	txMgr, isPrivate := p.txmgrSelector.Select()
 	receipt, err := txMgr.Send(ctx, *txCandidate)
 	if err != nil {
 		log.Warn(
-			"Failed to send TaikoL1.proposeBlock / TaikoL1.proposeBlocksV2 transaction by tx manager",
+			"Failed to send TaikoL1.proposeBlockV2 / TaikoInbox.proposeBatch transaction by tx manager",
 			"isPrivateMempool", isPrivate,
 			"error", encoding.TryParsingCustomError(err),
 		)
@@ -532,6 +535,16 @@ func (p *Proposer) sendTx(ctx context.Context, txCandidate *txmgr.TxCandidate) e
 // Name returns the application name.
 func (p *Proposer) Name() string {
 	return "proposer"
+}
+
+// RegisterTxMgrSelctorToBlobServer registers the tx manager selector to the given blob server,
+// should only be used for testing.
+func (p *Proposer) RegisterTxMgrSelctorToBlobServer(blobServer *testutils.MemoryBlobServer) {
+	p.txmgrSelector = utils.NewTxMgrSelector(
+		testutils.NewMemoryBlobTxMgr(p.rpc, p.txmgrSelector.TxMgr(), blobServer),
+		testutils.NewMemoryBlobTxMgr(p.rpc, p.txmgrSelector.PrivateTxMgr(), blobServer),
+		nil,
+	)
 }
 
 // isProfitable checks if a transaction list is profitable to propose

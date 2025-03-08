@@ -8,7 +8,7 @@ import "src/shared/common/EssentialContract.sol";
 
 /// @title HeklaTaikoToken
 /// @notice Taiko token for Taiko Hekla testnet.
-/// @dev Labeled in AddressResolver as "taiko_token".
+/// @dev Labeled in address resolver as "taiko_token".
 /// @dev Due to historical reasons, the Taiko Token on Hekla has a different storage layout compared
 /// to the mainnet token contract. Therefore, we need to maintain this file.
 /// @custom:security-contact security@taiko.xyz
@@ -18,23 +18,23 @@ contract HeklaTaikoToken is EssentialContract, ERC20SnapshotUpgradeable, ERC20Vo
     error TKO_INVALID_ADDR();
     error TT_INVALID_PARAM();
 
+    constructor(address _resolver) EssentialContract(_resolver) { }
     /// @notice Initializes the contract.
     /// @param _owner The owner of this contract. msg.sender will be used if this value is zero.
     /// @param _name The name of the token.
     /// @param _symbol The symbol of the token.
     /// @param _recipient The address to receive initial token minting.
-    /// @param _addressManager The AddressManager address.
+
     function init(
         address _owner,
         string calldata _name,
         string calldata _symbol,
-        address _recipient,
-        address _addressManager
+        address _recipient
     )
         public
         initializer
     {
-        __Essential_init(_owner, _addressManager);
+        __Essential_init(_owner);
         __ERC20_init(_name, _symbol);
         __ERC20Snapshot_init();
         __ERC20Votes_init();
@@ -81,6 +81,16 @@ contract HeklaTaikoToken is EssentialContract, ERC20SnapshotUpgradeable, ERC20Vo
     {
         if (_to == address(this)) revert TKO_INVALID_ADDR();
         return super.transferFrom(_from, _to, _amount);
+    }
+
+    function clock() public view override returns (uint48) {
+        return SafeCastUpgradeable.toUint48(block.timestamp);
+    }
+
+    // solhint-disable-next-line func-name-mixedcase
+    function CLOCK_MODE() public pure override returns (string memory) {
+        // See https://eips.ethereum.org/EIPS/eip-6372
+        return "mode=timestamp";
     }
 
     function name() public pure override returns (string memory) {
@@ -145,7 +155,8 @@ contract HeklaTaikoToken is EssentialContract, ERC20SnapshotUpgradeable, ERC20Vo
         returns (bool)
     {
         if (recipients.length != amounts.length) revert TT_INVALID_PARAM();
-        for (uint256 i; i < recipients.length; ++i) {
+        uint256 size = recipients.length;
+        for (uint256 i; i < size; ++i) {
             _transfer(msg.sender, recipients[i], amounts[i]);
         }
         return true;

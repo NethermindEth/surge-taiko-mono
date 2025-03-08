@@ -12,41 +12,40 @@ Before compiling the smart contracts, ensure the following are installed and up 
 To install dependencies:
 
 ```bash
-foundryup && pnpm install
+foundryup -v stable && pnpm install
 ```
 
-## Compilation and Testing
+## Compilation
 
 Taiko’s protocol is split between Layer 1 (L1) and Layer 2 (L2). The smart contracts need to be compiled and tested separately for each layer:
 
-### Layer 1 (Ethereum, Duncan Hardfork)
-
-To compile, run tests, and generate the storage layout for L1:
+To compile and generate the storage layout for L1:
 
 ```bash
 pnpm compile:l1
-pnpm test:l1
 pnpm layout:l1
 ```
-
-### Layer 2 (Taiko, Shanghai Hardfork)
 
 Similarly, for L2:
 
 ```bash
 pnpm compile:l2
-pnpm test:l2
 pnpm layout:l2
 ```
 
-### Compile and Test for Both Layers
-
-To compile and test contracts for both L1 and L2 at once:
+To compile and generate the storage layout for both layers:
 
 ```bash
 pnpm compile
-pnpm test
 pnpm layout
+```
+
+## Testing
+
+```bash
+pnpm test:l1
+pnpm test:l2
+pnpm test
 ```
 
 ## Layer 2 Genesis Block
@@ -136,7 +135,7 @@ This command runs the deployment script located at `script/deploy_protocol_on_l1
 
 ## Style Guide
 
-Refer to [CONTRIBUTING.md](https://www.notion.so/CONTRIBUTING.md) for code style guidelines.
+Refer to [CONTRIBUTING.md](../../CONTRIBUTING.md) for code style guidelines.
 
 Before committing code, format and lint it using:
 

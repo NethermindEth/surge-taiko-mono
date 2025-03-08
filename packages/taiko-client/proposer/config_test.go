@@ -16,15 +16,15 @@ import (
 var (
 	l1Endpoint      = os.Getenv("L1_WS")
 	l2Endpoint      = os.Getenv("L2_HTTP")
-	taikoL1         = os.Getenv("TAIKO_L1")
-	taikoL2         = os.Getenv("TAIKO_L2")
+	taikoL1         = os.Getenv("TAIKO_INBOX")
+	taikoL2         = os.Getenv("TAIKO_ANCHOR")
 	taikoToken      = os.Getenv("TAIKO_TOKEN")
 	proposeInterval = "10s"
 	rpcTimeout      = "5s"
 )
 
 func (s *ProposerTestSuite) TestNewConfigFromCliContext() {
-	goldenTouchAddress, err := s.RPCClient.TaikoL2.GOLDENTOUCHADDRESS(nil)
+	goldenTouchAddress, err := s.RPCClient.OntakeClients.TaikoL2.GOLDENTOUCHADDRESS(nil)
 	s.Nil(err)
 
 	app := s.SetupApp()
@@ -43,7 +43,6 @@ func (s *ProposerTestSuite) TestNewConfigFromCliContext() {
 		s.Equal(1, len(c.LocalAddresses))
 		s.Equal(goldenTouchAddress, c.LocalAddresses[0])
 		s.Equal(5*time.Second, c.Timeout)
-		s.Equal(true, c.IncludeParentMetaHash)
 
 		s.Nil(new(Proposer).InitFromCli(context.Background(), cliCtx))
 		return nil
@@ -62,7 +61,6 @@ func (s *ProposerTestSuite) TestNewConfigFromCliContext() {
 		"--" + flags.TxPoolLocals.Name, goldenTouchAddress.Hex(),
 		"--" + flags.RPCTimeout.Name, rpcTimeout,
 		"--" + flags.TxGasLimit.Name, "100000",
-		"--" + flags.ProposeBlockIncludeParentMetaHash.Name, "true",
 	}))
 }
 
@@ -88,7 +86,7 @@ func (s *ProposerTestSuite) TestNewConfigFromCliContextL2RecipErr() {
 }
 
 func (s *ProposerTestSuite) TestNewConfigFromCliContextTxPoolLocalsErr() {
-	goldenTouchAddress, err := s.RPCClient.TaikoL2.GOLDENTOUCHADDRESS(nil)
+	goldenTouchAddress, err := s.RPCClient.OntakeClients.TaikoL2.GOLDENTOUCHADDRESS(nil)
 	s.Nil(err)
 
 	app := s.SetupApp()
@@ -117,7 +115,6 @@ func (s *ProposerTestSuite) SetupApp() *cli.App {
 		&cli.DurationFlag{Name: flags.ProposeInterval.Name},
 		&cli.StringFlag{Name: flags.TxPoolLocals.Name},
 		&cli.DurationFlag{Name: flags.RPCTimeout.Name},
-		&cli.BoolFlag{Name: flags.ProposeBlockIncludeParentMetaHash.Name},
 	}
 	app.Flags = append(app.Flags, flags.TxmgrFlags...)
 	app.Action = func(ctx *cli.Context) error {

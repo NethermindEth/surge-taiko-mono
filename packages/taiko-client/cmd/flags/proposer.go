@@ -2,12 +2,23 @@ package flags
 
 import (
 	"github.com/urfave/cli/v2"
-
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/version"
 )
 
 // Required flags used by proposer.
 var (
+	TaikoWrapperAddress = &cli.StringFlag{
+		Name:     "taikoWrapper",
+		Usage:    "TaikoWrapper contract `address`",
+		Required: true,
+		Category: proposerCategory,
+		EnvVars:  []string{"TAIKO_WRAPPER"},
+	}
+	ForcedInclusionStoreAddress = &cli.StringFlag{
+		Name:     "forcedInclusionStore",
+		Usage:    "ForcedInclusionStore contract `address`",
+		Required: true,
+		EnvVars:  []string{"FORCED_INCLUSION_STORE"},
+	}
 	L1ProposerPrivKey = &cli.StringFlag{
 		Name:     "l1.proposerPrivKey",
 		Usage:    "Private key of the L1 proposer, who will send TaikoL1.proposeBlock transactions",
@@ -69,14 +80,6 @@ var (
 		Value:    0,
 		EnvVars:  []string{"EPOCH_ALLOW_ZERO_INTERVAL"},
 	}
-	// Proposing metadata related.
-	ExtraData = &cli.StringFlag{
-		Name:     "extraData",
-		Usage:    "Block extra data set by the proposer (default = client version)",
-		Value:    version.CommitVersion(),
-		Category: proposerCategory,
-		EnvVars:  []string{"EXTRA_DATA"},
-	}
 	// Transactions pool related.
 	TxPoolLocals = &cli.StringSliceFlag{
 		Name:     "txPool.locals",
@@ -98,19 +101,27 @@ var (
 		Category: proposerCategory,
 		EnvVars:  []string{"TX_POOL_MAX_TX_LISTS_PER_EPOCH"},
 	}
-	ProposeBlockIncludeParentMetaHash = &cli.BoolFlag{
-		Name:     "includeParentMetaHash",
-		Usage:    "Include parent meta hash when proposing block",
-		Value:    false,
-		Category: proposerCategory,
-		EnvVars:  []string{"INCLUDE_PARENT_META_HASH"},
-	}
 	// Transaction related.
 	BlobAllowed = &cli.BoolFlag{
 		Name:    "l1.blobAllowed",
 		Usage:   "Send EIP-4844 blob transactions when proposing blocks",
 		Value:   false,
 		EnvVars: []string{"L1_BLOB_ALLOWED"},
+	}
+	FallbackToCalldata = &cli.BoolFlag{
+		Name:     "l1.fallbackToCalldata",
+		Usage:    "If set to true, proposer will use calldata as DA when blob fee is more expensive than using calldata",
+		Value:    false,
+		Category: proposerCategory,
+		EnvVars:  []string{"L1_FALLBACK_TO_CALLDATA"},
+	}
+	RevertProtectionEnabled = &cli.BoolFlag{
+		Name: "l1.revertProtection",
+		Usage: "Enable revert protection within your ProverSet contract, " +
+			"this is effective only if your PBS service supports revert protection",
+		Value:    false,
+		Category: proposerCategory,
+		EnvVars:  []string{"L1_REVERT_PROTECTION"},
 	}
 	// Surge related.
 	GasNeededForProposingBlock = &cli.Uint64Flag{
@@ -151,20 +162,22 @@ var ProposerFlags = MergeFlags(CommonFlags, []cli.Flag{
 	L2AuthEndpoint,
 	JWTSecret,
 	TaikoTokenAddress,
+	TaikoWrapperAddress,
+	ForcedInclusionStoreAddress,
 	L1ProposerPrivKey,
 	L2SuggestedFeeRecipient,
 	ProposeInterval,
 	TxPoolLocals,
 	TxPoolLocalsOnly,
-	ExtraData,
 	MinGasUsed,
 	MinTxListBytes,
 	MinTip,
 	MinProposingInternal,
 	AllowZeroInterval,
 	MaxProposedTxListsPerEpoch,
-	ProposeBlockIncludeParentMetaHash,
 	BlobAllowed,
+	FallbackToCalldata,
+	RevertProtectionEnabled,
 	// surge flags
 	GasNeededForProposingBlock,
 	GasNeededForProvingBlock,

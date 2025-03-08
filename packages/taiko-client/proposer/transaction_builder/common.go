@@ -4,40 +4,45 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings"
+	"github.com/ethereum-optimism/optimism/op-service/txmgr"
+	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
+	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 )
 
-// getParentMetaHash returns the meta hash of the parent block of the latest proposed block in protocol.
-func getParentMetaHash(ctx context.Context, rpc *rpc.Client, forkHeight *big.Int) (common.Hash, error) {
-	state, err := rpc.TaikoL1.State(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return common.Hash{}, err
-	}
-
-	blockNum := new(big.Int).SetUint64(state.SlotB.NumBlocks - 1)
-	var parent bindings.TaikoDataBlockV2
-	if isBlockForked(forkHeight, blockNum) {
-		parent, err = rpc.GetL2BlockInfoV2(ctx, blockNum)
-	} else {
-		parent, err = rpc.GetL2BlockInfo(ctx, blockNum)
-	}
-	if err != nil {
-		return common.Hash{}, err
-	}
-
-	return parent.MetaHash, nil
+// ProposeBlocksTransactionBuilder is an interface for building a TaikoL1.proposeBlock / TaikoInbox.proposeBatch
+// transaction.
+type ProposeBlocksTransactionBuilder interface {
+	BuildOntake(ctx context.Context, txListBytesArray [][]byte) (*txmgr.TxCandidate, error)
+	BuildPacaya(
+		ctx context.Context,
+		txBatch []types.Transactions,
+		forcedInclusion *pacayaBindings.IForcedInclusionStoreForcedInclusion,
+		minTxsPerForcedInclusion *big.Int,
+	) (*txmgr.TxCandidate, error)
 }
 
-// isBlockForked returns whether a fork scheduled at block s is active at the
-// given head block.
-func isBlockForked(s, head *big.Int) bool {
-	if s == nil || head == nil {
-		return false
+// buildParamsForForcedInclusion builds the blob params and the block params
+// for the given forced inclusion.
+func buildParamsForForcedInclusion(
+	forcedInclusion *pacayaBindings.IForcedInclusionStoreForcedInclusion,
+	minTxsPerForcedInclusion *big.Int,
+) (*encoding.BlobParams, []pacayaBindings.ITaikoInboxBlockParams) {
+	if forcedInclusion == nil {
+		return nil, nil
 	}
-	return s.Cmp(head) <= 0
+	return &encoding.BlobParams{
+			BlobHashes: [][32]byte{forcedInclusion.BlobHash},
+			NumBlobs:   0,
+			ByteOffset: forcedInclusion.BlobByteOffset,
+			ByteSize:   forcedInclusion.BlobByteSize,
+			CreatedIn:  forcedInclusion.BlobCreatedIn,
+		}, []pacayaBindings.ITaikoInboxBlockParams{
+			{
+				NumTransactions: uint16(minTxsPerForcedInclusion.Uint64()),
+				TimeShift:       0,
+				SignalSlots:     make([][32]byte, 0),
+			},
+		}
 }

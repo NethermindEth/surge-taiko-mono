@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/utils"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
 
 var (
@@ -39,48 +39,46 @@ func (s *TxListDecompressorTestSuite) SetupTest() {
 }
 
 func (s *TxListDecompressorTestSuite) TestZeroBytes() {
-	s.Empty(s.d.TryDecompress(chainID, []byte{}, false))
+	s.Empty(s.d.TryDecompress(chainID, []byte{}, false, false))
 }
 
 func (s *TxListDecompressorTestSuite) TestCalldataSize() {
-	s.Empty(s.d.TryDecompress(chainID, randBytes(rpc.BlockMaxTxListBytes+1), false))
-	s.Empty(s.d.TryDecompress(chainID, randBytes(rpc.BlockMaxTxListBytes-1), false))
+	s.Empty(s.d.TryDecompress(chainID, randBytes(rpc.BlockMaxTxListBytes+1), false, false))
+	s.Empty(s.d.TryDecompress(chainID, randBytes(rpc.BlockMaxTxListBytes-1), false, false))
 }
 
 func (s *TxListDecompressorTestSuite) TestValidTxList() {
-	compressed, err := utils.Compress(rlpEncodedTransactionBytes(1, true))
-	s.Nil(err)
-	decompressed, err := utils.Decompress(compressed)
+	txs, rlpEncodedBytes := rlpEncodedTransactionBytes(1, true)
+	compressed, err := utils.Compress(rlpEncodedBytes)
 	s.Nil(err)
 
-	s.Equal(s.d.TryDecompress(chainID, compressed, true), decompressed)
-	s.Equal(s.d.TryDecompress(chainID, compressed, false), decompressed)
+	s.Equal(len(s.d.TryDecompress(chainID, compressed, true, false)), len(txs))
+	s.Equal(len(s.d.TryDecompress(chainID, compressed, false, false)), len(txs))
 }
 
 func (s *TxListDecompressorTestSuite) TestInvalidTxList() {
 	compressed, err := utils.Compress(randBytes(1024))
 	s.Nil(err)
 
-	s.Zero(len(s.d.TryDecompress(chainID, compressed, true)))
-	s.Zero(len(s.d.TryDecompress(chainID, compressed, false)))
+	s.Zero(len(s.d.TryDecompress(chainID, compressed, true, false)))
+	s.Zero(len(s.d.TryDecompress(chainID, compressed, false, false)))
 }
 
 func (s *TxListDecompressorTestSuite) TestInvalidZlibBytes() {
-	s.Zero(len(s.d.TryDecompress(chainID, randBytes(1024), true)))
-	s.Zero(len(s.d.TryDecompress(chainID, randBytes(1024), false)))
+	s.Zero(len(s.d.TryDecompress(chainID, randBytes(1024), true, false)))
+	s.Zero(len(s.d.TryDecompress(chainID, randBytes(1024), false, false)))
 }
 
 func TestDriverTestSuite(t *testing.T) {
 	suite.Run(t, new(TxListDecompressorTestSuite))
 }
 
-func rlpEncodedTransactionBytes(l int, signed bool) []byte {
+func rlpEncodedTransactionBytes(l int, signed bool) (types.Transactions, []byte) {
 	txs := make(types.Transactions, 0)
 	for i := 0; i < l; i++ {
 		var tx *types.Transaction
 		if signed {
 			txData := &types.LegacyTx{Nonce: 1, To: &testAddr, GasPrice: common.Big256, Value: common.Big1, Gas: 10}
-
 			tx = types.MustSignNewTx(testKey, types.LatestSigner(&params.ChainConfig{ChainID: chainID}), txData)
 		} else {
 			tx = types.NewTransaction(1, testAddr, common.Big1, 10, new(big.Int).SetUint64(10*params.GWei), nil)
@@ -88,7 +86,7 @@ func rlpEncodedTransactionBytes(l int, signed bool) []byte {
 		txs = append(txs, tx)
 	}
 	b, _ := rlp.EncodeToBytes(txs)
-	return b
+	return txs, b
 }
 
 func randBytes(l uint64) []byte {

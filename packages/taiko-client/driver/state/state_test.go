@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/utils"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
 
 type DriverStateTestSuite struct {
@@ -36,10 +36,6 @@ func (s *DriverStateTestSuite) TearDownTest() {
 func (s *DriverStateTestSuite) TestGetL1Head() {
 	l1Head := s.s.GetL1Head()
 	s.NotNil(l1Head)
-}
-
-func (s *DriverStateTestSuite) TestGetHeadBlockID() {
-	s.Equal(uint64(0), s.s.GetHeadBlockID().Uint64())
 }
 
 func (s *DriverStateTestSuite) TestClose() {

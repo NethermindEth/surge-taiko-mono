@@ -14,7 +14,7 @@ linters:
     - bidichk
     - bodyclose
     - durationcheck
-    - exportloopref
+    - copyloopvar
     - errcheck
     - errchkjson
     - errname
@@ -33,7 +33,6 @@ linters:
     - misspell
     - gosimple
     - staticcheck
-    - revive
     - staticcheck
     - sqlclosecheck
     - staticcheck

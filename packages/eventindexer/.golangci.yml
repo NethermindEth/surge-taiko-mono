@@ -8,9 +8,6 @@
 #   "--config=${workspaceFolder}/.golangci.yml"
 # ],
 
-output:
-  format: colored-line-number
-
 linters:
   enable:
     - errcheck

@@ -4,8 +4,13 @@ on:
   pull_request:
     types: [labeled, unlabeled, synchronize, opened, reopened]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check_label:
+    if: github.event.pull_request.draft == false
     runs-on: [arc-runner-set]
     steps:
       - name: Check for "option.do-not-merge" label
