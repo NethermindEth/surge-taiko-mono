@@ -2,7 +2,6 @@ package proposer
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math/big"
@@ -10,14 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/urfave/cli/v2"
@@ -62,8 +58,8 @@ type Proposer struct {
 
 	checkProfitability bool
 
-	allowEmptyBlocks bool
-	initDone         bool
+	// allowEmptyBlocks bool
+	// initDone         bool
 }
 
 // InitFromCli initializes the given proposer instance based on the command line flags.
@@ -330,11 +326,14 @@ func (p *Proposer) ProposeTxLists(ctx context.Context, txLists []types.Transacti
 	return nil
 }
 
+/*
 // getTxListsToPropose returns the transaction lists to propose based on configuration limits
 func (p *Proposer) getTxListsToPropose(txLists []types.Transactions) []types.Transactions {
 	maxTxLists := utils.Min(p.MaxProposedTxListsPerEpoch, uint64(len(txLists)))
 	return txLists[:maxTxLists]
 }
+
+*/
 
 // ProposeTxListOntake proposes the given transactions lists to TaikoL1 smart contract.
 func (p *Proposer) ProposeTxListOntake(
@@ -489,6 +488,7 @@ func (p *Proposer) ProposeTxListPacaya(
 	return nil
 }
 
+/*
 func (p *Proposer) buildCheaperOnTakeTransaction(ctx context.Context,
 	txListsBytesArray [][]byte, isEmptyBlock bool) (*txmgr.TxCandidate, *big.Int, error) {
 
@@ -510,6 +510,8 @@ func (p *Proposer) buildCheaperOnTakeTransaction(ctx context.Context,
 
 	return txBlob, blobCost, nil
 }
+
+*/
 
 // compressTxLists compresses transaction lists and returns compressed bytes array and transaction counts
 func (p *Proposer) compressTxLists(txLists []types.Transactions) ([][]byte, int, error) {
@@ -595,6 +597,7 @@ func (p *Proposer) RegisterTxMgrSelctorToBlobServer(blobServer *testutils.Memory
 	)
 }
 
+/*
 // isProfitable checks if a transaction list is profitable to propose
 
 // Profitability is determined by comparing the revenue from transaction fees
@@ -761,3 +764,5 @@ func (p *Proposer) estimateTotalCosts(proposingCosts *big.Int) (*big.Int, error)
 
 	return totalCosts, nil
 }
+
+*/

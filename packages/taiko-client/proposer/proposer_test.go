@@ -478,6 +478,7 @@ func TestProposerTestSuite(t *testing.T) {
 	suite.Run(t, new(ProposerTestSuite))
 }
 
+/*
 func (s *ProposerTestSuite) TestEstimateTotalCosts() {
 	s.p.OffChainCosts = big.NewInt(500000000000) // 500 Gwei for off-chain costs
 	s.p.GasNeededForProvingBlock = 3000000
@@ -584,3 +585,5 @@ func (s *ProposerTestSuite) TestIsProfitable() {
 		})
 	}
 }
+
+*/
