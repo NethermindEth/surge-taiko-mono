@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"maps"
+	"math/big"
 	"os"
 	"testing"
 	"time"
@@ -309,49 +310,106 @@ func (s *ProposerTestSuite) TestName() {
 }
 
 func (s *ProposerTestSuite) TestProposeOp() {
-	// Propose txs in L2 execution engine's mempool
-	sink1 := make(chan *pacayaBindings.TaikoInboxClientBatchProposed)
-	sink2 := make(chan *ontakeBindings.TaikoL1ClientBlockProposedV2)
-	sub1, err := s.RPCClient.PacayaClients.TaikoInbox.WatchBatchProposed(nil, sink1)
-	s.Nil(err)
-	sub2, err := s.RPCClient.OntakeClients.TaikoL1.WatchBlockProposedV2(nil, sink2, nil)
-	s.Nil(err)
-
-	defer func() {
-		sub1.Unsubscribe()
-		sub2.Unsubscribe()
-		close(sink1)
-		close(sink2)
-	}()
-
-	to := common.BytesToAddress(testutils.RandomBytes(32))
-	_, err = testutils.SendDynamicFeeTx(s.p.rpc.L2, s.TestAddrPrivKey, &to, common.Big1, nil)
-	s.Nil(err)
-
-	s.Nil(s.p.ProposeOp(context.Background()))
-
-	var meta metadata.TaikoProposalMetaData
-	select {
-	case event := <-sink1:
-		meta = metadata.NewTaikoDataBlockMetadataPacaya(event)
-	case event := <-sink2:
-		meta = metadata.NewTaikoDataBlockMetadataOntake(event)
+	testCases := []struct {
+		name               string
+		checkProfitability bool
+	}{
+		{
+			name:               "Without profitability check",
+			checkProfitability: false,
+		},
+		{
+			name:               "With profitability check",
+			checkProfitability: true,
+		},
 	}
-	s.Equal(meta.GetCoinbase(), s.p.L2SuggestedFeeRecipient)
 
-	_, isPending, err := s.p.rpc.L1.TransactionByHash(context.Background(), meta.GetTxHash())
-	s.Nil(err)
-	s.False(isPending)
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			// Set profitability check
+			s.p.checkProfitability = tc.checkProfitability
 
-	receipt, err := s.p.rpc.L1.TransactionReceipt(context.Background(), meta.GetTxHash())
-	s.Nil(err)
-	s.Equal(types.ReceiptStatusSuccessful, receipt.Status)
+			// Propose txs in L2 execution engine's mempool
+			sink1 := make(chan *pacayaBindings.TaikoInboxClientBatchProposed)
+			sink2 := make(chan *ontakeBindings.TaikoL1ClientBlockProposedV2)
+			sub1, err := s.RPCClient.PacayaClients.TaikoInbox.WatchBatchProposed(nil, sink1)
+			s.Nil(err)
+			sub2, err := s.RPCClient.OntakeClients.TaikoL1.WatchBlockProposedV2(nil, sink2, nil)
+			s.Nil(err)
+
+			defer func() {
+				sub1.Unsubscribe()
+				sub2.Unsubscribe()
+				close(sink1)
+				close(sink2)
+			}()
+
+			to := common.BytesToAddress(testutils.RandomBytes(32))
+			_, err = testutils.SendDynamicFeeTx(s.p.rpc.L2, s.TestAddrPrivKey, &to, common.Big1, nil)
+			s.Nil(err)
+
+			s.Nil(s.p.ProposeOp(context.Background()))
+			s.Nil(s.s.ProcessL1Blocks(context.Background()))
+
+			var meta metadata.TaikoProposalMetaData
+			select {
+			case event := <-sink1:
+				meta = metadata.NewTaikoDataBlockMetadataPacaya(event)
+			case event := <-sink2:
+				meta = metadata.NewTaikoDataBlockMetadataOntake(event)
+			}
+			s.Equal(meta.GetCoinbase(), s.p.L2SuggestedFeeRecipient)
+
+			_, isPending, err := s.p.rpc.L1.TransactionByHash(context.Background(), meta.GetTxHash())
+			s.Nil(err)
+			s.False(isPending)
+
+			receipt, err := s.p.rpc.L1.TransactionReceipt(context.Background(), meta.GetTxHash())
+			s.Nil(err)
+			s.Equal(types.ReceiptStatusSuccessful, receipt.Status)
+		})
+	}
 }
 
 func (s *ProposerTestSuite) TestProposeEmptyBlockOp() {
 	s.p.MinProposingInternal = 1 * time.Second
 	s.p.lastProposedAt = time.Now().Add(-10 * time.Second)
 	s.Nil(s.p.ProposeOp(context.Background()))
+}
+
+func (s *ProposerTestSuite) TestProposeTxListOntake() {
+	for i := 0; i < int(s.p.protocolConfigs.ForkHeightsOntake()); i++ {
+		s.ProposeAndInsertValidBlock(s.p, s.s)
+	}
+
+	l2Head, err := s.p.rpc.L2.HeaderByNumber(context.Background(), nil)
+	s.Nil(err)
+	s.GreaterOrEqual(l2Head.Number.Uint64(), s.p.protocolConfigs.ForkHeightsOntake())
+
+	sink := make(chan *ontakeBindings.TaikoL1ClientBlockProposedV2)
+	sub, err := s.p.rpc.OntakeClients.TaikoL1.WatchBlockProposedV2(nil, sink, nil)
+	s.Nil(err)
+	defer func() {
+		sub.Unsubscribe()
+		close(sink)
+	}()
+	s.Nil(s.p.ProposeTxListOntake(context.Background(), []types.Transactions{{}, {}}))
+	s.Nil(s.s.ProcessL1Blocks(context.Background()))
+
+	var l1Height *big.Int
+	for i := 0; i < 2; i++ {
+		event := <-sink
+		if l1Height == nil {
+			l1Height = new(big.Int).SetUint64(event.Raw.BlockNumber)
+			continue
+		}
+		s.Equal(l1Height.Uint64(), event.Raw.BlockNumber)
+	}
+
+	newL2head, err := s.p.rpc.L2.HeaderByNumber(context.Background(), nil)
+	s.Nil(err)
+
+	s.Equal(l2Head.Number.Uint64()+2, newL2head.Number.Uint64())
 }
 
 func (s *ProposerTestSuite) TestUpdateProposingTicker() {
@@ -419,3 +477,113 @@ func (s *ProposerTestSuite) TestStartClose() {
 func TestProposerTestSuite(t *testing.T) {
 	suite.Run(t, new(ProposerTestSuite))
 }
+
+/*
+func (s *ProposerTestSuite) TestEstimateTotalCosts() {
+	s.p.OffChainCosts = big.NewInt(500000000000) // 500 Gwei for off-chain costs
+	s.p.GasNeededForProvingBlock = 3000000
+
+	tests := []struct {
+		name           string
+		proposingCosts *big.Int
+	}{
+		{
+			name:           "normal estimation",
+			proposingCosts: big.NewInt(300000000000), // 300 Gwei
+		},
+		{
+			name:           "zero proposing costs",
+			proposingCosts: big.NewInt(0),
+		},
+	}
+
+	for _, test := range tests {
+		s.Run(test.name, func() {
+			costs, err := s.p.estimateTotalCosts(test.proposingCosts)
+			log.Debug("Estimated total costs", "costs", costs)
+
+			s.NoError(err)
+			s.NotNil(costs)
+			s.Greater(costs.Int64(), int64(0))
+		})
+	}
+}
+
+func (s *ProposerTestSuite) TestIsProfitable() {
+	s.p.OffChainCosts = big.NewInt(500000000000) // 500 Gwei for off-chain costs
+	s.p.GasNeededForProvingBlock = 3000000
+
+	tests := []struct {
+		name           string
+		txList         types.Transactions
+		proposingCosts *big.Int
+		expectedResult bool
+		expectedError  bool
+	}{
+		{
+			name:           "empty tx list",
+			txList:         types.Transactions{},
+			proposingCosts: big.NewInt(100000000000), // 100 Gwei
+			expectedResult: false,
+			expectedError:  false,
+		},
+		{
+			name: "profitable tx list",
+			txList: func() types.Transactions {
+				txsNumber := 5
+				txs := make(types.Transactions, txsNumber)
+				for i := 0; i < txsNumber; i++ {
+					txs[i] = types.NewTx(&types.DynamicFeeTx{
+						ChainID:   big.NewInt(1),
+						Nonce:     uint64(i),
+						GasTipCap: big.NewInt(40000000000), // 40 Gwei gas tip cap
+						GasFeeCap: big.NewInt(40000000000), // 40 Gwei gas fee cap
+						Gas:       30000000,                // gas limit
+						To:        &common.Address{},
+						Value:     big.NewInt(0),
+						Data:      nil,
+					})
+				}
+				return txs
+			}(),
+			proposingCosts: big.NewInt(10000000000), // 10 Gwei
+			expectedResult: true,
+			expectedError:  false,
+		},
+		{
+			name: "unprofitable tx list",
+			txList: types.Transactions{
+				types.NewTx(&types.DynamicFeeTx{
+					ChainID:   big.NewInt(1),
+					Nonce:     0,
+					GasTipCap: big.NewInt(40000000),
+					GasFeeCap: big.NewInt(40000000),
+					Gas:       3000_000, // gas limit
+					To:        &common.Address{},
+					Value:     big.NewInt(0),
+					Data:      nil,
+				}),
+			},
+			proposingCosts: big.NewInt(100000000000), // 100 Gwei
+			expectedResult: false,
+			expectedError:  false,
+		},
+	}
+
+	for _, test := range tests {
+		s.Run(test.name, func() {
+			txLists := []types.Transactions{test.txList}
+			profitable, err := s.p.isProfitable(txLists, test.proposingCosts)
+
+			if test.expectedError {
+				s.Error(err)
+				return
+			}
+
+			s.NoError(err)
+			s.Equal(test.expectedResult, profitable)
+		})
+	}
+}
+
+*/

@@ -1,0 +1,243 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: "db"
+    cap_add:
+      - SYS_NICE
+    restart: always
+    environment:
+      - MYSQL_DATABASE=relayer
+      - MYSQL_ROOT_PASSWORD=root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - rabbitmq_go_net
+    profiles:
+      - init
+
+  migrations:
+    image: ghcr.io/kukymbr/goose-docker:3.22.1
+    environment:
+      - GOOSE_DRIVER=mysql
+      - GOOSE_DBSTRING=root:root@tcp(db:3306)/relayer
+    volumes:
+      - ./migrations:/migrations
+    networks:
+      - rabbitmq_go_net
+    profiles:
+      - migrations
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: "rabbitmq"
+    environment:
+      - RABBITMQ_DEFAULT_USER=root
+      - RABBITMQ_DEFAULT_PASS=root
+    ports:
+      - 5672:5672
+      - 15672:15672
+      - 15692:15692
+    volumes:
+      - ./rabbitmq/data/:/var/lib/rabbitmq/
+      - ./rabbitmq/log/:/var/log/rabbitmq
+    networks:
+      - rabbitmq_go_net
+    profiles:
+      - init
+
+  relayer-l1-processor:
+    image: nethsurge/taiko-relayer:latest
+    container_name: relayer-l1-processor
+    restart: always
+    entrypoint: ["/usr/local/bin/relayer"]
+    command:
+      - processor
+      - --queue.prefetch=100
+      - --processorPrivateKey=${PROCESSOR_PRIVATE_KEY}
+      - --destBridgeAddress=${L2_BRIDGE_ADDRESS}
+      - --destERC20VaultAddress=${L2_ERC20_VAULT_ADDRESS}
+      - --destERC721Address=${L2_ERC721_VAULT_ADDRESS}
+      - --destERC1155Address=${L2_ERC1155_VAULT_ADDRESS}
+      - --destTaikoAddress=${L2_TAIKO_ADDRESS}
+      - --srcSignalServiceAddress=${L1_SIGNAL_SERVICE_ADDRESS}
+      - --srcRpcUrl=${L1_RPC_URL}
+      - --destRpcUrl=${L2_RPC_URL}
+      - --confirmations=0
+      - --headerSyncInterval=2
+      - --profitableOnly=false
+      - --tx.minTipCap=0.01
+      - --queue.host=rabbitmq
+      - --queue.password=root
+      - --queue.port=5672
+      - --queue.username=root
+      - --db.host=db
+      - --db.maxIdleConns=50
+      - --db.maxOpenConns=3000
+      - --db.name=relayer
+      - --db.password=root
+      - --db.username=root
+    networks:
+      - rabbitmq_go_net
+    profiles:
+      - l1
+
+  relayer-l1-indexer:
+    image: nethsurge/taiko-relayer:latest
+    container_name: relayer-l1-indexer
+    restart: always
+    entrypoint: ["/usr/local/bin/relayer"]
+    command:
+      - indexer
+      - --db.host=db
+      - --db.connMaxLifetime=100000
+      - --db.maxIdleConns=50
+      - --db.maxOpenConns=3000
+      - --db.name=relayer
+      - --db.password=root
+      - --db.username=root
+      - --srcBridgeAddress=${L1_BRIDGE_ADDRESS}
+      - --destBridgeAddress=${L2_BRIDGE_ADDRESS}
+      - --srcTaikoAddress=${L1_TAIKO_ADDRESS}
+      - --srcSignalServiceAddress=${L1_SIGNAL_SERVICE_ADDRESS}
+      - --srcRpcUrl=${L1_RPC_URL}
+      - --destRpcUrl=${L2_RPC_URL}
+      - --queue.host=rabbitmq
+      - --queue.password=root
+      - --queue.port=5672
+      - --queue.username=root
+      - --maxNumGoroutines=50
+      - --blockBatchSize=100
+      - --event=MessageSent
+      - --confirmations=0
+    networks:
+      - rabbitmq_go_net
+    profiles:
+      - l1
+
+  relayer-l1-api:
+    image: nethsurge/taiko-relayer:latest
+    container_name: relayer-l1-api
+    restart: always
+    entrypoint: ["/usr/local/bin/relayer"]
+    ports:
+      - 4102:4102
+    command:
+      - api
+      - --db.host=db
+      - --db.connMaxLifetime=100000
+      - --db.maxIdleConns=50
+      - --db.maxOpenConns=3000
+      - --db.name=relayer
+      - --db.password=root
+      - --db.username=root
+      - --srcRpcUrl=${L1_RPC_URL}
+      - --destRpcUrl=${L2_RPC_URL}
+      - --destTaikoAddress=${L2_TAIKO_ADDRESS}
+      - --processingFeeMultiplier=1.75
+    networks:
+      - rabbitmq_go_net
+    profiles:
+      - api
+
+  relayer-l2-api:
+    image: nethsurge/taiko-relayer:latest
+    container_name: relayer-l2-api
+    restart: always
+    entrypoint: ["/usr/local/bin/relayer"]
+    ports:
+      - 4103:4102
+    command:
+      - api
+      - --db.host=db
+      - --db.connMaxLifetime=100000
+      - --db.maxIdleConns=50
+      - --db.maxOpenConns=3000
+      - --db.name=relayer
+      - --db.password=root
+      - --db.username=root
+      - --srcRpcUrl=${L2_RPC_URL}
+      - --destRpcUrl=${L1_RPC_URL}
+      - --destTaikoAddress=${L1_TAIKO_ADDRESS}
+      - --processingFeeMultiplier=1.75
+    networks:
+      - rabbitmq_go_net
+    profiles:
+      - api
+
+  relayer-l2-processor:
+    image: nethsurge/taiko-relayer:latest
+    container_name: relayer-l2-processor
+    restart: always
+    entrypoint: ["/usr/local/bin/relayer"]
+    command:
+      - processor
+      - --queue.prefetch=100
+      - --processorPrivateKey=${PROCESSOR_PRIVATE_KEY}
+      - --destBridgeAddress=${L1_BRIDGE_ADDRESS}
+      - --destERC20VaultAddress=${L1_ERC20_VAULT_ADDRESS}
+      - --destERC721Address=${L1_ERC721_VAULT_ADDRESS}
+      - --destERC1155Address=${L1_ERC1155_VAULT_ADDRESS}
+      - --destTaikoAddress=${L1_TAIKO_ADDRESS}
+      - --srcSignalServiceAddress=${L2_SIGNAL_SERVICE_ADDRESS}
+      - --srcRpcUrl=${L2_RPC_URL}
+      - --destRpcUrl=${L1_RPC_URL}
+      - --confirmations=0
+      - --headerSyncInterval=2
+      - --profitableOnly=false
+      - --tx.minTipCap=0.01
+      - --queue.host=rabbitmq
+      - --queue.password=root
+      - --queue.port=5672
+      - --queue.username=root
+      - --db.host=db
+      - --db.maxIdleConns=50
+      - --db.maxOpenConns=3000
+      - --db.name=relayer
+      - --db.password=root
+      - --db.username=root
+    networks:
+      - rabbitmq_go_net
+    profiles:
+      - l2
+
+  relayer-l2-indexer:
+    image: nethsurge/taiko-relayer:latest
+    container_name: relayer-l2-indexer
+    restart: always
+    entrypoint: ["/usr/local/bin/relayer"]
+    command:
+      - indexer
+      - --db.host=db
+      - --db.connMaxLifetime=100000
+      - --db.maxIdleConns=50
+      - --db.maxOpenConns=3000
+      - --db.name=relayer
+      - --db.password=root
+      - --db.username=root
+      - --srcBridgeAddress=${L2_BRIDGE_ADDRESS}
+      - --destBridgeAddress=${L1_BRIDGE_ADDRESS}
+      - --srcSignalServiceAddress=${L2_SIGNAL_SERVICE_ADDRESS}
+      - --srcRpcUrl=${L2_RPC_URL}
+      - --destRpcUrl=${L1_RPC_URL}
+      - --queue.host=rabbitmq
+      - --queue.password=root
+      - --queue.port=5672
+      - --queue.username=root
+      - --maxNumGoroutines=50
+      - --blockBatchSize=100
+      - --event=MessageSent
+      - --confirmations=0
+    networks:
+      - rabbitmq_go_net
+    profiles:
+      - l2
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  rabbitmq_go_net:
+    driver: bridge

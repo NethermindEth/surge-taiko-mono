@@ -1,0 +1,50 @@
+{
+  "configuredChains": [
+    {
+      "3151908": {
+        "name": "Holesky",
+        "type": "L1",
+        "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
+        "rpcUrls": {
+          "default": {
+            "http": ["https://host/l1-rpc/"]
+          }
+        },
+        "nativeCurrency": {
+          "name": "ETH",
+          "symbol": "ETH",
+          "decimals": 18
+        },
+        "blockExplorers": {
+          "default": {
+            "name": "Explorer 1",
+            "url": ""
+          }
+        }
+      }
+    },
+    {
+      "763374": {
+        "name": "Surge",
+        "type": "L2",
+        "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
+        "rpcUrls": {
+          "default": {
+            "http": ["https://host/l2-rpc/"]
+          }
+        },
+        "nativeCurrency": {
+          "name": "SurgeETH",
+          "symbol": "sETH",
+          "decimals": 18
+        },
+        "blockExplorers": {
+          "default": {
+            "name": "Explorer 2",
+            "url": ""
+          }
+        }
+      }
+    }
+  ]
+}
