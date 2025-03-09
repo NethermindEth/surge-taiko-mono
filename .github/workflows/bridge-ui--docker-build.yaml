@@ -1,19 +1,19 @@
-name: "Nethermind - Docker build and push - taiko-client"
+name: "Nethermind - Docker build and push - bridge-ui"
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
     tags:
-      - "taiko-client-v*"
+      - "bridge-ui-v*"
     paths:
-      - "packages/taiko-client/**"
+      - "packages/bridge-ui/**"
 
 env:
   DOCKER_REGISTRY: nethermind.jfrog.io
   DOCKER_USERNAME: modular
-  DOCKER_REPOSITORY_DEV: modular-oci-local-dev/taiko-client
-  DOCKER_REPOSITORY_STAGING: modular-oci-local-staging/taiko-client
+  DOCKER_REPOSITORY_DEV: modular-oci-local-dev/bridge-ui
+  DOCKER_REPOSITORY_STAGING: modular-oci-local-staging/bridge-ui
 
 jobs:
   build:
@@ -52,8 +52,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           platforms: linux/amd64,linux/arm64
-          context: .
-          file: packages/taiko-client/Dockerfile
+          context: packages/bridge-ui
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
