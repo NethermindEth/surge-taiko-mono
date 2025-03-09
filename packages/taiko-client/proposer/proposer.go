@@ -25,7 +25,6 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 	builder "github.com/taikoxyz/taiko-mono/packages/taiko-client/proposer/transaction_builder"
-	// "github.com/ethereum/go-ethereum/params"
 )
 
 // Proposer keep proposing new transactions from L2 execution engine's tx pool at a fixed interval.
