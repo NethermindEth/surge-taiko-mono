@@ -28,7 +28,9 @@ contract InboxTest_Cooldownis is InboxTestBase {
             cooldownWindow: 1 hours,
             maxSignalsToReceive: 16,
             maxBlocksPerBatch: 768,
-            forkHeights: forkHeights
+            forkHeights: forkHeights,
+            // Surge: to prevent compilation errors
+            maxLivenessDisruptionPeriod: 0
         });
     }
 
