@@ -8,6 +8,6 @@ library LibSharedData {
         uint8 sharingPctg;
         uint32 gasIssuancePerSecond;
         uint64 minGasExcess;
-        uint32 maxGasIssuancePerBlock;
+        uint64 maxGasIssuancePerBlock;
     }
 }

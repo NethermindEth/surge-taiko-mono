@@ -3,46 +3,62 @@ pragma solidity ^0.8.24;
 
 import "src/layer1/based/TaikoInbox.sol";
 import "src/shared/libs/LibNetwork.sol";
-import "./libs/LibFasterReentryLock.sol";
+import "../mainnet/libs/LibFasterReentryLock.sol";
 
-/// @title MainnetTaikoL1
-/// @dev This contract shall be deployed to replace its parent contract on Ethereum for Taiko
-/// mainnet to reduce gas cost.
-/// @notice See the documentation in {TaikoL1}.
-/// @custom:security-contact security@taiko.xyz
-contract MainnetInbox is TaikoInbox {
+/// @title SurgeInbox
+/// @notice See the documentation in {ITaikoInbox}.
+/// @custom:security-contact security@nethermind.io
+contract SurgeInbox is TaikoInbox {
+    struct ConfigParams {
+        uint64 chainId;
+        uint64 maxLivenessDisruptionPeriod;
+        uint96 livenessBondBase;
+        uint96 livenessBondPerBlock;
+    }
+
+    uint64 public immutable chainId;
+    uint64 public immutable maxLivenessDisruptionPeriod;
+    uint96 public immutable livenessBondBase;
+    uint96 public immutable livenessBondPerBlock;
+
     constructor(
+        ConfigParams memory _configParams,
         address _wrapper,
         address _verifier,
         address _bondToken,
         address _signalService
     )
         TaikoInbox(_wrapper, _verifier, _bondToken, _signalService)
-    { }
+    {
+        chainId = _configParams.chainId;
+        maxLivenessDisruptionPeriod = _configParams.maxLivenessDisruptionPeriod;
+        livenessBondBase = _configParams.livenessBondBase;
+        livenessBondPerBlock = _configParams.livenessBondPerBlock;
+    }
 
-    function pacayaConfig() public pure override returns (ITaikoInbox.Config memory) {
+    function pacayaConfig() public view override returns (ITaikoInbox.Config memory) {
         // All hard-coded configurations:
         // - treasury: the actual TaikoL2 address.
         // - anchorGasLimit: 1_000_000
         return ITaikoInbox.Config({
-            chainId: LibNetwork.TAIKO_MAINNET,
+            chainId: chainId,
             // Ring buffers are being reused on the mainnet, therefore the following two
             // configuration values must NEVER be changed!!!
             maxUnverifiedBatches: 324_000, // DO NOT CHANGE!!!
             batchRingBufferSize: 360_000, // DO NOT CHANGE!!!
             maxBatchesToVerify: 16,
-            blockMaxGasLimit: 240_000_000,
-            livenessBondBase: 125e18, // 125 Taiko token per batch
-            livenessBondPerBlock: 5e18, // 5 Taiko token per block
-            stateRootSyncInternal: 16,
+            blockMaxGasLimit: 600_000_000,
+            livenessBondBase: livenessBondBase,
+            livenessBondPerBlock: livenessBondPerBlock,
+            stateRootSyncInternal: 2,
             maxAnchorHeightOffset: 64,
             baseFeeConfig: LibSharedData.BaseFeeConfig({
                 adjustmentQuotient: 8,
-                sharingPctg: 75,
-                gasIssuancePerSecond: 5_000_000,
-                minGasExcess: 1_340_000_000, // correspond to 0.008847185 gwei basefee
-                maxGasIssuancePerBlock: 600_000_000 // two minutes: 5_000_000 * 120
-             }),
+                sharingPctg: 0,
+                gasIssuancePerSecond: 100_000_000,
+                minGasExcess: 31_136_000_000, // Resolves to ~0.09992 Gwei
+                maxGasIssuancePerBlock: 6_000_000_000
+            }),
             provingWindow: 2 hours,
             cooldownWindow: 2 hours,
             maxSignalsToReceive: 16,
@@ -54,7 +70,7 @@ contract MainnetInbox is TaikoInbox {
                 unzen: 0
             }),
             // Surge: to prevent compilation errors
-            maxLivenessDisruptionPeriod: 0
+            maxLivenessDisruptionPeriod: maxLivenessDisruptionPeriod
         });
     }
 

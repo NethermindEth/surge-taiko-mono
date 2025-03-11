@@ -182,6 +182,9 @@ interface ITaikoInbox {
         uint16 maxBlocksPerBatch;
         /// @notice Historical heights of the forks.
         ForkHeights forkHeights;
+        /// Surge: Requirement for stage-2.
+        /// @notice Maximum liveness disruption tolerance of the rollup
+        uint64 maxLivenessDisruptionPeriod;
     }
 
     /// @notice Struct holding the state variables for the {Taiko} contract.
@@ -199,7 +202,12 @@ interface ITaikoInbox {
         Stats1 stats1; // slot 5
         Stats2 stats2; // slot 6
         mapping(address account => uint256 bond) bondBalance;
-        uint256[43] __gap;
+        // Surge: Record a verification streak to enforce stricter stage-2 requirements of
+        // continuous
+        // liveness for a certain number of days (ideally, 45)
+        uint256 verificationStreakStartedAt; // Slot 7
+        // Surge: Gap reduced by 1
+        uint256[42] __gap;
     }
 
     /// @notice Emitted when tokens are deposited into a user's bond balance.
@@ -394,6 +402,11 @@ interface ITaikoInbox {
         external
         view
         returns (TransitionState memory);
+
+    /// @notice Returns the timestamp since when the verification streak has been going
+    /// @return The timestamp since which verification streak has been maintained
+    // Surge: Returns `verificationStreakStartedAt` added as stage-2 requirements for surge
+    function getVerificationStreakStartAt() external view returns (uint256);
 
     /// @notice Retrieves the current protocol configuration.
     /// @return The current configuration.

@@ -461,6 +461,23 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
     }
 
     /// @inheritdoc ITaikoInbox
+    // Surge: Stage-2 requirement
+    function getVerificationStreakStartAt() external view returns (uint256) {
+        // Surge: Since the `proposedAt` timestamp for the batch has been moved to the hashed
+        // metadata it is cleaner to use the timestamp of the last block within the batch since
+        // it provides similar guarantees.
+        Config memory config = pacayaConfig();
+        if (
+            state.batches[state.stats2.lastVerifiedBatchId % config.batchRingBufferSize]
+                .lastBlockTimestamp > config.maxLivenessDisruptionPeriod
+        ) {
+            return block.timestamp;
+        } else {
+            return state.verificationStreakStartedAt;
+        }
+    }
+
+    /// @inheritdoc ITaikoInbox
     function bondBalanceOf(address _user) external view returns (uint256) {
         return state.bondBalance[_user];
     }
@@ -649,6 +666,18 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
 
             if (_stats2.lastVerifiedBatchId != batchId) {
                 _stats2.lastVerifiedBatchId = batchId;
+
+                // Surge: Reset verification streak if the last verified block was proposed more
+                // than a certain
+                // number of seconds in the past
+                uint64 lastBlockTimestampInBatch =
+                    state.batches[batchId % _config.batchRingBufferSize].lastBlockTimestamp;
+                if (
+                    (block.timestamp - lastBlockTimestampInBatch)
+                        > _config.maxLivenessDisruptionPeriod
+                ) {
+                    state.verificationStreakStartedAt = block.timestamp;
+                }
 
                 batch = state.batches[_stats2.lastVerifiedBatchId % _config.batchRingBufferSize];
                 batch.verifiedTransitionId = tid;
