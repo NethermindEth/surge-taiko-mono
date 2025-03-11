@@ -2,12 +2,13 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./IResolver.sol";
 
 /// @title EssentialContract
 /// @custom:security-contact security@taiko.xyz
-abstract contract EssentialContract is UUPSUpgradeable, Ownable2StepUpgradeable {
+abstract contract EssentialContract is UUPSUpgradeable, OwnableUpgradeable {
+    // Surge: Using single step ownable upgradeable
     uint8 internal constant _FALSE = 1;
     uint8 internal constant _TRUE = 2;
 
