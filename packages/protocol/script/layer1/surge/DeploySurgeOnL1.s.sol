@@ -156,8 +156,6 @@ contract DeploySurgeOnL1 is DeployCapability {
 
         DefaultResolver(rollupResolver).transferOwnership(contractOwner);
         console2.log("** rollupResolver ownership transferred to:", contractOwner);
-
-        OwnableUpgradeable(taikoInboxAddr).transferOwnership(contractOwner);
     }
 
     function deploySharedContracts(address owner) internal returns (address sharedResolver) {
@@ -276,14 +274,15 @@ contract DeploySurgeOnL1 is DeployCapability {
         });
 
         // Inbox
-        address surgeInboxAddr = deployProxy({
+        address taikoInboxAddr = deployProxy({
             name: "taiko",
             impl: address(
                 new SurgeInbox(
-                    SurgeInbox.ConfigParams(0, 0, 0, 0), address(0), address(0), address(0), address(0)
+                    SurgeInbox.ConfigParams(0, 0, 0, 0), address(1), address(1), address(1), address(1)
                 )
             ),
-            data: ""
+            data: abi.encodeCall(TaikoInbox.init, (address(0), vm.envBytes32("L2_GENESIS_HASH"))),
+            registerTo: rollupResolver
         });
 
         //------------------------------------------------------------------
@@ -298,21 +297,21 @@ contract DeploySurgeOnL1 is DeployCapability {
 
         address routerAddr = deployProxy({
             name: "preconf_router",
-            impl: address(new PreconfRouter(address(0), address(0))),
+            impl: address(new PreconfRouter(address(1), address(1))),
             data: abi.encodeCall(PreconfRouter.init, address(0)),
             registerTo: rollupResolver
         });
 
         address storeAddr = deployProxy({
             name: "forced_inclusion_store",
-            impl: address(new ForcedInclusionStore(0, 0, surgeInboxAddr, address(1))),
+            impl: address(new ForcedInclusionStore(1, 1, taikoInboxAddr, address(1))),
             data: abi.encodeCall(ForcedInclusionStore.init, (address(0))),
             registerTo: rollupResolver
         });
 
         address taikoWrapperAddr = deployProxy({
             name: "taiko_wrapper",
-            impl: address(new TaikoWrapper(address(0), address(0), address(0))),
+            impl: address(new TaikoWrapper(address(1), address(1), address(1))),
             data: abi.encodeCall(TaikoWrapper.init, address(0)),
             registerTo: rollupResolver
         });
@@ -321,19 +320,21 @@ contract DeploySurgeOnL1 is DeployCapability {
         // Upgrades
 
         {
-            address sgxVerifier =
-                deploySgxVerifier(owner, rollupResolver, surgeInboxAddr, proofVerifierAddr);
+            address sgxVerifier = deploySgxVerifier(
+                vm.envAddress("VERIFIER_OWNER"), rollupResolver, taikoInboxAddr, proofVerifierAddr
+            );
 
-            (address risc0Verifier, address sp1Verifier) = deployZKVerifiers(owner, rollupResolver);
+            (address risc0Verifier, address sp1Verifier) =
+                deployZKVerifiers(vm.envAddress("VERIFIER_OWNER"), rollupResolver);
 
             UUPSUpgradeable(proofVerifierAddr).upgradeTo({
                 newImplementation: address(
-                    new AnyTwoVerifier(surgeInboxAddr, sgxVerifier, risc0Verifier, sp1Verifier)
+                    new AnyTwoVerifier(taikoInboxAddr, sgxVerifier, risc0Verifier, sp1Verifier)
                 )
             });
         }
 
-        UUPSUpgradeable(surgeInboxAddr).upgradeTo({
+        UUPSUpgradeable(taikoInboxAddr).upgradeTo({
             newImplementation: address(
                 new SurgeInbox(
                     SurgeInbox.ConfigParams(
@@ -352,7 +353,7 @@ contract DeploySurgeOnL1 is DeployCapability {
         });
 
         UUPSUpgradeable(taikoWrapperAddr).upgradeTo({
-            newImplementation: address(new TaikoWrapper(surgeInboxAddr, storeAddr, routerAddr))
+            newImplementation: address(new TaikoWrapper(taikoInboxAddr, storeAddr, routerAddr))
         });
 
         UUPSUpgradeable(storeAddr).upgradeTo(
@@ -360,7 +361,7 @@ contract DeploySurgeOnL1 is DeployCapability {
                 new ForcedInclusionStore(
                     uint8(vm.envUint("INCLUSION_WINDOW")),
                     uint64(vm.envUint("INCLUSION_FEE_IN_GWEI")),
-                    surgeInboxAddr,
+                    taikoInboxAddr,
                     taikoWrapperAddr
                 )
             )
@@ -369,7 +370,8 @@ contract DeploySurgeOnL1 is DeployCapability {
         //-------------------------------------------------------------------
         // Ownership transfers
 
-        SurgeInbox(surgeInboxAddr).init(owner, vm.envBytes32("L2_GENESIS_HASH"));
+        OwnableUpgradeable(taikoInboxAddr).transferOwnership(owner);
+        console2.log("** taiko_inbox ownership transferred to:", owner);
 
         OwnableUpgradeable(proofVerifierAddr).transferOwnership(owner);
         console2.log("** proof_verifier ownership transferred to:", owner);
@@ -393,6 +395,8 @@ contract DeploySurgeOnL1 is DeployCapability {
         private
         returns (address sgxVerifier)
     {
+        addressNotNull(owner, "verifierOwner");
+
         // No need to proxy these, because they are 3rd party. If we want to modify, we simply
         // change the registerAddress("automata_dcap_attestation", address(attestation));
         P256Verifier p256Verifier = new P256Verifier();
@@ -429,6 +433,8 @@ contract DeploySurgeOnL1 is DeployCapability {
         private
         returns (address risc0Verifier, address sp1Verifier)
     {
+        addressNotNull(owner, "verifierOwner");
+
         // Deploy r0 groth16 verifier
         RiscZeroGroth16Verifier verifier =
             new RiscZeroGroth16Verifier(ControlID.CONTROL_ROOT, ControlID.BN254_CONTROL_ID);
