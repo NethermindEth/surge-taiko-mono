@@ -35,6 +35,8 @@ abstract contract EssentialContract is UUPSUpgradeable, Ownable2StepUpgradeable 
     error RESOLVER_NOT_FOUND();
     error ZERO_ADDRESS();
     error ZERO_VALUE();
+    // Surge: thrown when a taiko function is disabled for Surge
+    error FUNCTION_DISABLED();
 
     /// @dev Modifier that ensures the caller is the owner or resolved address of a given name.
     /// @param _name The name to check against.
@@ -155,6 +157,8 @@ abstract contract EssentialContract is UUPSUpgradeable, Ownable2StepUpgradeable 
 
     /// @notice Pauses the contract.
     function pause() public whenNotPaused {
+        // Surge: stage-2 requirements make this redundant
+        _disabled();
         _pause();
         emit Paused(msg.sender);
         // We call the authorize function here to avoid:
@@ -214,6 +218,11 @@ abstract contract EssentialContract is UUPSUpgradeable, Ownable2StepUpgradeable 
     /// @return The resolved address
     function resolve(bytes32 _name, bool _allowZeroAddress) internal view returns (address) {
         return IResolver(resolver()).resolve(block.chainid, _name, _allowZeroAddress);
+    }
+
+    // Surge: Called in the first line of a function that is disabled in Surge.
+    function _disabled() internal pure {
+        revert FUNCTION_DISABLED();
     }
 
     /// @notice Initializes the contract.
