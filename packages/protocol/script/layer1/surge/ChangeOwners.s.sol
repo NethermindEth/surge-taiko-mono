@@ -17,7 +17,7 @@ contract ChangeOwners is Script {
         address[] memory contracts = vm.envAddress("CONTRACTS", ",");
         vm.startBroadcast(adminPrivateKey);
         for(uint i; i < contracts.length; ++i) {
-            OwnableUpgradeable(contracts[0]).transferOwnership(newOwner);
+            OwnableUpgradeable(contracts[i]).transferOwnership(newOwner);
         }
         vm.stopBroadcast();
     }
