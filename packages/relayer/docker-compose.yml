@@ -111,7 +111,7 @@ services:
       - --srcRpcUrl=${L1_RPC_URL}
       - --destBridgeAddress=${L2_BRIDGE_ADDRESS}
       - --destRpcUrl=${L2_RPC_URL}
-      - --maxNumGoroutines=${MAX_NUM_GOROUTINES}
+      - --maxNumGoroutines=${NUM_GOROUTINES}
       - --blockBatchSize=${BLOCK_BATCH_SIZE}
       - --event=MessageSent
       - --confirmations=${CONFIRMATIONS_BEFORE_PROCESSING:-0}
@@ -237,7 +237,7 @@ services:
       - --srcRpcUrl=${L2_RPC_URL}
       - --destBridgeAddress=${L1_BRIDGE_ADDRESS}
       - --destRpcUrl=${L1_RPC_URL}
-      - --maxNumGoroutines=${MAX_NUM_GOROUTINES}
+      - --maxNumGoroutines=${NUM_GOROUTINES}
       - --blockBatchSize=${BLOCK_BATCH_SIZE}
       - --event=MessageSent
       - --confirmations=${CONFIRMATIONS_BEFORE_PROCESSING:-0}
