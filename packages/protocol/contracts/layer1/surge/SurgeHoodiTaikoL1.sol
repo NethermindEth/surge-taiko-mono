@@ -29,7 +29,7 @@ contract SurgeHoodiTaikoL1 is TaikoL1 {
             baseFeeConfig: LibSharedData.BaseFeeConfig({
                 adjustmentQuotient: 8,
                 sharingPctg: 0,
-                gasIssuancePerSecond: 100_000_000, // The network targets 1 block / second
+                gasIssuancePerSecond: 50_000_000, // The network targets 1 block / 2 seconds
                 minGasExcess: 31_136_000_000, // Resolves to ~0.09992 Gwei
                 maxGasIssuancePerBlock: 6_000_000_000
             }),
