@@ -20,13 +20,14 @@ import "src/shared/tokenvault/BridgedERC721.sol";
 import "src/shared/tokenvault/ERC1155Vault.sol";
 import "src/shared/tokenvault/ERC20Vault.sol";
 import "src/shared/tokenvault/ERC721Vault.sol";
-import "src/layer1/surge/SurgeTimelockController.sol";
 import "src/layer1/automata-attestation/AutomataDcapV3Attestation.sol";
 import "src/layer1/automata-attestation/lib/PEMCertChainLib.sol";
 import "src/layer1/automata-attestation/utils/SigVerifyLib.sol";
 import "src/layer1/based/TaikoL1.sol";
-import "src/layer1/surge/SurgeTierRouter.sol";
-import "src/layer1/surge/SurgeTaikoL1.sol";
+import "src/layer1/surge/common/SurgeTimelockController.sol";
+import "src/layer1/surge/common/SurgeTierRouter.sol";
+import "src/layer1/surge/SurgeDevnetTaikoL1.sol";
+import "src/layer1/surge/SurgeHoodiTaikoL1.sol";
 import "src/layer1/verifiers/SgxVerifier.sol";
 import "src/layer1/verifiers/Risc0Verifier.sol";
 import "src/layer1/verifiers/SP1Verifier.sol";
@@ -255,7 +256,7 @@ contract DeploySurgeOnL1 is DeployCapability {
         copyRegister(rollupAddressManager, _sharedAddressManager, "signal_service");
         copyRegister(rollupAddressManager, _sharedAddressManager, "bridge");
 
-        TaikoL1 taikoL1 = TaikoL1(address(new SurgeTaikoL1(l2ChainId, maxLivenessDisruptionPeriod)));
+        TaikoL1 taikoL1 = TaikoL1(deploySurgeL1());
 
         deployProxy({
             name: "taiko",
@@ -348,6 +349,18 @@ contract DeploySurgeOnL1 is DeployCapability {
             data: abi.encodeCall(SP1Verifier.init, (verifierOwner, rollupAddressManager)),
             registerTo: rollupAddressManager
         });
+    }
+
+    function deploySurgeL1() private returns(address) {
+        string memory network = vm.envString("NETWORK");
+
+        if(keccak256(abi.encode(network)) == keccak256(abi.encode("hoodi"))) {
+            return address(new SurgeHoodiTaikoL1(l2ChainId, maxLivenessDisruptionPeriod));
+        } else if(keccak256(abi.encode(network)) == keccak256(abi.encode("devnet"))) {
+            return address(new SurgeDevnetTaikoL1(l2ChainId, maxLivenessDisruptionPeriod));
+        } else {
+            revert("invalid network");
+        }
     }
 
     function deployAuxContracts() private {

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "./SurgeTierProviderBase.sol";
-import "../tiers/ITierRouter.sol";
+import "../../tiers/ITierRouter.sol";
 
 /// @title SurgeTierRouter
 /// @custom:security-contact security@nethermind.io

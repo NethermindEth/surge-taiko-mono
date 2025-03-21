@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "../based/ITaikoL1.sol";
+import "../../based/ITaikoL1.sol";
 import "@openzeppelin/contracts/governance/TimelockController.sol";
 
 /// @title SurgeTimelockController

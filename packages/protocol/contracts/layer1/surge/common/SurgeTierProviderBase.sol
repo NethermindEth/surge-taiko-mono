@@ -2,8 +2,8 @@
 pragma solidity ^0.8.24;
 
 import "src/shared/common/LibStrings.sol";
-import "../tiers/ITierProvider.sol";
-import "../tiers/LibTiers.sol";
+import "../../tiers/ITierProvider.sol";
+import "../../tiers/LibTiers.sol";
 
 /// @title SurgeTierProviderBase
 /// @notice This contract is a version of Taiko's TierProviderBase modified for Nethermind's Surge
