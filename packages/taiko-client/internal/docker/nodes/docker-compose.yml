@@ -1,7 +1,7 @@
 services:
   l1_node:
     container_name: l1_node
-    image: ghcr.io/foundry-rs/foundry:nightly
+    image: ghcr.io/foundry-rs/foundry:latest
     restart: unless-stopped
     platform: linux/amd64
     pull_policy: always
@@ -18,7 +18,7 @@ services:
 
   l2_geth:
     container_name: l2_geth
-    image: us-docker.pkg.dev/evmchain/images/taiko-geth:taiko
+    image: nethsurge/taiko-geth:surge
     restart: unless-stopped
     pull_policy: always
     volumes:
