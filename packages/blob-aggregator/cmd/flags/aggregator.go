@@ -12,4 +12,33 @@ var (
 		Category: aggregatorCategory,
 		EnvVars:  []string{"L1_AGGREGATOR_PRIV_KEY"},
 	}
+	L1RPCUrl = &cli.StringFlag{
+		Name:     "l1.rpcUrl",
+		Usage:    "RPC URL of the L1 chain",
+		Required: true,
+		Category: aggregatorCategory,
+		EnvVars:  []string{"L1_RPC_URL"},
+	}
+	MinAggregatedBlobs = &cli.Uint64Flag{
+		Name:     "MinAggregatedBlobs",
+		Usage:    "Min number of blobs to aggregate block proposals across",
+		Required: false,
+		Value:    3,
+		Category: aggregatorCategory,
+		EnvVars:  []string{"MIN_AGGREGATED_BLOBS"},
+	}
+	MinBlobsFillupPercentage = &cli.Uint64Flag{
+		Name:     "minBlobsFillupPercentage",
+		Usage:    "Minimum fillup percentage of the aggregated blob space",
+		Required: false,
+		Value:    75,
+		Category: aggregatorCategory,
+		EnvVars:  []string{"MIN_BLOB_FILLUP_PERCENTAGE"},
+	}
 )
+
+var AggregatorFlags = MergeFlags(CommonFlags, TxmgrFlags, []cli.Flag{
+	L1AggregatorPrivKey,
+	MinAggregatedBlobs,
+	MinBlobsFillupPercentage,
+})

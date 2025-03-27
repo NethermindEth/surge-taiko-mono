@@ -14,8 +14,14 @@ var (
 
 type Queue interface {
 	Close()
+	Ack(ctx context.Context, msg Message) error
 	Publish(ctx context.Context, proposal types.QueueProposalRequestBody) error
-	Subscribe(ctx context.Context, msgChan chan<- types.QueueProposalRequestBody, wg *sync.WaitGroup) error
+	Subscribe(ctx context.Context, msgChan chan<- Message, wg *sync.WaitGroup) error
+}
+
+type Message struct {
+	Proposal types.QueueProposalRequestBody
+	Internal interface{}
 }
 
 type NewQueueOpts struct {

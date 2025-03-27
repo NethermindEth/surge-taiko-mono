@@ -7,6 +7,7 @@ import (
 var (
 	commonCategory     = "COMMON"
 	aggregatorCategory = "AGGREGATOR"
+	txmgrCategory      = "TXMGR"
 )
 
 var (

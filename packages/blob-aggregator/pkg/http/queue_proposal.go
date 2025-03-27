@@ -18,11 +18,14 @@ func (srv *Server) queue_proposal(c echo.Context) error {
 	}
 
 	// Validate proposal request
-	if reqBody.TxDest == (common.Address{}) {
-		return srv.returnError(c, http.StatusBadRequest, errors.New("require non zero transaction destination"))
+	if reqBody.Inbox == (common.Address{}) {
+		return srv.returnError(c, http.StatusBadRequest, errors.New("require non zero inbox address"))
 	}
-	if reqBody.TxData == nil || len(reqBody.TxData) == 0 {
-		return srv.returnError(c, http.StatusBadRequest, errors.New("require non empty transaction data"))
+	if reqBody.Coinbase == (common.Address{}) {
+		return srv.returnError(c, http.StatusBadRequest, errors.New("require non zero coinbase address"))
+	}
+	if reqBody.Blocks == nil || len(reqBody.Blocks) == 0 {
+		return srv.returnError(c, http.StatusBadRequest, errors.New("require non empty blocks list"))
 	}
 	if reqBody.TxList == nil || len(reqBody.TxList) == 0 {
 		return srv.returnError(c, http.StatusBadRequest, errors.New("require non empty transaction list"))

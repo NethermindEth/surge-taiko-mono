@@ -3,10 +3,15 @@ package types
 import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 )
 
 type QueueProposalRequestBody struct {
-	TxDest common.Address `json:"txDest"`
-	TxData hexutil.Bytes  `json:"txData"`
-	TxList hexutil.Bytes  `json:"txList"`
+	Inbox                    common.Address                  `json:"inbox"`
+	Coinbase                 common.Address                  `json:"coinbase"`
+	RevertIfNotFirstProposal bool                            `json:"revertIfNotFirstProposal"`
+	Blocks                   []pacaya.ITaikoInboxBlockParams `json:"blocks"`
+	TxList                   hexutil.Bytes                   `json:"txList"`
+	ForcedInclusionParams    encoding.BatchParams            `json:"forcedInclusionParams"`
 }

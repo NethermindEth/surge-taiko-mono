@@ -77,6 +77,21 @@ func (r *RabbitMQ) connect() error {
 	return nil
 }
 
+func (r *RabbitMQ) Ack(ctx context.Context, msg queue.Message) error {
+	rmqMsg := msg.Internal.(amqp.Delivery)
+
+	err := rmqMsg.Ack(false)
+
+	if err != nil {
+		slog.Error("error acknowledging rabbitmq message", "err", err.Error())
+		return err
+	}
+
+	slog.Info("acknowledged rabbitmq message", "msgId", rmqMsg.MessageId)
+
+	return nil
+}
+
 func (r *RabbitMQ) Publish(ctx context.Context, proposal types.QueueProposalRequestBody) error {
 	slog.Info("Publishing message to RabbitMQ", "queue", r.queueName)
 
@@ -103,7 +118,7 @@ func (r *RabbitMQ) Publish(ctx context.Context, proposal types.QueueProposalRequ
 	return nil
 }
 
-func (r *RabbitMQ) Subscribe(ctx context.Context, msgChan chan<- types.QueueProposalRequestBody, wg *sync.WaitGroup) error {
+func (r *RabbitMQ) Subscribe(ctx context.Context, msgChan chan<- queue.Message, wg *sync.WaitGroup) error {
 	wg.Add(1)
 	defer wg.Done()
 
@@ -152,8 +167,11 @@ func (r *RabbitMQ) Subscribe(ctx context.Context, msgChan chan<- types.QueueProp
 				continue
 			}
 
-			slog.Info("Received message", "txDest", proposal.TxDest)
-			msgChan <- proposal
+			slog.Info("Received message", "proposal", proposal)
+			msgChan <- queue.Message{
+				Proposal: proposal,
+				Internal: d,
+			}
 
 			_ = d.Ack(false)
 		}
