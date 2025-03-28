@@ -25,7 +25,7 @@ type ProposeBlocksTransactionBuilder interface {
 
 // buildParamsForForcedInclusion builds the blob params and the block params
 // for the given forced inclusion.
-func buildParamsForForcedInclusion(
+func BuildParamsForForcedInclusion(
 	forcedInclusion *pacayaBindings.IForcedInclusionStoreForcedInclusion,
 	minTxsPerForcedInclusion *big.Int,
 ) (*encoding.BlobParams, []pacayaBindings.ITaikoInboxBlockParams) {

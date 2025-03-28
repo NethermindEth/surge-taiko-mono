@@ -40,6 +40,9 @@ type Config struct {
 	RevertProtectionEnabled    bool
 	TxmgrConfigs               *txmgr.CLIConfig
 	PrivateTxmgrConfigs        *txmgr.CLIConfig
+	AggregatorEndpoint         string
+	AggregatorAddress          common.Address
+	UseBlobAggregator          bool
 
 	GasNeededForProposingBlock uint64
 	GasNeededForProvingBlock   uint64
@@ -141,5 +144,8 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		GasNeededForProvingBlock:   gasNeededForProvingBlock,
 		PriceFluctuationModifier:   priceFluctuationModifier,
 		OffChainCosts:              offChainCosts,
+		UseBlobAggregator:          c.Bool(flags.UseBlobAggregator.Name),
+		AggregatorEndpoint:         c.String(flags.AggregatorEndpoint.Name),
+		AggregatorAddress:          common.HexToAddress(c.String(flags.AggregatorAddress.Name)),
 	}, nil
 }

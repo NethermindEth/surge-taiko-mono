@@ -173,7 +173,7 @@ func (b *BlobTransactionBuilder) BuildPacaya(
 	}
 
 	if forcedInclusion != nil {
-		blobParams, blockParams := buildParamsForForcedInclusion(forcedInclusion, minTxsPerForcedInclusion)
+		blobParams, blockParams := BuildParamsForForcedInclusion(forcedInclusion, minTxsPerForcedInclusion)
 		forcedInclusionParams = &encoding.BatchParams{
 			Proposer:                 proposer,
 			Coinbase:                 b.l2SuggestedFeeRecipient,

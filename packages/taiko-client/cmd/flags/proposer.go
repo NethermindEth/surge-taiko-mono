@@ -33,6 +33,13 @@ var (
 		Category: proposerCategory,
 		EnvVars:  []string{"L2_SUGGESTED_FEE_RECIPIENT"},
 	}
+	UseBlobAggregator = &cli.BoolFlag{
+		Name:     "useBlobAggregator",
+		Usage:    "Use blob aggregator to propose blocks",
+		Value:    false,
+		Category: proposerCategory,
+		EnvVars:  []string{"USE_BLOB_AGGREGATOR"},
+	}
 )
 
 // Optional flags used by proposer.
@@ -154,6 +161,18 @@ var (
 		Category: proposerCategory,
 		EnvVars:  []string{"SURGE_OFF_CHAIN_COSTS"},
 	}
+	AggregatorEndpoint = &cli.StringFlag{
+		Name:     "aggregator.endpoint",
+		Usage:    "Aggregator endpoint",
+		Category: proposerCategory,
+		EnvVars:  []string{"AGGREGATOR_ENDPOINT"},
+	}
+	AggregatorAddress = &cli.StringFlag{
+		Name:     "aggregator.address",
+		Usage:    "Aggregator address",
+		Category: proposerCategory,
+		EnvVars:  []string{"AGGREGATOR_ADDRESS"},
+	}
 )
 
 // ProposerFlags All proposer flags.
@@ -178,6 +197,9 @@ var ProposerFlags = MergeFlags(CommonFlags, []cli.Flag{
 	BlobAllowed,
 	FallbackToCalldata,
 	RevertProtectionEnabled,
+	UseBlobAggregator,
+	AggregatorEndpoint,
+	AggregatorAddress,
 	// surge flags
 	GasNeededForProposingBlock,
 	GasNeededForProvingBlock,
