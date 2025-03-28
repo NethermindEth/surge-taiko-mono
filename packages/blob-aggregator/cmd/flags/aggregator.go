@@ -38,6 +38,7 @@ var (
 )
 
 var AggregatorFlags = MergeFlags(CommonFlags, TxmgrFlags, []cli.Flag{
+	L1RPCUrl,
 	L1AggregatorPrivKey,
 	MinAggregatedBlobs,
 	MinBlobsFillupPercentage,

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+	"github.com/taikoxyz/taiko-mono/packages/blob-aggregator/aggregator"
 	"github.com/taikoxyz/taiko-mono/packages/blob-aggregator/api"
 	"github.com/taikoxyz/taiko-mono/packages/blob-aggregator/cmd/flags"
 	"github.com/taikoxyz/taiko-mono/packages/blob-aggregator/cmd/utils"
@@ -41,6 +42,13 @@ func main() {
 			Usage:       "Starts the blob aggregator http API software",
 			Description: "Taiko blob aggregator http API software",
 			Action:      utils.SubcommandAction(new(api.API)),
+		},
+		{
+			Name:        "aggregator",
+			Flags:       flags.AggregatorFlags,
+			Usage:       "Starts the blob aggregator software",
+			Description: "Taiko blob aggregator software",
+			Action:      utils.SubcommandAction(new(aggregator.Aggregator)),
 		},
 	}
 
