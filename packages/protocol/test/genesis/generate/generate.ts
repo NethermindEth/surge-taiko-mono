@@ -21,8 +21,7 @@ async function main() {
         !seedAccounts.every((seedAccount) => {
             return (
                 Object.keys(seedAccount).length === 1 &&
-                ethers.utils.isAddress(Object.keys(seedAccount)[0]) &&
-                Number.isInteger(Object.values(seedAccount)[0])
+                ethers.utils.isAddress(Object.keys(seedAccount)[0])
             );
         }) ||
         typeof predeployERC20 !== "boolean"
