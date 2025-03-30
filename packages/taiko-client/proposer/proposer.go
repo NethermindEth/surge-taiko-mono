@@ -571,7 +571,7 @@ func (p *Proposer) buildAggregatorProposal(ctx context.Context, txBatch []types.
 	}
 
 	proposal := &aggTypes.QueueProposalRequestBody{
-		Inbox:                    p.TaikoWrapperAddress,
+		Inbox:                    p.TaikoL1Address,
 		Coinbase:                 p.L2SuggestedFeeRecipient,
 		RevertIfNotFirstProposal: p.RevertProtectionEnabled,
 		Blocks:                   blockParams,
