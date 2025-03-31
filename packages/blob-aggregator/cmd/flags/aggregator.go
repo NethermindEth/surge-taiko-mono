@@ -6,7 +6,7 @@ import (
 
 var (
 	L1AggregatorPrivKey = &cli.StringFlag{
-		Name:     "l1.proposerPrivKey",
+		Name:     "l1.aggregatorPrivKey",
 		Usage:    "Private key of the L1 aggregator, who will send the L2 proposals with a shared blob",
 		Required: true,
 		Category: aggregatorCategory,
@@ -20,7 +20,7 @@ var (
 		EnvVars:  []string{"L1_RPC_URL"},
 	}
 	MinAggregatedBlobs = &cli.Uint64Flag{
-		Name:     "MinAggregatedBlobs",
+		Name:     "minAggregatedBlobs",
 		Usage:    "Min number of blobs to aggregate block proposals across",
 		Required: false,
 		Value:    3,

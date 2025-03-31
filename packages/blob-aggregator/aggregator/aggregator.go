@@ -66,6 +66,7 @@ func InitFromConfig(ctx context.Context, agg *Aggregator, cfg *Config) (err erro
 
 	agg.queue = q
 	agg.batch = []*queue.Message{}
+	// Todo: multiply blob min fillup
 	agg.minTxBatchDataSize = eth.BlobSize * cfg.MinAggregatedBlobs
 	agg.minBlobFillupPercentage = cfg.MinBlobsFillupPercentage
 	agg.proposalCh = make(chan queue.Message)
