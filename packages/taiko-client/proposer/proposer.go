@@ -419,8 +419,7 @@ func (p *Proposer) ProposeTxListPacaya(
 	txBatch []types.Transactions,
 ) error {
 	var (
-		proposerAddress = p.proposerAddress
-		txs             uint64
+		txs uint64
 	)
 
 	// Make sure the tx list is not bigger than the maxBlocksPerBatch.
@@ -432,57 +431,11 @@ func (p *Proposer) ProposeTxListPacaya(
 		txs += uint64(len(txList))
 	}
 
-	// Check balance.
-	if p.Config.ClientConfig.ProverSetAddress != rpc.ZeroAddress {
-		proposerAddress = p.Config.ClientConfig.ProverSetAddress
-	}
-
-	ok, err := rpc.CheckProverBalance(
-		ctx,
-		p.rpc,
-		// Todo: check aggregator when aggregator is endable
-		proposerAddress,
-		p.TaikoL1Address,
-		new(big.Int).Add(
-			p.protocolConfigs.LivenessBond(),
-			new(big.Int).Mul(
-				p.protocolConfigs.LivenessBondPerBlock(),
-				new(big.Int).SetUint64(uint64(len(txBatch))),
-			),
-		),
-	)
-
-	if err != nil {
-		log.Warn("Failed to check prover balance", "proposer", proposerAddress, "error", err)
-		return err
-	}
-
-	if !ok {
-		return fmt.Errorf("insufficient proposer (%s) balance", proposerAddress.Hex())
-	}
-
-	forcedInclusion, minTxsPerForcedInclusion, err := p.rpc.GetForcedInclusionPacaya(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to fetch forced inclusion: %w", err)
-	}
-
-	if forcedInclusion == nil {
-		log.Info("No forced inclusion", "proposer", proposerAddress.Hex())
-	} else {
-		log.Info(
-			"Forced inclusion",
-			"proposer", proposerAddress.Hex(),
-			"blobHash", common.BytesToHash(forcedInclusion.BlobHash[:]),
-			"feeInGwei", forcedInclusion.FeeInGwei,
-			"createdAtBatchId", forcedInclusion.CreatedAtBatchId,
-			"blobByteOffset", forcedInclusion.BlobByteOffset,
-			"blobByteSize", forcedInclusion.BlobByteSize,
-			"minTxsPerForcedInclusion", minTxsPerForcedInclusion,
-		)
-	}
+	var forcedInclusion *pacayaBindings.IForcedInclusionStoreForcedInclusion = nil
+	minTxsPerForcedInclusion := big.NewInt(512)
 
 	if p.Config.UseBlobAggregator {
-		proposal, err := p.buildAggregatorProposal(ctx, txBatch, forcedInclusion, minTxsPerForcedInclusion)
+		proposal, err := p.buildAggregatorProposal(ctx, txBatch)
 		if err != nil {
 			return err
 		}
@@ -536,25 +489,12 @@ func (p *Proposer) ProposeTxListPacaya(
 	return nil
 }
 
-func (p *Proposer) buildAggregatorProposal(ctx context.Context, txBatch []types.Transactions, forcedInclusion *pacayaBindings.IForcedInclusionStoreForcedInclusion,
-	minTxsPerForcedInclusion *big.Int) (*aggTypes.QueueProposalRequestBody, error) {
+func (p *Proposer) buildAggregatorProposal(ctx context.Context, txBatch []types.Transactions) (*aggTypes.QueueProposalRequestBody, error) {
 
 	var (
-		blockParams           []pacayaBindings.ITaikoInboxBlockParams
-		forcedInclusionParams *encoding.BatchParams
-		allTxs                types.Transactions
+		blockParams []pacayaBindings.ITaikoInboxBlockParams
+		allTxs      types.Transactions
 	)
-
-	if forcedInclusion != nil {
-		blobParams, blockParams := builder.BuildParamsForForcedInclusion(forcedInclusion, minTxsPerForcedInclusion)
-		forcedInclusionParams = &encoding.BatchParams{
-			Proposer:                 crypto.PubkeyToAddress(p.L1ProposerPrivKey.PublicKey),
-			Coinbase:                 p.L2SuggestedFeeRecipient,
-			RevertIfNotFirstProposal: p.RevertProtectionEnabled,
-			BlobParams:               *blobParams,
-			Blocks:                   blockParams,
-		}
-	}
 
 	for _, txs := range txBatch {
 		allTxs = append(allTxs, txs...)
@@ -576,7 +516,6 @@ func (p *Proposer) buildAggregatorProposal(ctx context.Context, txBatch []types.
 		RevertIfNotFirstProposal: p.RevertProtectionEnabled,
 		Blocks:                   blockParams,
 		TxList:                   txListsBytes,
-		ForcedInclusionParams:    *forcedInclusionParams,
 	}
 
 	return proposal, nil
