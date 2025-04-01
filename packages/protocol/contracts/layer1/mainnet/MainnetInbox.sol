@@ -48,8 +48,8 @@ contract MainnetInbox is TaikoInbox {
             maxSignalsToReceive: 16,
             maxBlocksPerBatch: 768,
             forkHeights: ITaikoInbox.ForkHeights({
-                ontake: 538_304,
-                pacaya: 538_304 * 10, // TODO
+                ontake: 0,
+                pacaya: 0, // TODO
                 shasta: 0,
                 unzen: 0
             })
