@@ -12,7 +12,7 @@ library LibNetwork {
     uint256 internal constant ETHEREUM_SEPOLIA = 11_155_111;
     uint256 internal constant ETHEREUM_HELDER = 7_014_190_335;
 
-    uint64 internal constant TAIKO_MAINNET = 167_000;
+    uint64 internal constant TAIKO_MAINNET = 763_374;
     uint64 internal constant TAIKO_HEKLA = 167_009;
     uint64 internal constant TAIKO_PRECONFS = 167_010;
 
