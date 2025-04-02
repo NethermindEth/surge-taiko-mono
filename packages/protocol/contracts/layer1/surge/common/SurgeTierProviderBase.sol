@@ -19,7 +19,8 @@ abstract contract SurgeTierProviderBase is ITierProvider {
     function getTier(uint16 _tierId) public pure virtual returns (ITierProvider.Tier memory) {
         if (_tierId == LibTiers.TIER_TWO_OF_THREE) {
             // No validity or contestation period
-            return _buildTier(LibStrings.B_TIER_TWO_OF_THREE, 0, 0, 180);
+            // 9 hours of proving window
+            return _buildTier(LibStrings.B_TIER_TWO_OF_THREE, 0, 0, 540);
         }
 
         revert TIER_NOT_FOUND();

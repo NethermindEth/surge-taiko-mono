@@ -30,7 +30,7 @@ contract SurgeHoodiTaikoL1 is TaikoL1 {
                 adjustmentQuotient: 8,
                 sharingPctg: 0,
                 gasIssuancePerSecond: 50_000_000, // The network targets 1 block / 2 seconds
-                minGasExcess: 31_136_000_000, // Resolves to ~0.09992 Gwei
+                minGasExcess: 15_291_000_000, // Resolves to ~0.0999 Gwei
                 maxGasIssuancePerBlock: 6_000_000_000
             }),
             ontakeForkHeight: 1,
