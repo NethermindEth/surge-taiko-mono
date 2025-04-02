@@ -29,7 +29,7 @@ var (
 	}
 	MinBlobsFillupPercentage = &cli.Uint64Flag{
 		Name:     "minBlobsFillupPercentage",
-		Usage:    "Minimum fillup percentage of the aggregated blob space",
+		Usage:    "Minimum fillup percentage of the last blob",
 		Required: false,
 		Value:    75,
 		Category: aggregatorCategory,
