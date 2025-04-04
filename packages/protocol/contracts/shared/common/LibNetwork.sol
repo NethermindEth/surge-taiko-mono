@@ -10,6 +10,7 @@ library LibNetwork {
     uint256 internal constant ETHEREUM_KOVAN = 42;
     uint256 internal constant ETHEREUM_HOLESKY = 17_000;
     uint256 internal constant ETHEREUM_SEPOLIA = 11_155_111;
+    uint256 internal constant ETHEREUM_HOODI = 56_004_8;
 
     // Surge: updated chainid for surge
     uint64 internal constant TAIKO_MAINNET = 763_374;
@@ -24,7 +25,8 @@ library LibNetwork {
     function isEthereumTestnet(uint256 _chainId) internal pure returns (bool) {
         return _chainId == LibNetwork.ETHEREUM_ROPSTEN || _chainId == LibNetwork.ETHEREUM_RINKEBY
             || _chainId == LibNetwork.ETHEREUM_GOERLI || _chainId == LibNetwork.ETHEREUM_KOVAN
-            || _chainId == LibNetwork.ETHEREUM_HOLESKY || _chainId == LibNetwork.ETHEREUM_SEPOLIA;
+            || _chainId == LibNetwork.ETHEREUM_HOLESKY || _chainId == LibNetwork.ETHEREUM_SEPOLIA
+            || _chainId == LibNetwork.ETHEREUM_HOODI;
     }
 
     /// @dev Checks if the chain ID represents an Ethereum testnet or the Etheruem mainnet.
@@ -57,6 +59,7 @@ library LibNetwork {
     function isDencunSupported(uint256 _chainId) internal pure returns (bool) {
         // Surge: Kurtosis based devnet should support Dencun
         return _chainId == LibNetwork.ETHEREUM_MAINNET || _chainId == LibNetwork.ETHEREUM_HOLESKY
-            || _chainId == LibNetwork.ETHEREUM_SEPOLIA || _chainId == LibNetwork.KURTOSIS_DEVNET || isTaikoDevnet(_chainId);
+            || _chainId == LibNetwork.ETHEREUM_SEPOLIA || _chainId == LibNetwork.KURTOSIS_DEVNET
+            || _chainId == LibNetwork.ETHEREUM_HOODI || isTaikoDevnet(_chainId);
     }
 }
