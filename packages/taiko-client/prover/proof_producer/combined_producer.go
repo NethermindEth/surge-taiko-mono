@@ -75,7 +75,7 @@ func (c *CombinedProducer) RequestProof(
 			select {
 			case <-taskCtx.Done():
 				return
-			case <-time.After(100 * time.Millisecond):
+			case <-time.After(5 * time.Second):
 				// Continue checking
 			}
 		}
