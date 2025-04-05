@@ -52,12 +52,34 @@ func (c *CombinedProducer) RequestProof(
 		wg         sync.WaitGroup
 		proofMutex sync.Mutex
 		errorsChan = make(chan error, len(c.Producers))
+		successCh  = make(chan struct{})
 	)
 
 	proofState := c.getProofState(blockID)
 
 	taskCtx, taskCtxCancel := context.WithCancel(ctx)
 	defer taskCtxCancel()
+
+	// Create a goroutine to monitor proof collection and signal success
+	go func() {
+		for {
+			proofMutex.Lock()
+			if uint8(len(proofState.proofs)) >= c.RequiredProofs {
+				proofMutex.Unlock()
+				close(successCh)
+				taskCtxCancel()
+				return
+			}
+			proofMutex.Unlock()
+
+			select {
+			case <-taskCtx.Done():
+				return
+			case <-time.After(100 * time.Millisecond):
+				// Continue checking
+			}
+		}
+	}()
 
 	for i, producer := range c.Producers {
 		if proofStateContainsTier(proofState, producer.Tier(), &proofMutex) {
@@ -91,14 +113,18 @@ func (c *CombinedProducer) RequestProof(
 					},
 				)
 			}
-
-			if uint8(len(proofState.proofs)) == c.RequiredProofs {
-				taskCtxCancel()
-			}
 		}(i, producer, verifier)
 	}
 
-	wg.Wait()
+	// Wait for either success or all producers to finish
+	select {
+	case <-successCh:
+		// Required proofs collected
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		wg.Wait()
+	}
 
 	if uint8(len(proofState.proofs)) < c.RequiredProofs {
 		var errMsgs []string
