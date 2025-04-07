@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 	txmgrMetrics "github.com/ethereum-optimism/optimism/op-service/txmgr/metrics"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -67,7 +68,7 @@ func InitFromConfig(ctx context.Context, agg *Aggregator, cfg *Config) (err erro
 	agg.queue = q
 	agg.batch = []*queue.Message{}
 	agg.minTxBatchDataSize = eth.BlobSize * cfg.MinAggregatedBlobs
-	agg.minBlobFillupPercentage = cfg.MinBlobsFillupPercentage // Todo: this is currently unused
+	agg.minBlobFillupPercentage = cfg.MinBlobsFillupPercentage
 	agg.proposalCh = make(chan queue.Message)
 	agg.ctx = ctx
 
@@ -124,7 +125,10 @@ func (agg *Aggregator) addProposalToBatch(msg *queue.Message) error {
 	agg.batch = append(agg.batch, msg)
 	agg.batchTxListSize += uint64(len(msg.Proposal.TxList))
 
-	if agg.batchTxListSize >= agg.minTxBatchDataSize {
+	slog.Info("Batch size", "size", agg.batchTxListSize)
+
+	// Todo: use minBlobFillupPercentage only for the last blob
+	if agg.batchTxListSize >= (agg.minTxBatchDataSize*agg.minBlobFillupPercentage)/100 {
 		if err := agg.processBatch(); err != nil {
 			return err
 		}
@@ -157,12 +161,13 @@ func (agg *Aggregator) processBatch() error {
 		return err
 	}
 
+	slog.Info("Here 3")
+
 	to := crypto.PubkeyToAddress(agg.aggregatorPrivateKey.PublicKey)
 	candidate := txmgr.TxCandidate{
-		TxData:   executeBatchCalldata,
-		Blobs:    blobs,
-		To:       &to,
-		GasLimit: 0,
+		TxData: executeBatchCalldata,
+		Blobs:  blobs,
+		To:     &to,
 	}
 
 	receipt, err := agg.txmgr.Send(agg.ctx, candidate)
@@ -187,10 +192,9 @@ func (agg *Aggregator) buildParamsForBatchedProposal(blobParamsList []*taikoEnco
 	)
 
 	for i := 0; i < len(agg.batch); i++ {
-		if encodedProposalParams, err = taikoEncoding.EncodeBatchParamsWithForcedInclusion(
-			&agg.batch[i].Proposal.ForcedInclusionParams,
+		if encodedProposalParams, err = taikoEncoding.BatchParamsComponentsArgs.Pack(
 			&taikoEncoding.BatchParams{
-				Proposer:                 crypto.PubkeyToAddress(agg.aggregatorPrivateKey.PublicKey),
+				Proposer:                 common.Address{},
 				Coinbase:                 agg.batch[i].Proposal.Coinbase,
 				RevertIfNotFirstProposal: agg.batch[i].Proposal.RevertIfNotFirstProposal,
 				BlobParams:               *blobParamsList[i],
@@ -199,7 +203,7 @@ func (agg *Aggregator) buildParamsForBatchedProposal(blobParamsList []*taikoEnco
 			return nil, err
 		}
 
-		if proposalCalldata, err = taikoEncoding.TaikoWrapperABI.Pack("proposeBatch", encodedProposalParams, []byte{}); err != nil {
+		if proposalCalldata, err = taikoEncoding.TaikoInboxABI.Pack("proposeBatch", encodedProposalParams, []byte{}); err != nil {
 			return nil, err
 		}
 
@@ -214,12 +218,8 @@ func (agg *Aggregator) buildParamsForBatchedProposal(blobParamsList []*taikoEnco
 }
 
 func (agg *Aggregator) buildExecuteBatchCalldata(calls []bindings.Call) ([]byte, error) {
-	executeBatchParams, err := encoding.EncodeExecuteBatchInput(calls)
-	if err != nil {
-		return nil, err
-	}
-
-	executeBatchCalldata, err := encoding.MinimalBatcherABI.Pack("executeBatch", executeBatchParams)
+	// Pass the calls array directly to Pack without pre-encoding
+	executeBatchCalldata, err := encoding.MinimalBatcherABI.Pack("executeBatch", calls)
 	if err != nil {
 		return nil, err
 	}

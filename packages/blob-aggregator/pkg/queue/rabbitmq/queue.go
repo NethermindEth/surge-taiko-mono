@@ -72,6 +72,18 @@ func (r *RabbitMQ) connect() error {
 	r.conn = conn
 	r.ch = ch
 
+	_, err = r.ch.QueueDeclare(
+		"aggregator-queue",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+
 	slog.Info("connected to rabbitmq")
 
 	return nil
@@ -100,9 +112,8 @@ func (r *RabbitMQ) Publish(ctx context.Context, proposal types.QueueProposalRequ
 		return err
 	}
 
-	err = r.ch.PublishWithContext(ctx,
-		"",
-		r.queueName,
+	err = r.ch.Publish("",
+		"aggregator-queue",
 		false,
 		false,
 		amqp.Publishing{
@@ -125,7 +136,7 @@ func (r *RabbitMQ) Subscribe(ctx context.Context, msgChan chan<- queue.Message, 
 	slog.Info("Starting message consumer", "queue", r.queueName)
 
 	msgs, err := r.ch.Consume(
-		r.queueName,
+		"aggregator-queue",
 		"",
 		false,
 		false,
@@ -139,20 +150,10 @@ func (r *RabbitMQ) Subscribe(ctx context.Context, msgChan chan<- queue.Message, 
 
 	for {
 		select {
-		case <-r.subscriptionCtx.Done():
-			defer r.Close()
-			slog.Info("Subscription context cancelled")
-			return nil
 		case <-ctx.Done():
 			defer r.Close()
 			slog.Info("Consumer context cancelled")
 			return nil
-		case err := <-r.connErrCh:
-			slog.Error("RabbitMQ connection closed", "error", err)
-			return err
-		case err := <-r.chErrCh:
-			slog.Error("RabbitMQ channel closed", "error", err)
-			return err
 		case d, ok := <-msgs:
 			if !ok {
 				slog.Error("Message channel closed")

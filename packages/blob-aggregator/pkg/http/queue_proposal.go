@@ -2,6 +2,7 @@ package http
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -30,6 +31,8 @@ func (srv *Server) queue_proposal(c echo.Context) error {
 	if reqBody.TxList == nil || len(reqBody.TxList) == 0 {
 		return srv.returnError(c, http.StatusBadRequest, errors.New("require non empty transaction list"))
 	}
+
+	slog.Info("queue_proposal", "reqBody", reqBody)
 
 	// Publish to rabbitmq
 	err = srv.queue.Publish(c.Request().Context(), *reqBody)

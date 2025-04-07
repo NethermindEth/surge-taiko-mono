@@ -36,7 +36,7 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		L1RPCUrl:                 c.String(flags.L1RPCUrl.Name),
 		L1AggregatorPrivKey:      l1AggregatorPrivKey,
 		MinAggregatedBlobs:       c.Uint64(flags.MinAggregatedBlobs.Name),
-		MinBlobsFillupPercentage: c.Uint64(flags.MinAggregatedBlobs.Name),
+		MinBlobsFillupPercentage: c.Uint64(flags.MinBlobsFillupPercentage.Name),
 		OpenQueueFunc: func() (queue.Queue, error) {
 			opts := queue.NewQueueOpts{
 				Username: c.String(flags.QueueUsername.Name),

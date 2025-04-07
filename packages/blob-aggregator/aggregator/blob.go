@@ -19,7 +19,7 @@ func (agg *Aggregator) buildBlobs(msgBatch []*queue.Message) ([]*eth.Blob, error
 	var blobs []*eth.Blob
 
 	for {
-		byteSize := min(uint(len(msgBatch[i].Proposal.TxList[start:])), eth.BlobSize)
+		byteSize := min(uint(len(msgBatch[i].Proposal.TxList[start:])), eth.BlobSize-uint(len(blobBytes)))
 		blobBytes = append(blobBytes, msgBatch[i].Proposal.TxList[start:start+byteSize]...)
 		start += byteSize
 
@@ -59,17 +59,17 @@ func (agg *Aggregator) buildBlobParamsForBatchedProposal() []*taikoEncoding.Blob
 
 	for _, msg := range agg.batch {
 		txListLen := len(msg.Proposal.TxList)
-		blobsUsed := (byteOffset + uint(txListLen)) / uint(eth.BlobSize)
+		blobsFilled := (byteOffset + uint(txListLen)) / uint(eth.BlobSize)
 
 		blobParams := taikoEncoding.BlobParams{
 			FirstBlobIndex: uint8(blobNumber),
-			NumBlobs:       uint8(txListLen / eth.BlobSize),
+			NumBlobs:       uint8((int(byteOffset) + txListLen + eth.BlobSize - 1) / eth.BlobSize),
 			ByteOffset:     uint32(byteOffset),
 			ByteSize:       uint32(txListLen),
 		}
 
 		byteOffset = (byteOffset + uint(txListLen)) % uint(eth.BlobSize)
-		blobNumber += blobsUsed
+		blobNumber += blobsFilled
 
 		// Store the blob params locally and remove the now redundant proposal message from rabbit mq
 		blobParamsList = append(blobParamsList, &blobParams)
