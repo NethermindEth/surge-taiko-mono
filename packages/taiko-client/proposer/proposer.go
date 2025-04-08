@@ -1,11 +1,15 @@
 package proposer
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"math/rand"
+	"net/http"
 	"sync"
 	"time"
 
@@ -18,7 +22,9 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/urfave/cli/v2"
 
+	aggTypes "github.com/taikoxyz/taiko-mono/packages/blob-aggregator/pkg/types"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
+	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
@@ -413,8 +419,7 @@ func (p *Proposer) ProposeTxListPacaya(
 	txBatch []types.Transactions,
 ) error {
 	var (
-		proposerAddress = p.proposerAddress
-		txs             uint64
+		txs uint64
 	)
 
 	// Make sure the tx list is not bigger than the maxBlocksPerBatch.
@@ -426,70 +431,94 @@ func (p *Proposer) ProposeTxListPacaya(
 		txs += uint64(len(txList))
 	}
 
-	// Check balance.
-	if p.Config.ClientConfig.ProverSetAddress != rpc.ZeroAddress {
-		proposerAddress = p.Config.ClientConfig.ProverSetAddress
-	}
+	var forcedInclusion *pacayaBindings.IForcedInclusionStoreForcedInclusion = nil
+	minTxsPerForcedInclusion := big.NewInt(512)
 
-	ok, err := rpc.CheckProverBalance(
-		ctx,
-		p.rpc,
-		proposerAddress,
-		p.TaikoL1Address,
-		new(big.Int).Add(
-			p.protocolConfigs.LivenessBond(),
-			new(big.Int).Mul(
-				p.protocolConfigs.LivenessBondPerBlock(),
-				new(big.Int).SetUint64(uint64(len(txBatch))),
-			),
-		),
-	)
+	if p.Config.UseBlobAggregator {
+		proposal, err := p.buildAggregatorProposal(ctx, txBatch)
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		log.Warn("Failed to check prover balance", "proposer", proposerAddress, "error", err)
-		return err
-	}
+		proposalData, err := json.Marshal(proposal)
+		if err != nil {
+			log.Warn("Failed to marshal proposal", "error", err)
+			return err
+		}
 
-	if !ok {
-		return fmt.Errorf("insufficient proposer (%s) balance", proposerAddress.Hex())
-	}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.Config.AggregatorEndpoint+"/queueProposal", bytes.NewBuffer(proposalData))
+		if err != nil {
+			log.Warn("Failed to create HTTP request", "error", err)
+			return err
+		}
+		req.Header.Set("Content-Type", "application/json")
 
-	forcedInclusion, minTxsPerForcedInclusion, err := p.rpc.GetForcedInclusionPacaya(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to fetch forced inclusion: %w", err)
-	}
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Warn("Failed to send proposal to aggregator", "error", err)
+			return err
+		}
+		defer resp.Body.Close()
 
-	if forcedInclusion == nil {
-		log.Info("No forced inclusion", "proposer", proposerAddress.Hex())
+		if resp.StatusCode != http.StatusOK {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			log.Warn("Aggregator responded with non-OK status", "status", resp.StatusCode, "body", string(bodyBytes))
+			return fmt.Errorf("aggregator responded with non-OK status: %d", resp.StatusCode)
+		}
+
+		log.Info("📝 Successfully sent proposal to aggregator")
+
 	} else {
-		log.Info(
-			"Forced inclusion",
-			"proposer", proposerAddress.Hex(),
-			"blobHash", common.BytesToHash(forcedInclusion.BlobHash[:]),
-			"feeInGwei", forcedInclusion.FeeInGwei,
-			"createdAtBatchId", forcedInclusion.CreatedAtBatchId,
-			"blobByteOffset", forcedInclusion.BlobByteOffset,
-			"blobByteSize", forcedInclusion.BlobByteSize,
-			"minTxsPerForcedInclusion", minTxsPerForcedInclusion,
-		)
-	}
+		txCandidate, err := p.txBuilder.BuildPacaya(ctx, txBatch, forcedInclusion, minTxsPerForcedInclusion)
+		if err != nil {
+			log.Warn("Failed to build TaikoInbox.proposeBatch transaction", "error", encoding.TryParsingCustomError(err))
+			return err
+		}
 
-	txCandidate, err := p.txBuilder.BuildPacaya(ctx, txBatch, forcedInclusion, minTxsPerForcedInclusion)
-	if err != nil {
-		log.Warn("Failed to build TaikoInbox.proposeBatch transaction", "error", encoding.TryParsingCustomError(err))
-		return err
-	}
+		if err := p.SendTx(ctx, txCandidate); err != nil {
+			return err
+		}
 
-	if err := p.SendTx(ctx, txCandidate); err != nil {
-		return err
+		log.Info("📝 Propose blocks batch succeeded", "blocksInBatch", len(txBatch), "txs", txs)
 	}
-
-	log.Info("📝 Propose blocks batch succeeded", "blocksInBatch", len(txBatch), "txs", txs)
 
 	metrics.ProposerProposedTxListsCounter.Add(float64(len(txBatch)))
 	metrics.ProposerProposedTxsCounter.Add(float64(txs))
 
 	return nil
+}
+
+func (p *Proposer) buildAggregatorProposal(ctx context.Context, txBatch []types.Transactions) (*aggTypes.QueueProposalRequestBody, error) {
+
+	var (
+		blockParams []pacayaBindings.ITaikoInboxBlockParams
+		allTxs      types.Transactions
+	)
+
+	for _, txs := range txBatch {
+		allTxs = append(allTxs, txs...)
+		blockParams = append(blockParams, pacayaBindings.ITaikoInboxBlockParams{
+			NumTransactions: uint16(len(txs)),
+			TimeShift:       0,
+			SignalSlots:     make([][32]byte, 0),
+		})
+	}
+
+	txListsBytes, err := utils.EncodeAndCompressTxList(allTxs)
+	if err != nil {
+		return nil, err
+	}
+
+	proposal := &aggTypes.QueueProposalRequestBody{
+		Inbox:                    p.TaikoL1Address,
+		Coinbase:                 p.L2SuggestedFeeRecipient,
+		RevertIfNotFirstProposal: p.RevertProtectionEnabled,
+		Blocks:                   blockParams,
+		TxList:                   txListsBytes,
+	}
+
+	return proposal, nil
 }
 
 // updateProposingTicker updates the internal proposing timer.

@@ -7,6 +7,7 @@ WORKDIR /build
 COPY go.mod go.sum ./
 
 COPY packages/taiko-client/ packages/taiko-client/
+COPY packages/blob-aggregator/ packages/blob-aggregator/
 
 WORKDIR /build/packages/taiko-client
 
