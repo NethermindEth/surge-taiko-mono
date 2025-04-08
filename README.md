@@ -11,9 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/NethermindEth/surge-taiko-mono/actions"><img src="https://img.shields.io/github/actions/workflow/status/NethermindEth/surge-taiko-mono/ci.yml?branch=main" alt="Build Status"></a>
   <a href="https://docs.surge.wtf"><img src="https://img.shields.io/badge/docs-online-blue" alt="Documentation"></a>
-  <a href="https://github.com/NethermindEth/surge-taiko-mono/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
 </p>
 
 ---
