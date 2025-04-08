@@ -161,8 +161,6 @@ func (agg *Aggregator) processBatch() error {
 		return err
 	}
 
-	slog.Info("Here 3")
-
 	to := crypto.PubkeyToAddress(agg.aggregatorPrivateKey.PublicKey)
 	candidate := txmgr.TxCandidate{
 		TxData: executeBatchCalldata,
