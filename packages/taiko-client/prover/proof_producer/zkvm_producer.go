@@ -10,6 +10,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -32,6 +33,28 @@ var (
 	ErrRetry           = errors.New("retry")
 	StatusRegistered   = "registered"
 )
+
+// Add a local struct to track proof state for each block.
+type zkProofStatus int
+
+const (
+	zkProofStatusNew zkProofStatus = iota
+	zkProofStatusInProgress
+	zkProofStatusDone
+)
+
+// Store the final proof or error
+type zkProofCache struct {
+	status  zkProofStatus
+	proof   []byte
+	lastErr error
+}
+
+// 3) Define a composite key type to represent (blockID, proofType)
+type blockProofKey struct {
+	BlockID   uint64
+	ProofType string
+}
 
 // RaikoRequestProofBodyResponseV2 represents the JSON body of the response of the proof requests.
 type RaikoRequestProofBodyResponseV2 struct {
@@ -64,6 +87,10 @@ type ZKvmProofProducer struct {
 	RaikoRISC0Profile      bool
 	RaikoRISC0ExecutionPo2 *big.Int
 	DummyProofProducer
+
+	// 4) Use a map keyed by blockProofKey, not just blockID
+	proofCache map[blockProofKey]*zkProofCache
+	cacheMutex sync.Mutex
 }
 
 // RequestProof implements the ProofProducer interface.
@@ -75,6 +102,10 @@ func (s *ZKvmProofProducer) RequestProof(
 	header *types.Header,
 	requestAt time.Time,
 ) (*ProofWithHeader, error) {
+	if s.proofCache == nil {
+		s.proofCache = make(map[blockProofKey]*zkProofCache)
+	}
+
 	log.Info(
 		"Request zk proof from raiko-host service",
 		"blockID", blockID,
@@ -88,10 +119,81 @@ func (s *ZKvmProofProducer) RequestProof(
 		return s.DummyProofProducer.RequestProof(opts, blockID, meta, header, s.Tier(), requestAt)
 	}
 
-	proof, err := s.callProverDaemon(ctx, opts, requestAt)
-	if err != nil {
-		return nil, err
+	// 5) Build the composite key (blockID, proofType)
+	key := blockProofKey{
+		BlockID:   blockID.Uint64(),
+		ProofType: s.ZKProofType, // e.g. "risc0" or "sp1"
 	}
+
+	// 6) Check the cache
+	s.cacheMutex.Lock()
+	cache, exists := s.proofCache[key]
+	if !exists {
+		cache = &zkProofCache{status: zkProofStatusNew}
+		s.proofCache[key] = cache
+	}
+
+	switch cache.status {
+	// case zkProofStatusInProgress:
+	// 	// Another RequestProof call for the same (blockID, proofType) is still running
+	// 	s.cacheMutex.Unlock()
+
+	// 	log.Info("=============== zkvm_producer.go proof in progress", key)
+
+	// 	return nil, ErrProofInProgress
+
+	case zkProofStatusDone:
+		proof := cache.proof
+		err := cache.lastErr
+		s.cacheMutex.Unlock()
+
+		log.Info("=============== zkvm_producer.go proof done", key)
+
+		if err != nil {
+			return nil, err // previously failed
+		}
+
+		// Return the cached proof
+		return &ProofWithHeader{
+			BlockID: blockID,
+			Header:  header,
+			Meta:    meta,
+			Proof:   proof,
+			Opts:    opts,
+			Tier:    s.Tier(),
+		}, nil
+
+	case zkProofStatusInProgress:
+	case zkProofStatusNew:
+		// Mark as in-progress
+		cache.status = zkProofStatusInProgress
+
+		log.Info("=============== zkvm_producer.go proof new and in progress", key)
+	}
+	s.cacheMutex.Unlock()
+
+	proof, err := s.callProverDaemon(ctx, opts, requestAt)
+
+	// 8) Update the cache with final result
+	s.cacheMutex.Lock()
+	defer s.cacheMutex.Unlock()
+
+	if err != nil {
+		cache.lastErr = err
+		if err == ErrProofInProgress {
+			log.Info("======================= at zkvm_producer.go received proof generating error", err)
+			return nil, err
+		} else {
+			log.Info("======================= at zkvm_producer.go received bad bad error", err)
+			cache.status = zkProofStatusDone
+			return nil, err
+		}
+	}
+
+	// Otherwise, success
+	cache.status = zkProofStatusDone
+	cache.proof = proof
+	cache.lastErr = nil
 
 	if s.ZKProofType == ZKProofTypeR0 {
 		metrics.ProverR0ProofGeneratedCounter.Add(1)

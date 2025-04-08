@@ -162,6 +162,7 @@ func (s *ProofSubmitter) RequestProof(ctx context.Context, meta metadata.TaikoBl
 				return nil
 			}
 
+			log.Info("==================== Actually calling RequestProof at proof_submitter.go", "blockID", meta.GetBlockID())
 			result, err := s.proofProducer.RequestProof(
 				ctx,
 				opts,

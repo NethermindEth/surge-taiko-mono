@@ -9,6 +9,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -17,9 +18,28 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 )
+
+var (
+	errProofInProgress = fmt.Errorf("sgx proof is still being generated")
+)
+
+// subProofStatus is just an internal state for each block’s proof.
+type subProofStatus int
+
+const (
+	subProofStatusNew subProofStatus = iota
+	subProofStatusInProgress
+	subProofStatusDone
+)
+
+// sgxProofCache holds the cached proof/result for one block.
+type sgxProofCache struct {
+	status  subProofStatus
+	proof   []byte
+	lastErr error
+}
 
 const (
 	ProofTypeSgx = "sgx"
@@ -34,6 +54,10 @@ type SGXProofProducer struct {
 	Dummy               bool
 	RaikoRequestTimeout time.Duration
 	DummyProofProducer
+
+	// 1) Add a concurrency-safe map from blockID -> sgxProofCache
+	proofCache map[uint64]*sgxProofCache
+	cacheMutex sync.Mutex
 }
 
 // RaikoRequestProofBody represents the JSON body for requesting the proof.
@@ -88,6 +112,10 @@ func (s *SGXProofProducer) RequestProof(
 	header *types.Header,
 	requestAt time.Time,
 ) (*ProofWithHeader, error) {
+	if s.proofCache == nil {
+		s.proofCache = make(map[uint64]*sgxProofCache)
+	}
+
 	log.Info(
 		"Request sgx proof from raiko-host service",
 		"blockID", blockID,
@@ -100,21 +128,94 @@ func (s *SGXProofProducer) RequestProof(
 		return s.DummyProofProducer.RequestProof(opts, blockID, meta, header, s.Tier(), requestAt)
 	}
 
-	proof, err := s.callProverDaemon(ctx, opts, requestAt)
-	if err != nil {
-		return nil, err
+	// 2) Check or create the cache entry for this block
+	bid := blockID.Uint64()
+
+	s.cacheMutex.Lock()
+	cache, ok := s.proofCache[bid]
+	if !ok {
+		cache = &sgxProofCache{status: subProofStatusNew}
+		s.proofCache[bid] = cache
 	}
 
-	metrics.ProverSgxProofGeneratedCounter.Add(1)
+	switch cache.status {
+	// case subProofStatusInProgress:
+	// 	// This block is still generating a proof
+	// 	s.cacheMutex.Unlock()
 
-	return &ProofWithHeader{
-		BlockID: blockID,
-		Header:  header,
-		Meta:    meta,
-		Proof:   proof,
-		Opts:    opts,
-		Tier:    s.Tier(),
-	}, nil
+	// 	log.Info("================= sgx_producer.go: proof in progress", bid)
+
+	// 	return nil, errProofInProgress
+
+	case subProofStatusDone:
+		// We’ve already finalized a result for this block. Return the proof or the error we cached.
+		proof := cache.proof
+		lastErr := cache.lastErr
+		s.cacheMutex.Unlock()
+
+		log.Info("================= sgx_producer.go: proof done", bid)
+
+		if lastErr != nil {
+			// e.g., if we ended in an error last time, we return that error
+			return nil, lastErr
+		}
+
+		// Otherwise, return the cached proof
+		return &ProofWithHeader{
+			BlockID: blockID,
+			Header:  header,
+			Meta:    meta,
+			Proof:   proof,
+			Opts:    opts,
+			Tier:    s.Tier(),
+		}, nil
+
+	case subProofStatusNew:
+	case subProofStatusInProgress:
+		log.Info("================= sgx_producer.go: proof new or in progress", bid)
+
+		// Mark as in-progress, then generate the proof
+		cache.status = subProofStatusInProgress
+		s.cacheMutex.Unlock()
+
+		// We'll do the actual proof generation outside the lock
+		proofBytes, err := s.callProverDaemon(ctx, opts, requestAt)
+
+		// Re-lock to update the cache
+		s.cacheMutex.Lock()
+		defer s.cacheMutex.Unlock()
+
+		if err != nil {
+			cache.lastErr = err
+			if err == errProofGenerating {
+				log.Info("======================= at sgx_producer.go received proof generating error", err)
+				return nil, err
+			} else {
+				log.Info("======================= at sgx_producer.go received bad bad error", err)
+				cache.status = subProofStatusDone
+				return nil, err
+			}
+		}
+
+		// If we got a valid proof:
+		cache.status = subProofStatusDone
+		cache.proof = proofBytes
+		cache.lastErr = nil
+
+		// Return final result
+		return &ProofWithHeader{
+			BlockID: blockID,
+			Header:  header,
+			Meta:    meta,
+			Proof:   proofBytes,
+			Opts:    opts,
+			Tier:    s.Tier(),
+		}, nil
+	}
+
+	// Should never happen, but just in case:
+	s.cacheMutex.Unlock()
+	return nil, fmt.Errorf("unhandled status for block %d", bid)
 }
 
 func (s *SGXProofProducer) RequestCancel(

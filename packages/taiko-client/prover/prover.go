@@ -403,6 +403,7 @@ func (p *Prover) contestProofOp(req *proofProducer.ContestRequestBody) error {
 
 // requestProofOp requests a new proof generation operation.
 func (p *Prover) requestProofOp(meta metadata.TaikoBlockMetaData, minTier uint16) error {
+	log.Info("============================== Requesting new proof at prover.go", "blockID", meta.GetBlockID(), "minTier", meta.GetMinTier())
 	if submitter := p.selectSubmitter(minTier); submitter != nil {
 		if err := submitter.RequestProof(p.ctx, meta); err != nil {
 			log.Error("Request new proof error", "blockID", meta.GetBlockID(), "minTier", meta.GetMinTier(), "error", err)
