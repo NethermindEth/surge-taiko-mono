@@ -339,10 +339,13 @@ func (p *Prover) eventLoop() {
 		case m := <-p.assignmentExpiredCh:
 			p.withRetry(func() error { return p.assignmentExpiredHandler.Handle(p.ctx, m) })
 		case <-blockProposedCh:
+			log.Debug("receive on blockProposedCh, calling reqProving()")
 			reqProving()
 		case <-blockProposedV2Ch:
+			log.Debug("receive on blockProposedV2Ch, calling reqProving()")
 			reqProving()
 		case <-forceProvingTicker.C:
+			log.Debug("receive on forceProvingTickerCh, calling reqProving()")
 			reqProving()
 		}
 	}
@@ -355,6 +358,7 @@ func (p *Prover) Close(_ context.Context) {
 
 // proveOp iterates through BlockProposed events.
 func (p *Prover) proveOp() error {
+	log.Debug("Inside proveOp()")
 	iter, err := eventIterator.NewBlockProposedIterator(p.ctx, &eventIterator.BlockProposedIteratorConfig{
 		Client:               p.rpc.L1,
 		TaikoL1:              p.rpc.TaikoL1,

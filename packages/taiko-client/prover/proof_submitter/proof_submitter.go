@@ -170,6 +170,7 @@ func (s *ProofSubmitter) RequestProof(ctx context.Context, meta metadata.TaikoBl
 				header,
 				startTime,
 			)
+
 			if err != nil {
 				// If request proof has timed out in retry, let's cancel the proof generating and skip
 				if errors.Is(err, proofProducer.ErrProofInProgress) && time.Since(startTime) >= ProofTimeout {

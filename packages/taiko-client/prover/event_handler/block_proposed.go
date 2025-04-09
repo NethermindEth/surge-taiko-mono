@@ -111,6 +111,8 @@ func (h *BlockProposedEventHandler) Handle(
 
 	// If the current block is handled, just skip it.
 	if meta.GetBlockID().Uint64() <= h.sharedState.GetLastHandledBlockID() {
+		log.Debug("block proposed handled event skipping", "blockID", meta.GetBlockID(),
+			"sharedState.GetLasHandledBlockID", h.sharedState.GetLastHandledBlockID())
 		return nil
 	}
 
@@ -139,6 +141,7 @@ func (h *BlockProposedEventHandler) Handle(
 	go func() {
 		if err := backoff.Retry(
 			func() error {
+				log.Debug("Inside Handle()'s go routine to generate proof")
 				if err := h.checkExpirationAndSubmitProof(ctx, meta); err != nil {
 					log.Error(
 						"Failed to check proof status and submit proof",
