@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -48,6 +49,8 @@ type ProofSubmitter struct {
 	// Guardian prover related.
 	isGuardian      bool
 	submissionDelay time.Duration
+
+	cache sync.Map
 }
 
 // NewProofSubmitter creates a new ProofSubmitter instance.
@@ -138,6 +141,10 @@ func (s *ProofSubmitter) RequestProof(ctx context.Context, meta metadata.TaikoBl
 		opts.ProverAddress = s.proverSetAddress
 	}
 
+	if _, ok := s.cache.LoadOrStore(meta.GetBlockID().Uint64(), struct{}{}); ok {
+		return nil
+	}
+
 	startTime := time.Now()
 
 	// Send the generated proof.
@@ -177,10 +184,12 @@ func (s *ProofSubmitter) RequestProof(ctx context.Context, meta metadata.TaikoBl
 					if cancelErr := s.proofProducer.RequestCancel(ctx, opts); cancelErr != nil {
 						log.Error("Failed to request cancellation of proof", "err", cancelErr)
 					}
+					s.cache.Delete(meta.GetBlockID().Uint64())
 					return nil
 				}
 				return fmt.Errorf("failed to request proof (id: %d): %w", meta.GetBlockID(), err)
 			}
+			s.cache.Delete(meta.GetBlockID().Uint64())
 			s.resultCh <- result
 			metrics.ProverQueuedProofCounter.Add(1)
 			return nil
