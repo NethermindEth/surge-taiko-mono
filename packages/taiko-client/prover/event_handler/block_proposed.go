@@ -141,7 +141,6 @@ func (h *BlockProposedEventHandler) Handle(
 	go func() {
 		if err := backoff.Retry(
 			func() error {
-				log.Debug("Inside Handle()'s go routine to generate proof")
 				if err := h.checkExpirationAndSubmitProof(ctx, meta); err != nil {
 					log.Error(
 						"Failed to check proof status and submit proof",

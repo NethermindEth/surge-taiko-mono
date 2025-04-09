@@ -88,8 +88,11 @@ func NewProofSubmitter(
 	}, nil
 }
 
+var requestProofCount int
+
 // RequestProof implements the Submitter interface.
 func (s *ProofSubmitter) RequestProof(ctx context.Context, meta metadata.TaikoBlockMetaData) error {
+	requestProofCount++
 	var (
 		blockInfo bindings.TaikoDataBlockV2
 	)
@@ -138,11 +141,19 @@ func (s *ProofSubmitter) RequestProof(ctx context.Context, meta metadata.TaikoBl
 		opts.ProverAddress = s.proverSetAddress
 	}
 
+	var retryCount int
 	startTime := time.Now()
 
 	// Send the generated proof.
 	if err := backoff.Retry(
 		func() error {
+			originalRequestProofCount := requestProofCount
+			retryCount++
+
+			log.Debug("Inside proof Submitters's RequestProof", "requestProofCount", originalRequestProofCount, "blockID",
+				opts.BlockID, "retryCount",
+				retryCount)
+
 			if ctx.Err() != nil {
 				log.Error("Failed to request proof, context is canceled", "blockID", opts.BlockID, "error", ctx.Err())
 				return nil
