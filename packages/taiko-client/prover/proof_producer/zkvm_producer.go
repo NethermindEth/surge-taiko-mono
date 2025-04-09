@@ -34,12 +34,12 @@ var (
 	StatusRegistered   = "registered"
 )
 
-// Add a local struct to track proof state for each block.
+// A type to track proof state for each block
 type zkProofStatus int
 
 const (
-	zkProofStatusNew zkProofStatus = iota
-	zkProofStatusInProgress
+	zkProofStatusNew        zkProofStatus = iota
+	zkProofStatusInProgress               // indicates the proof is either currently being generated or a previous API request encountered an error
 	zkProofStatusDone
 )
 
@@ -50,10 +50,9 @@ type zkProofCache struct {
 	lastErr error
 }
 
-// 3) Define a composite key type to represent (blockID, proofType)
 type blockProofKey struct {
-	BlockID   uint64
-	ProofType string
+	blockID   uint64
+	proofType string
 }
 
 // RaikoRequestProofBodyResponseV2 represents the JSON body of the response of the proof requests.
@@ -88,7 +87,6 @@ type ZKvmProofProducer struct {
 	RaikoRISC0ExecutionPo2 *big.Int
 	DummyProofProducer
 
-	// 4) Use a map keyed by blockProofKey, not just blockID
 	proofCache map[blockProofKey]*zkProofCache
 	cacheMutex sync.Mutex
 }
@@ -119,13 +117,11 @@ func (s *ZKvmProofProducer) RequestProof(
 		return s.DummyProofProducer.RequestProof(opts, blockID, meta, header, s.Tier(), requestAt)
 	}
 
-	// 5) Build the composite key (blockID, proofType)
 	key := blockProofKey{
-		BlockID:   blockID.Uint64(),
-		ProofType: s.ZKProofType, // e.g. "risc0" or "sp1"
+		blockID:   blockID.Uint64(),
+		proofType: s.ZKProofType, // "risc0" or "sp1"
 	}
 
-	// 6) Check the cache
 	s.cacheMutex.Lock()
 	cache, exists := s.proofCache[key]
 	if !exists {
@@ -134,28 +130,17 @@ func (s *ZKvmProofProducer) RequestProof(
 	}
 
 	switch cache.status {
-	// case zkProofStatusInProgress:
-	// 	// Another RequestProof call for the same (blockID, proofType) is still running
-	// 	s.cacheMutex.Unlock()
-
-	// 	log.Info("=============== zkvm_producer.go proof in progress", key)
-
-	// 	return nil, ErrProofInProgress
-
 	case zkProofStatusDone:
 		proof := cache.proof
 		err := cache.lastErr
 		s.cacheMutex.Unlock()
 
-		log.Info("=============== zkvm_producer.go proof done", key)
-
 		if err != nil {
-			log.Info("================== zkvm_producer.go proof done with error", key, err)
+			log.Info("ZK proof generation completed with error", "key", key, "error", err)
 			return nil, err // previously failed
 		}
 
-		log.Info("================== zkvm_producer.go proof done with actual proof", key)
-
+		log.Info("ZK proof generation completed", "key", key, "proof", proof)
 		// Return the cached proof
 		return &ProofWithHeader{
 			BlockID: blockID,
@@ -170,29 +155,29 @@ func (s *ZKvmProofProducer) RequestProof(
 		// Mark as in-progress
 		cache.status = zkProofStatusInProgress
 
-		log.Info("=============== zkvm_producer.go proof new or in progress", key)
+		log.Info("ZK proof generation is new/in progress", "key", key)
 	}
 	s.cacheMutex.Unlock()
 
 	proof, err := s.callProverDaemon(ctx, opts, requestAt)
 
-	// 8) Update the cache with final result
 	s.cacheMutex.Lock()
 	defer s.cacheMutex.Unlock()
 
 	if err != nil {
+		// Received error, so mark as in-progress and let it retry
 		cache.lastErr = err
-		if err == ErrProofInProgress || err == ErrRetry {
-			log.Info("======================= at zkvm_producer.go", key, "received normal error", err)
+		if errors.Is(err, ErrProofInProgress) || errors.Is(err, ErrRetry) {
+			log.Info("ZK proof generation in progress, received normal error", "key", key, "error", err)
 			return nil, err
 		} else {
-			log.Info("======================= at zkvm_producer.go", key, "received bad bad error", err)
-			// cache.status = zkProofStatusDone
+			log.Info("ZK proof generation in progress, received unknown error", "key", key, "error", err, "but continue to retry")
 			return nil, err
 		}
 	}
 
 	// Otherwise, success
+	log.Info("ZK proof generation succeeded, changed status to done", "key", key)
 	cache.status = zkProofStatusDone
 	cache.proof = proof
 	cache.lastErr = nil
