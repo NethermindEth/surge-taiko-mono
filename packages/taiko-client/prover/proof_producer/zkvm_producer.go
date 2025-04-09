@@ -150,8 +150,11 @@ func (s *ZKvmProofProducer) RequestProof(
 		log.Info("=============== zkvm_producer.go proof done", key)
 
 		if err != nil {
+			log.Info("================== zkvm_producer.go proof done with error", key, err)
 			return nil, err // previously failed
 		}
+
+		log.Info("================== zkvm_producer.go proof done with actual proof", key)
 
 		// Return the cached proof
 		return &ProofWithHeader{
@@ -163,12 +166,11 @@ func (s *ZKvmProofProducer) RequestProof(
 			Tier:    s.Tier(),
 		}, nil
 
-	case zkProofStatusInProgress:
-	case zkProofStatusNew:
+	case zkProofStatusInProgress, zkProofStatusNew:
 		// Mark as in-progress
 		cache.status = zkProofStatusInProgress
 
-		log.Info("=============== zkvm_producer.go proof new and in progress", key)
+		log.Info("=============== zkvm_producer.go proof new or in progress", key)
 	}
 	s.cacheMutex.Unlock()
 
@@ -180,12 +182,12 @@ func (s *ZKvmProofProducer) RequestProof(
 
 	if err != nil {
 		cache.lastErr = err
-		if err == ErrProofInProgress {
-			log.Info("======================= at zkvm_producer.go received proof generating error", err)
+		if err == ErrProofInProgress || err == ErrRetry {
+			log.Info("======================= at zkvm_producer.go", key, "received normal error", err)
 			return nil, err
 		} else {
-			log.Info("======================= at zkvm_producer.go received bad bad error", err)
-			cache.status = zkProofStatusDone
+			log.Info("======================= at zkvm_producer.go", key, "received bad bad error", err)
+			// cache.status = zkProofStatusDone
 			return nil, err
 		}
 	}

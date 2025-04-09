@@ -138,7 +138,14 @@ func (s *SGXProofProducer) RequestProof(
 		s.proofCache[bid] = cache
 	}
 
+	log.Info("============== sgx_producer.go: proof cache", bid, cache.status)
+
+	if cache.status == subProofStatusNew {
+		log.Info("================= hey hey sgx_producer.go: proof new", bid)
+	}
+
 	switch cache.status {
+
 	// case subProofStatusInProgress:
 	// 	// This block is still generating a proof
 	// 	s.cacheMutex.Unlock()
@@ -170,8 +177,7 @@ func (s *SGXProofProducer) RequestProof(
 			Tier:    s.Tier(),
 		}, nil
 
-	case subProofStatusNew:
-	case subProofStatusInProgress:
+	case subProofStatusNew, subProofStatusInProgress:
 		log.Info("================= sgx_producer.go: proof new or in progress", bid)
 
 		// Mark as in-progress, then generate the proof
@@ -192,7 +198,7 @@ func (s *SGXProofProducer) RequestProof(
 				return nil, err
 			} else {
 				log.Info("======================= at sgx_producer.go received bad bad error", err)
-				cache.status = subProofStatusDone
+				// cache.status = subProofStatusDone
 				return nil, err
 			}
 		}
@@ -211,6 +217,9 @@ func (s *SGXProofProducer) RequestProof(
 			Opts:    opts,
 			Tier:    s.Tier(),
 		}, nil
+
+	default:
+		log.Info("================= sgx_producer.go: unhandled status", bid, cache.status)
 	}
 
 	// Should never happen, but just in case:
