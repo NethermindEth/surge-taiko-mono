@@ -168,10 +168,14 @@ func (s *ZKvmProofProducer) RequestProof(
 		// Received error, so mark as in-progress and let it retry
 		cache.lastErr = err
 		if errors.Is(err, ErrProofInProgress) || errors.Is(err, ErrRetry) {
-			log.Info("ZK proof generation in progress, received normal error", "key", key, "error", err)
+			log.Info("ZK proof generation in progress, received normal error (continuing to retry)", "key", key, "error", err)
 			return nil, err
 		} else {
-			log.Info("ZK proof generation in progress, received unknown error", "key", key, "error", err, "but continue to retry")
+			log.Info(
+				"ZK proof generation in progress, received unknown error (continuing to retry)",
+				"key", key,
+				"error", err,
+			)
 			return nil, err
 		}
 	}

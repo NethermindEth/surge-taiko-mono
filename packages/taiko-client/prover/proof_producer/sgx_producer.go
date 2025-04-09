@@ -174,16 +174,16 @@ func (s *SGXProofProducer) RequestProof(
 		// Received error, so mark as in-progress and let it retry
 		cache.lastErr = err
 		if errors.Is(err, errProofGenerating) {
-			log.Info("SGX proof generation in progress, received normal error", "blockID", bid, "error", err)
+			log.Info("SGX proof generation in progress, received normal error (continuing to retry)", "blockID", bid, "error", err)
 			return nil, err
 		} else {
-			log.Info("SGX proof generation in progress, received unknown error", "blockID", bid, "error", err)
+			log.Info("SGX proof generation in progress, received unknown error (continuing to retry)", "blockID", bid, "error", err)
 			return nil, err
 		}
 	}
 
 	// If we got a valid proof:
-	log.Info("SGX proof generation completed", "blockID", bid, "proof", proofBytes)
+	log.Info("SGX proof generation succeeded, changed status to done", "blockID", bid)
 	cache.status = sgxProofStatusDone
 	cache.proof = proofBytes
 	cache.lastErr = nil
