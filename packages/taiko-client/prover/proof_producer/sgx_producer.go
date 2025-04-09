@@ -26,8 +26,8 @@ import (
 type sgxProofStatus int
 
 const (
-	sgxProofStatusNew sgxProofStatus = iota
-	sgxProofStatusInProgress
+	sgxProofStatusNew        sgxProofStatus = iota
+	sgxProofStatusInProgress                // indicates the proof is either currently being generated or a previous API request encountered an error
 	sgxProofStatusDone
 )
 
