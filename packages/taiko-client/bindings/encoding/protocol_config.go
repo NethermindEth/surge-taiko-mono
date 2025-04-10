@@ -16,7 +16,7 @@ const (
 
 var (
 	livenessBond, _             = new(big.Int).SetString("125000000000000000000", 10)
-	surgeLivenessBond, _        = new(big.Int).SetString("70000000000000000", 10)
+	surgeLivenessBond, _        = new(big.Int).SetString("10000000000000000000000", 10)
 	InternlDevnetProtocolConfig = &bindings.TaikoDataConfig{
 		ChainId:               params.TaikoInternalL2ANetworkID.Uint64(),
 		BlockMaxProposals:     324_000,
