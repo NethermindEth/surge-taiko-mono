@@ -50,7 +50,6 @@ func (c *CombinedProducer) RequestProof(
 	log.Debug("CombinedProducer: RequestProof", "blockID", blockID, "Producers num", len(c.Producers))
 	var (
 		wg         sync.WaitGroup
-		proofMutex sync.Mutex
 		errorsChan = make(chan error, len(c.Producers))
 	)
 
@@ -60,7 +59,7 @@ func (c *CombinedProducer) RequestProof(
 	defer taskCtxCancel()
 
 	for i, producer := range c.Producers {
-		if proofStateContainsTier(proofState, producer.Tier(), &proofMutex) {
+		if proofStateContainsTier(proofState, producer.Tier(), &c.mapMutex) {
 			log.Debug("Skipping producer, proof already verified", "tier", producer.Tier())
 			continue
 		}
@@ -78,8 +77,8 @@ func (c *CombinedProducer) RequestProof(
 				return
 			}
 
-			proofMutex.Lock()
-			defer proofMutex.Unlock()
+			c.mapMutex.Lock()
+			defer c.mapMutex.Unlock()
 
 			proofState.verifiedTiers = append(proofState.verifiedTiers, p.Tier())
 			if uint8(len(proofState.proofs)) < c.RequiredProofs {

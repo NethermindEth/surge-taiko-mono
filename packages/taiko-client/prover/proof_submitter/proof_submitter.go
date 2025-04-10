@@ -93,6 +93,8 @@ func NewProofSubmitter(
 
 // RequestProof implements the Submitter interface.
 func (s *ProofSubmitter) RequestProof(ctx context.Context, meta metadata.TaikoBlockMetaData) error {
+	log.Debug("Start proof submitter for block", "blockID", meta.GetBlockID())
+
 	var (
 		blockInfo bindings.TaikoDataBlockV2
 	)
@@ -146,6 +148,11 @@ func (s *ProofSubmitter) RequestProof(ctx context.Context, meta metadata.TaikoBl
 	}
 
 	startTime := time.Now()
+
+	log.Info("Starting the polling for proof request at proof submitter",
+		"blockID", opts.BlockID,
+		"interval", proofPollingInterval,
+	)
 
 	// Send the generated proof.
 	if err := backoff.Retry(
