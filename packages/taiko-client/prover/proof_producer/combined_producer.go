@@ -129,7 +129,15 @@ func (m *ProofStateManager) cleanOldProofStates(latestBlockID *big.Int, blockHis
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	threshold := blockID - blockHistoryLength
+	var threshold uint64
+	if blockID < blockHistoryLength {
+		// Need this to avoid underflow as both variables are of type uint64; otherwise we could
+		// end up deleting all states with a huge threshold.
+		threshold = 0
+	} else {
+		threshold = blockID - blockHistoryLength
+	}
+
 	for key := range m.states {
 		if key < threshold {
 			delete(m.states, key)
