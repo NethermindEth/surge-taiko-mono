@@ -79,7 +79,6 @@ func (m *ProofStateManager) addTierAndProof(
 
 	state, ok := m.states[blockIDUint64]
 	if !ok {
-		// create if it doesn't exist
 		state = &BlockProofState{
 			verifiedTiers: []uint16{},
 			proofs:        []encoding.SubProof{},
@@ -87,15 +86,12 @@ func (m *ProofStateManager) addTierAndProof(
 		m.states[blockIDUint64] = state
 	}
 
-	// Record that we've verified this tier
 	state.verifiedTiers = append(state.verifiedTiers, tier)
 
-	// Only add to the subproofs if we haven't reached requiredProofs count yet
 	if uint8(len(state.proofs)) < requiredProofs {
 		state.proofs = append(state.proofs, subProof)
 	}
 
-	// Return true if we've now collected enough proofs
 	return uint8(len(state.proofs)) == requiredProofs
 }
 
@@ -173,7 +169,6 @@ func (c *CombinedProducer) RequestProof(
 		errorsChan = make(chan error, len(c.Producers))
 	)
 
-	// We create the proof state to track progress
 	c.ProofStates.create(blockID)
 
 	taskCtx, taskCtxCancel := context.WithCancel(ctx)
@@ -216,7 +211,6 @@ func (c *CombinedProducer) RequestProof(
 
 	currentProofCount := c.ProofStates.currentProofCount(blockID)
 	if uint8(currentProofCount) < c.RequiredProofs {
-		// Not enough proofs, gather errors
 		var errMsgs []string
 		errMsgs = append(errMsgs,
 			fmt.Sprintf("not enough proofs collected: required %d, got %d", c.RequiredProofs, currentProofCount),
