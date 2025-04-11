@@ -140,6 +140,7 @@ func (m *ProofStateManager) cleanOldProofStates(latestBlockID *big.Int, blockHis
 
 	for key := range m.states {
 		if key < threshold {
+			log.Info("Cleaning old proof state", "blockID", key)
 			delete(m.states, key)
 		}
 	}
