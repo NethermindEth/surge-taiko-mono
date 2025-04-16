@@ -2,11 +2,11 @@
   "configuredRelayer": [
     {
       "chainIds": [560048, 763375],
-      "url": "https://relayer-api-l1.hoodi.surge.wtf"
+      "url": ""
     },
     {
       "chainIds": [763375, 560048],
-      "url": "https://relayer-api-l2.hoodi.surge.wtf"
+      "url": ""
     }
   ]
 }

@@ -7,7 +7,7 @@
         "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
           "default": {
-            "http": ["https://l1-rpc.hoodi.surge.wtf"]
+            "http": [""]
           }
         },
         "nativeCurrency": {
@@ -30,7 +30,7 @@
         "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
           "default": {
-            "http": ["https://l2-rpc.hoodi.surge.wtf"]
+            "http": [""]
           }
         },
         "nativeCurrency": {
