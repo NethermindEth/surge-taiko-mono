@@ -46,7 +46,7 @@ These are the additional configuration files that have to be filled in:
 
 | Name                                    | Description                                                                                   |
 | --------------------------------------- | --------------------------------------------------------------------------------------------- |
-| **/config/configuredBridges.json**      | Defines the chains that are connected via CoreRollup bridges and lists the contract addresses |
+| **/config/configuredBridges.json**      | Defines the chains that are connected via Surge bridges and lists the contract addresses |
 | **/config/configuredChains.json**       | Defines some metadata for the chains, such as name, icons, explorer URL, etc.                 |
 | **/config/configuredRelayer.json**      | If chains have a relayer, the URL and the chain IDs it covers are entered here                |
 | **/config/configuredEventIndexer.json** | NFT Indexer we can query to help with importing NFTs                                          |

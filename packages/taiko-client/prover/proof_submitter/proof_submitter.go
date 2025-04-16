@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -48,6 +49,8 @@ type ProofSubmitter struct {
 	// Guardian prover related.
 	isGuardian      bool
 	submissionDelay time.Duration
+
+	cache sync.Map
 }
 
 // NewProofSubmitter creates a new ProofSubmitter instance.
@@ -90,6 +93,8 @@ func NewProofSubmitter(
 
 // RequestProof implements the Submitter interface.
 func (s *ProofSubmitter) RequestProof(ctx context.Context, meta metadata.TaikoBlockMetaData) error {
+	log.Debug("Start proof submitter for block", "blockID", meta.GetBlockID())
+
 	var (
 		blockInfo bindings.TaikoDataBlockV2
 	)
@@ -138,7 +143,16 @@ func (s *ProofSubmitter) RequestProof(ctx context.Context, meta metadata.TaikoBl
 		opts.ProverAddress = s.proverSetAddress
 	}
 
+	if _, ok := s.cache.LoadOrStore(meta.GetBlockID().Uint64(), struct{}{}); ok {
+		return nil
+	}
+
 	startTime := time.Now()
+
+	log.Info("Starting the polling for proof request at proof submitter",
+		"blockID", opts.BlockID,
+		"interval", proofPollingInterval,
+	)
 
 	// Send the generated proof.
 	if err := backoff.Retry(
@@ -177,10 +191,12 @@ func (s *ProofSubmitter) RequestProof(ctx context.Context, meta metadata.TaikoBl
 					if cancelErr := s.proofProducer.RequestCancel(ctx, opts); cancelErr != nil {
 						log.Error("Failed to request cancellation of proof", "err", cancelErr)
 					}
+					s.cache.Delete(meta.GetBlockID().Uint64())
 					return nil
 				}
 				return fmt.Errorf("failed to request proof (id: %d): %w", meta.GetBlockID(), err)
 			}
+			s.cache.Delete(meta.GetBlockID().Uint64())
 			s.resultCh <- result
 			metrics.ProverQueuedProofCounter.Add(1)
 			return nil

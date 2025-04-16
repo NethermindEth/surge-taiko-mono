@@ -4,7 +4,7 @@
 </script>
 
 <svelte:head>
-  <title>CoreRollup Bridge | Transactions</title>
+  <title>Surge Testnet Bridge | Transactions</title>
 </svelte:head>
 <Page>
   <Transactions />

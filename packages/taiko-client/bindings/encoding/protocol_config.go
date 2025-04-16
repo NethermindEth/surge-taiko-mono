@@ -9,13 +9,14 @@ import (
 )
 
 const (
-	SurgeNetworkID     = 763373 // 0xba5ed
-	SurgeTestNetworkID = 763374 // 0xba5ee
+	SurgeNetworkID       = 763373 // 0xba5ed
+	SurgeDevnetNetworkID = 763374 // 0xba5ee
+	SurgeHoodiNetworkID  = 763375 // 0xba5ef
 )
 
 var (
 	livenessBond, _             = new(big.Int).SetString("125000000000000000000", 10)
-	surgeLivenessBond, _        = new(big.Int).SetString("70000000000000000", 10)
+	surgeLivenessBond, _        = new(big.Int).SetString("10000000000000000000000", 10)
 	InternlDevnetProtocolConfig = &bindings.TaikoDataConfig{
 		ChainId:               params.TaikoInternalL2ANetworkID.Uint64(),
 		BlockMaxProposals:     324_000,
@@ -77,33 +78,52 @@ var (
 		BlockMaxProposals:     324_000,
 		BlockRingBufferSize:   360_000,
 		MaxBlocksToVerify:     4,
-		BlockMaxGasLimit:      600_000_000,
+		BlockMaxGasLimit:      200_000_000,
 		LivenessBond:          surgeLivenessBond,
-		StateRootSyncInternal: 1,
+		StateRootSyncInternal: 4,
 		MaxAnchorHeightOffset: 64,
 		OntakeForkHeight:      1,
 		BaseFeeConfig: bindings.LibSharedDataBaseFeeConfig{
 			AdjustmentQuotient:     8,
-			GasIssuancePerSecond:   100_000_000,
-			MinGasExcess:           31_136_000_000,
+			GasIssuancePerSecond:   50_000_000,
+			MinGasExcess:           15_291_000_000,
 			MaxGasIssuancePerBlock: 6_000_000_000,
 		},
 		MaxLivenessDisruptionPeriod: 604800,
 	}
-	SurgeTestnetProtocolConfig = &bindings.TaikoDataConfig{
-		ChainId:               SurgeTestNetworkID,
+
+	SurgeHoodiProtocolConfig = &bindings.TaikoDataConfig{
+		ChainId:               SurgeHoodiNetworkID,
 		BlockMaxProposals:     324_000,
 		BlockRingBufferSize:   360_000,
 		MaxBlocksToVerify:     4,
-		BlockMaxGasLimit:      600_000_000,
+		BlockMaxGasLimit:      200_000_000,
 		LivenessBond:          surgeLivenessBond,
-		StateRootSyncInternal: 1,
+		StateRootSyncInternal: 4,
 		MaxAnchorHeightOffset: 64,
 		OntakeForkHeight:      1,
 		BaseFeeConfig: bindings.LibSharedDataBaseFeeConfig{
 			AdjustmentQuotient:     8,
-			GasIssuancePerSecond:   100_000_000,
-			MinGasExcess:           31_136_000_000,
+			GasIssuancePerSecond:   50_000_000,
+			MinGasExcess:           15_291_000_000,
+			MaxGasIssuancePerBlock: 6_000_000_000,
+		},
+		MaxLivenessDisruptionPeriod: 604800,
+	}
+	SurgeDevnetProtocolConfig = &bindings.TaikoDataConfig{
+		ChainId:               SurgeNetworkID,
+		BlockMaxProposals:     324_000,
+		BlockRingBufferSize:   360_000,
+		MaxBlocksToVerify:     4,
+		BlockMaxGasLimit:      200_000_000,
+		LivenessBond:          surgeLivenessBond,
+		StateRootSyncInternal: 4,
+		MaxAnchorHeightOffset: 64,
+		OntakeForkHeight:      1,
+		BaseFeeConfig: bindings.LibSharedDataBaseFeeConfig{
+			AdjustmentQuotient:     8,
+			GasIssuancePerSecond:   50_000_000,
+			MinGasExcess:           15_291_000_000,
 			MaxGasIssuancePerBlock: 6_000_000_000,
 		},
 		MaxLivenessDisruptionPeriod: 604800,
@@ -119,8 +139,10 @@ func GetProtocolConfig(chainID uint64) *bindings.TaikoDataConfig {
 		return MainnetProtocolConfig
 	case SurgeNetworkID:
 		return SurgeProtocolConfig
-	case SurgeTestNetworkID:
-		return SurgeTestnetProtocolConfig
+	case SurgeHoodiNetworkID:
+		return SurgeHoodiProtocolConfig
+	case SurgeDevnetNetworkID:
+		return SurgeDevnetProtocolConfig
 	default:
 		return InternlDevnetProtocolConfig
 	}

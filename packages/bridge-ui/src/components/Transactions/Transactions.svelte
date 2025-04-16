@@ -33,7 +33,6 @@
   import { StatusInfoDialog } from './Status';
   import { connectedSourceChain } from '$stores/network';
 
-
   let transactions: BridgeTransaction[] = [];
 
   let currentPage = 1;
@@ -91,7 +90,22 @@
   const updateTransactions = async (address: Address) => {
     if (loadingTxs) return;
     loadingTxs = true;
-    const { mergedTransactions, outdatedLocalTransactions, error } = await fetchTransactions(address, $connectedSourceChain?.id);
+    // Wait for connectedSourceChain to be set if it's null
+    if (!$connectedSourceChain) {
+      await new Promise<void>(resolve => {
+      const unsubscribe = connectedSourceChain.subscribe((value: any) => {
+        if (value) {
+        unsubscribe();
+        resolve();
+        }
+      });
+      });
+    }
+    
+    const { mergedTransactions, outdatedLocalTransactions, error } = await fetchTransactions(
+      address, 
+      $connectedSourceChain?.id
+    );
     transactions = mergedTransactions;
 
     if (outdatedLocalTransactions.length > 0) {

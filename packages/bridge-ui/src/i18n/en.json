@@ -22,7 +22,7 @@
       },
       "bridge": {
         "success": {
-          "message": "Your funds are being prepared for claiming on CoreRollup.",
+          "message": "Your funds are being prepared for claiming on the target chain.",
           "title": "Transaction completed"
         },
         "timeout": {
@@ -623,7 +623,7 @@
         "name": "Failed"
       },
       "pending": {
-        "description": "Your asset is not yet eligible for claiming. The bridging process from CoreRollup to Holesky may take several hours before becoming claimable. Sepolia to CoreRollup bridging should be claimable within minutes.",
+        "description": "Your asset is not yet eligible for claiming. The bridging process from a Surge chain to L1 may take several hours before becoming claimable. L1 to Surge chain bridging should be claimable within minutes.",
         "name": "Pending"
       },
       "processing": {

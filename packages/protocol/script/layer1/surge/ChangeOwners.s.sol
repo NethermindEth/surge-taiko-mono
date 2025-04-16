@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import "forge-std/src/Script.sol";
 import "forge-std/src/console2.sol";
-import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import "src/shared/common/AddressManager.sol";
 
@@ -17,7 +17,7 @@ contract ChangeOwners is Script {
         address[] memory contracts = vm.envAddress("CONTRACTS", ",");
         vm.startBroadcast(adminPrivateKey);
         for(uint i; i < contracts.length; ++i) {
-            OwnableUpgradeable(contracts[0]).transferOwnership(newOwner);
+            OwnableUpgradeable(contracts[i]).transferOwnership(newOwner);
         }
         vm.stopBroadcast();
     }

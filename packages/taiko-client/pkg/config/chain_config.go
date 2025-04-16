@@ -39,7 +39,8 @@ var NetworkNames = map[uint64]string{
 	params.HeklaNetworkID.Uint64():            "Taiko Hekla Testnet",
 	params.TaikoInternalL2ANetworkID.Uint64(): "Taiko Internal Devnet",
 	encoding.SurgeNetworkID:                   "Surge Mainnet",
-	encoding.SurgeTestNetworkID:               "Surge Testnet",
+	encoding.SurgeDevnetNetworkID:             "Surge Devnet",
+	encoding.SurgeHoodiNetworkID:              "Surge Hoodi Testnet",
 }
 
 // Description returns a human-readable description of ChainConfig.

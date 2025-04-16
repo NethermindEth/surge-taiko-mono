@@ -191,7 +191,7 @@ func (p *Prover) initProofSubmitters(
 					p.cfg.Risc0VerifierAddress,
 					p.cfg.Sp1VerifierAddress,
 				},
-				ProofStates: make(map[uint64]*proofProducer.BlockProofState),
+				ProofStates: proofProducer.NewProofStateManager(),
 			}
 		case encoding.TierGuardianMinorityID:
 			producer = proofProducer.NewGuardianProofProducer(encoding.TierGuardianMinorityID, p.cfg.EnableLivenessBondProof)

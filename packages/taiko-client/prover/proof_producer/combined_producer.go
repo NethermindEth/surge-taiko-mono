@@ -17,24 +17,148 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 )
 
+type BlockProofState struct {
+	verifiedTiers []uint16
+	proofs        []encoding.SubProof
+}
+
+type ProofStateManager struct {
+	mu     sync.Mutex
+	states map[uint64]*BlockProofState
+}
+
+func NewProofStateManager() *ProofStateManager {
+	return &ProofStateManager{
+		states: make(map[uint64]*BlockProofState),
+	}
+}
+
+func (m *ProofStateManager) create(blockID *big.Int) {
+	blockIDUint64 := blockID.Uint64()
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	state, ok := m.states[blockIDUint64]
+	if !ok {
+		state = &BlockProofState{
+			verifiedTiers: []uint16{},
+			proofs:        []encoding.SubProof{},
+		}
+		m.states[blockIDUint64] = state
+	}
+}
+
+func (m *ProofStateManager) containsTier(blockID *big.Int, tier uint16) bool {
+	blockIDUint64 := blockID.Uint64()
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	state, ok := m.states[blockIDUint64]
+	if !ok {
+		return false
+	}
+
+	return slices.Contains(state.verifiedTiers, tier)
+}
+
+// addTierAndProof marks the tier as verified and adds the subproof to the block's state if
+// the state has not yet collected enough proofs. It returns whether the required number
+// of proofs has now been reached.
+func (m *ProofStateManager) addTierAndProof(
+	blockID *big.Int,
+	tier uint16,
+	subProof encoding.SubProof,
+	requiredProofs uint8,
+) (reachedRequired bool) {
+	blockIDUint64 := blockID.Uint64()
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	state, ok := m.states[blockIDUint64]
+	if !ok {
+		state = &BlockProofState{
+			verifiedTiers: []uint16{},
+			proofs:        []encoding.SubProof{},
+		}
+		m.states[blockIDUint64] = state
+	}
+
+	state.verifiedTiers = append(state.verifiedTiers, tier)
+
+	if uint8(len(state.proofs)) < requiredProofs {
+		state.proofs = append(state.proofs, subProof)
+	}
+
+	return uint8(len(state.proofs)) == requiredProofs
+}
+
+func (m *ProofStateManager) currentProofCount(blockID *big.Int) int {
+	blockIDUint64 := blockID.Uint64()
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	state, ok := m.states[blockIDUint64]
+	if !ok {
+		return 0
+	}
+	return len(state.proofs)
+}
+
+func (m *ProofStateManager) encodeSubProofs(blockID *big.Int) ([]byte, error) {
+	blockIDUint64 := blockID.Uint64()
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	state, ok := m.states[blockIDUint64]
+	if !ok {
+		return nil, fmt.Errorf("block proof state not found for blockID: %d", blockIDUint64)
+	}
+
+	return encoding.EncodeSubProofs(state.proofs)
+}
+
+// cleanOldProofStates removes proof states for blocks older than `blockHistoryLength` blocks.
+func (m *ProofStateManager) cleanOldProofStates(latestBlockID *big.Int, blockHistoryLength uint64) {
+	blockID := latestBlockID.Uint64()
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var threshold uint64
+	if blockID < blockHistoryLength {
+		// Need this to avoid underflow as both variables are of type uint64; otherwise we could
+		// end up deleting all states with a huge threshold.
+		threshold = 0
+	} else {
+		threshold = blockID - blockHistoryLength
+	}
+
+	for key := range m.states {
+		if key < threshold {
+			log.Info("Cleaning old proof state", "blockID", key)
+			delete(m.states, key)
+		}
+	}
+}
+
 // CombinedProducer generates proofs from multiple producers in parallel and combines them.
 type CombinedProducer struct {
 	ProofTier      uint16
 	RequiredProofs uint8
 	Producers      []ProofProducer
 	Verifiers      []common.Address
-	// Map blockID to its proof state
-	ProofStates map[uint64]*BlockProofState
-	mapMutex    sync.Mutex
-}
 
-type BlockProofState struct {
-	verifiedTiers []uint16
-	proofs        []encoding.SubProof
+	// Thread-safe manager for block proof states
+	ProofStates *ProofStateManager
 }
 
 const (
-	// represents the number of blocks to keep in history of proof states
+	// BlockHistoryLength represents the number of blocks to keep in history of proof states.
 	BlockHistoryLength = 256
 )
 
@@ -48,28 +172,30 @@ func (c *CombinedProducer) RequestProof(
 	requestAt time.Time,
 ) (*ProofWithHeader, error) {
 	log.Debug("CombinedProducer: RequestProof", "blockID", blockID, "Producers num", len(c.Producers))
+
 	var (
 		wg         sync.WaitGroup
-		proofMutex sync.Mutex
 		errorsChan = make(chan error, len(c.Producers))
 	)
 
-	proofState := c.getProofState(blockID)
+	c.ProofStates.create(blockID)
 
 	taskCtx, taskCtxCancel := context.WithCancel(ctx)
 	defer taskCtxCancel()
 
 	for i, producer := range c.Producers {
-		if proofStateContainsTier(proofState, producer.Tier(), &proofMutex) {
-			log.Debug("Skipping producer, proof already verified", "tier", producer.Tier())
+		tier := producer.Tier()
+
+		if c.ProofStates.containsTier(blockID, tier) {
+			log.Debug("Skipping producer, proof already verified", "tier", tier)
 			continue
 		}
 
-		log.Debug("Adding proof producer", "blockID", blockID, "tier", producer.Tier())
+		log.Debug("Adding proof producer", "blockID", blockID, "tier", tier)
 		verifier := c.Verifiers[i]
 
 		wg.Add(1)
-		go func(idx int, p ProofProducer, verifier common.Address) {
+		go func(idx int, p ProofProducer, v common.Address) {
 			defer wg.Done()
 
 			proofWithHeader, err := p.RequestProof(taskCtx, opts, blockID, meta, header, requestAt)
@@ -78,45 +204,33 @@ func (c *CombinedProducer) RequestProof(
 				return
 			}
 
-			proofMutex.Lock()
-			defer proofMutex.Unlock()
+			reachedRequired := c.ProofStates.addTierAndProof(blockID, p.Tier(), encoding.SubProof{
+				Proof:    proofWithHeader.Proof,
+				Verifier: v,
+			}, c.RequiredProofs)
 
-			proofState.verifiedTiers = append(proofState.verifiedTiers, p.Tier())
-			if uint8(len(proofState.proofs)) < c.RequiredProofs {
-				proofState.proofs = append(
-					proofState.proofs,
-					encoding.SubProof{
-						Proof:    proofWithHeader.Proof,
-						Verifier: verifier,
-					},
-				)
-			}
-
-			if uint8(len(proofState.proofs)) == c.RequiredProofs {
+			if reachedRequired {
 				taskCtxCancel()
 			}
 		}(i, producer, verifier)
 	}
 
 	wg.Wait()
+	close(errorsChan)
 
-	if uint8(len(proofState.proofs)) < c.RequiredProofs {
+	currentProofCount := c.ProofStates.currentProofCount(blockID)
+	if uint8(currentProofCount) < c.RequiredProofs {
 		var errMsgs []string
-
-		errMsgs = append(
-			errMsgs,
-			fmt.Sprintf("not enough proofs collected: required %d, got %d", c.RequiredProofs, len(proofState.proofs)),
+		errMsgs = append(errMsgs,
+			fmt.Sprintf("not enough proofs collected: required %d, got %d", c.RequiredProofs, currentProofCount),
 		)
-
-		close(errorsChan)
 		for err := range errorsChan {
 			errMsgs = append(errMsgs, err.Error())
 		}
-
 		return nil, fmt.Errorf("combined proof production failed: %s", strings.Join(errMsgs, "; "))
 	}
 
-	combinedProof, err := encoding.EncodeSubProofs(proofState.proofs)
+	combinedProof, err := c.ProofStates.encodeSubProofs(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode sub proofs: %w", err)
 	}
@@ -128,7 +242,7 @@ func (c *CombinedProducer) RequestProof(
 		"producer", "CombinedProducer",
 	)
 
-	c.CleanOldProofStates(blockID)
+	c.ProofStates.cleanOldProofStates(blockID, BlockHistoryLength)
 
 	return &ProofWithHeader{
 		BlockID: blockID,
@@ -138,53 +252,6 @@ func (c *CombinedProducer) RequestProof(
 		Opts:    opts,
 		Tier:    c.Tier(),
 	}, nil
-}
-
-func proofStateContainsTier(proofState *BlockProofState, tier uint16, mutex *sync.Mutex) bool {
-	mutex.Lock()
-	defer mutex.Unlock()
-	return slices.Contains(proofState.verifiedTiers, tier)
-}
-
-// getProofState returns the proof state for the given block ID, creating a new one if it doesn't exist.
-func (c *CombinedProducer) getProofState(blockID *big.Int) *BlockProofState {
-	blockIDUint64 := blockID.Uint64()
-	c.mapMutex.Lock()
-	defer c.mapMutex.Unlock()
-
-	// Get or initialize proof state
-	proofState, ok := c.ProofStates[blockIDUint64]
-	if !ok {
-		proofState = &BlockProofState{
-			verifiedTiers: []uint16{},
-			proofs:        []encoding.SubProof{},
-		}
-		c.ProofStates[blockIDUint64] = proofState
-	}
-
-	return proofState
-}
-
-// CleanOldProofStates removes proof states for blocks older than 256 blocks.
-func (c *CombinedProducer) CleanOldProofStates(latestBlockID *big.Int) {
-	if len(c.ProofStates) == 0 {
-		return
-	}
-
-	blockID := latestBlockID.Uint64()
-	log.Debug("Cleaning old proof states", "latestBlockID", blockID)
-
-	c.mapMutex.Lock()
-	defer c.mapMutex.Unlock()
-
-	delete(c.ProofStates, blockID)
-
-	threshold := blockID - BlockHistoryLength
-	for key := range c.ProofStates {
-		if key < threshold {
-			delete(c.ProofStates, key)
-		}
-	}
 }
 
 // RequestCancel implements the ProofProducer interface.

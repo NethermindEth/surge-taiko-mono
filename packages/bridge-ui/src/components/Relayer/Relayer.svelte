@@ -13,7 +13,6 @@
   import { type Account, account } from '$stores/account';
   import { connectedSourceChain } from '$stores/network';
 
-
   const log = getLogger('RelayerComponent');
 
   let transactions: BridgeTransaction[] = [];

@@ -4,7 +4,7 @@
 </script>
 
 <svelte:head>
-  <title>CoreRollup Bridge | Relayer</title>
+  <title>Surge Testnet Bridge | Relayer</title>
 </svelte:head>
 <Page>
   <Relayer />

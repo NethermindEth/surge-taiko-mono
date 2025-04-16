@@ -7,12 +7,16 @@ import "../shared/common/LibAddress.sol";
 import "../shared/common/LibBytes.sol";
 import "../shared/bridge/IBridge.sol";
 
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+
 /// @title DelegateOwner
 /// @notice This contract will be the owner of all essential contracts deployed on the L2 chain.
 /// @dev Notice that when sending the message on the owner chain, the gas limit of the message must
 /// not be zero, so on this chain, some EOA can help execute this transaction.
 /// @custom:security-contact security@taiko.xyz
 contract DelegateOwner is EssentialContract, IMessageInvocable {
+    // Surge: Irrelevant for surge testnet
+
     /// @notice The owner chain ID.
     uint64 public remoteChainId; // slot 1
 

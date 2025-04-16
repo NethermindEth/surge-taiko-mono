@@ -14,6 +14,7 @@ MAX_LIVENESS_DISRUPTION_PERIOD=604800 \
 MIN_LIVENESS_STREAK=3888000 \
 VERIFIER_OWNER=0x1237810000000000000000000000000000000002 \
 FOUNDRY_PROFILE="layer1" \
+NETWORK="hoodi" \
 forge script ./script/layer1/surge/DeploySurgeOnL1.s.sol:DeploySurgeOnL1 \
     --fork-url $FORK_URL \
     --broadcast \

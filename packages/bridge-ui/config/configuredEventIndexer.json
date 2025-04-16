@@ -1,12 +1,12 @@
 {
   "configuredEventIndexer": [
     {
-      "chainIds": [3151908, 763374],
-      "url": "http://host.docker.internal:4102"
+      "chainIds": [560048, 763375],
+      "url": "https://relayer-api-l1.hoodi.surge.wtf"
     },
     {
-      "chainIds": [763374, 3151908],
-      "url": "http://host.docker.internal:4103"
+      "chainIds": [763375, 560048],
+      "url": "https://relayer-api-l2.hoodi.surge.wtf"
     }
   ]
 }

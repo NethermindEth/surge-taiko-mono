@@ -58,8 +58,7 @@ jobs:
           context: .
           file: ./packages/taiko-client/Dockerfile
           push: true
-          tags: |
-            ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
   merge:
@@ -113,7 +112,7 @@ jobs:
             echo "Promoting ${source_image} to ${staging_image}"
             oras cp -r "${source_image}" "${staging_image}"
           done
-      
+
       - name: Summary
         run: |
           echo "## Docker build completed :green_circle:" >> $GITHUB_STEP_SUMMARY
