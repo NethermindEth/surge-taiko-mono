@@ -38,17 +38,17 @@ CONTRACT_PATH_bridged_erc20="contracts/shared/tokenvault/BridgedERC20.sol:Bridge
 CONTRACT_PATH_bridged_erc721="contracts/shared/tokenvault/BridgedERC721.sol:BridgedERC721"
 CONTRACT_PATH_bridged_erc1155="contracts/shared/tokenvault/BridgedERC1155.sol:BridgedERC1155"
 CONTRACT_PATH_rollup_address_manager="contracts/shared/common/AddressManager.sol:AddressManager"
-CONTRACT_PATH_taiko="contracts/layer1/based/TaikoL1.sol:TaikoL1"
+CONTRACT_PATH_taiko="contracts/layer1/surge/SurgeHoodiTaikoL1.sol:SurgeHoodiTaikoL1"
 CONTRACT_PATH_tier_sgx="contracts/layer1/verifiers/SgxVerifier.sol:SgxVerifier"
-CONTRACT_PATH_tier_router="contracts/layer1/tiers/ITierRouter.sol:ITierRouter"
+CONTRACT_PATH_tier_router="contracts/layer1/surge/common/SurgeTierRouter.sol:SurgeTierRouter"
 CONTRACT_PATH_automata_dcap_attestation="contracts/layer1/automata-attestation/AutomataDcapV3Attestation.sol:AutomataDcapV3Attestation"
-CONTRACT_PATH_risc0_groth16_verifier="contracts/layer1/verifiers/Risc0Verifier.sol:Risc0Verifier"
+CONTRACT_PATH_risc0_groth16_verifier="node_modules/risc0-ethereum/contracts/src/groth16/RiscZeroGroth16Verifier.sol:RiscZeroGroth16Verifier"
 CONTRACT_PATH_tier_zkvm_risc0="contracts/layer1/verifiers/Risc0Verifier.sol:Risc0Verifier"
-CONTRACT_PATH_sp1_remote_verifier="contracts/layer1/verifiers/SP1Verifier.sol:SP1Verifier"
+CONTRACT_PATH_sp1_remote_verifier="node_modules/sp1-contracts/contracts/src/v4.0.0-rc.3/SP1VerifierPlonk.sol:SP1Verifier"
 CONTRACT_PATH_tier_zkvm_sp1="contracts/layer1/verifiers/SP1Verifier.sol:SP1Verifier"
 CONTRACT_PATH_tier_two_of_three="contracts/layer1/verifiers/compose/TwoOfThreeVerifier.sol:TwoOfThreeVerifier"
 CONTRACT_PATH_SigVerifyLib="contracts/layer1/automata-attestation/utils/SigVerifyLib.sol:SigVerifyLib"
-CONTRACT_PATH_PemCertChainLib="contracts/layer1/automata-attestation/lib/PEMCertChainLib.sol:PemCertChainLib"
+CONTRACT_PATH_PemCertChainLib="contracts/layer1/automata-attestation/lib/PEMCertChainLib.sol:PEMCertChainLib"
 
 # Function to get contract path
 get_contract_path() {
