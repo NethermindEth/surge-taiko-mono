@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum"
 	"math/big"
 	"math/rand"
 	"sync"
@@ -53,8 +54,9 @@ type Proposer struct {
 
 	txmgrSelector *utils.TxMgrSelector
 
-	ctx context.Context
-	wg  sync.WaitGroup
+	ctx              context.Context
+	wg               sync.WaitGroup
+	forceProposeOnce bool
 }
 
 // InitFromCli initializes the given proposer instance based on the command line flags.
@@ -132,6 +134,43 @@ func (p *Proposer) InitFromConfig(
 		cfg.FallbackToCalldata,
 	)
 
+	if (cfg.ClientConfig.InboxAddress != common.Address{}) {
+		if err := p.SubscribeToSignalSentEvent(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// subscribe to SignalSent event on eth l1 RPC
+func (p *Proposer) SubscribeToSignalSentEvent() error {
+	logChan := make(chan types.Log)
+	sub, err := p.rpc.L1.SubscribeFilterLogs(p.ctx, ethereum.FilterQuery{
+		Addresses: []common.Address{p.Config.InboxAddress},
+		Topics:    [][]common.Hash{{common.HexToHash("0x0ad2d108660a211f47bf7fb43a0443cae181624995d3d42b88ee6879d200e973")}},
+	}, logChan)
+	if err != nil {
+		return fmt.Errorf("subscribe error: %w", err)
+	}
+
+	p.wg.Add(1)
+	go func() {
+		defer p.wg.Done()
+		defer sub.Unsubscribe()
+
+		for {
+			select {
+			case <-p.ctx.Done():
+				return
+			case err := <-sub.Err():
+				log.Error("subscription error", "err", err)
+				return
+			case vLog := <-logChan:
+				log.Info("SignalSent event received", "log", vLog)
+				p.forceProposeOnce = true
+			}
+		}
+	}()
 	return nil
 }
 
@@ -279,8 +318,15 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 		return fmt.Errorf("failed to wait until L2 execution engine synced: %w", err)
 	}
 
+	l2Head, err := p.rpc.L2.BlockNumber(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get L2 chain head number: %w", err)
+	}
+
 	// Check whether it's time to allow proposing empty pool content, if the `--epoch.minProposingInterval` flag is set.
-	allowEmptyPoolContent := time.Now().After(p.lastProposedAt.Add(p.MinProposingInternal))
+	allowEmptyPoolContent := p.forceProposeOnce ||
+		time.Now().After(p.lastProposedAt.Add(p.MinProposingInternal)) ||
+		l2Head < 1
 
 	log.Info(
 		"Start fetching L2 execution engine's transaction pool content",
@@ -288,12 +334,11 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 		"minProposingInternal", p.MinProposingInternal,
 		"allowEmpty", allowEmptyPoolContent,
 		"lastProposedAt", p.lastProposedAt,
+		"forceProposeOnce", p.forceProposeOnce,
+		"l2Head", l2Head,
 	)
 
-	l2Head, err := p.rpc.L2.BlockNumber(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get L2 chain head number: %w", err)
-	}
+	p.forceProposeOnce = false
 
 	// Fetch the parent meta hash of current the L2 head, which will be used
 	// by revert protection.
