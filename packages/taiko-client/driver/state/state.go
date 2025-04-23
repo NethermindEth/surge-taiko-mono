@@ -170,6 +170,7 @@ func (s *State) eventLoop(ctx context.Context) {
 				"stateRoot", common.Hash(e.StateRoot),
 				"prover", e.Prover,
 			)
+			metrics.DriverL2VerifiedHeightGauge.Set(float64(e.BlockId.Uint64()))
 		case e := <-blockVerifiedV2Ch:
 			log.Info(
 				"📈 Block verified",
@@ -177,6 +178,7 @@ func (s *State) eventLoop(ctx context.Context) {
 				"hash", common.Hash(e.BlockHash),
 				"prover", e.Prover,
 			)
+			metrics.DriverL2VerifiedHeightGauge.Set(float64(e.BlockId.Uint64()))
 		case newHead := <-l1HeadCh:
 			s.setL1Head(newHead)
 			s.l1HeadsFeed.Send(newHead)

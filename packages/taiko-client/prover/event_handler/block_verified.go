@@ -19,7 +19,6 @@ func NewBlockVerifiedEventHandler() *BlockVerifiedEventHandler {
 
 // Handle handles the BlockVerified event.
 func (h *BlockVerifiedEventHandler) Handle(e *bindings.TaikoL1ClientBlockVerifiedV2) {
-	metrics.DriverL2VerifiedHeightGauge.Set(float64(e.BlockId.Uint64()))
 	metrics.ProverLatestVerifiedIDGauge.Set(float64(e.BlockId.Uint64()))
 
 	log.Info(
