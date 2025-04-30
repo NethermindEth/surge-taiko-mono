@@ -69,6 +69,10 @@ type Proposer struct {
 	allowEmptyBlocks bool
 	initDone         bool
 	forceProposeOnce bool
+
+	// Bridge message monitoring
+	pendingBridgeMessages []*types.Transaction
+	bridgeMessageMutex    sync.Mutex
 }
 
 // InitFromCli initializes the given proposer instance based on the command line flags.
@@ -99,6 +103,13 @@ func (p *Proposer) InitFromConfig(
 	if p.rpc, err = rpc.NewClient(p.ctx, cfg.ClientConfig); err != nil {
 		return fmt.Errorf("initialize rpc clients error: %w", err)
 	}
+
+	// Check L1 RPC connection
+	blockNum, err := p.rpc.L1.BlockNumber(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to connect to L1 RPC: %w", err)
+	}
+	log.Info("Successfully connected to L1 RPC", "currentBlock", blockNum)
 
 	// Protocol configs
 	p.protocolConfigs = encoding.GetProtocolConfig(p.rpc.L2.ChainID.Uint64())
@@ -203,6 +214,11 @@ func (p *Proposer) SubscribeToSignalSentEvent() error {
 func (p *Proposer) Start() error {
 	p.wg.Add(1)
 	go p.eventLoop()
+
+	// Start monitoring L1 Bridge messages
+	p.wg.Add(1)
+	go p.monitorBridgeMessages()
+
 	return nil
 }
 
@@ -229,6 +245,73 @@ func (p *Proposer) eventLoop() {
 				log.Error("Proposing operation error", "error", err)
 				continue
 			}
+		}
+	}
+}
+
+// monitorBridgeMessages monitors L1 transaction pool for Bridge sendMessage calls
+func (p *Proposer) monitorBridgeMessages() {
+	defer p.wg.Done()
+
+	// Create a channel for new pending transactions
+	pendingTxs := make(chan common.Hash)
+
+	// Subscribe to new pending transactions using RPC client
+	sub, err := p.rpc.L1.Client.Subscribe(p.ctx, "eth", pendingTxs, "newPendingTransactions")
+	if err != nil {
+		log.Error("Failed to subscribe to pending transactions", "error", err)
+		return
+	}
+	defer sub.Unsubscribe()
+
+	// Keep track of processed transaction hashes to avoid duplicates
+	processedTxs := make(map[common.Hash]bool)
+
+	// The selector for sendMessage is 0x1bdb0037, retrived from Bridge.go
+	sendMessageSelector := common.HexToHash("0x1bdb0037")
+
+	for {
+		select {
+		case <-p.ctx.Done():
+			return
+		case err := <-sub.Err():
+			log.Error("Subscription error", "error", err)
+			return
+		case txHash := <-pendingTxs:
+			// Skip if we've already processed this transaction
+			if processedTxs[txHash] {
+				continue
+			}
+
+			// Get transaction details
+			tx, isPending, err := p.rpc.L1.TransactionByHash(p.ctx, txHash)
+			if err != nil {
+				log.Error("Failed to get transaction details", "hash", txHash, "error", err)
+				continue
+			}
+
+			// Skip if transaction is no longer pending (as in, has been mined already) because with the fast
+			// L1-to-L2 bridging, proposer will propose the sendMessage transactions as part of its block
+			if !isPending {
+				continue
+			}
+
+			// Check if transaction is to Bridge contract
+			if tx.To() == nil || *tx.To() != p.Config.ClientConfig.BridgeAddress {
+				continue
+			}
+
+			// Check if transaction data starts with sendMessage selector
+			if len(tx.Data()) < 4 || common.BytesToHash(tx.Data()[:4]) != sendMessageSelector {
+				continue
+			}
+
+			// Add to pending messages
+			p.bridgeMessageMutex.Lock()
+			p.pendingBridgeMessages = append(p.pendingBridgeMessages, tx)
+			processedTxs[txHash] = true
+			log.Info("New Bridge sendMessage transaction detected in mempool", "hash", txHash)
+			p.bridgeMessageMutex.Unlock()
 		}
 	}
 }
@@ -354,6 +437,20 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 	if err := p.rpc.WaitTillL2ExecutionEngineSynced(ctx); err != nil {
 		return fmt.Errorf("failed to wait until L2 execution engine synced: %w", err)
 	}
+
+	// Add pending Bridge messages to the transaction list
+	txList := types.Transactions{}
+	p.bridgeMessageMutex.Lock()
+	if len(p.pendingBridgeMessages) > 0 {
+		log.Info("Pending Bridge sendMessage transactions", "count", len(p.pendingBridgeMessages))
+		for _, tx := range p.pendingBridgeMessages {
+			txList = append(txList, tx)
+		}
+		p.pendingBridgeMessages = nil // Clear processed messages
+	}
+	p.bridgeMessageMutex.Unlock()
+
+	// TODO(@jmadibekov): Add a check that the transaction is valid and hasn't been mined already (whether by relayer or some other way) and include it in the proposed block
 
 	log.Info(
 		"Start fetching L2 execution engine's transaction pool content",
