@@ -71,8 +71,8 @@ type Proposer struct {
 	forceProposeOnce bool
 
 	// Bridge message monitoring
-	pendingBridgeMessages []*types.Transaction
-	bridgeMessageMutex    sync.Mutex
+	pendingBridgeMessages map[common.Hash]*types.Transaction
+	bridgeMsgMu           sync.RWMutex
 }
 
 // InitFromCli initializes the given proposer instance based on the command line flags.
@@ -264,8 +264,8 @@ func (p *Proposer) monitorBridgeMessages() {
 	}
 	defer sub.Unsubscribe()
 
-	// Keep track of processed transaction hashes to avoid duplicates
-	processedTxs := make(map[common.Hash]bool)
+	// Initialize pending messages map
+	p.pendingBridgeMessages = make(map[common.Hash]*types.Transaction)
 
 	// The selector for sendMessage is 0x1bdb0037, retrived from Bridge.go
 	sendMessageSelector := common.HexToHash("0x1bdb0037")
@@ -278,10 +278,13 @@ func (p *Proposer) monitorBridgeMessages() {
 			log.Error("Subscription error", "error", err)
 			return
 		case txHash := <-pendingTxs:
-			// Skip if we've already processed this transaction
-			if processedTxs[txHash] {
+			// Skip if we already have this transaction
+			p.bridgeMsgMu.RLock()
+			if _, exists := p.pendingBridgeMessages[txHash]; exists {
+				p.bridgeMsgMu.RUnlock()
 				continue
 			}
+			p.bridgeMsgMu.RUnlock()
 
 			// Get transaction details
 			tx, isPending, err := p.rpc.L1.TransactionByHash(p.ctx, txHash)
@@ -307,11 +310,10 @@ func (p *Proposer) monitorBridgeMessages() {
 			}
 
 			// Add to pending messages
-			p.bridgeMessageMutex.Lock()
-			p.pendingBridgeMessages = append(p.pendingBridgeMessages, tx)
-			processedTxs[txHash] = true
+			p.bridgeMsgMu.Lock()
+			p.pendingBridgeMessages[txHash] = tx
 			log.Info("New Bridge sendMessage transaction detected in mempool", "hash", txHash)
-			p.bridgeMessageMutex.Unlock()
+			p.bridgeMsgMu.Unlock()
 		}
 	}
 }
@@ -440,15 +442,15 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 
 	// Add pending Bridge messages to the transaction list
 	txList := types.Transactions{}
-	p.bridgeMessageMutex.Lock()
+	p.bridgeMsgMu.Lock()
 	if len(p.pendingBridgeMessages) > 0 {
 		log.Info("Pending Bridge sendMessage transactions", "count", len(p.pendingBridgeMessages))
 		for _, tx := range p.pendingBridgeMessages {
 			txList = append(txList, tx)
 		}
-		p.pendingBridgeMessages = nil // Clear processed messages
+		p.pendingBridgeMessages = make(map[common.Hash]*types.Transaction) // Clear processed messages
 	}
-	p.bridgeMessageMutex.Unlock()
+	p.bridgeMsgMu.Unlock()
 
 	// TODO(@jmadibekov): Add a check that the transaction is valid and hasn't been mined already (whether by relayer or some other way) and include it in the proposed block
 
