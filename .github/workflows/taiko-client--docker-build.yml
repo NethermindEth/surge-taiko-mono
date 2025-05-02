@@ -11,9 +11,10 @@ on:
 
 env:
   DOCKER_REGISTRY: nethermind.jfrog.io
-  DOCKER_USERNAME: modular
+  DOCKER_USERNAME_MODULAR: modular
   DOCKER_REPOSITORY_DEV: modular-oci-local-dev/taiko-client
   DOCKER_REPOSITORY_STAGING: modular-oci-local-staging/taiko-client
+  DOCKER_REPOSITORY_NETHERMIND: nethermind/taiko-client
 
 jobs:
   build:
@@ -40,14 +41,21 @@ jobs:
       - uses: docker/login-action@v3
         with:
           registry: ${{ env.DOCKER_REGISTRY }}
-          username: ${{ env.DOCKER_USERNAME }}
+          username: ${{ env.DOCKER_USERNAME_MODULAR }}
           password: ${{ secrets.ARTIFACTORY_MODULAR_TOKEN_DEVELOPER }}
+      
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME_NETHERMIND }}
+          password: ${{ secrets.DOCKER_ACCESS_TOKEN_NETHERMIND }}
 
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}
+          images: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}
+            ${{ env.DOCKER_REPOSITORY_NETHERMIND }}
           tags: type=raw,value=temp-${{ matrix.os }}
 
       - name: Build and push by digest
@@ -69,8 +77,13 @@ jobs:
       - uses: docker/login-action@v3
         with:
           registry: ${{ env.DOCKER_REGISTRY }}
-          username: ${{ env.DOCKER_USERNAME }}
+          username: ${{ env.DOCKER_USERNAME_MODULAR }}
           password: ${{ secrets.ARTIFACTORY_MODULAR_TOKEN_DEVELOPER }}
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME_NETHERMIND }}
+          password: ${{ secrets.DOCKER_ACCESS_TOKEN_NETHERMIND }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -79,7 +92,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}
+          images: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}
+            ${{ env.DOCKER_REPOSITORY_NETHERMIND }}
           tags: |
             type=raw,value=latest
             type=ref,event=branch
@@ -87,18 +102,24 @@ jobs:
             type=ref,event=tag
             type=sha
 
-      - name: Create manifest list and push
+      - name: Create manifest list and push for JFrog
         run: |
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+          docker buildx imagetools create $(jq -cr '.tags | map(select(contains("${{ env.DOCKER_REGISTRY }}")) | "-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:temp-ubuntu-latest \
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_DEV }}:temp-ubuntu-24.04-arm
- 
+
+      - name: Create manifest list and push for Docker Hub
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map(select(contains("${{ env.DOCKER_REPOSITORY_NETHERMIND }}")) | "-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            ${{ env.DOCKER_REPOSITORY_NETHERMIND }}:temp-ubuntu-latest \
+            ${{ env.DOCKER_REPOSITORY_NETHERMIND }}:temp-ubuntu-24.04-arm
+
       - uses: oras-project/setup-oras@v1
       - run: oras version
       - name: Login to registry with oras
         run: |
           oras login ${{ env.DOCKER_REGISTRY }} \
-            -u ${{ env.DOCKER_USERNAME }} \
+            -u ${{ env.DOCKER_USERNAME_MODULAR }} \
             -p ${{ secrets.ARTIFACTORY_MODULAR_TOKEN_DEVELOPER }}
 
       - name: Promote to Staging
