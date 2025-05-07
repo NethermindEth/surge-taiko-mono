@@ -1,7 +1,9 @@
 package proposer
 
 import (
+	"bytes"
 	"context"
+	"math"
 	"math/big"
 	"os"
 	"testing"
@@ -9,7 +11,6 @@ import (
 
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -75,6 +76,7 @@ func (s *ProposerTestSuite) SetupTest() {
 			TaikoL1Address:    common.HexToAddress(os.Getenv("TAIKO_L1")),
 			TaikoL2Address:    common.HexToAddress(os.Getenv("TAIKO_L2")),
 			TaikoTokenAddress: common.HexToAddress(os.Getenv("TAIKO_TOKEN")),
+			BridgeAddress:     common.HexToAddress(os.Getenv("BRIDGE_L1")),
 		},
 		L1ProposerPrivKey:          l1ProposerPrivKey,
 		L2SuggestedFeeRecipient:    common.HexToAddress(os.Getenv("L2_SUGGESTED_FEE_RECIPIENT")),
@@ -470,4 +472,135 @@ func (s *ProposerTestSuite) TestIsProfitable() {
 			s.Equal(test.expectedResult, profitable)
 		})
 	}
+}
+
+func (s *ProposerTestSuite) TestBridgeMessageMonitoring() {
+	// ===== Setup Phase =====
+	// Create a test transaction that simulates a Bridge sendMessage call
+	bridgeAddr := s.p.Config.ClientConfig.BridgeAddress
+	s.NotEqual(bridgeAddr, common.Address{}, "Bridge address should not be zero")
+	log.Info("Using Bridge address for test", "address", bridgeAddr.Hex())
+
+	// Start the proposer first to ensure subscription is active
+	s.Nil(s.p.Start())
+
+	// ===== Test Case 1: Valid Bridge Message Transaction =====
+	// Now create and send the Bridge message transaction
+	selectorBytes := common.FromHex("1bdb0037") // Remove 0x prefix to avoid double prefix
+	testData := append(selectorBytes, testutils.RandomBytes(100)...)
+
+	testNonce, err := s.p.rpc.L1.NonceAt(context.Background(), s.TestAddr, nil)
+	s.Nil(err)
+
+	// Get current base fee
+	header, err := s.p.rpc.L1.HeaderByNumber(context.Background(), nil)
+	s.Nil(err)
+	baseFee := header.BaseFee
+
+	// Get chain ID
+	chainID := s.p.rpc.L1.ChainID
+
+	// Create a signed transaction with very low gas price to keep it pending
+	gasFeeCap := new(big.Int).Add(baseFee, big.NewInt(1)) // Set max fee per gas just slightly above base fee
+	gasTipCap := big.NewInt(1)                            // Set priority fee (tip) very low
+
+	signer := types.LatestSignerForChainID(chainID)
+	tx := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   chainID,
+		Nonce:     testNonce,
+		To:        &bridgeAddr,
+		Value:     common.Big1,
+		Gas:       100000,
+		GasFeeCap: gasFeeCap,
+		GasTipCap: gasTipCap,
+		Data:      testData,
+	})
+
+	signedTx, err := types.SignTx(tx, signer, s.TestAddrPrivKey)
+	s.Nil(err)
+
+	err = s.p.rpc.L1.SendTransaction(context.Background(), signedTx)
+	s.Nil(err)
+
+	log.Info(
+		"Sent Bridge message transaction",
+		"hash", signedTx.Hash().Hex(),
+		"from", s.TestAddr.Hex(),
+		"to", bridgeAddr.Hex(),
+		"nonce", testNonce,
+		"value", signedTx.Value(),
+		"gasFeeCap", gasFeeCap,
+		"gasTipCap", gasTipCap,
+	)
+
+	time.Sleep(2 * time.Second)
+
+	// Verify the transaction was detected and stored
+	s.p.bridgeMsgMu.RLock()
+	detected := s.p.pendingBridgeMessages[signedTx.Hash()]
+	s.p.bridgeMsgMu.RUnlock()
+
+	s.NotNil(detected, "Bridge message transaction should be detected")
+	s.Equal(signedTx.Hash(), detected.Hash(), "Detected transaction hash should match sent transaction")
+	s.Equal(bridgeAddr, *detected.To(), "Detected transaction should be to Bridge contract")
+	s.True(bytes.HasPrefix(detected.Data(), selectorBytes), "Transaction should have sendMessage selector")
+
+	// ===== Test Case 2: Non-Bridge Transaction =====
+	// Test that non-Bridge transactions are not detected
+	randomAddr := common.BytesToAddress(testutils.RandomBytes(20))
+	nonBridgeTx, err := testutils.AssembleAndSendTestTx(
+		s.p.rpc.L1,
+		s.TestAddrPrivKey,
+		testNonce+1,
+		&randomAddr,
+		common.Big1,
+		testutils.RandomBytes(100),
+	)
+	s.Nil(err)
+	s.NotNil(nonBridgeTx, "Non-bridge transaction should not be nil")
+
+	time.Sleep(2 * time.Second)
+
+	// Verify the non-Bridge transaction was not detected
+	s.p.bridgeMsgMu.RLock()
+	notDetected := s.p.pendingBridgeMessages[nonBridgeTx.Hash()]
+	s.p.bridgeMsgMu.RUnlock()
+
+	s.Nil(notDetected, "Non-Bridge transaction should not be detected")
+
+	// ===== Test Case 3: Invalid Bridge Transaction =====
+	// Test that Bridge transactions without sendMessage selector are not detected
+	invalidSelectorTx, err := testutils.AssembleAndSendTestTx(
+		s.p.rpc.L1,
+		s.TestAddrPrivKey,
+		testNonce+2,
+		&bridgeAddr,
+		common.Big1,
+		testutils.RandomBytes(100),
+	)
+	s.Nil(err)
+	s.NotNil(invalidSelectorTx, "Invalid selector transaction should not be nil")
+
+	time.Sleep(2 * time.Second)
+
+	// Verify the Bridge transaction without sendMessage selector was not detected
+	s.p.bridgeMsgMu.RLock()
+	notDetectedInvalid := s.p.pendingBridgeMessages[invalidSelectorTx.Hash()]
+	s.p.bridgeMsgMu.RUnlock()
+
+	s.Nil(notDetectedInvalid, "Bridge transaction without sendMessage selector should not be detected")
+
+	// ===== Test Case 4: Cleanup After Proposal =====
+	// Test that detected transactions are cleared after being proposed
+	s.Nil(s.p.ProposeOp(context.Background()))
+
+	s.p.bridgeMsgMu.RLock()
+	remainingMsgs := len(s.p.pendingBridgeMessages)
+	s.p.bridgeMsgMu.RUnlock()
+
+	s.Equal(0, remainingMsgs, "Pending messages should be cleared after proposing")
+
+	// ===== Cleanup =====
+	s.cancel()
+	s.NotPanics(func() { s.p.Close(s.p.ctx) })
 }

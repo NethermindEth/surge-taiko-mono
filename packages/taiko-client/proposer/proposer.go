@@ -270,6 +270,10 @@ func (p *Proposer) monitorBridgeMessages() {
 	// The selector for sendMessage is 0x1bdb0037, retrived from Bridge.go
 	sendMessageSelector := common.HexToHash("0x1bdb0037")
 
+	log.Debug("Starting Bridge message monitoring",
+		"bridgeAddress", p.Config.ClientConfig.BridgeAddress.Hex(),
+		"sendMessageSelector", sendMessageSelector.Hex())
+
 	for {
 		select {
 		case <-p.ctx.Done():
@@ -278,6 +282,8 @@ func (p *Proposer) monitorBridgeMessages() {
 			log.Error("Subscription error", "error", err)
 			return
 		case txHash := <-pendingTxs:
+			log.Debug("New pending transaction detected", "hash", txHash.Hex())
+
 			// Skip if we already have this transaction
 			p.bridgeMsgMu.RLock()
 			if _, exists := p.pendingBridgeMessages[txHash]; exists {
@@ -296,16 +302,23 @@ func (p *Proposer) monitorBridgeMessages() {
 			// Skip if transaction is no longer pending (as in, has been mined already) because with the fast
 			// L1-to-L2 bridging, proposer will propose the sendMessage transactions as part of its block
 			if !isPending {
+				log.Debug("Transaction is no longer pending", "hash", txHash.Hex())
 				continue
 			}
 
 			// Check if transaction is to Bridge contract
 			if tx.To() == nil || *tx.To() != p.Config.ClientConfig.BridgeAddress {
+				log.Debug("Transaction is not to Bridge contract", "hash", txHash.Hex())
 				continue
 			}
 
 			// Check if transaction data starts with sendMessage selector
 			if len(tx.Data()) < 4 || common.BytesToHash(tx.Data()[:4]) != sendMessageSelector {
+				log.Debug("Transaction data does not start with sendMessage selector", "hash", txHash.Hex())
+				log.Debug("Transaction data comparison",
+					"hash", txHash.Hex(),
+					"actual", common.BytesToHash(tx.Data()[:4]).Hex(),
+					"expected", sendMessageSelector.Hex())
 				continue
 			}
 
