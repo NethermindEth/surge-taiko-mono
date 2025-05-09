@@ -1,6 +1,7 @@
 package proposer
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -25,6 +26,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/bridge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/utils"
@@ -267,12 +269,23 @@ func (p *Proposer) monitorBridgeMessages() {
 	// Initialize pending messages map
 	p.pendingBridgeMessages = make(map[common.Hash]*types.Transaction)
 
-	// The selector for sendMessage is 0x1bdb0037, retrived from Bridge.go
-	sendMessageSelector := common.HexToHash("0x1bdb0037")
+	// Get the Bridge contract ABI
+	bridgeABI, err := bridge.BridgeMetaData.GetAbi()
+	if err != nil {
+		log.Error("Failed to get Bridge ABI", "error", err)
+		return
+	}
+
+	// Get the sendMessage method
+	sendMessageMethod := bridgeABI.Methods["sendMessage"]
+	if sendMessageMethod.ID == nil {
+		log.Error("Failed to get sendMessage method ID")
+		return
+	}
 
 	log.Debug("Starting Bridge message monitoring",
 		"bridgeAddress", p.Config.ClientConfig.BridgeAddress.Hex(),
-		"sendMessageSelector", sendMessageSelector.Hex())
+		"sendMessageSelector", common.BytesToHash(sendMessageMethod.ID).Hex())
 
 	for {
 		select {
@@ -313,12 +326,12 @@ func (p *Proposer) monitorBridgeMessages() {
 			}
 
 			// Check if transaction data starts with sendMessage selector
-			if len(tx.Data()) < 4 || common.BytesToHash(tx.Data()[:4]) != sendMessageSelector {
+			if len(tx.Data()) < 4 || !bytes.Equal(tx.Data()[:4], sendMessageMethod.ID) {
 				log.Debug("Transaction data does not start with sendMessage selector", "hash", txHash.Hex())
 				log.Debug("Transaction data comparison",
 					"hash", txHash.Hex(),
 					"actual", common.BytesToHash(tx.Data()[:4]).Hex(),
-					"expected", sendMessageSelector.Hex())
+					"expected", common.BytesToHash(sendMessageMethod.ID).Hex())
 				continue
 			}
 
