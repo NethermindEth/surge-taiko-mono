@@ -28,7 +28,9 @@ contract InboxTest_StopBatch is InboxTestBase {
             cooldownWindow: 0 hours,
             maxSignalsToReceive: 16,
             maxBlocksPerBatch: 768,
-            forkHeights: forkHeights
+            forkHeights: forkHeights,
+            // Surge: to prevent compilation errors
+            maxVerificationDelay: 0
         });
     }
 

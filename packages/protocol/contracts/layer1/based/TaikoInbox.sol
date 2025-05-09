@@ -25,7 +25,7 @@ import "./IProposeBatch.sol";
 /// delegated to IVerifier contracts.
 ///
 /// @dev Registered in the address resolver as "taiko".
-/// @custom:security-contact security@taiko.xyz
+/// @custom:security-contact security@nethermind.io
 abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, ITaiko {
     using LibMath for uint256;
     using SafeERC20 for IERC20;
@@ -527,6 +527,24 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
         }
     }
 
+    // Surge: This function is required for stage-2
+    /// @inheritdoc ITaikoInbox
+    function getVerificationStreakStartedAt() external view returns (uint256) {
+        Config memory config = pacayaConfig();
+
+        // Surge: If the verification streak has been broken, we return the current timestamp,
+        // otherwise we return the last recorded timestamp when the streak started.
+        if (
+            block.timestamp
+                - state.batches[state.stats2.lastVerifiedBatchId % config.batchRingBufferSize]
+                    .lastBlockTimestamp > config.maxVerificationDelay
+        ) {
+            return block.timestamp;
+        } else {
+            return state.verificationStreakStartedAt;
+        }
+    }
+
     /// @inheritdoc ITaikoInbox
     function pacayaConfig() public view virtual returns (Config memory);
 
@@ -549,6 +567,9 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
 
         state.stats2.lastProposedIn = uint56(block.number);
         state.stats2.numBatches = 1;
+
+        // Surge: Initialize the verification streak started at timestamp
+        state.verificationStreakStartedAt = block.timestamp;
 
         emit BatchesVerified(0, _genesisBlockHash);
     }
@@ -612,6 +633,13 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
             Batch storage batch = state.batches[slot];
             uint24 tid = batch.verifiedTransitionId;
             bytes32 blockHash = state.transitions[slot][tid].blockHash;
+
+            // Surge: If the verification streak has been broken, we reset the streak timestamp
+            // `batch` points to the last verified batch, so we can use it to check if the streak
+            // has been broken.
+            if (block.timestamp - batch.lastBlockTimestamp > _config.maxVerificationDelay) {
+                state.verificationStreakStartedAt = block.timestamp;
+            }
 
             SyncBlock memory synced;
 

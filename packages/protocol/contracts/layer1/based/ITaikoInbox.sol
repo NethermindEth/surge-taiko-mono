@@ -15,7 +15,7 @@ import "src/shared/based/LibSharedData.sol";
 ///   delegated to IVerifier contracts.
 ///
 /// @dev Registered in the address resolver as "taiko".
-/// @custom:security-contact security@taiko.xyz
+/// @custom:security-contact security@nethermind.io
 interface ITaikoInbox {
     struct BlockParams {
         // the max number of transactions in this block. Note that if there are not enough
@@ -174,7 +174,8 @@ interface ITaikoInbox {
         /// @notice Base fee configuration
         LibSharedData.BaseFeeConfig baseFeeConfig;
         /// @notice The proving window in seconds.
-        uint16 provingWindow;
+        // Surge: switch from uint18 to uint24
+        uint24 provingWindow;
         /// @notice The time required for a transition to be used for verifying a batch.
         uint24 cooldownWindow;
         /// @notice The maximum number of signals to be received by TaikoL2.
@@ -183,6 +184,9 @@ interface ITaikoInbox {
         uint16 maxBlocksPerBatch;
         /// @notice Historical heights of the forks.
         ForkHeights forkHeights;
+        // Surge: This parameter is required for stage-2.
+        /// @notice Defines the maximum allowable duration without a batch verification.
+        uint64 maxVerificationDelay;
     }
 
     /// @notice Struct holding the state variables for the {Taiko} contract.
@@ -200,7 +204,11 @@ interface ITaikoInbox {
         Stats1 stats1; // slot 5
         Stats2 stats2; // slot 6
         mapping(address account => uint256 bond) bondBalance;
-        uint256[43] __gap;
+        // Surge: This parameter is required for stage-2.
+        // Last timestamp at which a batch was verified within `Config.maxVerificationDelay`
+        uint256 verificationStreakStartedAt; // Slot 7
+        // Surge: Gap reduced by 1
+        uint256[42] __gap;
     }
 
     /// @notice Emitted when tokens are deposited into a user's bond balance.
@@ -397,6 +405,12 @@ interface ITaikoInbox {
         external
         view
         returns (TransitionState memory);
+
+    /// @notice Returns the timestamp indicating when the current verification streak began.
+    /// @return The timestamp marking the start of the ongoing verification streak.
+    // Surge: This function returns `State.verificationStreakStartedAt` added as stage-2
+    // requirement.
+    function getVerificationStreakStartedAt() external view returns (uint256);
 
     /// @notice Retrieves the current protocol configuration.
     /// @return The current configuration.

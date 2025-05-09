@@ -7,6 +7,12 @@ import "../shared/libs/LibAddress.sol";
 import "../shared/libs/LibBytes.sol";
 import "../shared/bridge/IBridge.sol";
 
+// Surge: to prevent compilation errors
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+
+// Surge: This contract is not used in Surge. Moreover, essential contracts no longer
+// use the Ownable2StepUpgradeable contract.
+
 /// @title DelegateOwner
 /// @notice This contract will be the owner of all essential contracts deployed on the L2 chain.
 /// @dev Notice that when sending the message on the owner chain, the gas limit of the message must
