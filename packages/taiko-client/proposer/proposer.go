@@ -1,6 +1,7 @@
 package proposer
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -25,6 +26,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/bridge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/utils"
@@ -69,6 +71,10 @@ type Proposer struct {
 	allowEmptyBlocks bool
 	initDone         bool
 	forceProposeOnce bool
+
+	// Bridge message monitoring
+	pendingBridgeMessages map[common.Hash]*types.Transaction
+	bridgeMsgMu           sync.RWMutex
 }
 
 // InitFromCli initializes the given proposer instance based on the command line flags.
@@ -99,6 +105,13 @@ func (p *Proposer) InitFromConfig(
 	if p.rpc, err = rpc.NewClient(p.ctx, cfg.ClientConfig); err != nil {
 		return fmt.Errorf("initialize rpc clients error: %w", err)
 	}
+
+	// Check L1 RPC connection
+	blockNum, err := p.rpc.L1.BlockNumber(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to connect to L1 RPC: %w", err)
+	}
+	log.Info("Successfully connected to L1 RPC", "currentBlock", blockNum)
 
 	// Protocol configs
 	p.protocolConfigs = encoding.GetProtocolConfig(p.rpc.L2.ChainID.Uint64())
@@ -203,6 +216,11 @@ func (p *Proposer) SubscribeToSignalSentEvent() error {
 func (p *Proposer) Start() error {
 	p.wg.Add(1)
 	go p.eventLoop()
+
+	// Start monitoring L1 Bridge messages
+	p.wg.Add(1)
+	go p.monitorBridgeMessages()
+
 	return nil
 }
 
@@ -229,6 +247,99 @@ func (p *Proposer) eventLoop() {
 				log.Error("Proposing operation error", "error", err)
 				continue
 			}
+		}
+	}
+}
+
+// monitorBridgeMessages monitors L1 transaction pool for Bridge sendMessage calls
+func (p *Proposer) monitorBridgeMessages() {
+	defer p.wg.Done()
+
+	// Create a channel for new pending transactions
+	pendingTxs := make(chan common.Hash)
+
+	// Subscribe to new pending transactions using RPC client
+	sub, err := p.rpc.L1.Client.Subscribe(p.ctx, "eth", pendingTxs, "newPendingTransactions")
+	if err != nil {
+		log.Error("Failed to subscribe to pending transactions", "error", err)
+		return
+	}
+	defer sub.Unsubscribe()
+
+	// Initialize pending messages map
+	p.pendingBridgeMessages = make(map[common.Hash]*types.Transaction)
+
+	// Get the Bridge contract ABI
+	bridgeABI, err := bridge.BridgeMetaData.GetAbi()
+	if err != nil {
+		log.Error("Failed to get Bridge ABI", "error", err)
+		return
+	}
+
+	// Get the sendMessage method
+	sendMessageMethod := bridgeABI.Methods["sendMessage"]
+	if sendMessageMethod.ID == nil {
+		log.Error("Failed to get sendMessage method ID")
+		return
+	}
+
+	log.Debug("Starting Bridge message monitoring",
+		"bridgeAddress", p.Config.ClientConfig.BridgeAddress.Hex(),
+		"sendMessageSelector", common.BytesToHash(sendMessageMethod.ID).Hex())
+
+	for {
+		select {
+		case <-p.ctx.Done():
+			return
+		case err := <-sub.Err():
+			log.Error("Subscription error", "error", err)
+			return
+		case txHash := <-pendingTxs:
+			log.Debug("New pending transaction detected", "hash", txHash.Hex())
+
+			// Skip if we already have this transaction
+			p.bridgeMsgMu.RLock()
+			if _, exists := p.pendingBridgeMessages[txHash]; exists {
+				p.bridgeMsgMu.RUnlock()
+				continue
+			}
+			p.bridgeMsgMu.RUnlock()
+
+			// Get transaction details
+			tx, isPending, err := p.rpc.L1.TransactionByHash(p.ctx, txHash)
+			if err != nil {
+				log.Error("Failed to get transaction details", "hash", txHash, "error", err)
+				continue
+			}
+
+			// Skip if transaction is no longer pending (as in, has been mined already) because with the fast
+			// L1-to-L2 bridging, proposer will propose the sendMessage transactions as part of its block
+			if !isPending {
+				log.Debug("Transaction is no longer pending", "hash", txHash.Hex())
+				continue
+			}
+
+			// Check if transaction is to Bridge contract
+			if tx.To() == nil || *tx.To() != p.Config.ClientConfig.BridgeAddress {
+				log.Debug("Transaction is not to Bridge contract", "hash", txHash.Hex())
+				continue
+			}
+
+			// Check if transaction data starts with sendMessage selector
+			if len(tx.Data()) < 4 || !bytes.Equal(tx.Data()[:4], sendMessageMethod.ID) {
+				log.Debug("Transaction data does not start with sendMessage selector", "hash", txHash.Hex())
+				log.Debug("Transaction data comparison",
+					"hash", txHash.Hex(),
+					"actual", common.BytesToHash(tx.Data()[:4]).Hex(),
+					"expected", common.BytesToHash(sendMessageMethod.ID).Hex())
+				continue
+			}
+
+			// Add to pending messages
+			p.bridgeMsgMu.Lock()
+			p.pendingBridgeMessages[txHash] = tx
+			log.Info("New Bridge sendMessage transaction detected in mempool", "hash", txHash)
+			p.bridgeMsgMu.Unlock()
 		}
 	}
 }
@@ -354,6 +465,20 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 	if err := p.rpc.WaitTillL2ExecutionEngineSynced(ctx); err != nil {
 		return fmt.Errorf("failed to wait until L2 execution engine synced: %w", err)
 	}
+
+	// Add pending Bridge messages to the transaction list
+	txList := types.Transactions{}
+	p.bridgeMsgMu.Lock()
+	if len(p.pendingBridgeMessages) > 0 {
+		log.Info("Pending Bridge sendMessage transactions", "count", len(p.pendingBridgeMessages))
+		for _, tx := range p.pendingBridgeMessages {
+			txList = append(txList, tx)
+		}
+		p.pendingBridgeMessages = make(map[common.Hash]*types.Transaction) // Clear processed messages
+	}
+	p.bridgeMsgMu.Unlock()
+
+	// TODO(@jmadibekov): Add a check that the transaction is valid and hasn't been mined already (whether by relayer or some other way) and include it in the proposed block
 
 	log.Info(
 		"Start fetching L2 execution engine's transaction pool content",

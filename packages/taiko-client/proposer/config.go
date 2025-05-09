@@ -112,6 +112,7 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			Timeout:           c.Duration(flags.RPCTimeout.Name),
 			ProverSetAddress:  common.HexToAddress(c.String(flags.ProverSetAddress.Name)),
 			InboxAddress:      common.HexToAddress(c.String(flags.InboxAddress.Name)),
+			BridgeAddress:     common.HexToAddress(c.String(flags.BridgeAddress.Name)),
 		},
 		L1ProposerPrivKey:          l1ProposerPrivKey,
 		L2SuggestedFeeRecipient:    common.HexToAddress(l2SuggestedFeeRecipient),

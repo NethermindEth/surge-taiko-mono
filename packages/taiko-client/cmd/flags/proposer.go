@@ -22,6 +22,13 @@ var (
 		Category: proposerCategory,
 		EnvVars:  []string{"L2_SUGGESTED_FEE_RECIPIENT"},
 	}
+	BridgeAddress = &cli.StringFlag{
+		Name:     "bridge",
+		Usage:    "Bridge contract `address`",
+		Required: true,
+		Category: proposerCategory,
+		EnvVars:  []string{"BRIDGE"},
+	}
 )
 
 // Optional flags used by proposer.
@@ -159,6 +166,7 @@ var ProposerFlags = MergeFlags(CommonFlags, []cli.Flag{
 	TaikoTokenAddress,
 	L1ProposerPrivKey,
 	L2SuggestedFeeRecipient,
+	BridgeAddress,
 	ProposeInterval,
 	TxPoolLocals,
 	TxPoolLocalsOnly,

@@ -120,3 +120,6 @@ __pycache__/
 
 # Idea
 .idea/
+
+# Go checksum database
+pkg/sumdb/
