@@ -5,7 +5,7 @@ import "../based/TaikoInbox.sol";
 
 /// @title DevnetInbox
 /// @dev Labeled in address resolver as "taiko"
-/// @custom:security-contact security@taiko.xyz
+/// @custom:security-contact security@nethermind.io
 contract DevnetInbox is TaikoInbox {
     uint64 internal immutable chainId;
     uint24 internal immutable cooldownWindow;
@@ -47,7 +47,9 @@ contract DevnetInbox is TaikoInbox {
             cooldownWindow: cooldownWindow,
             maxSignalsToReceive: 16,
             maxBlocksPerBatch: 768,
-            forkHeights: ITaikoInbox.ForkHeights({ ontake: 0, pacaya: 10, shasta: 0, unzen: 0 })
+            forkHeights: ITaikoInbox.ForkHeights({ ontake: 0, pacaya: 10, shasta: 0, unzen: 0 }),
+            // Surge: to prevent compilation errors
+            maxVerificationDelay: 0
         });
     }
 }

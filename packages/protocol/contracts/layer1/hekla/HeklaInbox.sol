@@ -5,7 +5,7 @@ import "../based/TaikoInbox.sol";
 
 /// @title HeklaInbox
 /// @dev Labeled in address resolver as "taiko"
-/// @custom:security-contact security@taiko.xyz
+/// @custom:security-contact security@nethermind.io
 contract HeklaInbox is TaikoInbox {
     /// @notice Emitted when a transition is written to the state by the owner.
     /// @param batchId The ID of the batch containing the transition.
@@ -107,7 +107,9 @@ contract HeklaInbox is TaikoInbox {
                 pacaya: 1_299_888,
                 shasta: 0,
                 unzen: 0
-            })
+            }),
+            // Surge: to prevent compilation errors
+            maxVerificationDelay: 0
         });
     }
 }

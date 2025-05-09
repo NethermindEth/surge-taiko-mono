@@ -9,7 +9,7 @@ import "./libs/LibFasterReentryLock.sol";
 /// @dev This contract shall be deployed to replace its parent contract on Ethereum for Taiko
 /// mainnet to reduce gas cost.
 /// @notice See the documentation in {TaikoL1}.
-/// @custom:security-contact security@taiko.xyz
+/// @custom:security-contact security@nethermind.io
 contract MainnetInbox is TaikoInbox {
     constructor(
         address _wrapper,
@@ -52,7 +52,9 @@ contract MainnetInbox is TaikoInbox {
                 pacaya: 538_304 * 10, // TODO
                 shasta: 0,
                 unzen: 0
-            })
+            }),
+            // Surge: to prevent compilation errors
+            maxVerificationDelay: 0
         });
     }
 

@@ -65,6 +65,9 @@ contract StubInbox is ITaikoInbox {
         returns (TransitionState memory)
     { }
 
+    // Surge: to prevent compilation errors
+    function getVerificationStreakStartedAt() external view returns (uint256) { }
+
     function getStats1() external view returns (Stats1 memory) { }
 
     function getStats2() external view returns (Stats2 memory) { }
