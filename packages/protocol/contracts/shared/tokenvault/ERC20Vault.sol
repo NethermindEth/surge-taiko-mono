@@ -628,7 +628,11 @@ contract ERC20Vault is BaseVault {
             (owner(), ctoken.addr, ctoken.chainId, ctoken.decimals, ctoken.symbol, ctoken.name)
         );
 
-        btoken = address(new ERC1967Proxy(resolve(LibStrings.B_BRIDGED_ERC20, false), data));
+        // Surge: use create2 salt to deploy at a deterministic address
+        bytes32 salt = keccak256(abi.encodePacked(ctoken.addr));
+        btoken = address(
+            new ERC1967Proxy{ salt: salt }(resolve(LibStrings.B_BRIDGED_ERC20, false), data)
+        );
         bridgedToCanonical[btoken] = ctoken;
         canonicalToBridged[ctoken.chainId][ctoken.addr] = btoken;
 
