@@ -130,7 +130,9 @@ interface ITaikoInbox {
     /// compiling without any optimization (neither optimizer runs, no compiling --via-ir flag).
     struct Stats1 {
         uint64 genesisHeight;
-        uint64 __reserved2;
+        // Surge: This parameter is required for stage-2.
+        // Last timestamp at which a batch was verified within `Config.maxVerificationDelay`
+        uint64 verificationStreakStartedAt;
         uint64 lastSyncedBatchId;
         uint64 lastSyncedAt;
     }
@@ -203,12 +205,8 @@ interface ITaikoInbox {
         bytes32 __reserve1; // slot 4 - was used as a ring buffer for Ether deposits
         Stats1 stats1; // slot 5
         Stats2 stats2; // slot 6
-        mapping(address account => uint256 bond) bondBalance;
-        // Surge: This parameter is required for stage-2.
-        // Last timestamp at which a batch was verified within `Config.maxVerificationDelay`
-        uint256 verificationStreakStartedAt; // Slot 7
-        // Surge: Gap reduced by 1
-        uint256[42] __gap;
+        mapping(address account => uint256 bond) bondBalance; // slot 7
+        uint256[43] __gap;
     }
 
     /// @notice Emitted when tokens are deposited into a user's bond balance.

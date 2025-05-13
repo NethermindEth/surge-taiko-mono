@@ -541,7 +541,7 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
         ) {
             return block.timestamp;
         } else {
-            return state.verificationStreakStartedAt;
+            return state.stats1.verificationStreakStartedAt;
         }
     }
 
@@ -569,7 +569,7 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
         state.stats2.numBatches = 1;
 
         // Surge: Initialize the verification streak started at timestamp
-        state.verificationStreakStartedAt = block.timestamp;
+        state.stats1.verificationStreakStartedAt = uint64(block.timestamp);
 
         emit BatchesVerified(0, _genesisBlockHash);
     }
@@ -638,7 +638,7 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
             // `batch` points to the last verified batch, so we can use it to check if the streak
             // has been broken.
             if (block.timestamp - batch.lastBlockTimestamp > _config.maxVerificationDelay) {
-                state.verificationStreakStartedAt = block.timestamp;
+                state.stats1.verificationStreakStartedAt = uint64(block.timestamp);
             }
 
             SyncBlock memory synced;
