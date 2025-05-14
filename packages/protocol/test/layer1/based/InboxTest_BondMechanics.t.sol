@@ -83,7 +83,8 @@ contract InboxTest_BondMechanics is InboxTestBase {
         assertEq(inbox.bondBalanceOf(Bob), 0);
     }
 
-    function test_inbox_bonds_half_returned_to_proposer_out_of_proving_window() external {
+    // Surge: change the test to check the entire bond amount
+    function test_inbox_bonds_full_returned_to_proposer_out_of_proving_window() external {
         vm.warp(1_000_000);
 
         uint256 initialBondBalance = 100_000 ether;
@@ -101,10 +102,11 @@ contract InboxTest_BondMechanics is InboxTestBase {
         vm.prank(Alice);
         _proveBatchesWithCorrectTransitions(batchIds);
 
-        assertEq(inbox.bondBalanceOf(Alice), bondBalance - config.livenessBondBase / 2);
+        assertEq(inbox.bondBalanceOf(Alice), bondBalance);
     }
 
-    function test_inbox_bonds_half_returned_to_non_proposer_out_of_proving_window() external {
+    // Surge: change the test to check the entire bond amount
+    function test_inbox_bonds_full_returned_to_non_proposer_out_of_proving_window() external {
         vm.warp(1_000_000);
 
         uint256 initialBondBalance = 100_000 ether;
@@ -123,7 +125,7 @@ contract InboxTest_BondMechanics is InboxTestBase {
         _proveBatchesWithCorrectTransitions(batchIds);
 
         assertEq(inbox.bondBalanceOf(Alice), bondBalance - config.livenessBondBase);
-        assertEq(inbox.bondBalanceOf(Bob), config.livenessBondBase / 2);
+        assertEq(inbox.bondBalanceOf(Bob), config.livenessBondBase);
     }
 
     function test_inbox_bonds_multiple_blocks_per_batch() external transactBy(Alice) {

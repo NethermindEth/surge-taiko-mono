@@ -155,7 +155,8 @@ abstract contract InboxTestBase is Layer1Test {
             transitions[i].stateRoot = correctStateRoot(batchIds[i]);
         }
 
-        inbox.proveBatches(abi.encode(metas, transitions), "proof");
+        // Surge: use happy case proof type
+        inbox.proveBatches(abi.encode(ITaikoInbox.ProofType.ZK_TEE, metas, transitions), "proof");
     }
 
     function _proveBatchesWithWrongTransitions(uint64[] memory batchIds) internal {
@@ -169,7 +170,8 @@ abstract contract InboxTestBase is Layer1Test {
             transitions[i].stateRoot = randBytes32();
         }
 
-        inbox.proveBatches(abi.encode(metas, transitions), "proof");
+        // Surge: use happy case proof type
+        inbox.proveBatches(abi.encode(ITaikoInbox.ProofType.ZK_TEE, metas, transitions), "proof");
     }
 
     function _logAllBatchesAndTransitions() internal view {
