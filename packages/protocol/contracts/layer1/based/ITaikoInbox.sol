@@ -199,7 +199,9 @@ interface ITaikoInbox {
         /// @notice The proving window in seconds.
         // Surge: switch from uint18 to uint24
         uint24 provingWindow;
-        /// @notice The time required for a transition to be used for verifying a batch.
+        /// @notice The time window after which a transition with just a ZK or TEE proof
+        /// can be used for verifying a batch.
+        /// Surge: modify the usage
         uint24 cooldownWindow;
         /// @notice The maximum number of signals to be received by TaikoL2.
         uint8 maxSignalsToReceive;

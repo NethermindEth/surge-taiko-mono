@@ -60,7 +60,7 @@ contract SurgeHoodiInbox is TaikoInbox {
                 maxGasIssuancePerBlock: 6_000_000_000
             }),
             provingWindow: 24 hours,
-            cooldownWindow: 0 hours,
+            cooldownWindow: 7 days,
             maxSignalsToReceive: 16,
             maxBlocksPerBatch: 768,
             forkHeights: ITaikoInbox.ForkHeights({ ontake: 0, pacaya: 0, shasta: 0, unzen: 0 }),
