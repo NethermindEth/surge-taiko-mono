@@ -10,10 +10,12 @@ import "@openzeppelin/contracts/governance/TimelockController.sol";
 /// @custom:security-contact security@nethermind.io
 contract SurgeTimelockController is TimelockController {
     /// @notice Address of taiko's inbox contract
-    ITaikoInbox internal taikoInbox;
+    ITaikoInbox public taikoInbox;
 
     /// @notice Minimum period for which the verification streak must not have been disrupted
-    uint64 internal minVerificationStreak;
+    uint64 public minVerificationStreak;
+
+    uint256[50] private _gap;
 
     error AlreadyInitialized();
     error VerificationStreakDisrupted();
@@ -73,6 +75,13 @@ contract SurgeTimelockController is TimelockController {
         }
 
         super.executeBatch(_targets, _values, _payloads, _predecessor, _salt);
+    }
+
+    /// @dev Can be used to bypass the timelock when the verifier needs an instant upgrade.
+    /// @dev Only the proposer role can call this function, which in the case of Surge is the
+    /// primary owner multisig.
+    function executeVerifierUpgrade(address _newVerifier) public onlyRole(PROPOSER_ROLE) {
+        ITaikoInbox(taikoInbox).upgradeVerifier(_newVerifier);
     }
 
     function updateMinVerificationStreak(uint64 _minVerificationStreak)

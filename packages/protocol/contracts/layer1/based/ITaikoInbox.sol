@@ -99,14 +99,30 @@ interface ITaikoInbox {
         bytes32 stateRoot;
     }
 
+    // Surge: for the new finality gadget
+    enum ProofType {
+        // Only a TEE proof is provided
+        TEE,
+        // Only a ZK proof is provided
+        ZK,
+        // A TEE proof and a ZK proof are provided
+        ZK_TEE,
+        // Invalid proof type
+        INVALID
+    }
+
     //  @notice Struct representing transition storage
     /// @notice 4 slots used.
     struct TransitionState {
         bytes32 parentHash;
         bytes32 blockHash;
         bytes32 stateRoot;
-        address prover;
-        bool inProvingWindow;
+        // Surge: added proofType
+        ProofType proofType;
+        // Surge: add field `challenged`
+        bool challenged;
+        // Surge: renamed from `prover` to `bondReceiver`
+        address bondReceiver;
         uint48 createdAt;
     }
 
@@ -143,6 +159,11 @@ interface ITaikoInbox {
         bool paused;
         uint56 lastProposedIn;
         uint64 lastUnpausedAt;
+    }
+
+    struct Verifier {
+        bool upgradeable;
+        address addr;
     }
 
     struct ForkHeights {
@@ -205,8 +226,11 @@ interface ITaikoInbox {
         bytes32 __reserve1; // slot 4 - was used as a ring buffer for Ether deposits
         Stats1 stats1; // slot 5
         Stats2 stats2; // slot 6
-        mapping(address account => uint256 bond) bondBalance; // slot 7
-        uint256[43] __gap;
+        mapping(address account => uint256 bond) bondBalance; // Slot 7
+        // Surge: put verifier in the storage to make it upgradeable
+        Verifier verifier; // Slot 8
+        // Surge: Gap reduced by 1
+        uint256[42] __gap;
     }
 
     /// @notice Emitted when tokens are deposited into a user's bond balance.
@@ -260,6 +284,10 @@ interface ITaikoInbox {
     /// @param blockHash The hash of the verified batch.
     event BatchesVerified(uint64 batchId, bytes32 blockHash);
 
+    /// @notice Emitted when the verifier is upgraded.
+    /// @param newVerifier The address of the new verifier.
+    event VerifierUpgraded(address newVerifier);
+
     error AnchorBlockIdSmallerThanParent();
     error AnchorBlockIdTooLarge();
     error AnchorBlockIdTooSmall();
@@ -281,6 +309,7 @@ interface ITaikoInbox {
     error InvalidBlobParams();
     error InvalidGenesisBlockHash();
     error InvalidParams();
+    error InvalidProofType();
     error InvalidTransitionBlockHash();
     error InvalidTransitionParentHash();
     error InvalidTransitionStateRoot();
@@ -299,7 +328,9 @@ interface ITaikoInbox {
     error TooManyBlocks();
     error TooManySignals();
     error TransitionNotFound();
+    error VerifierNotUpgradeable();
     error ZeroAnchorBlockHash();
+    error ZkTeeProofCannotBeChallenged();
 
     /// @notice Proposes a batch of blocks.
     /// @param _params ABI-encoded parameters.
@@ -329,6 +360,11 @@ interface ITaikoInbox {
     /// @param _amount The amount of TAIKO tokens to withdraw.
     function withdrawBond(uint256 _amount) external;
 
+    /// @notice Upgrades the verifier.
+    /// @param _newVerifier The address of the new verifier.
+    // Surge: required for Surge's finality gadget
+    function upgradeVerifier(address _newVerifier) external;
+
     /// @notice Returns the TAIKO token balance of a specific user.
     /// @param _user The address of the user.
     /// @return The TAIKO token balance of the user.
@@ -346,6 +382,11 @@ interface ITaikoInbox {
     /// @notice Retrieves the second set of protocol statistics.
     /// @return Stats2 structure containing the statistics.
     function getStats2() external view returns (Stats2 memory);
+
+    /// @notice Retrieves the verifier.
+    /// @return The verifier.
+    // Surge: required for Surge's finality gadget
+    function getVerifier() external view returns (Verifier memory);
 
     /// @notice Retrieves data about a specific batch.
     /// @param _batchId The ID of the batch to retrieve.

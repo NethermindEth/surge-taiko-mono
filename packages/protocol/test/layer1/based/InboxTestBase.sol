@@ -44,6 +44,8 @@ abstract contract InboxTestBase is Layer1Test {
 
         inbox = deployInbox(
             correctBlockhash(0),
+            // Surge: add dao address
+            address(1),
             verifierAddr,
             address(bondToken),
             address(signalService),
@@ -220,12 +222,10 @@ abstract contract InboxTestBase is Layer1Test {
                     unicode"│    │    └── stateRoot:",
                     Strings.toHexString(uint256(ts.stateRoot))
                 );
-                console2.log(unicode"│    │    └── prover:", ts.prover);
-
-                console2.log(
-                    unicode"│    │    └── inProvingWindow:",
-                    ts.inProvingWindow ? "Y" : "N"
-                );
+                // Surge: add new fields on transition state
+                console2.log(unicode"│    │    └── bondReceiver:", ts.bondReceiver);
+                console2.log(unicode"│    │    └── proofType:", uint8(ts.proofType));
+                console2.log(unicode"│    │    └── challenged:", ts.challenged ? "Y" : "N");
                 console2.log(unicode"│    │    └── createdAt:", ts.createdAt);
             }
         }

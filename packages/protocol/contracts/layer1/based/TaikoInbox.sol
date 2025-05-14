@@ -9,7 +9,8 @@ import "src/shared/libs/LibMath.sol";
 import "src/shared/libs/LibNetwork.sol";
 import "src/shared/libs/LibStrings.sol";
 import "src/shared/signal/ISignalService.sol";
-import "src/layer1/verifiers/IVerifier.sol";
+// Surge: import ISurgeVerifier
+import "src/layer1/surge/verifiers/ISurgeVerifier.sol";
 import "./ITaikoInbox.sol";
 import "./IProposeBatch.sol";
 
@@ -31,7 +32,7 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
     using SafeERC20 for IERC20;
 
     address public immutable inboxWrapper;
-    address public immutable verifier;
+    address public immutable dao;
     address public immutable bondToken;
     ISignalService public immutable signalService;
 
@@ -42,22 +43,29 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
 
     constructor(
         address _inboxWrapper,
-        address _verifier,
+        address _dao,
         address _bondToken,
         address _signalService
     )
-        nonZeroAddr(_verifier)
+        nonZeroAddr(_dao)
         nonZeroAddr(_signalService)
         EssentialContract(address(0))
     {
         inboxWrapper = _inboxWrapper;
-        verifier = _verifier;
+        dao = _dao;
         bondToken = _bondToken;
         signalService = ISignalService(_signalService);
     }
 
-    function init(address _owner, bytes32 _genesisBlockHash) external initializer {
-        __Taiko_init(_owner, _genesisBlockHash);
+    function init(
+        address _owner,
+        address _verifier,
+        bytes32 _genesisBlockHash
+    )
+        external
+        initializer
+    {
+        __Taiko_init(_owner, _verifier, _genesisBlockHash);
     }
 
     /// @notice Proposes a batch of blocks.
@@ -232,12 +240,14 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
 
     /// @notice Proves multiple batches with a single aggregated proof.
     /// @param _params ABI-encoded parameter containing:
+    /// - proofType: Type of proof to be used.
     /// - metas: Array of metadata for each batch being proved.
     /// - transitions: Array of batch transitions to be proved.
     /// @param _proof The aggregated cryptographic proof proving the batches transitions.
     function proveBatches(bytes calldata _params, bytes calldata _proof) external nonReentrant {
-        (BatchMetadata[] memory metas, Transition[] memory trans) =
-            abi.decode(_params, (BatchMetadata[], Transition[]));
+        // Surge: Add proof type to the parameters
+        (ProofType proofType, BatchMetadata[] memory metas, Transition[] memory trans) =
+            abi.decode(_params, (ProofType, BatchMetadata[], Transition[]));
 
         uint256 metasLength = metas.length;
         require(metasLength != 0, NoBlocksToProve());
@@ -247,9 +257,11 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
         require(!stats2.paused, ContractPaused());
 
         Config memory config = pacayaConfig();
-        IVerifier.Context[] memory ctxs = new IVerifier.Context[](metasLength);
+        // Surge: Use the ISurgeVerifier interface
+        ISurgeVerifier.Context[] memory ctxs = new ISurgeVerifier.Context[](metasLength);
 
-        bool hasConflictingProof;
+        // Surge: Remove `hasConflictingProof` variable
+
         for (uint256 i; i < metasLength; ++i) {
             BatchMetadata memory meta = metas[i];
 
@@ -279,17 +291,21 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
             // Finds out if this transition is overwriting an existing one (with the same parent
             // hash) or is a new one.
             uint24 tid;
-            uint24 nextTransitionId = batch.nextTransitionId;
-            if (nextTransitionId > 1) {
-                // This batch has at least one transition.
-                if (state.transitions[slot][1].parentHash == tran.parentHash) {
-                    // Overwrite the first transition.
-                    tid = 1;
-                } else if (nextTransitionId > 2) {
-                    // Retrieve the transition ID using the parent hash from the mapping. If the ID
-                    // is 0, it indicates a new transition; otherwise, it's an overwrite of an
-                    // existing transition.
-                    tid = state.transitionIds[meta.batchId][tran.parentHash];
+            // Surge: block to avoid stack too deep
+            {
+                uint24 nextTransitionId = batch.nextTransitionId;
+                if (nextTransitionId > 1) {
+                    // This batch has at least one transition.
+                    if (state.transitions[slot][1].parentHash == tran.parentHash) {
+                        // Overwrite the first transition.
+                        tid = 1;
+                    } else if (nextTransitionId > 2) {
+                        // Retrieve the transition ID using the parent hash from the mapping. If the
+                        // ID
+                        // is 0, it indicates a new transition; otherwise, it's an overwrite of an
+                        // existing transition.
+                        tid = state.transitionIds[meta.batchId][tran.parentHash];
+                    }
                 }
             }
 
@@ -300,27 +316,78 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
                 }
             } else {
                 TransitionState memory _ts = state.transitions[slot][tid];
-                if (_ts.blockHash == 0) {
-                    // This transition has been invalidated due to a conflicting proof.
-                    // So we can reuse the transition ID.
-                } else {
-                    bool isSameTransition = _ts.blockHash == tran.blockHash
-                        && (_ts.stateRoot == 0 || _ts.stateRoot == tran.stateRoot);
 
-                    if (isSameTransition) {
-                        // Re-approving the same transition is allowed, but we will not change the
-                        // existing one.
-                    } else {
-                        // A conflict is detected with the new transition. Pause the contract and
-                        // invalidate the existing transition by setting its blockHash to 0.
-                        hasConflictingProof = true;
-                        state.transitions[slot][tid].blockHash = 0;
-                        emit ConflictingProof(meta.batchId, _ts, tran);
+                bool isSameTransition = _ts.blockHash == tran.blockHash
+                    && (_ts.stateRoot == 0 || _ts.stateRoot == tran.stateRoot);
+
+                // Surge: Remove the notion of reusing invalidated transitions since we no longer
+                // invalidate on conflicting proofs
+
+                if (isSameTransition) {
+                    // Surge: Take action depending upon previous proof type
+                    if (_ts.proofType == ProofType.ZK_TEE) {
+                        // Skip if the previous proof type was also ZK_TEE
+                        continue;
+                    } else if (_ts.proofType == ProofType.ZK) {
+                        // If a zk proof has already been accepted, we require either a matching TEE
+                        // proof or a ZK + TEE proof
+                        require(
+                            proofType == ProofType.TEE || proofType == ProofType.ZK_TEE,
+                            InvalidProofType()
+                        );
+                    } else if (_ts.proofType == ProofType.TEE) {
+                        // If a TEE proof has already been accepted, we require either a matching ZK
+                        // proof or a ZK + TEE proof
+                        require(
+                            proofType == ProofType.ZK || proofType == ProofType.ZK_TEE,
+                            InvalidProofType()
+                        );
                     }
 
-                    // Proceed with other transitions.
-                    continue;
+                    // At this point, the transition would be both ZK + TEE proven
+                    _ts.proofType = ProofType.ZK_TEE;
+                    // The sender of the latest set of proofs becomes the bond receiver
+                    _ts.bondReceiver = msg.sender;
+                } else {
+                    // Surge: Take action depending upon previous proof type
+                    if (_ts.proofType == ProofType.ZK_TEE) {
+                        // If a ZK + TEE proof has already been accepted, it cannot be challenged
+                        revert ZkTeeProofCannotBeChallenged();
+                    } else if (_ts.proofType == ProofType.ZK) {
+                        // If only a ZK proof has been accepted, we may provide a challenging
+                        // ZK proof or a ZK + TEE proof
+                        require(
+                            proofType == ProofType.ZK || proofType == ProofType.ZK_TEE,
+                            InvalidProofType()
+                        );
+                    } else if (_ts.proofType == ProofType.TEE) {
+                        // If only a TEE proof has been accepted, we may provide any challenging
+                        // proof
+                    }
+
+                    _ts.challenged = true;
+                    _ts.createdAt = uint48(block.timestamp);
+                    _ts.proofType = proofType;
+
+                    // Update the bond receiver if it is a finalising proof
+                    if (proofType == ProofType.ZK_TEE) {
+                        _ts.bondReceiver = msg.sender;
+                    }
+
+                    // Update the blockhash and state root
+                    _ts.blockHash = tran.blockHash;
+                    _ts.stateRoot = meta.batchId % config.stateRootSyncInternal == 0
+                        ? tran.stateRoot
+                        : bytes32(0);
+
+                    emit ConflictingProof(meta.batchId, _ts, tran);
                 }
+
+                // Surge: Update the transition state
+                state.transitions[slot][tid] = _ts;
+
+                // Proceed with other transitions.
+                continue;
             }
 
             TransitionState storage ts = state.transitions[slot][tid];
@@ -329,14 +396,22 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
             ts.stateRoot =
                 meta.batchId % config.stateRootSyncInternal == 0 ? tran.stateRoot : bytes32(0);
 
+            // Surge: Set the proof type
+            ts.proofType = proofType;
+
             bool inProvingWindow;
             unchecked {
                 inProvingWindow = block.timestamp
                     <= uint256(meta.proposedAt).max(stats2.lastUnpausedAt) + config.provingWindow;
             }
 
-            ts.inProvingWindow = inProvingWindow;
-            ts.prover = inProvingWindow ? meta.proposer : msg.sender;
+            // Surge: Set the bond receiver based on the proving window and received proof type
+            if (proofType == ProofType.ZK_TEE) {
+                ts.bondReceiver = inProvingWindow ? meta.proposer : msg.sender;
+            }
+
+            // Surge: Remove initialising `ts.provingWindow` and `ts.prover`
+
             ts.createdAt = uint48(block.timestamp);
 
             if (tid == 1) {
@@ -346,7 +421,12 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
             }
         }
 
-        IVerifier(verifier).verifyProof(ctxs, _proof);
+        // Surge: Use the new verifier from the storage and the ISurgeVerifier interface
+        address _verifier = state.verifier.addr;
+        ProofType _proofType = ISurgeVerifier(_verifier).verifyProof(ctxs, _proof);
+        // Surge: check that proof type sent in the parameters matches the
+        // proof type returned by the verifier
+        require(_proofType == proofType, InvalidProofType());
 
         // Emit the event
         {
@@ -355,15 +435,10 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
                 batchIds[i] = metas[i].batchId;
             }
 
-            emit BatchesProved(verifier, batchIds, trans);
+            emit BatchesProved(_verifier, batchIds, trans);
         }
 
-        if (hasConflictingProof) {
-            _pause();
-            emit Paused(verifier);
-        } else {
-            _verifyBatches(config, stats2, metasLength);
-        }
+        _verifyBatches(config, stats2, metasLength);
     }
 
     /// @notice Verify batches by providing the length of the batches to verify.
@@ -400,6 +475,15 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
         }
     }
 
+    // Surge: required for Surge's finality gadget
+    /// @inheritdoc ITaikoInbox
+    function upgradeVerifier(address _newVerifier) external onlyOwner {
+        require(state.verifier.upgradeable, VerifierNotUpgradeable());
+        state.verifier.addr = _newVerifier;
+        state.verifier.upgradeable = false;
+        emit VerifierUpgraded(_newVerifier);
+    }
+
     /// @inheritdoc ITaikoInbox
     function getStats1() external view returns (Stats1 memory) {
         return state.stats1;
@@ -408,6 +492,12 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
     /// @inheritdoc ITaikoInbox
     function getStats2() external view returns (Stats2 memory) {
         return state.stats2;
+    }
+
+    // Surge: required for Surge's finality gadget
+    /// @inheritdoc ITaikoInbox
+    function getVerifier() external view returns (Verifier memory) {
+        return state.verifier;
     }
 
     /// @inheritdoc ITaikoInbox
@@ -550,7 +640,14 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
 
     // Internal functions ----------------------------------------------------------------------
 
-    function __Taiko_init(address _owner, bytes32 _genesisBlockHash) internal onlyInitializing {
+    function __Taiko_init(
+        address _owner,
+        address _verifier,
+        bytes32 _genesisBlockHash
+    )
+        internal
+        onlyInitializing
+    {
         __Essential_init(_owner);
 
         require(_genesisBlockHash != 0, InvalidGenesisBlockHash());
@@ -570,6 +667,9 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
 
         // Surge: Initialize the verification streak started at timestamp
         state.stats1.verificationStreakStartedAt = uint64(block.timestamp);
+
+        // Surge: Initialize the verifier address
+        state.verifier.addr = _verifier;
 
         emit BatchesVerified(0, _genesisBlockHash);
     }
@@ -674,21 +774,34 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
                     break;
                 }
 
-                bytes32 _blockHash = ts.blockHash;
-                // This transition has been invalidated due to conflicting proof
-                if (_blockHash == 0) break;
+                // Surge: remove conflicting transition and cooldown window checks
 
-                unchecked {
-                    if (ts.createdAt + _config.cooldownWindow > block.timestamp) {
+                // Surge: directly use the block hash from the transition
+                blockHash = ts.blockHash;
+
+                // Surge: Handle verification based on proof type
+                bool _challenged = ts.challenged;
+                address _bondReceiver = ts.bondReceiver;
+
+                if (ts.proofType == ProofType.ZK_TEE) {
+                    if (_challenged) {
+                        // This signals the SC to upgrade the verifier
+                        state.verifier.upgradeable = true;
+                    }
+                } else {
+                    // Proof type is either ZK or TEE
+                    if (_challenged || ts.createdAt + _config.cooldownWindow > block.timestamp) {
+                        // A batch with just ZK or TEE proven transition cannot be verified if
+                        // it is challenged or if the cooldown window has not expired
                         break;
                     }
+
+                    // The batch is being verified because the optimistic cooldown window has
+                    // expired, and the liveness bond is sent to the DAO.
+                    _bondReceiver = dao;
                 }
 
-                blockHash = _blockHash;
-
-                uint96 bondToReturn =
-                    ts.inProvingWindow ? batch.livenessBond : batch.livenessBond / 2;
-                _creditBond(ts.prover, bondToReturn);
+                _creditBond(_bondReceiver, batch.livenessBond);
 
                 if (batchId % _config.stateRootSyncInternal == 0) {
                     synced.batchId = batchId;

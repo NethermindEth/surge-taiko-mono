@@ -18,22 +18,25 @@ contract ConfigurableInbox is TaikoInbox {
 
     constructor(
         address _wrapper,
-        address _verifier,
+        // Surge: add dao address
+        address _dao,
         address _bondToken,
         address _signalService
     )
-        TaikoInbox(_wrapper, _verifier, _bondToken, _signalService)
+        TaikoInbox(_wrapper, _dao, _bondToken, _signalService)
     { }
 
     function initWithConfig(
         address _owner,
+        // Surge: add verifier address
+        address _verifier,
         bytes32 _genesisBlockHash,
         ITaikoInbox.Config memory _config
     )
         external
         initializer
     {
-        __Taiko_init(_owner, _genesisBlockHash);
+        __Taiko_init(_owner, _verifier, _genesisBlockHash);
         __config = _config;
     }
 
@@ -57,6 +60,8 @@ contract ConfigurableInbox is TaikoInbox {
 abstract contract Layer1Test is CommonTest {
     function deployInbox(
         bytes32 _genesisBlockHash,
+        // Surge: add dao address
+        address _dao,
         address _verifier,
         address _bondToken,
         address _signalService,
@@ -68,9 +73,10 @@ abstract contract Layer1Test is CommonTest {
         return TaikoInbox(
             deploy({
                 name: "taiko",
-                impl: address(new ConfigurableInbox(address(0), _verifier, _bondToken, _signalService)),
+                impl: address(new ConfigurableInbox(address(0), _dao, _bondToken, _signalService)),
                 data: abi.encodeCall(
-                    ConfigurableInbox.initWithConfig, (address(0), _genesisBlockHash, _config)
+                    ConfigurableInbox.initWithConfig,
+                    (address(0), _verifier, _genesisBlockHash, _config)
                 )
             })
         );

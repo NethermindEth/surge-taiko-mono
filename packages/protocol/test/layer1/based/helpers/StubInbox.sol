@@ -20,6 +20,9 @@ contract StubInbox is ITaikoInbox {
 
     function withdrawBond(uint256 _amount) external virtual { }
 
+    // Surge: to prevent compilation errors
+    function upgradeVerifier(address _newVerifier) external virtual { }
+
     function bondBalanceOf(address _user) external view returns (uint256) { }
 
     function bondToken() external pure returns (address) {
@@ -71,6 +74,9 @@ contract StubInbox is ITaikoInbox {
     function getStats1() external view returns (Stats1 memory) { }
 
     function getStats2() external view returns (Stats2 memory) { }
+
+    // Surge: to prevent compilation errors
+    function getVerifier() external view virtual returns (Verifier memory) { }
 
     function pacayaConfig() external pure virtual returns (ITaikoInbox.Config memory) { }
 }
