@@ -654,6 +654,56 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         );
     }
 
+    function test_inbox_challenged_ZK_proof_cannot_be_finalised_via_cooldown_period()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using ZK proof type
+        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+
+        // Challenge using ZK proof type
+        _challengeTransitionWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+
+        // Warp time to after the cooldown period ends
+        vm.warp(block.timestamp + pacayaConfig().cooldownWindow + 1);
+
+        // Attempt to finalise
+        inbox.verifyBatches(1);
+
+        // The batch should still not be finalised
+        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 0);
+    }
+
+    function test_inbox_challenged_TEE_proof_cannot_be_finalised_via_cooldown_period()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using TEE proof type
+        _proveBatchesWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
+
+        // Challenge using TEE proof type
+        _challengeTransitionWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
+
+        // Warp time to after the cooldown period ends
+        vm.warp(block.timestamp + pacayaConfig().cooldownWindow + 1);
+
+        // Attempt to finalise
+        inbox.verifyBatches(1);
+
+        // The batch should still not be finalised
+        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 0);
+    }
+
     function test_inbox_verifier_is_upgradeable_when_challenged_ZK_proof_is_finalised()
         external
         transactBy(Alice)
