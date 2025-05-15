@@ -1,10 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "src/layer1/verifiers/IVerifier.sol";
+import "src/layer1/surge/verifiers/ISurgeVerifier.sol";
+import "src/layer1/based/ITaikoInbox.sol";
 
-contract Verifier_ToggleStub is IVerifier {
+// Surge: change the contract to ISurgeVerifier
+contract Verifier_ToggleStub is ISurgeVerifier {
     bool private shouldFail;
+    ITaikoInbox.ProofType private proofType;
+
+    constructor() {
+        proofType = ITaikoInbox.ProofType.ZK_TEE;
+    }
 
     function makeVerifierToFail() external {
         shouldFail = true;
@@ -14,7 +21,19 @@ contract Verifier_ToggleStub is IVerifier {
         shouldFail = false;
     }
 
-    function verifyProof(Context[] calldata, bytes calldata) external view {
-        require(!shouldFail, "IVerifier failure");
+    function setProofType(ITaikoInbox.ProofType _proofType) external {
+        proofType = _proofType;
+    }
+
+    function verifyProof(
+        Context[] calldata,
+        bytes calldata
+    )
+        external
+        view
+        returns (ITaikoInbox.ProofType)
+    {
+        require(!shouldFail, "ISurgeVerifier failure");
+        return proofType;
     }
 }

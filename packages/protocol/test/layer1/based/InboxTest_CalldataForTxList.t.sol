@@ -165,6 +165,7 @@ contract InboxTest_CalldataForTxList is InboxTestBase {
 
         vm.prank(Alice);
         vm.expectRevert(ITaikoInbox.MetaHashMismatch.selector);
-        inbox.proveBatches(abi.encode(metas, transitions), "proof");
+        // Surge: use happy case proof type
+        inbox.proveBatches(abi.encode(ITaikoInbox.ProofType.ZK_TEE, metas, transitions), "proof");
     }
 }

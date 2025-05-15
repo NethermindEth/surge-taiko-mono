@@ -44,6 +44,8 @@ abstract contract InboxTestBase is Layer1Test {
 
         inbox = deployInbox(
             correctBlockhash(0),
+            // Surge: add dao address
+            address(1),
             verifierAddr,
             address(bondToken),
             address(signalService),
@@ -153,7 +155,8 @@ abstract contract InboxTestBase is Layer1Test {
             transitions[i].stateRoot = correctStateRoot(batchIds[i]);
         }
 
-        inbox.proveBatches(abi.encode(metas, transitions), "proof");
+        // Surge: use happy case proof type
+        inbox.proveBatches(abi.encode(ITaikoInbox.ProofType.ZK_TEE, metas, transitions), "proof");
     }
 
     function _proveBatchesWithWrongTransitions(uint64[] memory batchIds) internal {
@@ -167,7 +170,8 @@ abstract contract InboxTestBase is Layer1Test {
             transitions[i].stateRoot = randBytes32();
         }
 
-        inbox.proveBatches(abi.encode(metas, transitions), "proof");
+        // Surge: use happy case proof type
+        inbox.proveBatches(abi.encode(ITaikoInbox.ProofType.ZK_TEE, metas, transitions), "proof");
     }
 
     function _logAllBatchesAndTransitions() internal view {
@@ -220,12 +224,10 @@ abstract contract InboxTestBase is Layer1Test {
                     unicode"│    │    └── stateRoot:",
                     Strings.toHexString(uint256(ts.stateRoot))
                 );
-                console2.log(unicode"│    │    └── prover:", ts.prover);
-
-                console2.log(
-                    unicode"│    │    └── inProvingWindow:",
-                    ts.inProvingWindow ? "Y" : "N"
-                );
+                // Surge: add new fields on transition state
+                console2.log(unicode"│    │    └── bondReceiver:", ts.bondReceiver);
+                console2.log(unicode"│    │    └── proofType:", uint8(ts.proofType));
+                console2.log(unicode"│    │    └── challenged:", ts.challenged ? "Y" : "N");
                 console2.log(unicode"│    │    └── createdAt:", ts.createdAt);
             }
         }

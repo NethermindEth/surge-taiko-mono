@@ -24,11 +24,11 @@ contract SurgeDevnetInbox is TaikoInbox {
     constructor(
         ConfigParams memory _configParams,
         address _wrapper,
-        address _verifier,
+        address _dao,
         address _bondToken,
         address _signalService
     )
-        TaikoInbox(_wrapper, _verifier, _bondToken, _signalService)
+        TaikoInbox(_wrapper, _dao, _bondToken, _signalService)
     {
         chainId = _configParams.chainId;
         maxVerificationDelay = _configParams.maxVerificationDelay;
@@ -60,7 +60,7 @@ contract SurgeDevnetInbox is TaikoInbox {
                 maxGasIssuancePerBlock: 6_000_000_000
             }),
             provingWindow: 24 hours,
-            cooldownWindow: 2 hours,
+            cooldownWindow: 7 days,
             maxSignalsToReceive: 16,
             maxBlocksPerBatch: 768,
             forkHeights: ITaikoInbox.ForkHeights({ ontake: 0, pacaya: 0, shasta: 0, unzen: 0 }),
