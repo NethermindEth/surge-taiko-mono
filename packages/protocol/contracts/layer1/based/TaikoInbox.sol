@@ -325,23 +325,14 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
 
                 if (isSameTransition) {
                     // Surge: Take action depending upon previous proof type
-                    if (_ts.proofType == ProofType.ZK_TEE) {
-                        // Skip if the previous proof type was also ZK_TEE
+                    if (
+                        _ts.proofType == ProofType.ZK_TEE
+                            || (_ts.proofType == ProofType.ZK && proofType == ProofType.ZK)
+                            || (_ts.proofType == ProofType.TEE && proofType == ProofType.TEE)
+                    ) {
+                        // We skip the transition if the existing proof type is ZK_TEE or if the
+                        // existing proof type is same as the newly submitted proof type
                         continue;
-                    } else if (_ts.proofType == ProofType.ZK) {
-                        // If a zk proof has already been accepted, we require either a matching TEE
-                        // proof or a ZK + TEE proof
-                        require(
-                            proofType == ProofType.TEE || proofType == ProofType.ZK_TEE,
-                            InvalidProofType()
-                        );
-                    } else if (_ts.proofType == ProofType.TEE) {
-                        // If a TEE proof has already been accepted, we require either a matching ZK
-                        // proof or a ZK + TEE proof
-                        require(
-                            proofType == ProofType.ZK || proofType == ProofType.ZK_TEE,
-                            InvalidProofType()
-                        );
                     }
 
                     // At this point, the transition would be both ZK + TEE proven
@@ -350,19 +341,14 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
                     _ts.bondReceiver = msg.sender;
                 } else {
                     // Surge: Take action depending upon previous proof type
-                    if (_ts.proofType == ProofType.ZK_TEE) {
-                        // If a ZK + TEE proof has already been accepted, it cannot be challenged
-                        revert ZkTeeProofCannotBeChallenged();
-                    } else if (_ts.proofType == ProofType.ZK) {
-                        // If only a ZK proof has been accepted, we may provide a challenging
-                        // ZK proof or a ZK + TEE proof
-                        require(
-                            proofType == ProofType.ZK || proofType == ProofType.ZK_TEE,
-                            InvalidProofType()
-                        );
-                    } else if (_ts.proofType == ProofType.TEE) {
-                        // If only a TEE proof has been accepted, we may provide any challenging
-                        // proof
+                    if (
+                        _ts.proofType == ProofType.ZK_TEE
+                            || (_ts.proofType == ProofType.ZK && proofType == ProofType.TEE)
+                    ) {
+                        // We skip the transition if the existing proof type is ZK_TEE or if the
+                        // an existing ZK proof is being challenged by a TEE proof.
+                        // A TEE proof can be challenged by any proof type.
+                        continue;
                     }
 
                     _ts.challenged = true;

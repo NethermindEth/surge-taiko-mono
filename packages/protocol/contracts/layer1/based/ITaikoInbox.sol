@@ -332,7 +332,6 @@ interface ITaikoInbox {
     error TransitionNotFound();
     error VerifierNotUpgradeable();
     error ZeroAnchorBlockHash();
-    error ZkTeeProofCannotBeChallenged();
 
     /// @notice Proposes a batch of blocks.
     /// @param _params ABI-encoded parameters.
@@ -353,6 +352,11 @@ interface ITaikoInbox {
     /// - transitions: Array of batch transitions to be proved.
     /// @param _proof The aggregated cryptographic proof proving the batches transitions.
     function proveBatches(bytes calldata _params, bytes calldata _proof) external;
+
+    // Surge: added this function since it was missing in the interface
+    /// @notice Verifies a specified number of batches.
+    /// @param _length The number of batches to verify.
+    function verifyBatches(uint64 _length) external;
 
     /// @notice Deposits TAIKO tokens into the contract to be used as liveness bond.
     /// @param _amount The amount of TAIKO tokens to deposit.
