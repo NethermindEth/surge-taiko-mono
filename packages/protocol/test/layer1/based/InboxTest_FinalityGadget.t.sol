@@ -192,6 +192,7 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         // The transition is now challenged
         ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
         assertEq(ts.challenged, true);
+        // and, a new cooldown period begins
         assertEq(ts.createdAt, block.timestamp);
         assertEq(ts.blockHash, challengedBlockhash(1));
     }
@@ -323,6 +324,7 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
         assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.TEE));
         assertEq(ts.challenged, true);
+        // and, a new cooldown period begins
         assertEq(ts.createdAt, block.timestamp);
         assertEq(ts.blockHash, challengedBlockhash(1));
     }
@@ -354,6 +356,7 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
         assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK));
         assertEq(ts.challenged, true);
+        // and, a new cooldown period begins
         assertEq(ts.createdAt, block.timestamp);
         assertEq(ts.blockHash, challengedBlockhash(1));
     }
