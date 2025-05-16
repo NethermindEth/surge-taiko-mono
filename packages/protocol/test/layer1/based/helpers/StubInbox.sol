@@ -16,6 +16,8 @@ contract StubInbox is ITaikoInbox {
 
     function proveBatches(bytes calldata _params, bytes calldata _proof) external { }
 
+    function verifyBatches(uint64 _length) external { }
+
     function depositBond(uint256 _amount) external payable virtual { }
 
     function withdrawBond(uint256 _amount) external virtual { }

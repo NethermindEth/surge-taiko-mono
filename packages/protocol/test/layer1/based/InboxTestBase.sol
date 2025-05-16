@@ -11,6 +11,8 @@ abstract contract InboxTestBase is Layer1Test {
     ITaikoInbox internal inbox;
     TaikoToken internal bondToken;
     SignalService internal signalService;
+    // Surge: use the verifier instance
+    Verifier_ToggleStub internal verifier;
     uint256 genesisBlockProposedAt;
     uint256 genesisBlockProposedIn;
     uint256 private __blocksPerBatch;
@@ -39,14 +41,14 @@ abstract contract InboxTestBase is Layer1Test {
 
         signalService = deploySignalService(address(new SignalService(address(resolver))));
 
-        address verifierAddr = address(new Verifier_ToggleStub());
-        resolver.registerAddress(block.chainid, "proof_verifier", verifierAddr);
+        verifier = new Verifier_ToggleStub();
+        // Surge: do not register the verifier address
 
         inbox = deployInbox(
             correctBlockhash(0),
             // Surge: add dao address
             address(1),
-            verifierAddr,
+            address(verifier),
             address(bondToken),
             address(signalService),
             pacayaConfig()
@@ -159,6 +161,49 @@ abstract contract InboxTestBase is Layer1Test {
         inbox.proveBatches(abi.encode(ITaikoInbox.ProofType.ZK_TEE, metas, transitions), "proof");
     }
 
+    // Surge: helper to prove using a specific proof type
+    function _proveBatchesWithProofType(
+        ITaikoInbox.ProofType proofType,
+        uint64[] memory batchIds
+    )
+        internal
+    {
+        ITaikoInbox.BatchMetadata[] memory metas = new ITaikoInbox.BatchMetadata[](batchIds.length);
+        ITaikoInbox.Transition[] memory transitions = new ITaikoInbox.Transition[](batchIds.length);
+
+        for (uint256 i; i < metas.length; ++i) {
+            (metas[i],) = _loadMetadataAndInfo(batchIds[i]);
+            transitions[i].parentHash = correctBlockhash(batchIds[i] - 1);
+            transitions[i].blockHash = correctBlockhash(batchIds[i]);
+            transitions[i].stateRoot = correctStateRoot(batchIds[i]);
+        }
+
+        verifier.setProofType(proofType);
+        inbox.proveBatches(abi.encode(proofType, metas, transitions), "proof");
+    }
+
+    // Surge: helper to challenge a transition with a specific proof type
+    function _challengeTransitionWithProofType(
+        ITaikoInbox.ProofType proofType,
+        uint64[] memory batchIds
+    )
+        internal
+    {
+        ITaikoInbox.BatchMetadata[] memory metas = new ITaikoInbox.BatchMetadata[](batchIds.length);
+        ITaikoInbox.Transition[] memory transitions = new ITaikoInbox.Transition[](batchIds.length);
+
+        for (uint256 i; i < metas.length; ++i) {
+            (metas[i],) = _loadMetadataAndInfo(batchIds[i]);
+            // Parent hash is correct
+            transitions[i].parentHash = correctBlockhash(batchIds[i] - 1);
+            transitions[i].blockHash = challengedBlockhash(batchIds[i]);
+            transitions[i].stateRoot = challengedStateRoot(batchIds[i]);
+        }
+
+        verifier.setProofType(proofType);
+        inbox.proveBatches(abi.encode(proofType, metas, transitions), "proof");
+    }
+
     function _proveBatchesWithWrongTransitions(uint64[] memory batchIds) internal {
         ITaikoInbox.BatchMetadata[] memory metas = new ITaikoInbox.BatchMetadata[](batchIds.length);
         ITaikoInbox.Transition[] memory transitions = new ITaikoInbox.Transition[](batchIds.length);
@@ -240,6 +285,16 @@ abstract contract InboxTestBase is Layer1Test {
 
     function correctStateRoot(uint256 blockId) internal pure returns (bytes32) {
         return bytes32(0x2000000 + blockId);
+    }
+
+    // Surge: helper to get a challenged blockhash
+    function challengedBlockhash(uint256 blockId) internal pure returns (bytes32) {
+        return bytes32(0x3000000 + blockId);
+    }
+
+    // Surge: helper to get a challenged state root
+    function challengedStateRoot(uint256 blockId) internal pure returns (bytes32) {
+        return bytes32(0x4000000 + blockId);
     }
 
     function range(uint64 start, uint64 end) internal pure returns (uint64[] memory arr) {
