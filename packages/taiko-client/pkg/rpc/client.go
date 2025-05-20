@@ -84,6 +84,7 @@ type ClientConfig struct {
 	GuardianProverMinorityAddress common.Address
 	GuardianProverMajorityAddress common.Address
 	ProverSetAddress              common.Address
+	InboxAddress                  common.Address
 	L2EngineEndpoint              string
 	JwtSecret                     string
 	Timeout                       time.Duration

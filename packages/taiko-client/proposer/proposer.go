@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -55,6 +56,8 @@ type Proposer struct {
 
 	ctx context.Context
 	wg  sync.WaitGroup
+
+	forceProposeOnce bool // TODO: to verify that this works as expected
 }
 
 // InitFromCli initializes the given proposer instance based on the command line flags.
@@ -132,6 +135,44 @@ func (p *Proposer) InitFromConfig(
 		cfg.FallbackToCalldata,
 	)
 
+	if (cfg.ClientConfig.InboxAddress != common.Address{}) {
+		if err := p.subscribeToSignalSentEvent(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// subscribeToSignalSentEvent subscribes to SignalSent event on eth l1 RPC
+func (p *Proposer) subscribeToSignalSentEvent() error {
+	logChan := make(chan types.Log)
+	sub, err := p.rpc.L1.SubscribeFilterLogs(p.ctx, ethereum.FilterQuery{
+		Addresses: []common.Address{p.Config.InboxAddress},
+		Topics:    [][]common.Hash{{common.HexToHash("0x0ad2d108660a211f47bf7fb43a0443cae181624995d3d42b88ee6879d200e973")}},
+	}, logChan)
+	if err != nil {
+		return fmt.Errorf("subscribe error: %w", err)
+	}
+
+	p.wg.Add(1)
+	go func() {
+		defer p.wg.Done()
+		defer sub.Unsubscribe()
+
+		for {
+			select {
+			case <-p.ctx.Done():
+				return
+			case err := <-sub.Err():
+				log.Error("subscription error", "err", err)
+				return
+			case vLog := <-logChan:
+				log.Info("SignalSent event received", "log", vLog)
+				p.forceProposeOnce = true
+			}
+		}
+	}()
 	return nil
 }
 
@@ -207,6 +248,13 @@ func (p *Proposer) fetchPoolContent(allowEmptyPoolContent bool) ([]types.Transac
 
 	// Extract the transaction lists from the pre-built transaction lists information.
 	txLists := []types.Transactions{}
+
+	if p.forceProposeOnce {
+		log.Info("Force proposing empty block because of signal event")
+		txLists = append(txLists, types.Transactions{})
+		return txLists, nil
+	}
+
 	for _, txs := range preBuiltTxList {
 		txLists = append(txLists, txs.TxList)
 	}
