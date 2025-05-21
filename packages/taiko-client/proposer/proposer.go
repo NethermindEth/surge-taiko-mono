@@ -447,11 +447,13 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 		for _, tx := range p.pendingBridgeMessages {
 			txList = append(txList, tx)
 		}
+		log.Debug("Added bridge message to txList", "txList", txList)
 		p.pendingBridgeMessages = make(map[common.Hash]*types.Transaction) // Clear processed messages
 	}
 	p.bridgeMsgMu.Unlock()
 
-	// TODO(@jmadibekov): Add a check that the transaction is valid and hasn't been mined already (whether by relayer or some other way) and include it in the proposed block
+	// TODO(@jmadibekov): Add a check that the transaction is valid and hasn't been mined already
+	// (whether by relayer or some other way) and include it in the proposed block
 
 	// Check whether it's time to allow proposing empty pool content, if the `--epoch.minProposingInterval` flag is set.
 	allowEmptyPoolContent := time.Now().After(p.lastProposedAt.Add(p.MinProposingInternal))
