@@ -2,9 +2,9 @@ package encoding
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"strings"
-	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"

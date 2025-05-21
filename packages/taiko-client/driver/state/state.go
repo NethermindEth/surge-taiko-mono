@@ -155,6 +155,7 @@ func (s *State) eventLoop(ctx context.Context) {
 				"hash", common.Hash(e.BlockHash),
 				"prover", e.Prover,
 			)
+			metrics.DriverL2VerifiedHeightGauge.Set(float64(e.BlockId.Uint64()))
 		case e := <-batchesVerifiedPacayaCh:
 			log.Info(
 				"📈 Batches verified",
