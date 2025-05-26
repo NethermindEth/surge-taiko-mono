@@ -17,6 +17,7 @@ import "src/shared/tokenvault/ERC1155Vault.sol";
 import "src/shared/signal/SignalService.sol";
 
 // Layer2 contracts
+import "src/layer2/DelegateOwner.sol";
 import "src/layer2/based/TaikoAnchor.sol";
 
 /// @title SetupSurgeL2
@@ -36,10 +37,9 @@ contract SetupSurgeL2 is Script {
     address internal immutable l1ERC721Vault = vm.envAddress("L1_ERC721_VAULT");
     address internal immutable l1ERC1155Vault = vm.envAddress("L1_ERC1155_VAULT");
 
-    // Timelock configuration
+    // L1 Timelock configuration
     // --------------------------------------------------------------------------
-    address internal immutable ownerMultisig = vm.envAddress("OWNER_MULTISIG");
-    uint256 internal immutable timelockPeriod = vm.envUint("TIMELOCK_PERIOD");
+    address internal immutable l1TimelockController = vm.envAddress("L1_TIMELOCK_CONTROLLER");
 
     struct L2Contract {
         bytes32 key;
@@ -68,8 +68,6 @@ contract SetupSurgeL2 is Script {
 
     function run() external broadcast {
         require(l1ChainId != block.chainid || l1ChainId != 0, "config: L1_CHAIN_ID");
-        require(ownerMultisig != address(0), "config: OWNER_MULTISIG");
-        require(timelockPeriod != 0, "config: TIMELOCK_PERIOD");
         require(l1Bridge != address(0), "config: L1_BRIDGE");
         require(l1SignalService != address(0), "config: L1_SIGNAL_SERVICE");
         require(l1ERC20Vault != address(0), "config: L1_ERC20_VAULT");
@@ -127,9 +125,9 @@ contract SetupSurgeL2 is Script {
         // --------------------------------------------------------------------------
         registerL1ContractsToL2SharedResolver(l2ContractRegistry);
 
-        // Setup timelock and transfer ownership
+        // Setup delegate owner and transfer ownership
         // --------------------------------------------------------------------------
-        setupTimelockAndTransferOwnership(l2ContractRegistry);
+        setupDelegateOwnerAndTransferOwnership(l2ContractRegistry);
     }
 
     function verifyL2Registrations(L2ContractRegistry memory l2ContractRegistry) internal view {
@@ -193,47 +191,34 @@ contract SetupSurgeL2 is Script {
         console2.log("** Registered L1 ERC1155 vault to shared resolver");
     }
 
-    function setupTimelockAndTransferOwnership(L2ContractRegistry memory l2ContractRegistry)
+    function setupDelegateOwnerAndTransferOwnership(L2ContractRegistry memory l2ContractRegistry)
         internal
     {
-        address[] memory ownerMultisigSigners = vm.envAddress("OWNER_MULTISIG_SIGNERS", ",");
-        require(ownerMultisigSigners.length > 0, "Config: OWNER_MULTISIG_SIGNERS");
-        for (uint256 i = 0; i < ownerMultisigSigners.length; i++) {
-            require(ownerMultisigSigners[i] != address(0), "Config: OWNER_MULTISIG_SIGNERS");
-        }
+        address delegateOwner = address(new DelegateOwner(l2ContractRegistry.bridge.addr));
+        DelegateOwner(delegateOwner).init(l1TimelockController, uint64(l1ChainId), address(0));
 
-        // Proposers: only the multisig
-        address[] memory proposers = new address[](1);
-        proposers[0] = ownerMultisig;
+        console2.log("** Delegate owner (L2 owner):", delegateOwner);
 
-        // Executors: all multisig signers
-        address[] memory executors = ownerMultisigSigners;
-        address timelockController =
-            payable(new TimelockController(timelockPeriod, proposers, executors, address(0)));
-        console2.log("** Timelock controller (L2 owner):", timelockController);
+        Bridge(payable(l2ContractRegistry.bridge.addr)).transferOwnership(delegateOwner);
+        console2.log("** Transferred ownership of Bridge to delegate owner:", delegateOwner);
 
-        Bridge(payable(l2ContractRegistry.bridge.addr)).transferOwnership(timelockController);
-        console2.log("** Transferred ownership of Bridge to timelock:", timelockController);
+        ERC20Vault(l2ContractRegistry.erc20Vault.addr).transferOwnership(delegateOwner);
+        console2.log("** Transferred ownership of ERC20Vault to delegate owner:", delegateOwner);
 
-        ERC20Vault(l2ContractRegistry.erc20Vault.addr).transferOwnership(timelockController);
-        console2.log("** Transferred ownership of ERC20Vault to timelock:", timelockController);
+        ERC721Vault(l2ContractRegistry.erc721Vault.addr).transferOwnership(delegateOwner);
+        console2.log("** Transferred ownership of ERC721Vault to delegate owner:", delegateOwner);
 
-        ERC721Vault(l2ContractRegistry.erc721Vault.addr).transferOwnership(timelockController);
-        console2.log("** Transferred ownership of ERC721Vault to timelock:", timelockController);
+        ERC1155Vault(l2ContractRegistry.erc1155Vault.addr).transferOwnership(delegateOwner);
+        console2.log("** Transferred ownership of ERC1155Vault to delegate owner:", delegateOwner);
 
-        ERC1155Vault(l2ContractRegistry.erc1155Vault.addr).transferOwnership(timelockController);
-        console2.log("** Transferred ownership of ERC1155Vault to timelock:", timelockController);
+        SignalService(l2ContractRegistry.signalService.addr).transferOwnership(delegateOwner);
+        console2.log("** Transferred ownership of SignalService to delegate owner:", delegateOwner);
 
-        SignalService(l2ContractRegistry.signalService.addr).transferOwnership(timelockController);
-        console2.log("** Transferred ownership of SignalService to timelock:", timelockController);
+        TaikoAnchor(l2ContractRegistry.taiko.addr).transferOwnership(delegateOwner);
+        console2.log("** Transferred ownership of TaikoAnchor to delegate owner:", delegateOwner);
 
-        TaikoAnchor(l2ContractRegistry.taiko.addr).transferOwnership(timelockController);
-        console2.log("** Transferred ownership of TaikoAnchor to timelock:", timelockController);
-
-        DefaultResolver(l2ContractRegistry.sharedResolver.addr).transferOwnership(
-            timelockController
-        );
-        console2.log("** Transferred ownership of DefaultResolver to timelock:", timelockController);
+        DefaultResolver(l2ContractRegistry.sharedResolver.addr).transferOwnership(delegateOwner);
+        console2.log("** Transferred ownership of SharedResolver to delegate owner:", delegateOwner);
     }
 
     function getConstantAddress(
