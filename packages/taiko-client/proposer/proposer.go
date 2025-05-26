@@ -360,13 +360,6 @@ func (p *Proposer) fetchPoolContent(allowEmptyPoolContent bool) ([]types.Transac
 
 	// Extract the transaction lists from the pre-built transaction lists information.
 	txLists := []types.Transactions{}
-
-	if p.forceProposeOnce {
-		log.Info("Force proposing empty block because of signal event")
-		txLists = append(txLists, types.Transactions{})
-		return txLists, nil
-	}
-
 	for _, txs := range preBuiltTxList {
 		txLists = append(txLists, txs.TxList)
 	}
