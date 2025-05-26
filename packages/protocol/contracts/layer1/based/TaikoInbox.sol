@@ -483,6 +483,24 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
         ts_ = getBatchVerifyingTransition(batchId_);
     }
 
+    // Surge: This function is required for stage-2
+    /// @inheritdoc ITaikoInbox
+    function getVerificationStreakStartedAt() external view returns (uint256) {
+        Config memory config = pacayaConfig();
+
+        // Surge: If the verification streak has been broken, we return the current timestamp,
+        // otherwise we return the last recorded timestamp when the streak started.
+        if (
+            block.timestamp
+                - state.batches[state.stats2.lastVerifiedBatchId % config.batchRingBufferSize]
+                    .lastBlockTimestamp > config.maxVerificationDelay
+        ) {
+            return block.timestamp;
+        } else {
+            return state.stats1.verificationStreakStartedAt;
+        }
+    }
+
     /// @inheritdoc ITaikoInbox
     function bondBalanceOf(address _user) external view returns (uint256) {
         return state.bondBalance[_user];
@@ -524,24 +542,6 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
 
         if (batch.verifiedTransitionId != 0) {
             ts_ = state.transitions[slot][batch.verifiedTransitionId];
-        }
-    }
-
-    // Surge: This function is required for stage-2
-    /// @inheritdoc ITaikoInbox
-    function getVerificationStreakStartedAt() external view returns (uint256) {
-        Config memory config = pacayaConfig();
-
-        // Surge: If the verification streak has been broken, we return the current timestamp,
-        // otherwise we return the last recorded timestamp when the streak started.
-        if (
-            block.timestamp
-                - state.batches[state.stats2.lastVerifiedBatchId % config.batchRingBufferSize]
-                    .lastBlockTimestamp > config.maxVerificationDelay
-        ) {
-            return block.timestamp;
-        } else {
-            return state.stats1.verificationStreakStartedAt;
         }
     }
 
