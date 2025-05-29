@@ -324,7 +324,7 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
                 if (isSameTransition) {
                     // Surge: Take action depending upon previous proof type
                     if (
-                        proofType.isZkTeeProof()
+                        _ts.proofType.isZkTeeProof()
                             || (_ts.proofType.isZkProof() && proofType.isZkProof())
                             || (_ts.proofType.isTeeProof() && proofType.isTeeProof())
                     ) {
