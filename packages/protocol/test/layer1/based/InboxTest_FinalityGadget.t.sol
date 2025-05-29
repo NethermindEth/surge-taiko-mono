@@ -39,7 +39,14 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         super.setUpOnEthereum();
     }
 
-    function test_inbox_batch_is_finalised_immediately_with_ZK_TEE_proof()
+    // --------------------------------------------------------------------------------------------
+    // Happy cases
+    // --------------------------------------------------------------------------------------------
+
+    // ZK + TEE
+    // --------
+
+    function test_inbox_batch_is_finalised_immediately_with_SGX_SP1_proof()
         external
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
@@ -51,15 +58,15 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 0);
 
-        // Prove using ZK_TEE proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK_TEE, batchIds);
+        // Prove using SGX + SP1 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX_SP1, batchIds);
 
         // The batch is now finalised
         stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
     }
 
-    function test_inbox_batch_is_finalised_when_ZK_proof_is_followed_by_matching_TEE_proof()
+    function test_inbox_batch_is_finalised_immediately_with_SGX_RISC0_proof()
         external
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
@@ -67,28 +74,22 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Prove using ZK proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
-
-        // The batch is not finalised yet
+        // Batch is not finalised yet
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 0);
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK));
 
-        // Prove using TEE proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
+        // Prove using SGX + RISC0 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX_RISC0, batchIds);
 
         // The batch is now finalised
         stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, proof type is updated to ZK_TEE
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK_TEE));
     }
 
-    function test_inbox_batch_is_finalised_when_TEE_proof_is_followed_by_matching_ZK_proof()
+    // ZK followed by TEE
+    // --------------------
+
+    function test_inbox_batch_is_finalised_when_SP1_proof_is_followed_by_matching_SGX_proof()
         external
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
@@ -96,26 +97,119 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Prove using TEE proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
+        // Prove using SP1 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SP1, batchIds);
 
         // The batch is not finalised yet
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 0);
         ITaikoInbox.TransitionState memory ts =
             inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.TEE));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SP1));
 
-        // Prove using ZK proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
 
         // The batch is now finalised
         stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, proof type is updated to ZK_TEE
+        // and, proof type is updated to SGX_SP1
         ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK_TEE));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_SP1));
     }
+
+    function test_inbox_batch_is_finalised_when_RISC0_proof_is_followed_by_matching_SGX_proof()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using RISC0 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.RISC0, batchIds);
+
+        // The batch is not finalised yet
+        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 0);
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.RISC0));
+
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The batch is now finalised
+        stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 1);
+        // and, proof type is updated to SGX_RISC0
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_RISC0));
+    }
+
+    // TEE followed by ZK
+    // --------------------
+
+    function test_inbox_batch_is_finalised_when_SGX_proof_is_followed_by_matching_SP1_proof()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The batch is not finalised yet
+        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 0);
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX));
+
+        // Prove using SP1 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SP1, batchIds);
+
+        // The batch is now finalised
+        stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 1);
+        // and, proof type is updated to SGX_SP1
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_SP1));
+    }
+
+    function test_inbox_batch_is_finalised_when_SGX_proof_is_followed_by_matching_RISC0_proof()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The batch is not finalised yet
+        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 0);
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX));
+
+        // Prove using RISC0 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.RISC0, batchIds);
+
+        // The batch is now finalised
+        stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 1);
+        // and, proof type is updated to SGX_RISC0
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_RISC0));
+    }
+
+    // Misc
+    // ----
 
     function test_inbox_sender_of_the_matching_proof_becomes_bond_receiver()
         external
@@ -125,12 +219,12 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Alice proves the batch using ZK proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+        // Alice proves the batch using SP1 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SP1, batchIds);
 
-        // Bob proves the batch using matching TEE proof type
+        // Bob proves the batch using matching SGX proof type
         vm.startPrank(Bob);
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
         vm.stopPrank();
 
         // The batch is now finalised
@@ -150,23 +244,30 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Prove using ZK proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+        // Prove using SP1 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SP1, batchIds);
 
-        // Proof type is set to ZK
+        // Proof type is set to SP1
         ITaikoInbox.TransitionState memory ts =
             inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SP1));
 
-        // Prove using ZK proof type again
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+        // Prove using RISC0 proof type (i.e ZK again)
+        _proveBatchesWithProofType(LibProofType.ProofType.RISC0, batchIds);
 
-        // Proof type is still ZK, signaling that proving was skipped
+        // Proof type is still SP1, signaling that proving was skipped
         ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SP1));
     }
 
-    function test_inbox_a_ZK_proof_can_be_challenged_by_another_ZK_proof()
+    // --------------------------------------------------------------------------------------------
+    // Challenge cases
+    // --------------------------------------------------------------------------------------------
+
+    // ZK or ZK + TEE Challenging a ZK proof
+    // -------------------------------------
+
+    function test_inbox_an_SP1_proof_can_be_challenged_by_a_RISC0_proof()
         external
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
@@ -174,30 +275,32 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Prove using ZK proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+        // Prove using SP1 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SP1, batchIds);
 
         // The batch is not challenged yet
         ITaikoInbox.TransitionState memory ts =
             inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SP1));
         assertEq(ts.challenged, false);
         assertEq(ts.createdAt, block.timestamp);
 
         vm.warp(block.timestamp + 2);
 
-        // Challenge using ZK proof type again
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+        // Challenge using RISC0 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.RISC0, batchIds);
 
         // The transition is now challenged
         ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
         assertEq(ts.challenged, true);
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.RISC0));
+        assertEq(uint8(ts.challengedProofType), uint8(LibProofType.ProofType.SP1));
         // and, a new cooldown period begins
         assertEq(ts.createdAt, block.timestamp);
         assertEq(ts.blockHash, challengedBlockhash(1));
     }
 
-    function test_inbox_batch_is_finalised_when_ZK_proof_is_challenged_by_a_ZK_TEE_proof()
+    function test_inbox_a_RISC0_proof_can_be_challenged_by_an_SP1_proof()
         external
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
@@ -205,24 +308,58 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Prove using ZK proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+        // Prove using RISC0 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.RISC0, batchIds);
 
         // The batch is not challenged yet
         ITaikoInbox.TransitionState memory ts =
             inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.RISC0));
         assertEq(ts.challenged, false);
         assertEq(ts.createdAt, block.timestamp);
 
         vm.warp(block.timestamp + 2);
 
-        // Challenge using ZK_TEE proof type
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.ZK_TEE, batchIds);
+        // Challenge using SP1 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SP1, batchIds);
 
         // The transition is now challenged
         ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK_TEE));
+        assertEq(ts.challenged, true);
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SP1));
+        assertEq(uint8(ts.challengedProofType), uint8(LibProofType.ProofType.RISC0));
+        // and, a new cooldown period begins
+        assertEq(ts.createdAt, block.timestamp);
+        assertEq(ts.blockHash, challengedBlockhash(1));
+    }
+
+    function test_inbox_batch_is_finalised_when_SP1_proof_is_challenged_by_an_SGX_RISC0_proof()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SP1 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SP1, batchIds);
+
+        // The batch is not challenged yet
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SP1));
+        assertEq(ts.challenged, false);
+        assertEq(ts.createdAt, block.timestamp);
+
+        vm.warp(block.timestamp + 2);
+
+        // Challenge using SGX_RISC0 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX_RISC0, batchIds);
+
+        // The transition is now challenged
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_RISC0));
+        assertEq(uint8(ts.challengedProofType), uint8(LibProofType.ProofType.SP1));
         assertEq(ts.challenged, true);
         assertEq(ts.createdAt, block.timestamp);
         assertEq(ts.blockHash, challengedBlockhash(1));
@@ -231,7 +368,7 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         assertEq(stats2.lastVerifiedBatchId, 1);
     }
 
-    function test_inbox_sender_becomes_bond_receiver_when_ZK_proof_is_challenged_by_a_ZK_TEE_proof()
+    function test_inbox_batch_is_finalised_when_RISC0_proof_is_challenged_by_an_SGX_SP1_proof()
         external
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
@@ -239,154 +376,26 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Prove using ZK proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+        // Prove using RISC0 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.RISC0, batchIds);
 
         // The batch is not challenged yet
         ITaikoInbox.TransitionState memory ts =
             inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.RISC0));
         assertEq(ts.challenged, false);
         assertEq(ts.createdAt, block.timestamp);
 
         vm.warp(block.timestamp + 2);
 
-        // Challenge using ZK_TEE proof type
-        vm.startPrank(Bob);
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.ZK_TEE, batchIds);
-        vm.stopPrank();
+        // Challenge using SGX_SP1 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX_SP1, batchIds);
 
         // The transition is now challenged
         ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK_TEE));
-        assertEq(ts.challenged, true);
-        assertEq(ts.createdAt, block.timestamp);
-        assertEq(ts.blockHash, challengedBlockhash(1));
-        // and, bond receiver is updated to Bob
-        assertEq(ts.bondReceiver, Bob);
-    }
-
-    function test_inbox_a_ZK_proof_cannot_be_challenged_by_a_TEE_proof()
-        external
-        transactBy(Alice)
-        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
-    {
-        uint64[] memory batchIds = new uint64[](1);
-        batchIds[0] = 1;
-
-        // Prove using ZK proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
-
-        // The batch is not challenged yet
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK));
-        assertEq(ts.challenged, false);
-        assertEq(ts.createdAt, block.timestamp);
-
-        vm.warp(block.timestamp + 2);
-
-        // Attempt to challenge using TEE proof type
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
-
-        // The transition should remain unchanged
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK));
-        assertEq(ts.challenged, false);
-        assertEq(ts.createdAt, block.timestamp - 2);
-        assertEq(ts.blockHash, correctBlockhash(1));
-    }
-
-    function test_inbox_a_TEE_proof_can_be_challenged_by_another_TEE_proof()
-        external
-        transactBy(Alice)
-        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
-    {
-        uint64[] memory batchIds = new uint64[](1);
-        batchIds[0] = 1;
-
-        // Prove using TEE proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
-
-        // The batch is not challenged yet
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.TEE));
-        assertEq(ts.challenged, false);
-        assertEq(ts.createdAt, block.timestamp);
-
-        vm.warp(block.timestamp + 2);
-
-        // Challenge using TEE proof type again
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
-
-        // The transition is now challenged
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.TEE));
-        assertEq(ts.challenged, true);
-        // and, a new cooldown period begins
-        assertEq(ts.createdAt, block.timestamp);
-        assertEq(ts.blockHash, challengedBlockhash(1));
-    }
-
-    function test_inbox_a_TEE_proof_can_be_challenged_by_a_ZK_proof()
-        external
-        transactBy(Alice)
-        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
-    {
-        uint64[] memory batchIds = new uint64[](1);
-        batchIds[0] = 1;
-
-        // Prove using TEE proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
-
-        // The batch is not challenged yet
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.TEE));
-        assertEq(ts.challenged, false);
-        assertEq(ts.createdAt, block.timestamp);
-
-        vm.warp(block.timestamp + 2);
-
-        // Challenge using ZK proof type
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
-
-        // The transition is now challenged
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK));
-        assertEq(ts.challenged, true);
-        // and, a new cooldown period begins
-        assertEq(ts.createdAt, block.timestamp);
-        assertEq(ts.blockHash, challengedBlockhash(1));
-    }
-
-    function test_inbox_batch_is_finalised_when_TEE_proof_is_challenged_by_a_ZK_TEE_proof()
-        external
-        transactBy(Alice)
-        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
-    {
-        uint64[] memory batchIds = new uint64[](1);
-        batchIds[0] = 1;
-
-        // Prove using TEE proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
-
-        // The batch is not challenged yet
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.TEE));
-        assertEq(ts.challenged, false);
-        assertEq(ts.createdAt, block.timestamp);
-
-        vm.warp(block.timestamp + 2);
-
-        // Challenge using ZK_TEE proof type
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.ZK_TEE, batchIds);
-
-        // The transition is now challenged
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK_TEE));
+        console2.log("Here");
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_SP1));
+        assertEq(uint8(ts.challengedProofType), uint8(LibProofType.ProofType.RISC0));
         assertEq(ts.challenged, true);
         assertEq(ts.createdAt, block.timestamp);
         assertEq(ts.blockHash, challengedBlockhash(1));
@@ -395,7 +404,85 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         assertEq(stats2.lastVerifiedBatchId, 1);
     }
 
-    function test_inbox_sender_becomes_bond_receiver_when_TEE_proof_is_challenged_by_a_ZK_TEE_proof(
+    function test_inbox_batch_is_finalised_when_challenging_SP1_proof_gets_matching_SGX_proof()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using RISC0 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.RISC0, batchIds);
+
+        vm.warp(block.timestamp + 2);
+
+        // Challenge using SP1 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SP1, batchIds);
+
+        // The batch is challenged
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SP1));
+        assertEq(ts.challenged, true);
+        assertEq(ts.createdAt, block.timestamp);
+        assertEq(ts.blockHash, challengedBlockhash(1));
+        // but not finalised yet
+        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 0);
+
+        // Prove challenged transitions using SGX proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The batch is now finalised
+        stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 1);
+        // and, proof type is updated to SGX_SP1
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(ts.blockHash, challengedBlockhash(1));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_SP1));
+    }
+
+    function test_inbox_batch_is_finalised_when_challenging_RISC0_proof_gets_matching_SGX_proof()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SP1 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SP1, batchIds);
+
+        vm.warp(block.timestamp + 2);
+
+        // Challenge using RISC0 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.RISC0, batchIds);
+
+        // The batch is challenged
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.RISC0));
+        assertEq(ts.challenged, true);
+        assertEq(ts.createdAt, block.timestamp);
+        assertEq(ts.blockHash, challengedBlockhash(1));
+        // but not finalised yet
+        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 0);
+
+        // Prove challenged transitions using SGX proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The batch is now finalised
+        stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 1);
+        // and, proof type is updated to SGX_RISC0
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(ts.blockHash, challengedBlockhash(1));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_RISC0));
+    }
+
+    function test_inbox_sender_becomes_bond_receiver_when_SP1_proof_is_challenged_by_an_SGX_RISC0_proof(
     )
         external
         transactBy(Alice)
@@ -404,26 +491,26 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Prove using TEE proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
+        // Prove using SP1 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SP1, batchIds);
 
         // The batch is not challenged yet
         ITaikoInbox.TransitionState memory ts =
             inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.TEE));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SP1));
         assertEq(ts.challenged, false);
         assertEq(ts.createdAt, block.timestamp);
 
         vm.warp(block.timestamp + 2);
 
-        // Challenge using ZK_TEE proof type
+        // Challenge using SGX_RISC0 proof type
         vm.startPrank(Bob);
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.ZK_TEE, batchIds);
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX_RISC0, batchIds);
         vm.stopPrank();
 
         // The transition is now challenged
         ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK_TEE));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_RISC0));
         assertEq(ts.challenged, true);
         assertEq(ts.createdAt, block.timestamp);
         assertEq(ts.blockHash, challengedBlockhash(1));
@@ -431,7 +518,8 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         assertEq(ts.bondReceiver, Bob);
     }
 
-    function test_inbox_batch_is_finalised_when_challenged_ZK_proof_gets_matching_TEE_proof()
+    function test_inbox_sender_becomes_bond_receiver_when_RISC0_proof_is_challenged_by_an_SGX_SP1_proof(
+    )
         external
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
@@ -439,91 +527,445 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Prove using ZK proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
-
-        vm.warp(block.timestamp + 2);
-
-        // Challenge using ZK proof type
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
-
-        // The batch is challenged
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK));
-        assertEq(ts.challenged, true);
-        assertEq(ts.createdAt, block.timestamp);
-        assertEq(ts.blockHash, challengedBlockhash(1));
-        // but not finalised yet
-        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
-        assertEq(stats2.lastVerifiedBatchId, 0);
-
-        // Prove challenged transitions using TEE proof type
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
-
-        // The batch is now finalised
-        stats2 = inbox.getStats2();
-        assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, proof type is updated to ZK_TEE
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(ts.blockHash, challengedBlockhash(1));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK_TEE));
-    }
-
-    function test_inbox_batch_is_finalised_when_challenged_TEE_proof_gets_matching_ZK_proof()
-        external
-        transactBy(Alice)
-        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
-    {
-        uint64[] memory batchIds = new uint64[](1);
-        batchIds[0] = 1;
-
-        // Prove using TEE proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
-
-        vm.warp(block.timestamp + 2);
-
-        // Challenge using TEE proof type
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
-
-        // The batch is challenged
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.TEE));
-        assertEq(ts.challenged, true);
-        assertEq(ts.createdAt, block.timestamp);
-        assertEq(ts.blockHash, challengedBlockhash(1));
-        // but not finalised yet
-        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
-        assertEq(stats2.lastVerifiedBatchId, 0);
-
-        // Prove challenged transitions using ZK proof type
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
-
-        // The batch is now finalised
-        stats2 = inbox.getStats2();
-        assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, proof type is updated to ZK_TEE
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(ts.blockHash, challengedBlockhash(1));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK_TEE));
-    }
-
-    function test_inbox_batch_is_finalised_when_ZK_proof_is_not_challenged_within_cooldown_period()
-        external
-        transactBy(Alice)
-        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
-    {
-        uint64[] memory batchIds = new uint64[](1);
-        batchIds[0] = 1;
-
-        // Prove using ZK proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+        // Prove using RISC0 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.RISC0, batchIds);
 
         // The batch is not challenged yet
         ITaikoInbox.TransitionState memory ts =
             inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.RISC0));
+        assertEq(ts.challenged, false);
+        assertEq(ts.createdAt, block.timestamp);
+
+        vm.warp(block.timestamp + 2);
+
+        // Challenge using SGX_SP1 proof type
+        vm.startPrank(Bob);
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX_SP1, batchIds);
+        vm.stopPrank();
+
+        // The transition is now challenged
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_SP1));
+        assertEq(ts.challenged, true);
+        assertEq(ts.createdAt, block.timestamp);
+        assertEq(ts.blockHash, challengedBlockhash(1));
+        // and, bond receiver is updated to Bob
+        assertEq(ts.bondReceiver, Bob);
+    }
+
+    // ZK cannot be challenged by TEE
+    // ------------------------------
+
+    function test_inbox_an_SP1_proof_cannot_be_challenged_by_an_SGX_proof()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SP1 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SP1, batchIds);
+
+        // The batch is not challenged yet
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SP1));
+        assertEq(ts.challenged, false);
+        assertEq(ts.createdAt, block.timestamp);
+
+        vm.warp(block.timestamp + 2);
+
+        // Attempt to challenge using SGX proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The transition should remain unchanged
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SP1));
+        assertEq(ts.challenged, false);
+        assertEq(ts.createdAt, block.timestamp - 2);
+        assertEq(ts.blockHash, correctBlockhash(1));
+    }
+
+    function test_inbox_an_RISC0_proof_cannot_be_challenged_by_an_SGX_proof()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using RISC0 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.RISC0, batchIds);
+
+        // The batch is not challenged yet
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.RISC0));
+        assertEq(ts.challenged, false);
+        assertEq(ts.createdAt, block.timestamp);
+
+        vm.warp(block.timestamp + 2);
+
+        // Attempt to challenge using SGX proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The transition should remain unchanged
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.RISC0));
+        assertEq(ts.challenged, false);
+        assertEq(ts.createdAt, block.timestamp - 2);
+        assertEq(ts.blockHash, correctBlockhash(1));
+    }
+
+    // Challenging a TEE proof
+    // ------------------------
+
+    // Note: This should become SGX <> TDX whenever that is introduced
+    function test_inbox_an_SGX_proof_can_be_challenged_by_another_SGX_proof()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The batch is not challenged yet
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX));
+        assertEq(ts.challenged, false);
+        assertEq(ts.createdAt, block.timestamp);
+
+        vm.warp(block.timestamp + 2);
+
+        // Challenge using SGX proof type again
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The transition is now challenged
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX));
+        assertEq(ts.challenged, true);
+        assertEq(uint8(ts.challengedProofType), uint8(LibProofType.ProofType.SGX));
+        // and, a new cooldown period begins
+        assertEq(ts.createdAt, block.timestamp);
+        assertEq(ts.blockHash, challengedBlockhash(1));
+    }
+
+    function test_inbox_an_SGX_proof_can_be_challenged_by_an_SP1_proof()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The batch is not challenged yet
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX));
+        assertEq(ts.challenged, false);
+        assertEq(ts.createdAt, block.timestamp);
+
+        vm.warp(block.timestamp + 2);
+
+        // Challenge using SP1 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SP1, batchIds);
+
+        // The transition is now challenged
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SP1));
+        assertEq(ts.challenged, true);
+        assertEq(uint8(ts.challengedProofType), uint8(LibProofType.ProofType.SGX));
+        // and, a new cooldown period begins
+        assertEq(ts.createdAt, block.timestamp);
+        assertEq(ts.blockHash, challengedBlockhash(1));
+    }
+
+    function test_inbox_an_SGX_proof_can_be_challenged_by_a_RISC0_proof()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The batch is not challenged yet
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX));
+        assertEq(ts.challenged, false);
+        assertEq(ts.createdAt, block.timestamp);
+
+        vm.warp(block.timestamp + 2);
+
+        // Challenge using RISC0 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.RISC0, batchIds);
+
+        // The transition is now challenged
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.RISC0));
+        assertEq(ts.challenged, true);
+        assertEq(uint8(ts.challengedProofType), uint8(LibProofType.ProofType.SGX));
+        // and, a new cooldown period begins
+        assertEq(ts.createdAt, block.timestamp);
+        assertEq(ts.blockHash, challengedBlockhash(1));
+    }
+
+    // Note: This should become SGX <> TDX + ZK whenever TDX is introduced
+    function test_inbox_batch_is_finalised_when_SGX_proof_is_challenged_by_an_SGX_SP1_proof()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The batch is not challenged yet
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX));
+        assertEq(ts.challenged, false);
+        assertEq(ts.createdAt, block.timestamp);
+
+        vm.warp(block.timestamp + 2);
+
+        // Challenge using SGX + SP1 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX_SP1, batchIds);
+
+        // The transition is now challenged
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_SP1));
+        assertEq(uint8(ts.challengedProofType), uint8(LibProofType.ProofType.SGX));
+        assertEq(ts.challenged, true);
+        assertEq(ts.createdAt, block.timestamp);
+        assertEq(ts.blockHash, challengedBlockhash(1));
+        // and, batch is finalised
+        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 1);
+    }
+
+    function test_inbox_batch_is_finalised_when_SGX_proof_is_challenged_by_an_SGX_RISC0_proof()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The batch is not challenged yet
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX));
+        assertEq(ts.challenged, false);
+        assertEq(ts.createdAt, block.timestamp);
+
+        vm.warp(block.timestamp + 2);
+
+        // Challenge using SGX + RISC0 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX_RISC0, batchIds);
+
+        // The transition is now challenged
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_RISC0));
+        assertEq(uint8(ts.challengedProofType), uint8(LibProofType.ProofType.SGX));
+        assertEq(ts.challenged, true);
+        assertEq(ts.createdAt, block.timestamp);
+        assertEq(ts.blockHash, challengedBlockhash(1));
+        // and, batch is finalised
+        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 1);
+    }
+
+    function test_inbox_batch_is_finalised_when_challenging_SGX_proof_gets_matching_SP1_proof()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Note: This will be changed to TDX later
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        vm.warp(block.timestamp + 2);
+
+        // Challenge using SGX proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The batch is challenged
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX));
+        assertEq(ts.challenged, true);
+        assertEq(ts.createdAt, block.timestamp);
+        assertEq(ts.blockHash, challengedBlockhash(1));
+        // but not finalised yet
+        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 0);
+
+        // Prove challenged transitions using SP1 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SP1, batchIds);
+
+        // The batch is now finalised
+        stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 1);
+        // and, proof type is updated to SGX_SP1
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(ts.blockHash, challengedBlockhash(1));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_SP1));
+    }
+
+    function test_inbox_batch_is_finalised_when_challenging_SGX_proof_gets_matching_RISC0_proof()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Note: This will be changed to TDX later
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        vm.warp(block.timestamp + 2);
+
+        // Challenge using SGX proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The batch is challenged
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX));
+        assertEq(ts.challenged, true);
+        assertEq(ts.createdAt, block.timestamp);
+        assertEq(ts.blockHash, challengedBlockhash(1));
+        // but not finalised yet
+        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 0);
+
+        // Prove challenged transitions using RISC0 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.RISC0, batchIds);
+
+        // The batch is now finalised
+        stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 1);
+        // and, proof type is updated to SGX_RISC0
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(ts.blockHash, challengedBlockhash(1));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_RISC0));
+    }
+
+    function test_inbox_sender_becomes_bond_receiver_when_SGX_proof_is_challenged_by_an_SGX_SP1_proof(
+    )
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The batch is not challenged yet
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX));
+        assertEq(ts.challenged, false);
+        assertEq(ts.createdAt, block.timestamp);
+
+        vm.warp(block.timestamp + 2);
+
+        // Challenge using SGX + SP1 proof type
+        vm.startPrank(Bob);
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX_SP1, batchIds);
+        vm.stopPrank();
+
+        // The transition is now challenged
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_SP1));
+        assertEq(uint8(ts.challengedProofType), uint8(LibProofType.ProofType.SGX));
+        assertEq(ts.challenged, true);
+        assertEq(ts.createdAt, block.timestamp);
+        assertEq(ts.blockHash, challengedBlockhash(1));
+        // and, bond receiver is updated to Bob
+        assertEq(ts.bondReceiver, Bob);
+    }
+
+    function test_inbox_sender_becomes_bond_receiver_when_SGX_proof_is_challenged_by_an_SGX_RISC0_proof(
+    )
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The batch is not challenged yet
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX));
+        assertEq(ts.challenged, false);
+        assertEq(ts.createdAt, block.timestamp);
+
+        vm.warp(block.timestamp + 2);
+
+        // Challenge using SGX + RISC0 proof type
+        vm.startPrank(Bob);
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX_RISC0, batchIds);
+        vm.stopPrank();
+
+        // The transition is now challenged
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_RISC0));
+        assertEq(uint8(ts.challengedProofType), uint8(LibProofType.ProofType.SGX));
+        assertEq(ts.challenged, true);
+        assertEq(ts.createdAt, block.timestamp);
+        assertEq(ts.blockHash, challengedBlockhash(1));
+        // and, bond receiver is updated to Bob
+        assertEq(ts.bondReceiver, Bob);
+    }
+
+    // ----------------------------------------------------------
+    // Cooldown Period
+    // ----------------------------------------------------------
+
+    function test_inbox_batch_is_finalised_when_SGX_proof_is_not_challenged_within_cooldown_period()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // The batch is not challenged yet
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX));
         assertEq(ts.challenged, false);
         assertEq(ts.blockHash, correctBlockhash(1));
 
@@ -546,13 +988,13 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         // The batch should now be finalised
         stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, proof type remains ZK as it was not challenged
+        // and, proof type remains SGX as it was not challenged
         ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
         assertEq(ts.blockHash, correctBlockhash(1));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX));
     }
 
-    function test_inbox_batch_is_finalised_when_TEE_proof_is_not_challenged_within_cooldown_period()
+    function test_inbox_batch_is_finalised_when_SP1_proof_is_not_challenged_within_cooldown_period()
         external
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
@@ -560,13 +1002,13 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Prove using TEE proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
+        // Prove using SP1 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SP1, batchIds);
 
         // The batch is not challenged yet
         ITaikoInbox.TransitionState memory ts =
             inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.TEE));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SP1));
         assertEq(ts.challenged, false);
         assertEq(ts.blockHash, correctBlockhash(1));
 
@@ -589,13 +1031,14 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         // The batch should now be finalised
         stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, proof type remains TEE as it was not challenged
+        // and, proof type remains SP1 as it was not challenged
         ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
         assertEq(ts.blockHash, correctBlockhash(1));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.TEE));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SP1));
     }
 
-    function test_inbox_dao_receives_liveness_bond_when_ZK_proof_is_finalised_via_cooldown_period()
+    function test_inbox_batch_is_finalised_when_RISC0_proof_is_not_challenged_within_cooldown_period(
+    )
         external
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
@@ -603,8 +1046,51 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Prove using ZK proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+        // Prove using RISC0 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.RISC0, batchIds);
+
+        // The batch is not challenged yet
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.RISC0));
+        assertEq(ts.challenged, false);
+        assertEq(ts.blockHash, correctBlockhash(1));
+
+        // Warp time to just before the cooldown period ends
+        vm.warp(block.timestamp + pacayaConfig().cooldownWindow - 1);
+
+        // Attempt to finalise
+        inbox.verifyBatches(1);
+
+        // The batch should still not be finalised
+        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 0);
+
+        // Warp time to after the cooldown period ends
+        vm.warp(block.timestamp + 2);
+
+        // Attempt to finalise again
+        inbox.verifyBatches(1);
+
+        // The batch should now be finalised
+        stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 1);
+        // and, proof type remains RISC0 as it was not challenged
+        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(ts.blockHash, correctBlockhash(1));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.RISC0));
+    }
+
+    function test_inbox_dao_receives_liveness_bond_when_SGX_proof_is_finalised_via_cooldown_period()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
 
         // Warp time to after the cooldown period ends
         vm.warp(block.timestamp + pacayaConfig().cooldownWindow + 1);
@@ -615,18 +1101,18 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         // The batch should now be finalised
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, proof type remains ZK as it was not challenged
+        // and, proof type remains SGX as it was not challenged
         ITaikoInbox.TransitionState memory ts =
             inbox.getTransitionByParentHash(1, correctBlockhash(0));
         assertEq(ts.blockHash, correctBlockhash(1));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX));
         // and, liveness bond is sent to DAO
         assertEq(
             inbox.bondBalanceOf(TaikoInbox(address(inbox)).dao()), pacayaConfig().livenessBondBase
         );
     }
 
-    function test_inbox_dao_receives_liveness_bond_when_TEE_proof_is_finalised_via_cooldown_period()
+    function test_inbox_dao_receives_liveness_bond_when_SP1_proof_is_finalised_via_cooldown_period()
         external
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
@@ -634,8 +1120,8 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Prove using TEE proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
+        // Prove using SP1 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SP1, batchIds);
 
         // Warp time to after the cooldown period ends
         vm.warp(block.timestamp + pacayaConfig().cooldownWindow + 1);
@@ -646,18 +1132,19 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         // The batch should now be finalised
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, proof type remains TEE as it was not challenged
+        // and, proof type remains SP1 as it was not challenged
         ITaikoInbox.TransitionState memory ts =
             inbox.getTransitionByParentHash(1, correctBlockhash(0));
         assertEq(ts.blockHash, correctBlockhash(1));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.TEE));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SP1));
         // and, liveness bond is sent to DAO
         assertEq(
             inbox.bondBalanceOf(TaikoInbox(address(inbox)).dao()), pacayaConfig().livenessBondBase
         );
     }
 
-    function test_inbox_challenged_ZK_proof_cannot_be_finalised_via_cooldown_period()
+    function test_inbox_dao_receives_liveness_bond_when_RISC0_proof_is_finalised_via_cooldown_period(
+    )
         external
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
@@ -665,11 +1152,43 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Prove using ZK proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+        // Prove using RISC0 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.RISC0, batchIds);
 
-        // Challenge using ZK proof type
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+        // Warp time to after the cooldown period ends
+        vm.warp(block.timestamp + pacayaConfig().cooldownWindow + 1);
+
+        // Attempt to finalise
+        inbox.verifyBatches(1);
+
+        // The batch should now be finalised
+        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 1);
+        // and, proof type remains RISC0 as it was not challenged
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(ts.blockHash, correctBlockhash(1));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.RISC0));
+        // and, liveness bond is sent to DAO
+        assertEq(
+            inbox.bondBalanceOf(TaikoInbox(address(inbox)).dao()), pacayaConfig().livenessBondBase
+        );
+    }
+
+    function test_inbox_challenged_SGX_proof_cannot_be_finalised_via_cooldown_period()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SGX proof type
+        // Note: This will be changed to TDX later
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
+
+        // Challenge using SGX proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX, batchIds);
 
         // Warp time to after the cooldown period ends
         vm.warp(block.timestamp + pacayaConfig().cooldownWindow + 1);
@@ -682,7 +1201,7 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         assertEq(stats2.lastVerifiedBatchId, 0);
     }
 
-    function test_inbox_challenged_TEE_proof_cannot_be_finalised_via_cooldown_period()
+    function test_inbox_challenged_SP1_proof_cannot_be_finalised_via_cooldown_period()
         external
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
@@ -690,11 +1209,11 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Prove using TEE proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
+        // Prove using RISC0 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.RISC0, batchIds);
 
-        // Challenge using TEE proof type
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
+        // Challenge using SP1 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SP1, batchIds);
 
         // Warp time to after the cooldown period ends
         vm.warp(block.timestamp + pacayaConfig().cooldownWindow + 1);
@@ -707,7 +1226,7 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         assertEq(stats2.lastVerifiedBatchId, 0);
     }
 
-    function test_inbox_verifier_is_upgradeable_when_challenged_ZK_proof_is_finalised()
+    function test_inbox_challenged_RISC0_proof_cannot_be_finalised_via_cooldown_period()
         external
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
@@ -715,27 +1234,28 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Prove using ZK proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+        // Prove using SP1 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SP1, batchIds);
 
-        // Challenge using ZK proof type
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+        // Challenge using RISC0 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.RISC0, batchIds);
 
-        // Prove challenged transitions using TEE proof type
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
+        // Warp time to after the cooldown period ends
+        vm.warp(block.timestamp + pacayaConfig().cooldownWindow + 1);
 
-        // The batch is now finalised
+        // Attempt to finalise
+        inbox.verifyBatches(1);
+
+        // The batch should still not be finalised
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
-        assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, proof type is updated to ZK_TEE
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK_TEE));
-        // and, verifier is upgradeable
-        assertEq(inbox.getVerifier().upgradeable, true);
+        assertEq(stats2.lastVerifiedBatchId, 0);
     }
 
-    function test_inbox_verifier_is_upgradeable_when_challenged_TEE_proof_is_finalised()
+    // ----------------------------------------------------------
+    // Verifier Upgradeability
+    // ----------------------------------------------------------
+
+    function test_inbox_verifier_is_upgradeable_when_challenged_SGX_proof_is_finalised()
         external
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
@@ -743,23 +1263,73 @@ contract InboxTest_FinalityGadget is InboxTestBase {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Prove using TEE proof type
-        _proveBatchesWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
+        // Prove using SGX proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SGX, batchIds);
 
-        // Challenge using TEE proof type
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.TEE, batchIds);
-
-        // Prove challenged transitions using ZK proof type
-        _challengeTransitionWithProofType(ITaikoInbox.ProofType.ZK, batchIds);
+        // Challenge using SGX + SP1 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX_SP1, batchIds);
 
         // The batch is now finalised
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, proof type is updated to ZK_TEE
+        // and, proof type is updated to SGX_SP1
         ITaikoInbox.TransitionState memory ts =
             inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(uint8(ts.proofType), uint8(ITaikoInbox.ProofType.ZK_TEE));
-        // and, verifier is upgradeable
-        assertEq(inbox.getVerifier().upgradeable, true);
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_SP1));
+        assertEq(uint8(ts.challengedProofType), uint8(LibProofType.ProofType.SGX));
+        // and, SGX verifier is upgradeable
+        assertEq(uint8(verifier.proofTypeToUpgrade()), uint8(LibProofType.ProofType.SGX));
+    }
+
+    function test_inbox_verifier_is_upgradeable_when_challenged_SP1_proof_is_finalised()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using SP1 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.SP1, batchIds);
+
+        // Challenge using SP1 + RISC0 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX_RISC0, batchIds);
+
+        // The batch is now finalised
+        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 1);
+        // and, proof type is updated to SGX_RISC0
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_RISC0));
+        assertEq(uint8(ts.challengedProofType), uint8(LibProofType.ProofType.SP1));
+        // and, SP1 verifier is upgradeable
+        assertEq(uint8(verifier.proofTypeToUpgrade()), uint8(LibProofType.ProofType.SP1));
+    }
+
+    function test_inbox_verifier_is_upgradeable_when_challenged_RISC0_proof_is_finalised()
+        external
+        transactBy(Alice)
+        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
+    {
+        uint64[] memory batchIds = new uint64[](1);
+        batchIds[0] = 1;
+
+        // Prove using RISC0 proof type
+        _proveBatchesWithProofType(LibProofType.ProofType.RISC0, batchIds);
+
+        // Challenge using SGX + SP1 proof type
+        _challengeTransitionWithProofType(LibProofType.ProofType.SGX_SP1, batchIds);
+
+        // The batch is now finalised
+        ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
+        assertEq(stats2.lastVerifiedBatchId, 1);
+        // and, proof type is updated to SGX_SP1
+        ITaikoInbox.TransitionState memory ts =
+            inbox.getTransitionByParentHash(1, correctBlockhash(0));
+        assertEq(uint8(ts.proofType), uint8(LibProofType.ProofType.SGX_SP1));
+        assertEq(uint8(ts.challengedProofType), uint8(LibProofType.ProofType.RISC0));
+        // and, RISC0 verifier is upgradeable
+        assertEq(uint8(verifier.proofTypeToUpgrade()), uint8(LibProofType.ProofType.RISC0));
     }
 }

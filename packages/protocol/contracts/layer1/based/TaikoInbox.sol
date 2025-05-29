@@ -9,8 +9,9 @@ import "src/shared/libs/LibMath.sol";
 import "src/shared/libs/LibNetwork.sol";
 import "src/shared/libs/LibStrings.sol";
 import "src/shared/signal/ISignalService.sol";
-// Surge: import ISurgeVerifier
+// Surge: import surge verifier related files
 import "src/layer1/surge/verifiers/ISurgeVerifier.sol";
+import "src/layer1/surge/verifiers/LibProofType.sol";
 import "./ITaikoInbox.sol";
 import "./IProposeBatch.sol";
 
@@ -30,9 +31,11 @@ import "./IProposeBatch.sol";
 abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, ITaiko {
     using LibMath for uint256;
     using SafeERC20 for IERC20;
+    using LibProofType for LibProofType.ProofType;
 
     address public immutable inboxWrapper;
     address public immutable dao;
+    address public immutable verifier;
     address public immutable bondToken;
     ISignalService public immutable signalService;
 
@@ -44,6 +47,7 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
     constructor(
         address _inboxWrapper,
         address _dao,
+        address _verifier,
         address _bondToken,
         address _signalService
     )
@@ -53,19 +57,13 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
     {
         inboxWrapper = _inboxWrapper;
         dao = _dao;
+        verifier = _verifier;
         bondToken = _bondToken;
         signalService = ISignalService(_signalService);
     }
 
-    function init(
-        address _owner,
-        address _verifier,
-        bytes32 _genesisBlockHash
-    )
-        external
-        initializer
-    {
-        __Taiko_init(_owner, _verifier, _genesisBlockHash);
+    function init(address _owner, bytes32 _genesisBlockHash) external initializer {
+        __Taiko_init(_owner, _genesisBlockHash);
     }
 
     /// @notice Proposes a batch of blocks.
@@ -246,8 +244,8 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
     /// @param _proof The aggregated cryptographic proof proving the batches transitions.
     function proveBatches(bytes calldata _params, bytes calldata _proof) external nonReentrant {
         // Surge: Add proof type to the parameters
-        (ProofType proofType, BatchMetadata[] memory metas, Transition[] memory trans) =
-            abi.decode(_params, (ProofType, BatchMetadata[], Transition[]));
+        (LibProofType.ProofType proofType, BatchMetadata[] memory metas, Transition[] memory trans)
+        = abi.decode(_params, (LibProofType.ProofType, BatchMetadata[], Transition[]));
 
         uint256 metasLength = metas.length;
         require(metasLength != 0, NoBlocksToProve());
@@ -326,26 +324,26 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
                 if (isSameTransition) {
                     // Surge: Take action depending upon previous proof type
                     if (
-                        _ts.proofType == ProofType.ZK_TEE
-                            || (_ts.proofType == ProofType.ZK && proofType == ProofType.ZK)
-                            || (_ts.proofType == ProofType.TEE && proofType == ProofType.TEE)
+                        proofType.isZkTeeProof()
+                            || (_ts.proofType.isZkProof() && proofType.isZkProof())
+                            || (_ts.proofType.isTeeProof() && proofType.isTeeProof())
                     ) {
-                        // We skip the transition if the existing proof type is ZK_TEE or if the
+                        // We skip the transition if the existing proof type is ZK + TEE or if the
                         // existing proof type is same as the newly submitted proof type
                         continue;
                     }
 
                     // At this point, the transition would be both ZK + TEE proven
-                    _ts.proofType = ProofType.ZK_TEE;
+                    _ts.proofType = _ts.proofType.combine(proofType);
                     // The sender of the latest set of proofs becomes the bond receiver
                     _ts.bondReceiver = msg.sender;
                 } else {
                     // Surge: Take action depending upon previous proof type
                     if (
-                        _ts.proofType == ProofType.ZK_TEE
-                            || (_ts.proofType == ProofType.ZK && proofType == ProofType.TEE)
+                        _ts.proofType.isZkTeeProof()
+                            || (_ts.proofType.isZkProof() && proofType.isTeeProof())
                     ) {
-                        // We skip the transition if the existing proof type is ZK_TEE or if the
+                        // We skip the transition if the existing proof type is ZK + TEE or if the
                         // an existing ZK proof is being challenged by a TEE proof.
                         // A TEE proof can be challenged by any proof type.
                         continue;
@@ -353,10 +351,11 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
 
                     _ts.challenged = true;
                     _ts.createdAt = uint48(block.timestamp);
+                    _ts.challengedProofType = _ts.proofType;
                     _ts.proofType = proofType;
 
                     // Update the bond receiver if it is a finalising proof
-                    if (proofType == ProofType.ZK_TEE) {
+                    if (proofType.isZkTeeProof()) {
                         _ts.bondReceiver = msg.sender;
                     }
 
@@ -392,7 +391,7 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
             }
 
             // Surge: Set the bond receiver based on the proving window and received proof type
-            if (proofType == ProofType.ZK_TEE) {
+            if (proofType.isZkTeeProof()) {
                 ts.bondReceiver = inProvingWindow ? meta.proposer : msg.sender;
             }
 
@@ -407,9 +406,8 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
             }
         }
 
-        // Surge: Use the new verifier from the storage and the ISurgeVerifier interface
-        address _verifier = state.verifier.addr;
-        ProofType _proofType = ISurgeVerifier(_verifier).verifyProof(ctxs, _proof);
+        // Surge: We use the ISurgeVerifier interface
+        LibProofType.ProofType _proofType = ISurgeVerifier(verifier).verifyProof(ctxs, _proof);
         // Surge: check that proof type sent in the parameters matches the
         // proof type returned by the verifier
         require(_proofType == proofType, InvalidProofType());
@@ -421,7 +419,7 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
                 batchIds[i] = metas[i].batchId;
             }
 
-            emit BatchesProved(_verifier, batchIds, trans);
+            emit BatchesProved(verifier, batchIds, trans);
         }
 
         _verifyBatches(config, stats2, metasLength);
@@ -461,15 +459,6 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
         }
     }
 
-    // Surge: required for Surge's finality gadget
-    /// @inheritdoc ITaikoInbox
-    function upgradeVerifier(address _newVerifier) external onlyOwner {
-        require(state.verifier.upgradeable, VerifierNotUpgradeable());
-        state.verifier.addr = _newVerifier;
-        state.verifier.upgradeable = false;
-        emit VerifierUpgraded(_newVerifier);
-    }
-
     /// @inheritdoc ITaikoInbox
     function getStats1() external view returns (Stats1 memory) {
         return state.stats1;
@@ -478,12 +467,6 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
     /// @inheritdoc ITaikoInbox
     function getStats2() external view returns (Stats2 memory) {
         return state.stats2;
-    }
-
-    // Surge: required for Surge's finality gadget
-    /// @inheritdoc ITaikoInbox
-    function getVerifier() external view returns (Verifier memory) {
-        return state.verifier;
     }
 
     /// @inheritdoc ITaikoInbox
@@ -626,14 +609,7 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
 
     // Internal functions ----------------------------------------------------------------------
 
-    function __Taiko_init(
-        address _owner,
-        address _verifier,
-        bytes32 _genesisBlockHash
-    )
-        internal
-        onlyInitializing
-    {
+    function __Taiko_init(address _owner, bytes32 _genesisBlockHash) internal onlyInitializing {
         __Essential_init(_owner);
 
         require(_genesisBlockHash != 0, InvalidGenesisBlockHash());
@@ -653,9 +629,6 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
 
         // Surge: Initialize the verification streak started at timestamp
         state.stats1.verificationStreakStartedAt = uint64(block.timestamp);
-
-        // Surge: Initialize the verifier address
-        state.verifier.addr = _verifier;
 
         emit BatchesVerified(0, _genesisBlockHash);
     }
@@ -769,10 +742,10 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
                 bool _challenged = ts.challenged;
                 address _bondReceiver = ts.bondReceiver;
 
-                if (ts.proofType == ProofType.ZK_TEE) {
+                if (ts.proofType.isZkTeeProof()) {
                     if (_challenged) {
                         // This signals the SC to upgrade the verifier
-                        state.verifier.upgradeable = true;
+                        ISurgeVerifier(verifier).markUpgradeable(ts.challengedProofType);
                     }
                 } else {
                     // Proof type is either ZK or TEE

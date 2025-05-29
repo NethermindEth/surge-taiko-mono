@@ -17,8 +17,10 @@ contract MainnetInbox is TaikoInbox {
         address _bondToken,
         address _signalService
     )
-        TaikoInbox(_wrapper, _verifier, _bondToken, _signalService)
-    { }
+        TaikoInbox(_wrapper, address(0), _verifier, _bondToken, _signalService)
+    {
+        // Surge: use address(0) as dao to prevent compilation errors
+    }
 
     function pacayaConfig() public pure override returns (ITaikoInbox.Config memory) {
         // All hard-coded configurations:

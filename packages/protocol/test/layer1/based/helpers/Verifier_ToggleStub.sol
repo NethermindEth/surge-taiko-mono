@@ -2,26 +2,19 @@
 pragma solidity ^0.8.24;
 
 import "src/layer1/surge/verifiers/ISurgeVerifier.sol";
-import "src/layer1/based/ITaikoInbox.sol";
+import "src/layer1/surge/verifiers/LibProofType.sol";
 
 // Surge: change the contract to ISurgeVerifier
 contract Verifier_ToggleStub is ISurgeVerifier {
-    bool private shouldFail;
-    ITaikoInbox.ProofType private proofType;
+    LibProofType.ProofType public proofType;
+    LibProofType.ProofType public proofTypeToUpgrade;
 
     constructor() {
-        proofType = ITaikoInbox.ProofType.ZK_TEE;
+        proofType = LibProofType.ProofType.SGX_SP1;
+        proofTypeToUpgrade = LibProofType.ProofType.INVALID;
     }
 
-    function makeVerifierToFail() external {
-        shouldFail = true;
-    }
-
-    function makeVerifierToSucceed() external {
-        shouldFail = false;
-    }
-
-    function setProofType(ITaikoInbox.ProofType _proofType) external {
+    function setProofType(LibProofType.ProofType _proofType) external {
         proofType = _proofType;
     }
 
@@ -31,9 +24,14 @@ contract Verifier_ToggleStub is ISurgeVerifier {
     )
         external
         view
-        returns (ITaikoInbox.ProofType)
+        returns (LibProofType.ProofType)
     {
-        require(!shouldFail, "ISurgeVerifier failure");
         return proofType;
     }
+
+    function markUpgradeable(LibProofType.ProofType _proofType) external {
+        proofTypeToUpgrade = _proofType;
+    }
+
+    function upgradeVerifier(LibProofType.ProofType _proofType, address _newVerifier) external { }
 }

@@ -25,10 +25,11 @@ contract SurgeHoodiInbox is TaikoInbox {
         ConfigParams memory _configParams,
         address _wrapper,
         address _dao,
+        address _verifier,
         address _bondToken,
         address _signalService
     )
-        TaikoInbox(_wrapper, _dao, _bondToken, _signalService)
+        TaikoInbox(_wrapper, _dao, _verifier, _bondToken, _signalService)
     {
         chainId = _configParams.chainId;
         maxVerificationDelay = _configParams.maxVerificationDelay;

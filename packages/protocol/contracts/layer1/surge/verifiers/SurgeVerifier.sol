@@ -26,32 +26,38 @@ contract SurgeVerifier is SurgeComposeVerifier {
         )
     { }
 
-    function areVerifiersSufficient(address[] memory _verifiers)
+    function getProofTypeFromVerifiers(address[] memory _verifiers)
         internal
         view
         override
-        returns (bool, ITaikoInbox.ProofType)
+        returns (LibProofType.ProofType)
     {
         if (_verifiers.length == 2) {
-            if (_verifiers[0] == sgxRethVerifier) {
-                return (
-                    _verifiers[1] == risc0RethVerifier || _verifiers[1] == sp1RethVerifier,
-                    ITaikoInbox.ProofType.ZK_TEE
-                );
-            } else if (_verifiers[0] == risc0RethVerifier || _verifiers[0] == sp1RethVerifier) {
-                return (_verifiers[1] == sgxRethVerifier, ITaikoInbox.ProofType.ZK);
+            if (_verifiers[0] == sgxRethVerifier.addr) {
+                if (_verifiers[1] == sp1RethVerifier.addr) {
+                    return LibProofType.ProofType.SGX_SP1;
+                } else if (_verifiers[1] == risc0RethVerifier.addr) {
+                    return LibProofType.ProofType.SGX_RISC0;
+                }
+            } else if (_verifiers[0] == risc0RethVerifier.addr) {
+                if (_verifiers[1] == sgxRethVerifier.addr) {
+                    return LibProofType.ProofType.SGX_RISC0;
+                }
+            } else if (_verifiers[0] == sp1RethVerifier.addr) {
+                if (_verifiers[1] == sgxRethVerifier.addr) {
+                    return LibProofType.ProofType.SGX_SP1;
+                }
             }
         } else if (_verifiers.length == 1) {
-            if (_verifiers[0] == sgxRethVerifier) {
-                return (true, ITaikoInbox.ProofType.TEE);
-            } else {
-                return (
-                    _verifiers[0] == risc0RethVerifier || _verifiers[0] == sp1RethVerifier,
-                    ITaikoInbox.ProofType.ZK
-                );
+            if (_verifiers[0] == sgxRethVerifier.addr) {
+                return LibProofType.ProofType.SGX;
+            } else if (_verifiers[0] == risc0RethVerifier.addr) {
+                return LibProofType.ProofType.RISC0;
+            } else if (_verifiers[0] == sp1RethVerifier.addr) {
+                return LibProofType.ProofType.SP1;
             }
         }
 
-        return (false, ITaikoInbox.ProofType.INVALID);
+        return LibProofType.ProofType.INVALID;
     }
 }

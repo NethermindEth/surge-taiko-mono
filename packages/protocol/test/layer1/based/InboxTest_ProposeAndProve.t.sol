@@ -519,7 +519,7 @@ contract InboxTest_ProposeAndProve is InboxTestBase {
 
         vm.startSnapshotGas("proveBatches");
         // Surge: use happy case proof type
-        inbox.proveBatches(abi.encode(ITaikoInbox.ProofType.ZK_TEE, metas, transitions), "proof");
+        inbox.proveBatches(abi.encode(LibProofType.ProofType.SGX_SP1, metas, transitions), "proof");
         uint256 gasProveBatches = vm.stopSnapshotGas("proveBatches");
         console2.log("Gas per batch - proving:", gasProveBatches / count);
         console2.log("Gas per batch - total:", (gasProposeBatches + gasProveBatches) / count);

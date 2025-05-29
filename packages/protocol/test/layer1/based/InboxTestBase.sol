@@ -158,12 +158,12 @@ abstract contract InboxTestBase is Layer1Test {
         }
 
         // Surge: use happy case proof type
-        inbox.proveBatches(abi.encode(ITaikoInbox.ProofType.ZK_TEE, metas, transitions), "proof");
+        inbox.proveBatches(abi.encode(LibProofType.ProofType.SGX_SP1, metas, transitions), "proof");
     }
 
     // Surge: helper to prove using a specific proof type
     function _proveBatchesWithProofType(
-        ITaikoInbox.ProofType proofType,
+        LibProofType.ProofType proofType,
         uint64[] memory batchIds
     )
         internal
@@ -184,7 +184,7 @@ abstract contract InboxTestBase is Layer1Test {
 
     // Surge: helper to challenge a transition with a specific proof type
     function _challengeTransitionWithProofType(
-        ITaikoInbox.ProofType proofType,
+        LibProofType.ProofType proofType,
         uint64[] memory batchIds
     )
         internal
@@ -216,7 +216,7 @@ abstract contract InboxTestBase is Layer1Test {
         }
 
         // Surge: use happy case proof type
-        inbox.proveBatches(abi.encode(ITaikoInbox.ProofType.ZK_TEE, metas, transitions), "proof");
+        inbox.proveBatches(abi.encode(LibProofType.ProofType.SGX_SP1, metas, transitions), "proof");
     }
 
     function _logAllBatchesAndTransitions() internal view {

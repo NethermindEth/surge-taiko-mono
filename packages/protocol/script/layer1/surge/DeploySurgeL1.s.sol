@@ -231,7 +231,11 @@ contract DeploySurgeL1 is DeployCapability {
         // Deploy preconf contracts
         // ---------------------------------------------------------------
         PreconfContracts memory preconfContracts = deployPreconfContracts(
-            timelockController, rollupContracts.taikoInbox, sharedContracts.signalService, emptyImpl
+            timelockController,
+            rollupContracts.proofVerifier,
+            rollupContracts.taikoInbox,
+            sharedContracts.signalService,
+            emptyImpl
         );
 
         // Setup verifiers
@@ -242,7 +246,9 @@ contract DeploySurgeL1 is DeployCapability {
 
         // Initialise and transfer ownership to timelock controller
         // ---------------------------------------------------------------\
-        SurgeTimelockController(payable(timelockController)).init(rollupContracts.taikoInbox);
+        SurgeTimelockController(payable(timelockController)).init(
+            rollupContracts.taikoInbox, rollupContracts.proofVerifier
+        );
         console2.log("** timelockController initialised");
 
         SgxVerifier(verifiers.sgxRethVerifier).transferOwnership(timelockController);
@@ -257,9 +263,7 @@ contract DeploySurgeL1 is DeployCapability {
         AutomataDcapV3Attestation(verifiers.automataProxy).transferOwnership(timelockController);
         console2.log("** automataProxy ownership transferred to:", timelockController);
 
-        TaikoInbox(payable(rollupContracts.taikoInbox)).init(
-            timelockController, rollupContracts.proofVerifier, l2GenesisHash
-        );
+        TaikoInbox(payable(rollupContracts.taikoInbox)).init(timelockController, l2GenesisHash);
         console2.log("** taikoInbox initialised and ownership transferred to:", timelockController);
 
         ComposeVerifier(rollupContracts.proofVerifier).init(timelockController);
@@ -457,6 +461,7 @@ contract DeploySurgeL1 is DeployCapability {
 
     function deployPreconfContracts(
         address _owner,
+        address _proofVerifier,
         address _taikoInbox,
         address _signalService,
         address _emptyImpl
@@ -488,6 +493,7 @@ contract DeploySurgeL1 is DeployCapability {
                 }),
                 preconfContracts.taikoWrapper,
                 dao,
+                _proofVerifier,
                 address(0),
                 _signalService
             )

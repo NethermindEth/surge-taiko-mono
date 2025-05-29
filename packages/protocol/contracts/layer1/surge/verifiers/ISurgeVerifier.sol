@@ -2,10 +2,12 @@
 pragma solidity ^0.8.24;
 
 import "src/layer1/based/ITaikoInbox.sol";
+import "src/layer1/surge/verifiers/LibProofType.sol";
 
 /// @title ISurgeVerifier
 /// @notice Defines the function that handles proof verification.
 /// @custom:security-contact security@nethermind.io
+
 interface ISurgeVerifier {
     struct Context {
         uint64 batchId;
@@ -22,5 +24,16 @@ interface ISurgeVerifier {
         bytes calldata _proof
     )
         external
-        returns (ITaikoInbox.ProofType);
+        returns (LibProofType.ProofType);
+
+    /// @notice Marks the verifier for a proof type as upgradeable.
+    /// @dev Should be called by the inbox contract.
+    /// @param _proofType The proof type to mark as upgradeable.
+    function markUpgradeable(LibProofType.ProofType _proofType) external;
+
+    /// @notice Upgrades the verifier for a proof type.
+    /// @dev Called by the owner of the parent compose verifier
+    /// @param _proofType The proof type to upgrade.
+    /// @param _newVerifier The address of the new verifier.
+    function upgradeVerifier(LibProofType.ProofType _proofType, address _newVerifier) external;
 }
