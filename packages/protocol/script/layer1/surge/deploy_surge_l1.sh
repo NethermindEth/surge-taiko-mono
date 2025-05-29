@@ -62,7 +62,7 @@ if [ "$BROADCAST" = "true" ]; then
     BROADCAST_ARG="--broadcast"
 fi
 
-forge script ./script/layer1/surge/DeploySurge.s.sol:DeploySurge \
+forge script ./script/layer1/surge/DeploySurgeL1.s.sol:DeploySurgeL1 \
     --fork-url $FORK_URL \
     $BROADCAST_ARG \
     --ffi \
