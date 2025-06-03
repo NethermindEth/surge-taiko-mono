@@ -7,10 +7,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/surge"
 )
 
 // EngineClient represents a RPC client connecting to an Ethereum Engine API
@@ -134,8 +134,8 @@ func (c *EngineClient) TxPoolContentWithMinTip(
 }
 
 // UpdateL1Origin sets the L2 block's corresponding L1 origin.
-func (c *EngineClient) UpdateL1Origin(ctx context.Context, l1Origin *rawdb.L1Origin) (*rawdb.L1Origin, error) {
-	var res *rawdb.L1Origin
+func (c *EngineClient) UpdateL1Origin(ctx context.Context, l1Origin *surge.L1Origin) (*surge.L1Origin, error) {
+	var res *surge.L1Origin
 
 	if err := c.CallContext(ctx, &res, "taikoAuth_updateL1Origin", l1Origin); err != nil {
 		return nil, err
