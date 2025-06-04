@@ -54,6 +54,8 @@ services:
     entrypoint: ["/usr/local/bin/relayer"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    ports:
+      - 6063:6063
     command:
       - processor
       - --queue.prefetch=${QUEUE_PREFETCH}
@@ -80,8 +82,13 @@ services:
       - --headerSyncInterval=${HEADER_SYNC_INTERVAL_IN_SECONDS:-2}
       - --profitableOnly=${PROFITABLE_ONLY:-false}
       - --tx.minTipCap=${TX_MIN_TIP_CAP:-0.01}
+      - --metrics.port=6063
     networks:
       - rabbitmq_go_net
+    labels:
+      metrics_enabled: "true"
+      metrics_port: "6063"
+      logs_enabled: "true"
     profiles:
       - l1
 
@@ -92,6 +99,8 @@ services:
     entrypoint: ["/usr/local/bin/relayer"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    ports:
+      - 6064:6064
     command:
       - indexer
       - --db.host=db
@@ -115,8 +124,13 @@ services:
       - --blockBatchSize=${BLOCK_BATCH_SIZE}
       - --event=MessageSent
       - --confirmations=${CONFIRMATIONS_BEFORE_PROCESSING:-0}
+      - --metrics.port=6064
     networks:
       - rabbitmq_go_net
+    labels:
+      metrics_enabled: "true"
+      metrics_port: "6064"
+      logs_enabled: "true"
     profiles:
       - l1
 
@@ -127,6 +141,7 @@ services:
     entrypoint: ["/usr/local/bin/relayer"]
     ports:
       - 4102:4102
+      - 6065:6065
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command:
@@ -142,8 +157,13 @@ services:
       - --destRpcUrl=${L2_RPC_URL}
       - --destTaikoAddress=${L2_TAIKO_ADDRESS}
       - --processingFeeMultiplier=${PROCESSING_FEE_MULTIPLIER}
+      - --metrics.port=6065
     networks:
       - rabbitmq_go_net
+    labels:
+      metrics_enabled: "true"
+      metrics_port: "6065"
+      logs_enabled: "true"
     profiles:
       - api
 
@@ -153,7 +173,8 @@ services:
     restart: always
     entrypoint: ["/usr/local/bin/relayer"]
     ports:
-      - 4103:4102
+      - 4103:4103
+      - 6066:6066
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command:
@@ -169,8 +190,13 @@ services:
       - --destRpcUrl=${L1_RPC_URL}
       - --destTaikoAddress=${L1_TAIKO_ADDRESS}
       - --processingFeeMultiplier=${PROCESSING_FEE_MULTIPLIER}
+      - --metrics.port=6066
     networks:
       - rabbitmq_go_net
+    labels:
+      metrics_enabled: "true"
+      metrics_port: "6066"
+      logs_enabled: "true"
     profiles:
       - api
 
@@ -181,6 +207,8 @@ services:
     entrypoint: ["/usr/local/bin/relayer"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    ports:
+      - 6067:6067
     command:
       - processor
       - --queue.prefetch=100
@@ -207,8 +235,13 @@ services:
       - --headerSyncInterval=${HEADER_SYNC_INTERVAL_IN_SECONDS:-2}
       - --profitableOnly=${PROFITABLE_ONLY:-false}
       - --tx.minTipCap=${TX_MIN_TIP_CAP:-0.01}
+      - --metrics.port=6067
     networks:
       - rabbitmq_go_net
+    labels:
+      metrics_enabled: "true"
+      metrics_port: "6067"
+      logs_enabled: "true"
     profiles:
       - l2
 
@@ -219,6 +252,8 @@ services:
     entrypoint: ["/usr/local/bin/relayer"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    ports:
+      - 6068:6068
     command:
       - indexer
       - --db.host=db
@@ -241,8 +276,13 @@ services:
       - --blockBatchSize=${BLOCK_BATCH_SIZE}
       - --event=MessageSent
       - --confirmations=${CONFIRMATIONS_BEFORE_PROCESSING:-0}
+      - --metrics.port=6068
     networks:
       - rabbitmq_go_net
+    labels:
+      metrics_enabled: "true"
+      metrics_port: "6068"
+      logs_enabled: "true"
     profiles:
       - l2
 
