@@ -22,16 +22,17 @@ var (
 		Category: proverCategory,
 		EnvVars:  []string{"RAIKO_HOST"},
 	}
+	RaikoZKVMHostEndpoint = &cli.StringFlag{
+		Name:     "raiko.host.zkvm",
+		Usage:    "RPC endpoint of a Raiko ZKVM host service",
+		Required: true,
+		Category: proverCategory,
+		EnvVars:  []string{"RAIKO_HOST_ZKVM"},
+	}
 )
 
 // Optional flags used by prover.
 var (
-	RaikoZKVMHostEndpoint = &cli.StringFlag{
-		Name:     "raiko.host.zkvm",
-		Usage:    "RPC endpoint of a Raiko ZKVM host service",
-		Category: proverCategory,
-		EnvVars:  []string{"RAIKO_HOST_ZKVM"},
-	}
 	RaikoJWTPath = &cli.StringFlag{
 		Name:     "raiko.jwtPath",
 		Usage:    "Path to a JWT secret for the Raiko service",

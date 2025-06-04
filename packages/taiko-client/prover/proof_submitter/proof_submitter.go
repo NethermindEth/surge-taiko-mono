@@ -168,35 +168,29 @@ func (s *ProofSubmitterPacaya) RequestProof(ctx context.Context, meta metadata.T
 				)
 				return nil
 			}
-			// If zk proof is enabled, request zk proof first, and check if ZK proof is drawn.
-			if s.zkvmProofProducer != nil {
-				if proofResponse, err = s.zkvmProofProducer.RequestProof(
-					ctx,
-					opts,
-					meta.Pacaya().GetBatchID(),
-					meta,
-					startAt,
-				); err != nil {
-					if errors.Is(err, proofProducer.ErrZkAnyNotDrawn) {
-						// If zk proof is not drawn, request SGX proof.
-						log.Debug("ZK proof was not chosen, attempting to request SGX proof", "batchID", opts.BatchID)
-					} else {
-						return fmt.Errorf("failed to request zk proof, error: %w", err)
-					}
-				}
+
+			if s.zkvmProofProducer == nil {
+				return fmt.Errorf("zkvm proof producer is not enabled, please check the configuration")
 			}
-			// If zk proof is not enabled or zk proof is not drawn, request the base level proof.
+
+			if proofResponse, err = s.zkvmProofProducer.RequestProof(
+				ctx,
+				opts,
+				meta.Pacaya().GetBatchID(),
+				meta,
+				startAt,
+			); err != nil {
+				if errors.Is(err, proofProducer.ErrZkAnyNotDrawn) {
+					// If zk proof is not drawn
+					log.Debug("ZK proof was not chosen, attempting to request SGX proof", "batchID", opts.BatchID)
+				}
+				return fmt.Errorf("failed to request zk proof, error: %w", err)
+			}
+
 			if proofResponse == nil {
-				if proofResponse, err = s.baseLevelProofProducer.RequestProof(
-					ctx,
-					opts,
-					meta.Pacaya().GetBatchID(),
-					meta,
-					startAt,
-				); err != nil {
-					return fmt.Errorf("failed to request base proof, error: %w", err)
-				}
+				return fmt.Errorf("ZK proof response is nil")
 			}
+
 			// Try to add the proof to the buffer.
 			proofBuffer, exist := s.proofBuffers[proofResponse.ProofType]
 			if !exist {
