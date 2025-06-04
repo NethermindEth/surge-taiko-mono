@@ -67,7 +67,7 @@ contract SurgeTimelockControllerTestBase is CommonTest {
             executors,
             address(0)
         );
-        timelockController.init(address(mockTaikoInbox));
+        timelockController.init(address(mockTaikoInbox), address(0));
 
         target = address(mockStore);
         value = 0;

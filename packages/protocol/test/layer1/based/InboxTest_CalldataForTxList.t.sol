@@ -5,6 +5,8 @@ import "contracts/layer1/based/ITaikoInbox.sol";
 import "./InboxTestBase.sol";
 
 contract InboxTest_CalldataForTxList is InboxTestBase {
+    using LibProofType for LibProofType.ProofType;
+
     function pacayaConfig() internal pure override returns (ITaikoInbox.Config memory) {
         ITaikoInbox.ForkHeights memory forkHeights;
 
@@ -166,6 +168,9 @@ contract InboxTest_CalldataForTxList is InboxTestBase {
         vm.prank(Alice);
         vm.expectRevert(ITaikoInbox.MetaHashMismatch.selector);
         // Surge: use happy case proof type
-        inbox.proveBatches(abi.encode(LibProofType.ProofType.SGX_SP1, metas, transitions), "proof");
+        inbox.proveBatches(
+            abi.encode(LibProofType.sgxReth().combine(LibProofType.sp1Reth()), metas, transitions),
+            "proof"
+        );
     }
 }

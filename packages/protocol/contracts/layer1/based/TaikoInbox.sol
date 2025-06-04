@@ -212,7 +212,7 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
             batch.anchorBlockId = anchorBlockId;
             batch.nextTransitionId = 1;
             batch.verifiedTransitionId = 0;
-            batch.reserved4 = 0;
+            batch.finalisingProofIndex = 0;
             // SSTORE }}
 
             _debitBond(params.proposer, config.livenessBondBase);
@@ -315,18 +315,29 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
             } else {
                 TransitionState memory _ts = state.transitions[slot][tid];
 
-                bool isSameTransition = _ts.blockHash == tran.blockHash
-                    && (_ts.stateRoot == 0 || _ts.stateRoot == tran.stateRoot);
+                // Surge: Try to find a matching proof
+                // `mpi`: matching proof index
+                uint256 mpi = type(uint256).max;
+                for (uint256 j; j <= _ts.numConflictingProofs; ++j) {
+                    if (
+                        _ts.blockHashes[j] == tran.blockHash
+                            && (_ts.stateRoots[j] == 0 || _ts.stateRoots[j] == tran.stateRoot)
+                    ) {
+                        mpi = j;
+                        break;
+                    }
+                }
 
                 // Surge: Remove the notion of reusing invalidated transitions since we no longer
                 // invalidate on conflicting proofs
 
-                if (isSameTransition) {
+                // A matching proof was found
+                if (mpi != type(uint256).max) {
                     // Surge: Take action depending upon previous proof type
                     if (
-                        _ts.proofType.isZkTeeProof()
-                            || (_ts.proofType.isZkProof() && proofType.isZkProof())
-                            || (_ts.proofType.isTeeProof() && proofType.isTeeProof())
+                        _ts.proofTypes[mpi].isZkTeeProof()
+                            || (_ts.proofTypes[mpi].isZkProof() && proofType.isZkProof())
+                            || (_ts.proofTypes[mpi].isTeeProof() && proofType.isTeeProof())
                     ) {
                         // We skip the transition if the existing proof type is ZK + TEE or if the
                         // existing proof type is same as the newly submitted proof type
@@ -334,36 +345,29 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
                     }
 
                     // At this point, the transition would be both ZK + TEE proven
-                    _ts.proofType = _ts.proofType.combine(proofType);
+                    _ts.proofTypes[mpi] = _ts.proofTypes[mpi].combine(proofType);
                     // The sender of the latest set of proofs becomes the bond receiver
                     _ts.bondReceiver = msg.sender;
                 } else {
-                    // Surge: Take action depending upon previous proof type
-                    if (
-                        _ts.proofType.isZkTeeProof()
-                            || (_ts.proofType.isZkProof() && proofType.isTeeProof())
-                    ) {
-                        // We skip the transition if the existing proof type is ZK + TEE or if the
-                        // an existing ZK proof is being challenged by a TEE proof.
-                        // A TEE proof can be challenged by any proof type.
-                        continue;
+                    unchecked {
+                        ++_ts.numConflictingProofs;
                     }
+                    require(
+                        _ts.numConflictingProofs < LibProofType.NUM_PROOF_TYPES,
+                        TooManyConflictingProofs()
+                    );
 
-                    _ts.challenged = true;
-                    _ts.createdAt = uint48(block.timestamp);
-                    _ts.challengedProofType = _ts.proofType;
-                    _ts.proofType = proofType;
-
-                    // Update the bond receiver if it is a finalising proof
+                    // If the conflicting proof is a finalising proof, the sender of the proof
+                    // becomes the bond receiver
                     if (proofType.isZkTeeProof()) {
                         _ts.bondReceiver = msg.sender;
                     }
 
-                    // Update the blockhash and state root
-                    _ts.blockHash = tran.blockHash;
-                    _ts.stateRoot = meta.batchId % config.stateRootSyncInternal == 0
-                        ? tran.stateRoot
-                        : bytes32(0);
+                    // Add the conflicting proof
+                    _ts.blockHashes[_ts.numConflictingProofs] = tran.blockHash;
+                    _ts.stateRoots[_ts.numConflictingProofs] = meta.batchId
+                        % config.stateRootSyncInternal == 0 ? tran.stateRoot : bytes32(0);
+                    _ts.proofTypes[_ts.numConflictingProofs] = proofType;
 
                     emit ConflictingProof(meta.batchId, _ts, tran);
                 }
@@ -377,12 +381,12 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
 
             TransitionState storage ts = state.transitions[slot][tid];
 
-            ts.blockHash = tran.blockHash;
-            ts.stateRoot =
+            ts.blockHashes[0] = tran.blockHash;
+            ts.stateRoots[0] =
                 meta.batchId % config.stateRootSyncInternal == 0 ? tran.stateRoot : bytes32(0);
 
             // Surge: Set the proof type
-            ts.proofType = proofType;
+            ts.proofTypes[0] = proofType;
 
             bool inProvingWindow;
             unchecked {
@@ -410,7 +414,7 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
         LibProofType.ProofType _proofType = ISurgeVerifier(verifier).verifyProof(ctxs, _proof);
         // Surge: check that proof type sent in the parameters matches the
         // proof type returned by the verifier
-        require(_proofType == proofType, InvalidProofType());
+        require(_proofType.equals(proofType), InvalidProofType());
 
         // Emit the event
         {
@@ -613,13 +617,15 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
         __Essential_init(_owner);
 
         require(_genesisBlockHash != 0, InvalidGenesisBlockHash());
-        state.transitions[0][1].blockHash = _genesisBlockHash;
+        state.transitions[0][1].blockHashes[0] = _genesisBlockHash;
 
         Batch storage batch = state.batches[0];
         batch.metaHash = bytes32(uint256(1));
         batch.lastBlockTimestamp = uint64(block.timestamp);
         batch.anchorBlockId = uint64(block.number);
         batch.nextTransitionId = 2;
+        // Surge: Initialize the finalising proof index
+        batch.finalisingProofIndex = 0;
         batch.verifiedTransitionId = 1;
 
         state.stats1.genesisHeight = uint64(block.number);
@@ -691,7 +697,7 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
             uint256 slot = batchId % _config.batchRingBufferSize;
             Batch storage batch = state.batches[slot];
             uint24 tid = batch.verifiedTransitionId;
-            bytes32 blockHash = state.transitions[slot][tid].blockHash;
+            bytes32 blockHash = state.transitions[slot][tid].blockHashes[batch.finalisingProofIndex];
 
             // Surge: If the verification streak has been broken, we reset the streak timestamp
             // `batch` points to the last verified batch, so we can use it to check if the streak
@@ -735,38 +741,25 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
 
                 // Surge: remove conflicting transition and cooldown window checks
 
-                // Surge: directly use the block hash from the transition
-                blockHash = ts.blockHash;
+                // Surge: Handle verification based on proof types and conflicts
+                uint256 fpi = _tryFinalising(ts, _config, batch.livenessBond);
 
-                // Surge: Handle verification based on proof type
-                bool _challenged = ts.challenged;
-                address _bondReceiver = ts.bondReceiver;
-
-                if (ts.proofType.isZkTeeProof()) {
-                    if (_challenged) {
-                        // This signals the SC to upgrade the verifier
-                        ISurgeVerifier(verifier).markUpgradeable(ts.challengedProofType);
-                    }
-                } else {
-                    // Proof type is either ZK or TEE
-                    if (_challenged || ts.createdAt + _config.cooldownWindow > block.timestamp) {
-                        // A batch with just ZK or TEE proven transition cannot be verified if
-                        // it is challenged or if the cooldown window has not expired
-                        break;
-                    }
-
-                    // The batch is being verified because the optimistic cooldown window has
-                    // expired, and the liveness bond is sent to the DAO.
-                    _bondReceiver = dao;
+                // Surge: Do not verify the batch if no finalising proof is found
+                if (fpi == type(uint256).max) {
+                    break;
                 }
 
-                _creditBond(_bondReceiver, batch.livenessBond);
+                // Surge: use the finalising proof index to update the local blockhash
+                blockHash = ts.blockHashes[fpi];
+
+                // Surge: update the finalising proof index for the batch
+                batch.finalisingProofIndex = uint8(fpi);
 
                 if (batchId % _config.stateRootSyncInternal == 0) {
                     synced.batchId = batchId;
                     synced.blockId = batch.lastBlockId;
                     synced.tid = tid;
-                    synced.stateRoot = ts.stateRoot;
+                    synced.stateRoot = ts.stateRoots[fpi];
                 }
             }
 
@@ -805,6 +798,61 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
 
         state.stats2 = _stats2;
         emit Stats2Updated(_stats2);
+    }
+
+    // Surge: Logic for Surge's finality gadget
+    function _tryFinalising(
+        TransitionState storage _ts,
+        Config memory _config,
+        uint256 _livenessBond
+    )
+        internal
+        returns (uint256)
+    {
+        // `fpi` is used to store the finalising proof index for the transition
+        uint256 fpi = type(uint256).max;
+        address bondReceiver = _ts.bondReceiver;
+
+        // If there are no conflicting proofs
+        if (_ts.numConflictingProofs == 0) {
+            // If the first proof is just ZK or TEE
+            if (!_ts.proofTypes[0].isZkTeeProof()) {
+                // If the cooldown window has not expired, we cannot finalise the transition
+                if (_ts.createdAt + _config.cooldownWindow > block.timestamp) {
+                    return fpi;
+                }
+
+                // The DAO becomes the bond receiver since the batch is finalised via the cooldown
+                bondReceiver = dao;
+            }
+
+            // The first proof itself is the finalising proof
+            fpi = 0;
+        } else {
+            // Proof type(s) to upgrade
+            LibProofType.ProofType ptToUpgrade;
+
+            // Try to find a finalising proof
+            for (uint256 i; i <= _ts.numConflictingProofs; ++i) {
+                if (_ts.proofTypes[i].isZkTeeProof()) {
+                    fpi = i;
+                } else {
+                    ptToUpgrade = ptToUpgrade.combine(_ts.proofTypes[i]);
+                }
+            }
+
+            // If no finalising proof is found, we return
+            if (fpi == type(uint256).max) {
+                return fpi;
+            } else {
+                // Mark non finalising verifiers for upgrade
+                ISurgeVerifier(verifier).markUpgradeable(ptToUpgrade);
+            }
+        }
+
+        _creditBond(bondReceiver, _livenessBond);
+
+        return fpi;
     }
 
     function _debitBond(address _user, uint256 _amount) private {

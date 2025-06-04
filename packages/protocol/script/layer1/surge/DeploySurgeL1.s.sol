@@ -190,6 +190,9 @@ contract DeploySurgeL1 is DeployCapability {
             newImplementation: address(
                 new SurgeVerifier(
                     rollupContracts.taikoInbox,
+                    address(0),
+                    address(0),
+                    address(0),
                     verifiers.sgxRethVerifier,
                     verifiers.risc0RethVerifier,
                     verifiers.sp1RethVerifier

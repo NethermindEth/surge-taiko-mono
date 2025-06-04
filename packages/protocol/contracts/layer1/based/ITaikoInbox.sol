@@ -100,20 +100,20 @@ interface ITaikoInbox {
         bytes32 stateRoot;
     }
 
-    //  @notice Struct representing transition storage
-    /// @notice 4 slots used.
+    /// @notice Struct representing transition storage
+    /// @dev Uses 5 slots when no conflicts are present, with 2 slots for every new conflict.
     struct TransitionState {
         bytes32 parentHash;
-        bytes32 blockHash;
-        bytes32 stateRoot;
-        // Surge: added proofType
-        LibProofType.ProofType proofType;
-        // Surge: add field `challenged`
-        bool challenged;
-        // Surge: added challengedProofType
-        LibProofType.ProofType challengedProofType;
+        // Surge: Store `proofTypes` for every proof
+        LibProofType.ProofType[4] proofTypes;
+        // Surge: Switch to arrays to store conflicts, and add `numConflictingProofs`
+        bytes32[4] blockHashes;
+        bytes32[4] stateRoots;
+        // Surge: add `numConflictingProofs`
+        uint8 numConflictingProofs;
         // Surge: renamed from `prover` to `bondReceiver`
         address bondReceiver;
+        // Surge: remove `provingWindow`
         uint48 createdAt;
     }
 
@@ -127,7 +127,10 @@ interface ITaikoInbox {
         uint64 lastBlockTimestamp;
         uint64 anchorBlockId;
         uint24 nextTransitionId;
-        uint8 reserved4;
+        // Surge: add `finalisingProofIndex`
+        // The index of the finalising proof in the transition state. This is only updated and used
+        // when this batch is verified as the last one in a transaction.
+        uint8 finalisingProofIndex;
         // The ID of the transaction that is used to verify this batch. However, if this batch is
         // not verified as the last one in a transaction, verifiedTransitionId will remain zero.
         uint24 verifiedTransitionId;
@@ -307,6 +310,7 @@ interface ITaikoInbox {
     error TimestampTooSmall();
     error TooManyBatches();
     error TooManyBlocks();
+    error TooManyConflictingProofs();
     error TooManySignals();
     error TransitionNotFound();
     error ZeroAnchorBlockHash();

@@ -5,6 +5,8 @@ import "../Layer1Test.sol";
 import "test/layer1/based/helpers/Verifier_ToggleStub.sol";
 
 abstract contract InboxTestBase is Layer1Test {
+    using LibProofType for LibProofType.ProofType;
+
     mapping(uint256 => bytes) private _batchMetadatas;
     mapping(uint256 => bytes) private _batchInfos;
 
@@ -158,7 +160,7 @@ abstract contract InboxTestBase is Layer1Test {
         }
 
         // Surge: use happy case proof type
-        inbox.proveBatches(abi.encode(LibProofType.ProofType.SGX_SP1, metas, transitions), "proof");
+        inbox.proveBatches(abi.encode(_sgxSp1ProofType(), metas, transitions), "proof");
     }
 
     // Surge: helper to prove using a specific proof type
@@ -182,10 +184,21 @@ abstract contract InboxTestBase is Layer1Test {
         inbox.proveBatches(abi.encode(proofType, metas, transitions), "proof");
     }
 
-    // Surge: helper to challenge a transition with a specific proof type
-    function _challengeTransitionWithProofType(
+    // Surge: helper to push a conflicting proof type to a transition
+    function _pushConflictingProof(
         LibProofType.ProofType proofType,
         uint64[] memory batchIds
+    )
+        internal
+    {
+        _pushConflictingProof(proofType, batchIds, 0);
+    }
+
+    // Surge: helper to push a conflicting proof type to a transition
+    function _pushConflictingProof(
+        LibProofType.ProofType proofType,
+        uint64[] memory batchIds,
+        uint8 salt
     )
         internal
     {
@@ -196,8 +209,8 @@ abstract contract InboxTestBase is Layer1Test {
             (metas[i],) = _loadMetadataAndInfo(batchIds[i]);
             // Parent hash is correct
             transitions[i].parentHash = correctBlockhash(batchIds[i] - 1);
-            transitions[i].blockHash = challengedBlockhash(batchIds[i]);
-            transitions[i].stateRoot = challengedStateRoot(batchIds[i]);
+            transitions[i].blockHash = conflictingBlockHash(batchIds[i], salt);
+            transitions[i].stateRoot = conflictingStateRoot(batchIds[i], salt);
         }
 
         verifier.setProofType(proofType);
@@ -216,7 +229,7 @@ abstract contract InboxTestBase is Layer1Test {
         }
 
         // Surge: use happy case proof type
-        inbox.proveBatches(abi.encode(LibProofType.ProofType.SGX_SP1, metas, transitions), "proof");
+        inbox.proveBatches(abi.encode(_sgxSp1ProofType(), metas, transitions), "proof");
     }
 
     function _logAllBatchesAndTransitions() internal view {
@@ -261,18 +274,29 @@ abstract contract InboxTestBase is Layer1Test {
                     unicode"│    │    |── parentHash:",
                     Strings.toHexString(uint256(ts.parentHash))
                 );
-                console2.log(
-                    unicode"│    │    |── blockHash:",
-                    Strings.toHexString(uint256(ts.blockHash))
-                );
-                console2.log(
-                    unicode"│    │    └── stateRoot:",
-                    Strings.toHexString(uint256(ts.stateRoot))
-                );
-                // Surge: add new fields on transition state
+                // Log all block hashes
+                for (uint8 k = 0; k <= ts.numConflictingProofs; ++k) {
+                    console2.log(
+                        unicode"│    │    |── blockHash[",
+                        k,
+                        "]:",
+                        Strings.toHexString(uint256(ts.blockHashes[k]))
+                    );
+                    console2.log(
+                        unicode"│    │    |── stateRoot[",
+                        k,
+                        "]:",
+                        Strings.toHexString(uint256(ts.stateRoots[k]))
+                    );
+                    console2.log(
+                        unicode"│    │    |── proofType[",
+                        k,
+                        "]:",
+                        LibProofType.ProofType.unwrap(ts.proofTypes[k])
+                    );
+                }
+                console2.log(unicode"│    │    └── numConflictingProofs:", ts.numConflictingProofs);
                 console2.log(unicode"│    │    └── bondReceiver:", ts.bondReceiver);
-                console2.log(unicode"│    │    └── proofType:", uint8(ts.proofType));
-                console2.log(unicode"│    │    └── challenged:", ts.challenged ? "Y" : "N");
                 console2.log(unicode"│    │    └── createdAt:", ts.createdAt);
             }
         }
@@ -287,14 +311,24 @@ abstract contract InboxTestBase is Layer1Test {
         return bytes32(0x2000000 + blockId);
     }
 
-    // Surge: helper to get a challenged blockhash
-    function challengedBlockhash(uint256 blockId) internal pure returns (bytes32) {
-        return bytes32(0x3000000 + blockId);
+    // Surge: helper to get a conflicting blockhash without salt
+    function conflictingBlockHash(uint256 blockId) internal pure returns (bytes32) {
+        return conflictingBlockHash(blockId, 0);
     }
 
-    // Surge: helper to get a challenged state root
-    function challengedStateRoot(uint256 blockId) internal pure returns (bytes32) {
-        return bytes32(0x4000000 + blockId);
+    // Surge: helper to get a conflicting state root without salt
+    function conflictingStateRoot(uint256 blockId) internal pure returns (bytes32) {
+        return conflictingStateRoot(blockId, 0);
+    }
+
+    // Surge: helper to get a conflicting blockhash with salt
+    function conflictingBlockHash(uint256 blockId, uint8 salt) internal pure returns (bytes32) {
+        return bytes32(0x3000000 + blockId + salt);
+    }
+
+    // Surge: helper to get a conflicting state root with salt
+    function conflictingStateRoot(uint256 blockId, uint8 salt) internal pure returns (bytes32) {
+        return bytes32(0x4000000 + blockId + salt);
     }
 
     function range(uint64 start, uint64 end) internal pure returns (uint64[] memory arr) {
@@ -333,5 +367,10 @@ abstract contract InboxTestBase is Layer1Test {
 
         vm.prank(user);
         inbox.depositBond(bondAmount);
+    }
+
+    // Surge: Add proof type helpers
+    function _sgxSp1ProofType() internal pure returns (LibProofType.ProofType) {
+        return LibProofType.sgxReth().combine(LibProofType.sp1Reth());
     }
 }

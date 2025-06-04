@@ -4,14 +4,16 @@ pragma solidity ^0.8.24;
 import "src/layer1/surge/verifiers/ISurgeVerifier.sol";
 import "src/layer1/surge/verifiers/LibProofType.sol";
 
-// Surge: change the contract to ISurgeVerifier
+// Surge: change the contract interface to ISurgeVerifier
 contract Verifier_ToggleStub is ISurgeVerifier {
+    using LibProofType for LibProofType.ProofType;
+
     LibProofType.ProofType public proofType;
     LibProofType.ProofType public proofTypeToUpgrade;
 
     constructor() {
-        proofType = LibProofType.ProofType.SGX_SP1;
-        proofTypeToUpgrade = LibProofType.ProofType.INVALID;
+        proofType = LibProofType.sgxReth().combine(LibProofType.sp1Reth());
+        proofTypeToUpgrade = LibProofType.empty();
     }
 
     function setProofType(LibProofType.ProofType _proofType) external {

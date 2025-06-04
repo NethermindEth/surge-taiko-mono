@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import "./InboxTestBase.sol";
 
 contract InboxTest_ProposeAndProve is InboxTestBase {
+    using LibProofType for LibProofType.ProofType;
+
     function pacayaConfig() internal pure override returns (ITaikoInbox.Config memory) {
         ITaikoInbox.ForkHeights memory forkHeights;
 
@@ -65,14 +67,14 @@ contract InboxTest_ProposeAndProve is InboxTestBase {
             inbox.getLastVerifiedTransition();
         assertEq(batchId, 0);
         assertEq(blockId, 0);
-        assertEq(ts.blockHash, correctBlockhash(0));
-        assertEq(ts.stateRoot, bytes32(uint256(0)));
+        assertEq(ts.blockHashes[0], correctBlockhash(0));
+        assertEq(ts.stateRoots[0], bytes32(uint256(0)));
 
         (batchId, blockId, ts) = inbox.getLastSyncedTransition();
         assertEq(batchId, 0);
         assertEq(blockId, 0);
-        assertEq(ts.blockHash, correctBlockhash(0));
-        assertEq(ts.stateRoot, bytes32(uint256(0)));
+        assertEq(ts.blockHashes[0], correctBlockhash(0));
+        assertEq(ts.stateRoots[0], bytes32(uint256(0)));
     }
 
     function test_inbox_query_batches_not_exist_will_revert() external {
@@ -229,30 +231,30 @@ contract InboxTest_ProposeAndProve is InboxTestBase {
             inbox.getLastVerifiedTransition();
         assertEq(batchId, 9);
         assertEq(blockId, 9);
-        assertEq(ts.blockHash, correctBlockhash(9));
-        assertEq(ts.stateRoot, bytes32(uint256(0)));
+        assertEq(ts.blockHashes[0], correctBlockhash(9));
+        assertEq(ts.stateRoots[0], bytes32(uint256(0)));
 
         vm.expectRevert(ITaikoInbox.TransitionNotFound.selector);
         ts = inbox.getTransitionById(9, uint24(0));
 
         ts = inbox.getTransitionById(9, uint24(1));
         assertEq(ts.parentHash, correctBlockhash(8));
-        assertEq(ts.blockHash, correctBlockhash(9));
-        assertEq(ts.stateRoot, bytes32(uint256(0)));
+        assertEq(ts.blockHashes[0], correctBlockhash(9));
+        assertEq(ts.stateRoots[0], bytes32(uint256(0)));
 
         vm.expectRevert(ITaikoInbox.TransitionNotFound.selector);
         ts = inbox.getTransitionByParentHash(9, correctBlockhash(9));
 
         ts = inbox.getTransitionByParentHash(9, correctBlockhash(8));
         assertEq(ts.parentHash, correctBlockhash(8));
-        assertEq(ts.blockHash, correctBlockhash(9));
-        assertEq(ts.stateRoot, bytes32(uint256(0)));
+        assertEq(ts.blockHashes[0], correctBlockhash(9));
+        assertEq(ts.stateRoots[0], bytes32(uint256(0)));
 
         (batchId, blockId, ts) = inbox.getLastSyncedTransition();
         assertEq(batchId, 5);
         assertEq(blockId, 5);
-        assertEq(ts.blockHash, correctBlockhash(5));
-        assertEq(ts.stateRoot, correctStateRoot(5));
+        assertEq(ts.blockHashes[0], correctBlockhash(5));
+        assertEq(ts.stateRoots[0], correctStateRoot(5));
 
         // - Verify genesis block
         ITaikoInbox.Batch memory batch = inbox.getBatch(0);
@@ -309,14 +311,14 @@ contract InboxTest_ProposeAndProve is InboxTestBase {
             inbox.getLastVerifiedTransition();
         assertEq(batchId, 9);
         assertEq(blockId, 9 * 7);
-        assertEq(ts.blockHash, correctBlockhash(9));
-        assertEq(ts.stateRoot, bytes32(uint256(0)));
+        assertEq(ts.blockHashes[0], correctBlockhash(9));
+        assertEq(ts.stateRoots[0], bytes32(uint256(0)));
 
         (batchId, blockId, ts) = inbox.getLastSyncedTransition();
         assertEq(batchId, 5);
         assertEq(blockId, 5 * 7);
-        assertEq(ts.blockHash, correctBlockhash(5));
-        assertEq(ts.stateRoot, correctStateRoot(5));
+        assertEq(ts.blockHashes[0], correctBlockhash(5));
+        assertEq(ts.stateRoots[0], correctStateRoot(5));
 
         // - Verify genesis block
         ITaikoInbox.Batch memory batch = inbox.getBatch(0);
@@ -426,14 +428,14 @@ contract InboxTest_ProposeAndProve is InboxTestBase {
             inbox.getLastVerifiedTransition();
         assertEq(batchId, 10);
         assertEq(blockId, 10);
-        assertEq(ts.blockHash, correctBlockhash(10));
-        assertEq(ts.stateRoot, correctStateRoot(10));
+        assertEq(ts.blockHashes[0], correctBlockhash(10));
+        assertEq(ts.stateRoots[0], correctStateRoot(10));
 
         (batchId, blockId, ts) = inbox.getLastSyncedTransition();
         assertEq(batchId, 10);
         assertEq(blockId, 10);
-        assertEq(ts.blockHash, correctBlockhash(10));
-        assertEq(ts.stateRoot, correctStateRoot(10));
+        assertEq(ts.blockHashes[0], correctBlockhash(10));
+        assertEq(ts.stateRoots[0], correctStateRoot(10));
 
         // Verify block data
         for (uint64 i = 8; i < 15; ++i) {
@@ -519,7 +521,10 @@ contract InboxTest_ProposeAndProve is InboxTestBase {
 
         vm.startSnapshotGas("proveBatches");
         // Surge: use happy case proof type
-        inbox.proveBatches(abi.encode(LibProofType.ProofType.SGX_SP1, metas, transitions), "proof");
+        inbox.proveBatches(
+            abi.encode(LibProofType.sgxReth().combine(LibProofType.sp1Reth()), metas, transitions),
+            "proof"
+        );
         uint256 gasProveBatches = vm.stopSnapshotGas("proveBatches");
         console2.log("Gas per batch - proving:", gasProveBatches / count);
         console2.log("Gas per batch - total:", (gasProposeBatches + gasProveBatches) / count);
