@@ -10,6 +10,8 @@ services:
       - bridge-ui
     networks:
       - app-network
+    labels:
+      logs_enabled: "true"
 
   nginx:
     image: nginx:latest
