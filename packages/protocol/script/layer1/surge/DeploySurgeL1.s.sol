@@ -61,6 +61,10 @@ contract DeploySurgeL1 is DeployCapability {
     uint256 internal immutable timelockPeriod = uint64(vm.envUint("TIMELOCK_PERIOD"));
     address internal immutable ownerMultisig = vm.envAddress("OWNER_MULTISIG");
 
+    // DAO configuration
+    // ---------------------------------------------------------------
+    address internal immutable dao = vm.envAddress("DAO");
+
     // L2 configuration
     // ---------------------------------------------------------------
     uint64 internal immutable l2ChainId = uint64(vm.envUint("L2_CHAINID"));
@@ -186,6 +190,9 @@ contract DeploySurgeL1 is DeployCapability {
             newImplementation: address(
                 new SurgeVerifier(
                     rollupContracts.taikoInbox,
+                    address(0),
+                    address(0),
+                    address(0),
                     verifiers.sgxRethVerifier,
                     verifiers.risc0RethVerifier,
                     verifiers.sp1RethVerifier
@@ -228,8 +235,8 @@ contract DeploySurgeL1 is DeployCapability {
         // ---------------------------------------------------------------
         PreconfContracts memory preconfContracts = deployPreconfContracts(
             timelockController,
-            rollupContracts.taikoInbox,
             rollupContracts.proofVerifier,
+            rollupContracts.taikoInbox,
             sharedContracts.signalService,
             emptyImpl
         );
@@ -242,7 +249,9 @@ contract DeploySurgeL1 is DeployCapability {
 
         // Initialise and transfer ownership to timelock controller
         // ---------------------------------------------------------------\
-        SurgeTimelockController(payable(timelockController)).init(rollupContracts.taikoInbox);
+        SurgeTimelockController(payable(timelockController)).init(
+            rollupContracts.taikoInbox, rollupContracts.proofVerifier
+        );
         console2.log("** timelockController initialised");
 
         SgxVerifier(verifiers.sgxRethVerifier).transferOwnership(timelockController);
@@ -455,8 +464,8 @@ contract DeploySurgeL1 is DeployCapability {
 
     function deployPreconfContracts(
         address _owner,
+        address _proofVerifier,
         address _taikoInbox,
-        address _verifier,
         address _signalService,
         address _emptyImpl
     )
@@ -486,7 +495,8 @@ contract DeploySurgeL1 is DeployCapability {
                     livenessBondPerBlock: livenessBondPerBlock
                 }),
                 preconfContracts.taikoWrapper,
-                _verifier,
+                dao,
+                _proofVerifier,
                 address(0),
                 _signalService
             )

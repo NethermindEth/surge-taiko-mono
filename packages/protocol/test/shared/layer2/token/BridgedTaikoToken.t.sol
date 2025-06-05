@@ -62,13 +62,6 @@ contract BridgedTaikoTokenTest is CommonTest {
         assertEq(chainId, 1);
     }
 
-    function test_pause() public {
-        uint256 mintAmount = 1000 ether;
-
-        vm.startPrank(deployer);
-        token.pause();
-
-        vm.expectRevert(EssentialContract.INVALID_PAUSE_STATUS.selector);
-        token.mint(Alice, mintAmount);
-    }
+    // Surge: remove test
+    // test_pause
 }

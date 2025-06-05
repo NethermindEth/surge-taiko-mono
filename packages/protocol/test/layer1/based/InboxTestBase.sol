@@ -5,12 +5,16 @@ import "../Layer1Test.sol";
 import "test/layer1/based/helpers/Verifier_ToggleStub.sol";
 
 abstract contract InboxTestBase is Layer1Test {
+    using LibProofType for LibProofType.ProofType;
+
     mapping(uint256 => bytes) private _batchMetadatas;
     mapping(uint256 => bytes) private _batchInfos;
 
     ITaikoInbox internal inbox;
     TaikoToken internal bondToken;
     SignalService internal signalService;
+    // Surge: use the verifier instance
+    Verifier_ToggleStub internal verifier;
     uint256 genesisBlockProposedAt;
     uint256 genesisBlockProposedIn;
     uint256 private __blocksPerBatch;
@@ -39,12 +43,14 @@ abstract contract InboxTestBase is Layer1Test {
 
         signalService = deploySignalService(address(new SignalService(address(resolver))));
 
-        address verifierAddr = address(new Verifier_ToggleStub());
-        resolver.registerAddress(block.chainid, "proof_verifier", verifierAddr);
+        verifier = new Verifier_ToggleStub();
+        // Surge: do not register the verifier address
 
         inbox = deployInbox(
             correctBlockhash(0),
-            verifierAddr,
+            // Surge: add dao address
+            address(1),
+            address(verifier),
             address(bondToken),
             address(signalService),
             pacayaConfig()
@@ -153,7 +159,62 @@ abstract contract InboxTestBase is Layer1Test {
             transitions[i].stateRoot = correctStateRoot(batchIds[i]);
         }
 
-        inbox.proveBatches(abi.encode(metas, transitions), "proof");
+        // Surge: use happy case proof type
+        inbox.proveBatches(abi.encode(_sgxSp1ProofType(), metas, transitions), "proof");
+    }
+
+    // Surge: helper to prove using a specific proof type
+    function _proveBatchesWithProofType(
+        LibProofType.ProofType proofType,
+        uint64[] memory batchIds
+    )
+        internal
+    {
+        ITaikoInbox.BatchMetadata[] memory metas = new ITaikoInbox.BatchMetadata[](batchIds.length);
+        ITaikoInbox.Transition[] memory transitions = new ITaikoInbox.Transition[](batchIds.length);
+
+        for (uint256 i; i < metas.length; ++i) {
+            (metas[i],) = _loadMetadataAndInfo(batchIds[i]);
+            transitions[i].parentHash = correctBlockhash(batchIds[i] - 1);
+            transitions[i].blockHash = correctBlockhash(batchIds[i]);
+            transitions[i].stateRoot = correctStateRoot(batchIds[i]);
+        }
+
+        verifier.setProofType(proofType);
+        inbox.proveBatches(abi.encode(proofType, metas, transitions), "proof");
+    }
+
+    // Surge: helper to push a conflicting proof type to a transition
+    function _pushConflictingTransition(
+        LibProofType.ProofType proofType,
+        uint64[] memory batchIds
+    )
+        internal
+    {
+        _pushConflictingTransition(proofType, batchIds, 0);
+    }
+
+    // Surge: helper to push a conflicting proof type to a transition
+    function _pushConflictingTransition(
+        LibProofType.ProofType proofType,
+        uint64[] memory batchIds,
+        uint8 salt
+    )
+        internal
+    {
+        ITaikoInbox.BatchMetadata[] memory metas = new ITaikoInbox.BatchMetadata[](batchIds.length);
+        ITaikoInbox.Transition[] memory transitions = new ITaikoInbox.Transition[](batchIds.length);
+
+        for (uint256 i; i < metas.length; ++i) {
+            (metas[i],) = _loadMetadataAndInfo(batchIds[i]);
+            // Parent hash is correct
+            transitions[i].parentHash = correctBlockhash(batchIds[i] - 1);
+            transitions[i].blockHash = conflictingBlockHash(batchIds[i], salt);
+            transitions[i].stateRoot = conflictingStateRoot(batchIds[i], salt);
+        }
+
+        verifier.setProofType(proofType);
+        inbox.proveBatches(abi.encode(proofType, metas, transitions), "proof");
     }
 
     function _proveBatchesWithWrongTransitions(uint64[] memory batchIds) internal {
@@ -167,7 +228,8 @@ abstract contract InboxTestBase is Layer1Test {
             transitions[i].stateRoot = randBytes32();
         }
 
-        inbox.proveBatches(abi.encode(metas, transitions), "proof");
+        // Surge: use happy case proof type
+        inbox.proveBatches(abi.encode(_sgxSp1ProofType(), metas, transitions), "proof");
     }
 
     function _logAllBatchesAndTransitions() internal view {
@@ -206,27 +268,30 @@ abstract contract InboxTestBase is Layer1Test {
             console2.log(unicode"│    |── verifiedTransitionId:", batch.verifiedTransitionId);
 
             for (uint24 j = 1; j < batch.nextTransitionId; ++j) {
-                ITaikoInbox.TransitionState memory ts = inbox.getTransitionById(batch.batchId, j);
-                console2.log(unicode"│    |── transition#", j);
-                console2.log(
-                    unicode"│    │    |── parentHash:",
-                    Strings.toHexString(uint256(ts.parentHash))
-                );
-                console2.log(
-                    unicode"│    │    |── blockHash:",
-                    Strings.toHexString(uint256(ts.blockHash))
-                );
-                console2.log(
-                    unicode"│    │    └── stateRoot:",
-                    Strings.toHexString(uint256(ts.stateRoot))
-                );
-                console2.log(unicode"│    │    └── prover:", ts.prover);
-
-                console2.log(
-                    unicode"│    │    └── inProvingWindow:",
-                    ts.inProvingWindow ? "Y" : "N"
-                );
-                console2.log(unicode"│    │    └── createdAt:", ts.createdAt);
+                ITaikoInbox.TransitionState[] memory transitions =
+                    inbox.getTransitionsById(batch.batchId, j);
+                for (uint256 k = 0; k < transitions.length; ++k) {
+                    ITaikoInbox.TransitionState memory ts = transitions[k];
+                    console2.log(unicode"│    |── transition#", j, ", conflict#", k);
+                    console2.log(
+                        unicode"│    │    |── parentHash:",
+                        Strings.toHexString(uint256(ts.parentHash))
+                    );
+                    console2.log(
+                        unicode"│    │    |── blockHash:",
+                        Strings.toHexString(uint256(ts.blockHash))
+                    );
+                    console2.log(
+                        unicode"│    │    |── stateRoot:",
+                        Strings.toHexString(uint256(ts.stateRoot))
+                    );
+                    console2.log(
+                        unicode"│    │    |── proofType:",
+                        LibProofType.ProofType.unwrap(ts.proofType)
+                    );
+                    console2.log(unicode"│    │    └── bondReceiver:", ts.bondReceiver);
+                    console2.log(unicode"│    │    └── createdAt:", ts.createdAt);
+                }
             }
         }
         console2.log("");
@@ -238,6 +303,26 @@ abstract contract InboxTestBase is Layer1Test {
 
     function correctStateRoot(uint256 blockId) internal pure returns (bytes32) {
         return bytes32(0x2000000 + blockId);
+    }
+
+    // Surge: helper to get a conflicting blockhash without salt
+    function conflictingBlockHash(uint256 blockId) internal pure returns (bytes32) {
+        return conflictingBlockHash(blockId, 0);
+    }
+
+    // Surge: helper to get a conflicting state root without salt
+    function conflictingStateRoot(uint256 blockId) internal pure returns (bytes32) {
+        return conflictingStateRoot(blockId, 0);
+    }
+
+    // Surge: helper to get a conflicting blockhash with salt
+    function conflictingBlockHash(uint256 blockId, uint8 salt) internal pure returns (bytes32) {
+        return bytes32(0x3000000 + blockId + salt);
+    }
+
+    // Surge: helper to get a conflicting state root with salt
+    function conflictingStateRoot(uint256 blockId, uint8 salt) internal pure returns (bytes32) {
+        return bytes32(0x4000000 + blockId + salt);
     }
 
     function range(uint64 start, uint64 end) internal pure returns (uint64[] memory arr) {
@@ -276,5 +361,10 @@ abstract contract InboxTestBase is Layer1Test {
 
         vm.prank(user);
         inbox.depositBond(bondAmount);
+    }
+
+    // Surge: Add proof type helpers
+    function _sgxSp1ProofType() internal pure returns (LibProofType.ProofType) {
+        return LibProofType.sgxReth().combine(LibProofType.sp1Reth());
     }
 }
