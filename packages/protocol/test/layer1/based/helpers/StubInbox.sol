@@ -30,23 +30,23 @@ contract StubInbox is ITaikoInbox {
 
     function getBatch(uint64 _batchId) external view virtual returns (ITaikoInbox.Batch memory) { }
 
-    function getTransitionById(
+    function getTransitionsById(
         uint64 _batchId,
         uint24 _tid
     )
         external
         view
         virtual
-        returns (ITaikoInbox.TransitionState memory)
+        returns (ITaikoInbox.TransitionState[] memory)
     { }
 
-    function getTransitionByParentHash(
+    function getTransitionsByParentHash(
         uint64 _batchId,
         bytes32 _parentHash
     )
         external
         view
-        returns (ITaikoInbox.TransitionState memory)
+        returns (ITaikoInbox.TransitionState[] memory)
     { }
 
     function getLastVerifiedTransition()
