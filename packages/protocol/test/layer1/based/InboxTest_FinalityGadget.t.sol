@@ -97,9 +97,9 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // The batch is not finalised yet
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 0);
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(zkProofType));
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(zkProofType));
 
         // Prove using TEE proof type
         _proveBatchesWithProofType(teeProofType, batchIds);
@@ -108,8 +108,8 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
         // and, proof type is updated to ZK + TEE
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(zkProofType.combine(teeProofType)));
+        transitions = inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(zkProofType.combine(teeProofType)));
     }
 
     // TEE followed by ZK
@@ -137,9 +137,9 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // The batch is not finalised yet
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 0);
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(teeProofType));
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(teeProofType));
 
         // Prove using ZK proof type
         _proveBatchesWithProofType(zkProofType, batchIds);
@@ -148,8 +148,8 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
         // and, proof type is updated to ZK + TEE
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(teeProofType.combine(zkProofType)));
+        transitions = inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(teeProofType.combine(zkProofType)));
     }
 
     // Misc
@@ -183,9 +183,9 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
         // and, bond receiver is updated to Bob
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(ts.bondReceiver, Bob);
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertEq(transitions[0].bondReceiver, Bob);
     }
 
     function test_inbox_skips_reproving_transition_when_both_existing_and_new_proof_types_are_ZK(
@@ -211,16 +211,16 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         _proveBatchesWithProofType(zkProofType1, batchIds);
 
         // Proof type is set to ZK proof type 1
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(zkProofType1));
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(zkProofType1));
 
         // Prove using ZK proof type 2
         _proveBatchesWithProofType(zkProofType2, batchIds);
 
         // Proof type is still ZK proof type 1, signaling that proving was skipped
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(zkProofType1));
+        transitions = inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(zkProofType1));
     }
 
     function test_inbox_skips_reproving_transition_when_both_existing_and_new_proof_types_are_TEE(
@@ -246,26 +246,26 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         _proveBatchesWithProofType(teeProofType1, batchIds);
 
         // Proof type is set to TEE proof type 1
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(teeProofType1));
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(teeProofType1));
 
         // Prove using TEE proof type 2
         _proveBatchesWithProofType(teeProofType2, batchIds);
 
         // Proof type is still TEE proof type 1, signaling that proving was skipped
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(teeProofType1));
+        transitions = inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(teeProofType1));
     }
 
     // --------------------------------------------------------------------------------------------
-    // Conflicting proof cases
+    // Conflicting transition cases
     // --------------------------------------------------------------------------------------------
 
-    // Conflicts with existing ZK proof
-    // --------------------------------
+    // Conflicts with existing ZK proven transition
+    // ----------------------------------------------
 
-    function test_inbox_push_conflicting_ZK_proof_for_existing_ZK_proof(
+    function test_inbox_push_conflicting_ZK_transition_for_existing_ZK_transition(
         uint256 _zkIndex1,
         uint256 _zkIndex2
     )
@@ -286,26 +286,26 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // Prove using ZK proof type 1
         _proveBatchesWithProofType(zkProofType1, batchIds);
 
-        // The transition has no conflicting proofs yet
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(zkProofType1));
-        assertEq(ts.numConflictingProofs, 0);
-        assertEq(ts.createdAt, block.timestamp);
+        // The transition has no conflicts yet
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(zkProofType1));
+        assertEq(transitions.length, 1); // No conflicts
+        assertEq(transitions[0].createdAt, block.timestamp);
 
         vm.warp(block.timestamp + 2);
 
-        // Push a conflicting ZK proof
-        _pushConflictingProof(zkProofType2, batchIds);
+        // Push a conflicting transition of ZK proof type 2
+        _pushConflictingTransition(zkProofType2, batchIds);
 
-        // The transition now has a conflicting proof
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(ts.numConflictingProofs, 1);
-        assertEq(ts.blockHashes[1], conflictingBlockHash(1));
-        assertTrue(ts.proofTypes[1].equals(zkProofType2));
+        // The transition now has a conflicting transition of ZK proof type 2
+        transitions = inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertEq(transitions.length, 2); // 1 conflict
+        assertEq(transitions[1].blockHash, conflictingBlockHash(1));
+        assertTrue(transitions[1].proofType.equals(zkProofType2));
     }
 
-    function test_inbox_batch_is_finalised_when_conflicting_ZK_TEE_proof_is_pushed_for_existing_ZK_proof(
+    function test_inbox_batch_is_finalised_when_conflicting_ZK_TEE_transition_is_pushed_for_existing_ZK_transition(
         uint256 _zkIndex,
         uint256 _zkTeeIndex
     )
@@ -324,32 +324,33 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // Prove using ZK proof type
         _proveBatchesWithProofType(zkProofType, batchIds);
 
-        // The transition has no conflicting proofs yet
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(zkProofType));
-        assertEq(ts.numConflictingProofs, 0);
+        // The transition has no conflicts yet
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(zkProofType));
+        assertEq(transitions.length, 1); // No conflicts
+        assertEq(transitions[0].createdAt, block.timestamp);
 
         vm.warp(block.timestamp + 2);
 
-        // Push a conflicting ZK + TEE proof
-        _pushConflictingProof(zkTeeProofType, batchIds);
+        // Push a conflicting transition of ZK + TEE proof type
+        _pushConflictingTransition(zkTeeProofType, batchIds);
 
-        // The transition now has a conflicting proof
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(ts.numConflictingProofs, 1);
-        assertEq(ts.blockHashes[1], conflictingBlockHash(1));
-        assertTrue(ts.proofTypes[1].equals(zkTeeProofType));
+        // The transition now has a conflicting transition of ZK + TEE proof type
+        transitions = inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertEq(transitions.length, 2); // 1 conflict
+        assertEq(transitions[1].blockHash, conflictingBlockHash(1));
+        assertTrue(transitions[1].proofType.equals(zkTeeProofType));
 
         // The batch is now finalised
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, finalising proof index is updated to 1
+        // and, finalising transition index is updated to 1
         ITaikoInbox.Batch memory batch = inbox.getBatch(1);
-        assertEq(batch.finalisingProofIndex, 1);
+        assertEq(batch.finalisingTransitionIndex, 1);
     }
 
-    function test_inbox_batch_is_finalised_when_conflicting_ZK_proof_gets_matching_TEE_proof(
+    function test_inbox_batch_is_finalised_when_conflicting_ZK_transition_gets_matching_TEE_transition(
         uint256 _zkIndex1,
         uint256 _zkIndex2,
         uint256 _teeIndex
@@ -375,34 +376,34 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
 
         vm.warp(block.timestamp + 2);
 
-        // Push a conflicting ZK proof type 2
-        _pushConflictingProof(zkProofType2, batchIds);
+        // Push a conflicting transition of ZK proof type 2
+        _pushConflictingTransition(zkProofType2, batchIds);
 
-        // The transition now has a conflicting proof
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(ts.numConflictingProofs, 1);
-        assertEq(ts.blockHashes[1], conflictingBlockHash(1));
-        assertTrue(ts.proofTypes[1].equals(zkProofType2));
+        // The transition now has a conflicting transition of ZK proof type 2
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertEq(transitions.length, 2); // 1 conflict
+        assertEq(transitions[1].blockHash, conflictingBlockHash(1));
+        assertTrue(transitions[1].proofType.equals(zkProofType2));
         // But the batch is not finalised yet
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 0);
 
-        // Push a matching TEE proof for the conflicting ZK proof type 2
-        _pushConflictingProof(teeProofType, batchIds);
+        // Push a matching transition of TEE proof type
+        _pushConflictingTransition(teeProofType, batchIds);
 
         // The batch is now finalised
         stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, finalising proof type is updated to ZK + TEE
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[1].equals(zkProofType2.combine(teeProofType)));
-        // and, finalising proof index is updated to 1
+        // and, finalising transition's proof type is updated to ZK + TEE
+        transitions = inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[1].proofType.equals(zkProofType2.combine(teeProofType)));
+        // and, finalising transition index is updated to 1
         ITaikoInbox.Batch memory batch = inbox.getBatch(1);
-        assertEq(batch.finalisingProofIndex, 1);
+        assertEq(batch.finalisingTransitionIndex, 1);
     }
 
-    function test_inbox_sender_becomes_bond_receiver_when_conflicting_ZK_TEE_proof_is_pushed_for_existing_ZK_proof(
+    function test_inbox_sender_becomes_bond_receiver_when_conflicting_ZK_TEE_transition_is_pushed_for_existing_ZK_transition(
         uint256 _zkIndex,
         uint256 _zkTeeIndex
     )
@@ -421,32 +422,32 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // Prove using ZK proof type
         _proveBatchesWithProofType(zkProofType, batchIds);
 
-        // The transition has no conflicting proofs yet
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(zkProofType));
-        assertEq(ts.numConflictingProofs, 0);
+        // The transition has no conflicts yet
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(zkProofType));
+        assertEq(transitions.length, 1); // No conflicts
 
         vm.warp(block.timestamp + 2);
 
-        // Push a conflicting ZK + TEE proof
+        // Push a conflicting transition of ZK + TEE proof type
         vm.startPrank(Bob);
-        _pushConflictingProof(zkTeeProofType, batchIds);
+        _pushConflictingTransition(zkTeeProofType, batchIds);
         vm.stopPrank();
 
-        // The transition now has a conflicting proof
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(ts.numConflictingProofs, 1);
-        assertEq(ts.blockHashes[1], conflictingBlockHash(1));
-        assertTrue(ts.proofTypes[1].equals(zkTeeProofType));
+        // The transition now has a conflicting transition of ZK + TEE proof type
+        transitions = inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertEq(transitions.length, 2); // 1 conflict
+        assertEq(transitions[1].blockHash, conflictingBlockHash(1));
+        assertTrue(transitions[1].proofType.equals(zkTeeProofType));
         // and, bond receiver is updated to Bob
-        assertEq(ts.bondReceiver, Bob);
+        assertEq(transitions[1].bondReceiver, Bob);
     }
 
-    // Conflicts with existing TEE proof
-    // ----------------------------------
+    // Conflicts with existing TEE proven transition
+    // ----------------------------------------------
 
-    function test_inbox_push_conflicting_TEE_proof_for_existing_TEE_proof(
+    function test_inbox_push_conflicting_TEE_transition_for_existing_TEE_transition(
         uint256 _teeIndex1,
         uint256 _teeIndex2
     )
@@ -467,25 +468,25 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // Prove using TEE proof type 1
         _proveBatchesWithProofType(teeProofType1, batchIds);
 
-        // The transition has no conflicting proofs yet
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(teeProofType1));
-        assertEq(ts.numConflictingProofs, 0);
+        // The transition has no conflicts yet
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(teeProofType1));
+        assertEq(transitions.length, 1); // No conflicts
 
         vm.warp(block.timestamp + 2);
 
-        // Push a conflicting TEE proof type 2
-        _pushConflictingProof(teeProofType2, batchIds);
+        // Push a conflicting transition of TEE proof type 2
+        _pushConflictingTransition(teeProofType2, batchIds);
 
-        // The transition now has a conflicting proof
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(ts.numConflictingProofs, 1);
-        assertEq(ts.blockHashes[1], conflictingBlockHash(1));
-        assertTrue(ts.proofTypes[1].equals(teeProofType2));
+        // The transition now has a conflicting transition of TEE proof type 2
+        transitions = inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertEq(transitions.length, 2); // 1 conflict
+        assertEq(transitions[1].blockHash, conflictingBlockHash(1));
+        assertTrue(transitions[1].proofType.equals(teeProofType2));
     }
 
-    function test_inbox_push_conflicting_ZK_proof_for_existing_TEE_proof(
+    function test_inbox_push_conflicting_ZK_transition_for_existing_TEE_transition(
         uint256 _teeIndex,
         uint256 _zkIndex
     )
@@ -504,25 +505,25 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // Prove using TEE proof type
         _proveBatchesWithProofType(teeProofType, batchIds);
 
-        // The transition has no conflicting proofs yet
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(teeProofType));
-        assertEq(ts.numConflictingProofs, 0);
+        // The transition has no conflicts yet
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(teeProofType));
+        assertEq(transitions.length, 1); // No conflicts
 
         vm.warp(block.timestamp + 2);
 
-        // Push a conflicting ZK proof
-        _pushConflictingProof(zkProofType, batchIds);
+        // Push a conflicting transition of ZK proof type
+        _pushConflictingTransition(zkProofType, batchIds);
 
-        // The transition now has a conflicting proof
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(ts.numConflictingProofs, 1);
-        assertEq(ts.blockHashes[1], conflictingBlockHash(1));
-        assertTrue(ts.proofTypes[1].equals(zkProofType));
+        // The transition now has a conflicting transition of ZK proof type
+        transitions = inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertEq(transitions.length, 2); // 1 conflict
+        assertEq(transitions[1].blockHash, conflictingBlockHash(1));
+        assertTrue(transitions[1].proofType.equals(zkProofType));
     }
 
-    function test_inbox_batch_is_finalised_when_conflicting_ZK_TEE_proof_is_pushed_for_existing_TEE_proof(
+    function test_inbox_batch_is_finalised_when_conflicting_ZK_TEE_transition_is_pushed_for_existing_TEE_transition(
         uint256 _teeIndex,
         uint256 _zkTeeIndex
     )
@@ -541,31 +542,31 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // Prove using TEE proof type
         _proveBatchesWithProofType(teeProofType, batchIds);
 
-        // The transition has no conflicting proofs yet
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(teeProofType));
-        assertEq(ts.numConflictingProofs, 0);
+        // The transition has no conflicts yet
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(teeProofType));
+        assertEq(transitions.length, 1); // No conflicts
 
         vm.warp(block.timestamp + 2);
 
-        // Push a conflicting ZK + TEE proof
-        _pushConflictingProof(zkTeeProofType, batchIds);
+        // Push a conflicting transition of ZK + TEE proof type
+        _pushConflictingTransition(zkTeeProofType, batchIds);
 
-        // The transition now has a conflicting proof
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(ts.numConflictingProofs, 1);
-        assertEq(ts.blockHashes[1], conflictingBlockHash(1));
-        assertTrue(ts.proofTypes[1].equals(zkTeeProofType));
+        // The transition now has a conflicting transition of ZK + TEE proof type
+        transitions = inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertEq(transitions.length, 2); // 1 conflict
+        assertEq(transitions[1].blockHash, conflictingBlockHash(1));
+        assertTrue(transitions[1].proofType.equals(zkTeeProofType));
         // and, batch is finalised
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, finalising proof index is updated to 1
+        // and, finalising transition index is updated to 1
         ITaikoInbox.Batch memory batch = inbox.getBatch(1);
-        assertEq(batch.finalisingProofIndex, 1);
+        assertEq(batch.finalisingTransitionIndex, 1);
     }
 
-    function test_inbox_batch_is_finalised_when_conflicting_TEE_proof_gets_matching_ZK_proof(
+    function test_inbox_batch_is_finalised_when_conflicting_TEE_transition_gets_matching_ZK_transition(
         uint256 _teeIndex1,
         uint256 _teeIndex2,
         uint256 _zkIndex
@@ -591,34 +592,34 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
 
         vm.warp(block.timestamp + 2);
 
-        // Push a conflicting TEE proof type 2
-        _pushConflictingProof(teeProofType2, batchIds);
+        // Push a conflicting transition of TEE proof type 2
+        _pushConflictingTransition(teeProofType2, batchIds);
 
-        // The transition now has a conflicting proof
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(ts.numConflictingProofs, 1);
-        assertEq(ts.blockHashes[1], conflictingBlockHash(1));
-        assertTrue(ts.proofTypes[1].equals(teeProofType2));
+        // The transition now has a conflicting transition of TEE proof type 2
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertEq(transitions.length, 2); // 1 conflict
+        assertEq(transitions[1].blockHash, conflictingBlockHash(1));
+        assertTrue(transitions[1].proofType.equals(teeProofType2));
         // but not finalised yet
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 0);
 
-        // Push a matching ZK proof for the conflicting TEE proof type 2
-        _pushConflictingProof(zkProofType, batchIds);
+        // Push a matching transition of ZK proof type
+        _pushConflictingTransition(zkProofType, batchIds);
 
         // The batch is now finalised
         stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, finalising proof type is updated to ZK + TEE
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[1].equals(zkProofType.combine(teeProofType2)));
-        // and, finalising proof index is updated to 1
+        // and, finalising transition's proof type is updated to ZK + TEE
+        transitions = inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[1].proofType.equals(zkProofType.combine(teeProofType2)));
+        // and, finalising transition index is updated to 1
         ITaikoInbox.Batch memory batch = inbox.getBatch(1);
-        assertEq(batch.finalisingProofIndex, 1);
+        assertEq(batch.finalisingTransitionIndex, 1);
     }
 
-    function test_inbox_sender_becomes_bond_receiver_when_conflicting_ZK_TEE_proof_is_pushed_for_existing_TEE_proof(
+    function test_inbox_sender_becomes_bond_receiver_when_conflicting_ZK_TEE_transition_is_pushed_for_existing_TEE_transition(
         uint256 _teeIndex,
         uint256 _zkTeeIndex
     )
@@ -637,36 +638,36 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // Prove using TEE proof type
         _proveBatchesWithProofType(teeProofType, batchIds);
 
-        // The transition has no conflicting proofs yet
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(teeProofType));
-        assertEq(ts.numConflictingProofs, 0);
+        // The transition has no conflicts yet
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(teeProofType));
+        assertEq(transitions.length, 1); // No conflicts
 
         vm.warp(block.timestamp + 2);
 
-        // Push a conflicting ZK + TEE proof
+        // Push a conflicting transition of ZK + TEE proof type
         vm.startPrank(Bob);
-        _pushConflictingProof(zkTeeProofType, batchIds);
+        _pushConflictingTransition(zkTeeProofType, batchIds);
         vm.stopPrank();
 
-        // The transition now has a conflicting proof
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(ts.numConflictingProofs, 1);
-        assertEq(ts.blockHashes[1], conflictingBlockHash(1));
-        assertTrue(ts.proofTypes[1].equals(zkTeeProofType));
+        // The transition now has a conflicting transition of ZK + TEE proof type
+        transitions = inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertEq(transitions.length, 2); // 1 conflict
+        assertEq(transitions[1].blockHash, conflictingBlockHash(1));
+        assertTrue(transitions[1].proofType.equals(zkTeeProofType));
         // and, bond receiver is updated to Bob
-        assertEq(ts.bondReceiver, Bob);
-        // and, finalising proof index is updated to 1
+        assertEq(transitions[1].bondReceiver, Bob);
+        // and, finalising transition index is updated to 1
         ITaikoInbox.Batch memory batch = inbox.getBatch(1);
-        assertEq(batch.finalisingProofIndex, 1);
+        assertEq(batch.finalisingTransitionIndex, 1);
     }
 
     // ----------------------------------------------------------
     // Cooldown Period
     // ----------------------------------------------------------
 
-    function test_inbox_batch_is_finalised_when_existing_ZK_proof_has_no_conflicts_within_cooldown_period(
+    function test_inbox_batch_is_finalised_when_existing_ZK_transition_has_no_conflicts_within_cooldown_period(
         uint256 _zkIndex
     )
         external
@@ -682,11 +683,11 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // Prove using ZK proof type
         _proveBatchesWithProofType(zkProofType, batchIds);
 
-        // The batch is not challenged yet
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(zkProofType));
-        assertEq(ts.numConflictingProofs, 0);
+        // The batch has no conflicts yet
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(zkProofType));
+        assertEq(transitions.length, 1); // No conflicts
 
         // Warp time to just before the cooldown period ends
         vm.warp(block.timestamp + pacayaConfig().cooldownWindow - 1);
@@ -707,13 +708,13 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // The batch should now be finalised
         stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, proof type remains ZK as it was not challenged
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(zkProofType));
-        assertEq(ts.numConflictingProofs, 0);
+        // and, proof type remains ZK as no conflicting transition was pushed
+        transitions = inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(zkProofType));
+        assertEq(transitions.length, 1); // No conflicts
     }
 
-    function test_inbox_batch_is_finalised_when_existing_TEE_proof_has_no_conflicts_within_cooldown_period(
+    function test_inbox_batch_is_finalised_when_existing_TEE_transition_has_no_conflicts_within_cooldown_period(
         uint256 _teeIndex
     )
         external
@@ -729,11 +730,11 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // Prove using TEE proof type
         _proveBatchesWithProofType(teeProofType, batchIds);
 
-        // The transition has no conflicting proofs yet
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(teeProofType));
-        assertEq(ts.numConflictingProofs, 0);
+        // The transition has no conflicts yet
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(teeProofType));
+        assertEq(transitions.length, 1); // No conflicts
 
         // Warp time to just before the cooldown period ends
         vm.warp(block.timestamp + pacayaConfig().cooldownWindow - 1);
@@ -754,13 +755,13 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // The batch should now be finalised
         stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, proof type remains TEE as it was not challenged
-        ts = inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(teeProofType));
-        assertEq(ts.numConflictingProofs, 0);
+        // and, proof type remains TEE as no conflicting transition was pushed
+        transitions = inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(teeProofType));
+        assertEq(transitions.length, 1); // No conflicts
     }
 
-    function test_inbox_dao_receives_liveness_bond_when_ZK_proof_is_finalised_via_cooldown_period(
+    function test_inbox_dao_receives_liveness_bond_when_ZK_transition_is_finalised_via_cooldown_period(
         uint256 _zkIndex
     )
         external
@@ -785,18 +786,18 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // The batch should now be finalised
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, proof type remains ZK as it was not challenged
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(zkProofType));
-        assertEq(ts.numConflictingProofs, 0);
+        // and, proof type remains ZK as no conflicting transition was pushed
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(zkProofType));
+        assertEq(transitions.length, 1); // No conflicts
         // and, liveness bond is sent to DAO
         assertEq(
             inbox.bondBalanceOf(TaikoInbox(address(inbox)).dao()), pacayaConfig().livenessBondBase
         );
     }
 
-    function test_inbox_dao_receives_liveness_bond_when_TEE_proof_is_finalised_via_cooldown_period(
+    function test_inbox_dao_receives_liveness_bond_when_TEE_transition_is_finalised_via_cooldown_period(
         uint256 _teeIndex
     )
         external
@@ -821,18 +822,18 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // The batch should now be finalised
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // and, proof type remains TEE as it was not challenged
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertTrue(ts.proofTypes[0].equals(teeProofType));
-        assertEq(ts.numConflictingProofs, 0);
+        // and, proof type remains TEE as no conflicting transition was pushed
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertTrue(transitions[0].proofType.equals(teeProofType));
+        assertEq(transitions.length, 1); // No conflicts
         // and, liveness bond is sent to DAO
         assertEq(
             inbox.bondBalanceOf(TaikoInbox(address(inbox)).dao()), pacayaConfig().livenessBondBase
         );
     }
 
-    function test_inbox_batch_cannot_be_finalised_via_cooldown_period_if_there_are_conflicting_proofs(
+    function test_inbox_batch_cannot_be_finalised_via_cooldown_period_if_there_are_conflicting_transitions(
         uint256 _zkIndex,
         uint256 _teeIndex
     )
@@ -851,8 +852,8 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         // Prove using TEE proof type
         _proveBatchesWithProofType(teeProofType, batchIds);
 
-        // Push a conflicting ZK proof
-        _pushConflictingProof(zkProofType, batchIds);
+        // Push a conflicting transition of ZK proof type
+        _pushConflictingTransition(zkProofType, batchIds);
 
         // Warp time to after the cooldown period ends
         vm.warp(block.timestamp + pacayaConfig().cooldownWindow + 1);
@@ -869,7 +870,7 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
     // Verifier Upgradeability
     // ----------------------------------------------------------
 
-    function test_inbox_verifiers_of_conflicting_proof_are_marked_for_upgrade(
+    function test_inbox_proof_verifiers_of_conflicting_transitions_are_marked_for_upgrade(
         uint256 _zkTeeIndex,
         uint256 _teeIndex,
         uint256 _zkIndex
@@ -888,29 +889,29 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         uint64[] memory batchIds = new uint64[](1);
         batchIds[0] = 1;
 
-        // Push a conflicting TEE proof with salt 1
-        _pushConflictingProof(teeConflictingProofType, batchIds, 1);
+        // Push a conflicting transition of TEE proof type with salt 1
+        _pushConflictingTransition(teeConflictingProofType, batchIds, 1);
 
-        // Push a conflicting ZK proof with salt 2
-        _pushConflictingProof(zkConflictingProofType, batchIds, 2);
+        // Push a conflicting transition of ZK proof type with salt 2
+        _pushConflictingTransition(zkConflictingProofType, batchIds, 2);
 
-        // Push finalising proof
+        // Push finalising transition of ZK + TEE proof type
         _proveBatchesWithProofType(zkTeeProofType, batchIds);
 
         // The batch is now finalised
         ITaikoInbox.Stats2 memory stats2 = inbox.getStats2();
         assertEq(stats2.lastVerifiedBatchId, 1);
-        // but, it contains 2 conflicting proofs
-        ITaikoInbox.TransitionState memory ts =
-            inbox.getTransitionByParentHash(1, correctBlockhash(0));
-        assertEq(ts.numConflictingProofs, 2);
-        assertTrue(ts.proofTypes[0].equals(teeConflictingProofType));
-        assertTrue(ts.proofTypes[1].equals(zkConflictingProofType));
-        // and, the finalising proof
-        assertTrue(ts.proofTypes[2].equals(zkTeeProofType));
-        // Finalising proof index is updated to 2
+        // but, it contains 2 conflicting transitions
+        ITaikoInbox.TransitionState[] memory transitions =
+            inbox.getTransitionsByParentHash(1, correctBlockhash(0));
+        assertEq(transitions.length, 3); // 2 conflicts
+        assertTrue(transitions[0].proofType.equals(teeConflictingProofType));
+        assertTrue(transitions[1].proofType.equals(zkConflictingProofType));
+        // and, the finalising transition i.e is of ZK + TEE proof type
+        assertTrue(transitions[2].proofType.equals(zkTeeProofType));
+        // and, finalising transition index is updated to 2
         ITaikoInbox.Batch memory batch = inbox.getBatch(1);
-        assertEq(batch.finalisingProofIndex, 2);
+        assertEq(batch.finalisingTransitionIndex, 2);
         // and, conflicting ZK + conflicting TEE verifier is upgradeable
         assertTrue(
             verifier.proofTypeToUpgrade().equals(

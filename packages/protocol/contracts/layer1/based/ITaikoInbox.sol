@@ -104,16 +104,13 @@ interface ITaikoInbox {
     /// @dev Uses 5 slots when no conflicts are present, with 2 slots for every new conflict.
     struct TransitionState {
         bytes32 parentHash;
-        // Surge: Store `proofTypes` for every proof
-        LibProofType.ProofType[4] proofTypes;
-        // Surge: Switch to arrays to store conflicts, and add `numConflictingProofs`
-        bytes32[4] blockHashes;
-        bytes32[4] stateRoots;
-        // Surge: add `numConflictingProofs`
-        uint8 numConflictingProofs;
+        bytes32 blockHash;
+        bytes32 stateRoot;
+        // Surge: add `proofType`
+        LibProofType.ProofType proofType;
         // Surge: renamed from `prover` to `bondReceiver`
         address bondReceiver;
-        // Surge: remove `provingWindow`
+        // Surge: remove `inProvingWindow`
         uint48 createdAt;
     }
 
@@ -127,10 +124,11 @@ interface ITaikoInbox {
         uint64 lastBlockTimestamp;
         uint64 anchorBlockId;
         uint24 nextTransitionId;
-        // Surge: add `finalisingProofIndex`
-        // The index of the finalising proof in the transition state. This is only updated and used
-        // when this batch is verified as the last one in a transaction.
-        uint8 finalisingProofIndex;
+        // Surge: add `finalisingTransitionIndex`
+        // The index of the finalising transition among the conflicting transitions of this batch.
+        // This is only updated and used when this batch is verified as the last one in a
+        // transaction.
+        uint8 finalisingTransitionIndex;
         // The ID of the transaction that is used to verify this batch. However, if this batch is
         // not verified as the last one in a transaction, verifiedTransitionId will remain zero.
         uint24 verifiedTransitionId;
@@ -210,9 +208,12 @@ interface ITaikoInbox {
         // Indexing to transition ids (ring buffer not possible)
         mapping(uint256 batchId => mapping(bytes32 parentHash => uint24 transitionId)) transitionIds;
         // Ring buffer for transitions
+        // Surge: change `TransitionState` to `TransitionState[]` to accomodate conflicting
+        // transitions
+        // i.e transitions with the same parent hash.
         mapping(
             uint256 batchId_mod_batchRingBufferSize
-                => mapping(uint24 transitionId => TransitionState ts)
+                => mapping(uint24 transitionId => TransitionState[] transitions)
         ) transitions;
         bytes32 __reserve1; // slot 4 - was used as a ring buffer for Ether deposits
         Stats1 stats1; // slot 5
@@ -375,27 +376,27 @@ interface ITaikoInbox {
     /// revert if the transition is not found.
     /// @param _batchId The batch ID.
     /// @param _tid The transition ID.
-    /// @return The specified transition state.
-    function getTransitionById(
+    /// @return The specified transition states.
+    function getTransitionsById(
         uint64 _batchId,
         uint24 _tid
     )
         external
         view
-        returns (ITaikoInbox.TransitionState memory);
+        returns (ITaikoInbox.TransitionState[] memory);
 
     /// @notice Retrieves a specific transition by batch ID and parent Hash. This function may
     /// revert if the transition is not found.
     /// @param _batchId The batch ID.
     /// @param _parentHash The parent hash.
-    /// @return The specified transition state.
-    function getTransitionByParentHash(
+    /// @return The specified transition states.
+    function getTransitionsByParentHash(
         uint64 _batchId,
         bytes32 _parentHash
     )
         external
         view
-        returns (ITaikoInbox.TransitionState memory);
+        returns (ITaikoInbox.TransitionState[] memory);
 
     /// @notice Retrieves the transition used for the last verified batch.
     /// @return batchId_ The batch ID of the last verified transition.

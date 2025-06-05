@@ -185,17 +185,17 @@ abstract contract InboxTestBase is Layer1Test {
     }
 
     // Surge: helper to push a conflicting proof type to a transition
-    function _pushConflictingProof(
+    function _pushConflictingTransition(
         LibProofType.ProofType proofType,
         uint64[] memory batchIds
     )
         internal
     {
-        _pushConflictingProof(proofType, batchIds, 0);
+        _pushConflictingTransition(proofType, batchIds, 0);
     }
 
     // Surge: helper to push a conflicting proof type to a transition
-    function _pushConflictingProof(
+    function _pushConflictingTransition(
         LibProofType.ProofType proofType,
         uint64[] memory batchIds,
         uint8 salt
@@ -268,36 +268,30 @@ abstract contract InboxTestBase is Layer1Test {
             console2.log(unicode"│    |── verifiedTransitionId:", batch.verifiedTransitionId);
 
             for (uint24 j = 1; j < batch.nextTransitionId; ++j) {
-                ITaikoInbox.TransitionState memory ts = inbox.getTransitionById(batch.batchId, j);
-                console2.log(unicode"│    |── transition#", j);
-                console2.log(
-                    unicode"│    │    |── parentHash:",
-                    Strings.toHexString(uint256(ts.parentHash))
-                );
-                // Log all block hashes
-                for (uint8 k = 0; k <= ts.numConflictingProofs; ++k) {
+                ITaikoInbox.TransitionState[] memory transitions =
+                    inbox.getTransitionsById(batch.batchId, j);
+                for (uint256 k = 0; k < transitions.length; ++k) {
+                    ITaikoInbox.TransitionState memory ts = transitions[k];
+                    console2.log(unicode"│    |── transition#", j, ", conflict#", k);
                     console2.log(
-                        unicode"│    │    |── blockHash[",
-                        k,
-                        "]:",
-                        Strings.toHexString(uint256(ts.blockHashes[k]))
+                        unicode"│    │    |── parentHash:",
+                        Strings.toHexString(uint256(ts.parentHash))
                     );
                     console2.log(
-                        unicode"│    │    |── stateRoot[",
-                        k,
-                        "]:",
-                        Strings.toHexString(uint256(ts.stateRoots[k]))
+                        unicode"│    │    |── blockHash:",
+                        Strings.toHexString(uint256(ts.blockHash))
                     );
                     console2.log(
-                        unicode"│    │    |── proofType[",
-                        k,
-                        "]:",
-                        LibProofType.ProofType.unwrap(ts.proofTypes[k])
+                        unicode"│    │    |── stateRoot:",
+                        Strings.toHexString(uint256(ts.stateRoot))
                     );
+                    console2.log(
+                        unicode"│    │    |── proofType:",
+                        LibProofType.ProofType.unwrap(ts.proofType)
+                    );
+                    console2.log(unicode"│    │    └── bondReceiver:", ts.bondReceiver);
+                    console2.log(unicode"│    │    └── createdAt:", ts.createdAt);
                 }
-                console2.log(unicode"│    │    └── numConflictingProofs:", ts.numConflictingProofs);
-                console2.log(unicode"│    │    └── bondReceiver:", ts.bondReceiver);
-                console2.log(unicode"│    │    └── createdAt:", ts.createdAt);
             }
         }
         console2.log("");
