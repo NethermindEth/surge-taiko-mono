@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	consensus "github.com/ethereum/go-ethereum/consensus/taiko"
-	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -23,6 +22,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 	anchorTxConstructor "github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/anchor_tx_constructor"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
 
@@ -119,7 +119,7 @@ func createExecutionPayloads(
 	meta *createExecutionPayloadsMetaData,
 	txListBytes []byte,
 ) (payloadData *engine.ExecutableData, err error) {
-	attributes := &engine.PayloadAttributes{
+	attributes := &surge.PayloadAttributes{
 		Timestamp:             meta.Timestamp,
 		Random:                meta.Difficulty,
 		SuggestedFeeRecipient: meta.SuggestedFeeRecipient,
@@ -481,11 +481,12 @@ func assembleCreateExecutionPayloadMetaPacaya(
 		Difficulty:            common.BytesToHash(difficulty),
 		Timestamp:             timestamp,
 		ParentHash:            parent.Hash(),
-		L1Origin: &rawdb.L1Origin{
+		L1Origin: &surge.L1Origin{
 			BlockID:       blockID,
 			L2BlockHash:   common.Hash{}, // Will be set by taiko-geth.
 			L1BlockHeight: meta.GetRawBlockHeight(),
 			L1BlockHash:   meta.GetRawBlockHash(),
+			BatchID:       meta.GetBatchID(),
 		},
 		Txs:         txs,
 		Withdrawals: make([]*types.Withdrawal, 0),
@@ -517,11 +518,12 @@ func updateL1OriginForBatch(
 				return fmt.Errorf("failed to get block by number %d: %w", blockID, err)
 			}
 
-			l1Origin := &rawdb.L1Origin{
+			l1Origin := &surge.L1Origin{
 				BlockID:       blockID,
 				L2BlockHash:   header.Hash(),
 				L1BlockHeight: meta.GetRawBlockHeight(),
 				L1BlockHash:   meta.GetRawBlockHash(),
+				BatchID:       meta.GetBatchID(),
 			}
 			// Fetch the original L1Origin to get the BuildPayloadArgsID.
 			originalL1Origin, err := rpc.L2.L1OriginByID(ctx, blockID)
