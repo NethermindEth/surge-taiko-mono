@@ -4,43 +4,87 @@ pragma solidity ^0.8.24;
 import "../verifiers/ISurgeVerifier.sol";
 import "../verifiers/LibProofType.sol";
 import "src/layer1/based/ITaikoInbox.sol";
+import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/governance/TimelockController.sol";
 
 /// @title SurgeTimelockController
 /// @dev Satisfies stage-2 rollup requirements by blocking executions if a block
 /// has not been verified in a while.
 /// @custom:security-contact security@nethermind.io
-contract SurgeTimelockController is TimelockController {
-    address public taikoInbox; // Slot 1
-    address public verifier; // Slot 2
+contract SurgeTimelockController is TimelockController, Initializable, UUPSUpgradeable {
+    // Slot 0 is assigned in base `Initializable`
+    // Slot 1 is assigned in base `AccessControl`
+    // Slot 2 and 3 are assigned in base `TimelockController`
+
+    address public taikoInbox; // Slot 4
+    address public verifier; // Slot 5
 
     /// @notice Minimum period for which the verification streak must not have been disrupted
-    uint256 public minVerificationStreak; // Slot 3
+    uint256 public minVerificationStreak; // Slot 6
 
-    uint256[45] private _gap;
+    // Slots 0 through 6 are assigned
+    uint256[43] private _gap;
 
-    error AlreadyInitialized();
     error VerificationStreakDisrupted();
 
-    constructor(
-        uint64 _minVerificationStreak,
+    constructor() TimelockController(0, new address[](0), new address[](0), address(0)) {
+        _disableInitializers();
+    }
+
+    // Initialization functions
+    // --------------------------------------------------------------------------------------------
+
+    function init(
         uint256 _minDelay,
         address[] memory _proposers,
         address[] memory _executors,
-        address _admin
+        address _taikoInbox,
+        address _verifier,
+        uint256 _minVerificationStreak
     )
-        TimelockController(_minDelay, _proposers, _executors, _admin)
+        external
+        initializer
     {
+        __TimelockController_init(_minDelay, _proposers, _executors);
+
+        taikoInbox = _taikoInbox;
+        verifier = _verifier;
         minVerificationStreak = _minVerificationStreak;
     }
 
-    function init(address _taikoInbox, address _verifier) external {
-        if (taikoInbox != address(0)) {
-            revert AlreadyInitialized();
+    function __TimelockController_init(
+        uint256 _minDelay,
+        address[] memory _proposers,
+        address[] memory _executors
+    )
+        internal
+        onlyInitializing
+    {
+        _setRoleAdmin(TIMELOCK_ADMIN_ROLE, TIMELOCK_ADMIN_ROLE);
+        _setRoleAdmin(PROPOSER_ROLE, TIMELOCK_ADMIN_ROLE);
+        _setRoleAdmin(EXECUTOR_ROLE, TIMELOCK_ADMIN_ROLE);
+        _setRoleAdmin(CANCELLER_ROLE, TIMELOCK_ADMIN_ROLE);
+
+        // self administration
+        _setupRole(TIMELOCK_ADMIN_ROLE, address(this));
+
+        // register proposers and cancellers
+        for (uint256 i = 0; i < _proposers.length; ++i) {
+            _setupRole(PROPOSER_ROLE, _proposers[i]);
+            _setupRole(CANCELLER_ROLE, _proposers[i]);
         }
-        taikoInbox = _taikoInbox;
-        verifier = _verifier;
+
+        // register executors
+        for (uint256 i = 0; i < _executors.length; ++i) {
+            _setupRole(EXECUTOR_ROLE, _executors[i]);
+        }
+
+        _minDelay = _minDelay;
     }
+
+    // Timelocked overrides
+    // --------------------------------------------------------------------------------------------
 
     function execute(
         address _target,
@@ -127,4 +171,11 @@ contract SurgeTimelockController is TimelockController {
             ITaikoInbox(taikoInbox).getVerificationStreakStartedAt();
         return (block.timestamp - verificationStreakStartedAt) < minVerificationStreak;
     }
+
+    /// @dev Only the SurgeTimelockController can upgrade itself via the timelock delay mechanism.
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+        onlyRole(TIMELOCK_ADMIN_ROLE)
+    { }
 }

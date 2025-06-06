@@ -34,7 +34,6 @@ import "src/layer1/verifiers/compose/ComposeVerifier.sol";
 
 // Surge contracts
 import "src/layer1/surge/SurgeHoodiInbox.sol";
-import "src/layer1/surge/common/SurgeTimelockController.sol";
 import "src/layer1/surge/bridge/SurgeBridge.sol";
 import "src/layer1/surge/bridge/SurgeERC20Vault.sol";
 import "src/layer1/surge/bridge/SurgeERC721Vault.sol";
@@ -46,6 +45,9 @@ import "src/layer1/surge/verifiers/SurgeVerifier.sol";
 import "./common/EmptyImpl.sol";
 import "./common/AttestationLib.sol";
 import "test/shared/DeployCapability.sol";
+
+// Named imports to prevent conflicts
+import { SurgeTimelockController } from "src/layer1/surge/common/SurgeTimelockController.sol";
 
 /// @title DeploySurgeL1
 /// @notice This script deploys the core Taiko protocol modified for Nethermind's Surge.
@@ -162,12 +164,7 @@ contract DeploySurgeL1 is DeployCapability {
         proposers[0] = ownerMultisig;
 
         // This will serve as the owner of all the surge contracts
-        address payable timelockController = payable(
-            new SurgeTimelockController(
-                minVerificationStreak, timelockPeriod, proposers, executors, address(0)
-            )
-        );
-        console2.log("** Timelock controller (L1 owner):", timelockController);
+        address timelockController = deployTimelockController();
 
         // Deploy shared contracts
         // ---------------------------------------------------------------
@@ -248,9 +245,14 @@ contract DeploySurgeL1 is DeployCapability {
         }
 
         // Initialise and transfer ownership to timelock controller
-        // ---------------------------------------------------------------\
+        // ----------------------------------------------------------------
         SurgeTimelockController(payable(timelockController)).init(
-            rollupContracts.taikoInbox, rollupContracts.proofVerifier
+            timelockPeriod,
+            proposers,
+            executors,
+            rollupContracts.taikoInbox,
+            rollupContracts.proofVerifier,
+            minVerificationStreak
         );
         console2.log("** timelockController initialised");
 
@@ -299,6 +301,14 @@ contract DeploySurgeL1 is DeployCapability {
             sharedContracts.sharedResolver,
             timelockController
         );
+    }
+
+    function deployTimelockController() internal returns (address timelockController) {
+        timelockController = deployProxy({
+            name: "surge_timelock_controller",
+            impl: address(new SurgeTimelockController()),
+            data: ""
+        });
     }
 
     function deploySharedContracts(address _owner)

@@ -23,4 +23,11 @@ contract EmptyImpl is UUPSUpgradeable, OwnableUpgradeable {
         // Allow any address to upgrade since this is just a temporary implementation
         // In a production environment, this should be restricted to authorized addresses
     }
+
+    /**
+     * @dev Function that can be used to externally check if the implementation is empty.
+     */
+    function isEmptyImpl() external pure returns (bool) {
+        return true;
+    }
 }

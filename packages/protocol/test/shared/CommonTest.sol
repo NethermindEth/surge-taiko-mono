@@ -139,7 +139,7 @@ abstract contract CommonTest is Test, Script {
         console2.log(">", string.concat("'", bytes32ToString(name), "'"));
         console2.log("  proxy   :", proxy);
         console2.log("  impl    :", impl);
-        console2.log("  owner   :", OwnableUpgradeable(proxy).owner());
+        // Surge: remove owner console since a contract may not be ownable
         console2.log("  chain id:", block.chainid);
         if (name != "" && resolver != IResolver(address(0))) {
             console2.log("  resolver:", address(resolver));

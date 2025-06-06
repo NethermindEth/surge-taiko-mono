@@ -2,8 +2,12 @@
 pragma solidity ^0.8.24;
 
 import "../../shared/CommonTest.sol";
-import "src/layer1/surge/common/SurgeTimelockController.sol";
+import "script/layer1/surge/common/EmptyImpl.sol";
+import "src/layer1/surge/verifiers/LibProofType.sol";
 import "@openzeppelin/contracts/governance/TimelockController.sol";
+
+// Named imports to prevent conflicts
+import { SurgeTimelockController } from "src/layer1/surge/common/SurgeTimelockController.sol";
 
 contract MockTaikoInbox {
     uint256 internal verificationStreakStartedAt;
@@ -14,6 +18,16 @@ contract MockTaikoInbox {
 
     function resetVerificationStreakStartedAt() external {
         verificationStreakStartedAt = block.timestamp;
+    }
+}
+
+contract MockVerifier {
+    LibProofType.ProofType public proofTypeToUpgrade;
+    address public newVerifier;
+
+    function upgradeVerifier(LibProofType.ProofType _proofType, address _newVerifier) external {
+        proofTypeToUpgrade = _proofType;
+        newVerifier = _newVerifier;
     }
 }
 
@@ -31,6 +45,7 @@ contract MockStore {
 
 contract SurgeTimelockControllerTestBase is CommonTest {
     MockTaikoInbox internal mockTaikoInbox;
+    MockVerifier internal mockVerifier;
     SurgeTimelockController internal timelockController;
     MockStore internal mockStore;
 
@@ -49,6 +64,7 @@ contract SurgeTimelockControllerTestBase is CommonTest {
 
     function setUpOnEthereum() internal override {
         mockTaikoInbox = new MockTaikoInbox();
+        mockVerifier = new MockVerifier();
         mockStore = new MockStore();
 
         minVerificationStreak = 45 days;
@@ -60,14 +76,25 @@ contract SurgeTimelockControllerTestBase is CommonTest {
         proposers[0] = Alice;
         executors[0] = Alice;
 
-        timelockController = new SurgeTimelockController(
-            uint64(minVerificationStreak), // _minVerificationStreak
-            uint64(minDelay), // _minDelay
-            proposers,
-            executors,
-            address(0)
+        address payable timelockControllerAddress = payable(
+            deploy({
+                name: "surge_timelock_controller",
+                impl: address(new SurgeTimelockController()),
+                data: abi.encodeCall(
+                    SurgeTimelockController.init,
+                    (
+                        minDelay,
+                        proposers,
+                        executors,
+                        address(mockTaikoInbox),
+                        address(mockVerifier),
+                        minVerificationStreak
+                    )
+                )
+            })
         );
-        timelockController.init(address(mockTaikoInbox), address(0));
+
+        timelockController = SurgeTimelockController(timelockControllerAddress);
 
         target = address(mockStore);
         value = 0;
@@ -80,6 +107,11 @@ contract SurgeTimelockControllerTestBase is CommonTest {
 }
 
 contract SurgeTimelockControllerTest is SurgeTimelockControllerTestBase {
+    using LibProofType for LibProofType.ProofType;
+
+    // Timelocked execution tests
+    // --------------------------------------------------------------------------------------------
+
     function test_execute_fails_when_min_delay_is_not_met() external transactBy(Alice) {
         // Schedule a call to set the store to 1
         timelockController.schedule(target, value, data, predecessor, salt, minDelayPlusOne);
@@ -212,5 +244,53 @@ contract SurgeTimelockControllerTest is SurgeTimelockControllerTestBase {
 
         // Assert that the store was set to 2 (last operation in batch)
         assertEq(mockStore.getStore(), 2);
+    }
+
+    function test_impl_upgrade_fails_when_not_self() external transactBy(Alice) {
+        address newImpl = address(new EmptyImpl());
+        vm.expectRevert();
+        timelockController.upgradeTo(newImpl); // Caller is Alice
+    }
+
+    function test_impl_upgrade_passes_when_self() external transactBy(Alice) {
+        address newImpl = address(new EmptyImpl());
+
+        // Schedule a call to self to upgrade the implementation
+        address target = address(timelockController);
+        uint256 value = 0;
+        bytes memory payload =
+            abi.encodeWithSelector(timelockController.upgradeTo.selector, newImpl);
+
+        // Schedule the call
+        timelockController.schedule(target, value, payload, bytes32(0), bytes32(0), minDelayPlusOne);
+
+        // Warp time to cover the timelock delay
+        vm.warp(startTimestamp + minDelayPlusOne);
+
+        // Execute the scheduled call
+        timelockController.execute(target, value, payload, bytes32(0), bytes32(0));
+
+        // The contract should be upgraded to the new empty implementation
+        (bool success, bytes memory returnData) = address(timelockController).staticcall(
+            abi.encodeWithSelector(EmptyImpl.isEmptyImpl.selector)
+        );
+        assertTrue(success);
+        bool isEmptyImpl = abi.decode(returnData, (bool));
+        assertTrue(isEmptyImpl);
+    }
+
+    // Timelock bypass tests
+    // --------------------------------------------------------------------------------------------
+
+    function test_executeVerifierUpgrade_fails_when_not_proposer() external transactBy(Bob) {
+        vm.expectRevert();
+        timelockController.executeVerifierUpgrade(LibProofType.sgxReth(), address(1));
+    }
+
+    function test_executeVerifierUpgrade_upragdes_the_verifier() external transactBy(Alice) {
+        timelockController.executeVerifierUpgrade(LibProofType.sgxReth(), address(1));
+
+        assertTrue(mockVerifier.proofTypeToUpgrade().equals(LibProofType.sgxReth()));
+        assertEq(mockVerifier.newVerifier(), address(1));
     }
 }
