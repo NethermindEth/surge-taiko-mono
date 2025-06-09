@@ -21,4 +21,11 @@ contract ProofTypeFixtures {
 
     LibProofType.ProofType[] internal teeProofTypes =
         [LibProofType.sgxReth(), LibProofType.tdxReth()];
+
+    LibProofType.ProofType[] internal allProofTypes = [
+        LibProofType.sgxReth(),
+        LibProofType.tdxReth(),
+        LibProofType.sp1Reth(),
+        LibProofType.risc0Reth()
+    ];
 }

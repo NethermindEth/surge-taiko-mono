@@ -30,7 +30,6 @@ import "src/layer1/preconf/impl/PreconfRouter.sol";
 import "src/layer1/verifiers/Risc0Verifier.sol";
 import "src/layer1/verifiers/SP1Verifier.sol";
 import "src/layer1/verifiers/SgxVerifier.sol";
-import "src/layer1/verifiers/compose/ComposeVerifier.sol";
 
 // Surge contracts
 import "src/layer1/surge/SurgeHoodiInbox.sol";
@@ -184,17 +183,7 @@ contract DeploySurgeL1 is DeployCapability {
             deployVerifiers(rollupContracts.proofVerifier, rollupContracts.taikoInbox);
 
         UUPSUpgradeable(rollupContracts.proofVerifier).upgradeTo({
-            newImplementation: address(
-                new SurgeVerifier(
-                    rollupContracts.taikoInbox,
-                    address(0),
-                    address(0),
-                    address(0),
-                    verifiers.sgxRethVerifier,
-                    verifiers.risc0RethVerifier,
-                    verifiers.sp1RethVerifier
-                )
-            )
+            newImplementation: address(new SurgeVerifier(rollupContracts.taikoInbox))
         });
 
         // Signal service need to authorize the new rollup
@@ -271,7 +260,13 @@ contract DeploySurgeL1 is DeployCapability {
         TaikoInbox(payable(rollupContracts.taikoInbox)).init(timelockController, l2GenesisHash);
         console2.log("** taikoInbox initialised and ownership transferred to:", timelockController);
 
-        ComposeVerifier(rollupContracts.proofVerifier).init(timelockController);
+        SurgeVerifier(rollupContracts.proofVerifier).init(
+            timelockController,
+            verifiers.sgxRethVerifier,
+            address(0), // TDX Reth verifier is not deployed yet
+            verifiers.risc0RethVerifier,
+            verifiers.sp1RethVerifier
+        );
         console2.log(
             "** proofVerifier initialised and ownership transferred to:", timelockController
         );

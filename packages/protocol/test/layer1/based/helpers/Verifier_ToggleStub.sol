@@ -21,7 +21,7 @@ contract Verifier_ToggleStub is ISurgeVerifier {
     }
 
     function verifyProof(
-        Context[] calldata,
+        IVerifier.Context[] calldata,
         bytes calldata
     )
         external

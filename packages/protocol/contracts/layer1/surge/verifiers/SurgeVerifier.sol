@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import "src/shared/common/EssentialContract.sol";
 import "src/shared/libs/LibStrings.sol";
+import "src/layer1/verifiers/IVerifier.sol";
 import "./ISurgeVerifier.sol";
 import "./LibProofType.sol";
 
@@ -15,66 +16,42 @@ import "./LibProofType.sol";
 contract SurgeVerifier is EssentialContract, ISurgeVerifier {
     using LibProofType for LibProofType.ProofType;
 
-    struct SubProof {
-        // This is a single proof type i.e SGX_RETH / SP1_RETH / RISC0_RETH / TDX_RETH
-        LibProofType.ProofType proofType;
-        bytes proof;
-    }
-
-    struct Verifier {
-        bool upgradeable;
-        address addr;
-    }
-
     address public immutable taikoInbox;
-    /// The sgx/tdx-GethVerifier is the core verifier required in every proof.
-    /// All other proofs share its status root, despite different public inputs
-    /// due to different verification types.
-    /// proofs come from geth client
-    Verifier public sgxGethVerifier;
-    Verifier public tdxGethVerifier;
-    /// op for test purpose
-    Verifier public opVerifier;
     /// proofs come from reth client
-    Verifier public sgxRethVerifier;
-    Verifier public risc0RethVerifier;
-    Verifier public sp1RethVerifier;
+    InternalVerifier public sgxRethVerifier;
+    InternalVerifier public tdxRethVerifier;
+    InternalVerifier public risc0RethVerifier;
+    InternalVerifier public sp1RethVerifier;
 
-    uint256[44] private __gap;
+    uint256[46] private __gap;
 
-    constructor(
-        address _taikoInbox,
-        address _sgxGethVerifier,
-        address _tdxGethVerifier,
-        address _opVerifier,
+    constructor(address _taikoInbox) EssentialContract(address(0)) {
+        taikoInbox = _taikoInbox;
+    }
+
+    /// @notice Initializes the contract.
+    /// @param _owner The owner of this contract. msg.sender will be used if this value is zero.
+    function init(
+        address _owner,
         address _sgxRethVerifier,
+        address _tdxRethVerifier,
         address _risc0RethVerifier,
         address _sp1RethVerifier
     )
-        EssentialContract(address(0))
+        external
+        initializer
     {
-        taikoInbox = _taikoInbox;
-        sgxGethVerifier.addr = _sgxGethVerifier;
-        tdxGethVerifier.addr = _tdxGethVerifier;
-        opVerifier.addr = _opVerifier;
+        __Essential_init(_owner);
+
         sgxRethVerifier.addr = _sgxRethVerifier;
+        tdxRethVerifier.addr = _tdxRethVerifier;
         risc0RethVerifier.addr = _risc0RethVerifier;
         sp1RethVerifier.addr = _sp1RethVerifier;
     }
 
-    error INVALID_PROOF_TYPE();
-    error UPGRADE_NOT_SUPPORTED_BY_PROOF_TYPE();
-    error VERIFIER_NOT_MARKED_UPGRADEABLE();
-
-    /// @notice Initializes the contract.
-    /// @param _owner The owner of this contract. msg.sender will be used if this value is zero.
-    function init(address _owner) external initializer {
-        __Essential_init(_owner);
-    }
-
     /// @inheritdoc ISurgeVerifier
     function verifyProof(
-        Context[] calldata _ctxs,
+        IVerifier.Context[] calldata _ctxs,
         bytes calldata _proof
     )
         external
@@ -87,7 +64,7 @@ contract SurgeVerifier is EssentialContract, ISurgeVerifier {
 
         for (uint256 i; i < size; ++i) {
             address verifier = _getVerifierFromProofType(subProofs[i].proofType);
-            ISurgeVerifier(verifier).verifyProof(_ctxs, subProofs[i].proof);
+            IVerifier(verifier).verifyProof(_ctxs, subProofs[i].proof);
 
             composedProofType = composedProofType.combine(subProofs[i].proofType);
         }
@@ -104,7 +81,7 @@ contract SurgeVerifier is EssentialContract, ISurgeVerifier {
         }
         if ((pt & 0x02) != 0) {
             // TDX Reth (0b0010)
-            tdxGethVerifier.upgradeable = true;
+            tdxRethVerifier.upgradeable = true;
         }
         if ((pt & 0x04) != 0) {
             // RISC0 Reth (0b0100)
@@ -123,19 +100,22 @@ contract SurgeVerifier is EssentialContract, ISurgeVerifier {
         external
         onlyOwner
     {
-        Verifier storage _verifier;
+        InternalVerifier storage _verifier;
         if (_proofType.equals(LibProofType.sgxReth())) {
             _verifier = sgxRethVerifier;
+        } else if (_proofType.equals(LibProofType.tdxReth())) {
+            _verifier = tdxRethVerifier;
         } else if (_proofType.equals(LibProofType.sp1Reth())) {
             _verifier = sp1RethVerifier;
         } else if (_proofType.equals(LibProofType.risc0Reth())) {
             _verifier = risc0RethVerifier;
         } else {
-            revert UPGRADE_NOT_SUPPORTED_BY_PROOF_TYPE();
+            revert INVALID_PROOF_TYPE();
         }
 
         require(_verifier.upgradeable, VERIFIER_NOT_MARKED_UPGRADEABLE());
         _verifier.addr = _newVerifier;
+        _verifier.upgradeable = false;
     }
 
     function _getVerifierFromProofType(LibProofType.ProofType _proofType)
@@ -145,6 +125,8 @@ contract SurgeVerifier is EssentialContract, ISurgeVerifier {
     {
         if (_proofType.equals(LibProofType.sgxReth())) {
             return sgxRethVerifier.addr;
+        } else if (_proofType.equals(LibProofType.tdxReth())) {
+            return tdxRethVerifier.addr;
         } else if (_proofType.equals(LibProofType.sp1Reth())) {
             return sp1RethVerifier.addr;
         } else if (_proofType.equals(LibProofType.risc0Reth())) {

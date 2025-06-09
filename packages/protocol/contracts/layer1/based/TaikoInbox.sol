@@ -254,8 +254,7 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
         require(!stats2.paused, ContractPaused());
 
         Config memory config = pacayaConfig();
-        // Surge: Use the ISurgeVerifier interface
-        ISurgeVerifier.Context[] memory ctxs = new ISurgeVerifier.Context[](metas.length);
+        IVerifier.Context[] memory ctxs = new IVerifier.Context[](metas.length);
 
         // Surge: Remove `hasConflictingProof` variable
 

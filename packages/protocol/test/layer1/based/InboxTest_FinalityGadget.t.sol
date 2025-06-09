@@ -54,7 +54,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _zkTeeIndex = bound(_zkTeeIndex, 0, zkTeeProofTypes.length - 1);
         LibProofType.ProofType zkTeeProofType = _getZkTeeProofType(_zkTeeIndex);
 
         uint64[] memory batchIds = new uint64[](1);
@@ -83,8 +82,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _zkIndex = bound(_zkIndex, 0, zkProofTypes.length - 1);
-        _teeIndex = bound(_teeIndex, 0, teeProofTypes.length - 1);
         LibProofType.ProofType zkProofType = _getZkProofType(_zkIndex);
         LibProofType.ProofType teeProofType = _getTeeProofType(_teeIndex);
 
@@ -123,8 +120,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _teeIndex = bound(_teeIndex, 0, teeProofTypes.length - 1);
-        _zkIndex = bound(_zkIndex, 0, zkProofTypes.length - 1);
         LibProofType.ProofType teeProofType = _getTeeProofType(_teeIndex);
         LibProofType.ProofType zkProofType = _getZkProofType(_zkIndex);
 
@@ -163,8 +158,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _zkIndex = bound(_zkIndex, 0, zkProofTypes.length - 1);
-        _teeIndex = bound(_teeIndex, 0, teeProofTypes.length - 1);
         LibProofType.ProofType zkProofType = _getZkProofType(_zkIndex);
         LibProofType.ProofType teeProofType = _getTeeProofType(_teeIndex);
 
@@ -196,11 +189,7 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _zkIndex1 = bound(_zkIndex1, 0, zkProofTypes.length - 1);
-        _zkIndex2 = bound(_zkIndex2, 0, zkProofTypes.length - 1);
-
         vm.assume(_zkIndex1 != _zkIndex2);
-
         LibProofType.ProofType zkProofType1 = _getZkProofType(_zkIndex1);
         LibProofType.ProofType zkProofType2 = _getZkProofType(_zkIndex2);
 
@@ -231,11 +220,7 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _teeIndex1 = bound(_teeIndex1, 0, teeProofTypes.length - 1);
-        _teeIndex2 = bound(_teeIndex2, 0, teeProofTypes.length - 1);
-
         vm.assume(_teeIndex1 != _teeIndex2);
-
         LibProofType.ProofType teeProofType1 = _getTeeProofType(_teeIndex1);
         LibProofType.ProofType teeProofType2 = _getTeeProofType(_teeIndex2);
 
@@ -273,8 +258,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _zkIndex1 = bound(_zkIndex1, 0, zkProofTypes.length - 1);
-        _zkIndex2 = bound(_zkIndex2, 0, zkProofTypes.length - 1);
         LibProofType.ProofType zkProofType1 = _getZkProofType(_zkIndex1);
         LibProofType.ProofType zkProofType2 = _getZkProofType(_zkIndex2);
 
@@ -313,8 +296,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _zkIndex = bound(_zkIndex, 0, zkProofTypes.length - 1);
-        _zkTeeIndex = bound(_zkTeeIndex, 0, zkTeeProofTypes.length - 1);
         LibProofType.ProofType zkProofType = _getZkProofType(_zkIndex);
         LibProofType.ProofType zkTeeProofType = _getZkTeeProofType(_zkTeeIndex);
 
@@ -359,9 +340,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _zkIndex1 = bound(_zkIndex1, 0, zkProofTypes.length - 1);
-        _zkIndex2 = bound(_zkIndex2, 0, zkProofTypes.length - 1);
-        _teeIndex = bound(_teeIndex, 0, teeProofTypes.length - 1);
         LibProofType.ProofType zkProofType1 = _getZkProofType(_zkIndex1);
         LibProofType.ProofType zkProofType2 = _getZkProofType(_zkIndex2);
         LibProofType.ProofType teeProofType = _getTeeProofType(_teeIndex);
@@ -411,8 +389,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _zkIndex = bound(_zkIndex, 0, zkProofTypes.length - 1);
-        _zkTeeIndex = bound(_zkTeeIndex, 0, zkTeeProofTypes.length - 1);
         LibProofType.ProofType zkProofType = _getZkProofType(_zkIndex);
         LibProofType.ProofType zkTeeProofType = _getZkTeeProofType(_zkTeeIndex);
 
@@ -455,8 +431,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _teeIndex1 = bound(_teeIndex1, 0, teeProofTypes.length - 1);
-        _teeIndex2 = bound(_teeIndex2, 0, teeProofTypes.length - 1);
         LibProofType.ProofType teeProofType1 = _getTeeProofType(_teeIndex1);
         LibProofType.ProofType teeProofType2 = _getTeeProofType(_teeIndex2);
 
@@ -494,8 +468,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _teeIndex = bound(_teeIndex, 0, teeProofTypes.length - 1);
-        _zkIndex = bound(_zkIndex, 0, zkProofTypes.length - 1);
         LibProofType.ProofType teeProofType = _getTeeProofType(_teeIndex);
         LibProofType.ProofType zkProofType = _getZkProofType(_zkIndex);
 
@@ -531,8 +503,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _teeIndex = bound(_teeIndex, 0, teeProofTypes.length - 1);
-        _zkTeeIndex = bound(_zkTeeIndex, 0, zkTeeProofTypes.length - 1);
         LibProofType.ProofType teeProofType = _getTeeProofType(_teeIndex);
         LibProofType.ProofType zkTeeProofType = _getZkTeeProofType(_zkTeeIndex);
 
@@ -575,9 +545,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _teeIndex1 = bound(_teeIndex1, 0, teeProofTypes.length - 1);
-        _teeIndex2 = bound(_teeIndex2, 0, teeProofTypes.length - 1);
-        _zkIndex = bound(_zkIndex, 0, zkProofTypes.length - 1);
         LibProofType.ProofType teeProofType1 = _getTeeProofType(_teeIndex1);
         LibProofType.ProofType teeProofType2 = _getTeeProofType(_teeIndex2);
         LibProofType.ProofType zkProofType = _getZkProofType(_zkIndex);
@@ -627,8 +594,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _teeIndex = bound(_teeIndex, 0, teeProofTypes.length - 1);
-        _zkTeeIndex = bound(_zkTeeIndex, 0, zkTeeProofTypes.length - 1);
         LibProofType.ProofType teeProofType = _getTeeProofType(_teeIndex);
         LibProofType.ProofType zkTeeProofType = _getZkTeeProofType(_zkTeeIndex);
 
@@ -674,7 +639,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _zkIndex = bound(_zkIndex, 0, zkProofTypes.length - 1);
         LibProofType.ProofType zkProofType = _getZkProofType(_zkIndex);
 
         uint64[] memory batchIds = new uint64[](1);
@@ -721,7 +685,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _teeIndex = bound(_teeIndex, 0, teeProofTypes.length - 1);
         LibProofType.ProofType teeProofType = _getTeeProofType(_teeIndex);
 
         uint64[] memory batchIds = new uint64[](1);
@@ -768,7 +731,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _zkIndex = bound(_zkIndex, 0, zkProofTypes.length - 1);
         LibProofType.ProofType zkProofType = _getZkProofType(_zkIndex);
 
         uint64[] memory batchIds = new uint64[](1);
@@ -804,7 +766,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _teeIndex = bound(_teeIndex, 0, teeProofTypes.length - 1);
         LibProofType.ProofType teeProofType = _getTeeProofType(_teeIndex);
 
         uint64[] memory batchIds = new uint64[](1);
@@ -841,8 +802,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _zkIndex = bound(_zkIndex, 0, zkProofTypes.length - 1);
-        _teeIndex = bound(_teeIndex, 0, teeProofTypes.length - 1);
         LibProofType.ProofType zkProofType = _getZkProofType(_zkIndex);
         LibProofType.ProofType teeProofType = _getTeeProofType(_teeIndex);
 
@@ -879,9 +838,6 @@ contract InboxTest_FinalityGadget is InboxTestBase, ProofTypeFixtures {
         transactBy(Alice)
         WhenMultipleBatchesAreProposedWithDefaultParameters(1)
     {
-        _zkTeeIndex = bound(_zkTeeIndex, 0, zkTeeProofTypes.length - 1);
-        _teeIndex = bound(_teeIndex, 0, teeProofTypes.length - 1);
-        _zkIndex = bound(_zkIndex, 0, zkProofTypes.length - 1);
         LibProofType.ProofType zkTeeProofType = _getZkTeeProofType(_zkTeeIndex);
         LibProofType.ProofType teeConflictingProofType = _getTeeProofType(_teeIndex);
         LibProofType.ProofType zkConflictingProofType = _getZkProofType(_zkIndex);
