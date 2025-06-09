@@ -123,4 +123,4 @@ var ProposerFlags = MergeFlags(CommonFlags, []cli.Flag{
 	BlobAllowed,
 	FallbackToCalldata,
 	RevertProtectionEnabled,
-}, TxmgrFlags)
+}, TxmgrFlags, CelestiaFlags)
