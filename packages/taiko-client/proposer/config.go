@@ -42,6 +42,8 @@ type Config struct {
 	BatchPostingGasWithCalldata uint64
 	BatchPostingGasWithBlobs    uint64
 	ProofPostingGas             uint64
+	
+	CelestiaConfigs         *rpc.CelestiaConfig
 }
 
 // NewConfigFromCliContext initializes a Config instance from
@@ -123,5 +125,6 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		BatchPostingGasWithCalldata: batchPostingGasWithCalldata,
 		BatchPostingGasWithBlobs:    batchPostingGasWithBlobs,
 		ProofPostingGas:             proofPostingGas,
+		CelestiaConfigs: pkgFlags.InitCelestiaConfigsFromCli(c),
 	}, nil
 }
