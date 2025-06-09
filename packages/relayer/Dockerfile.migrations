@@ -1,4 +1,4 @@
-FROM ghcr.io/kukymbr/goose-docker:3.22.1
+FROM ghcr.io/kukymbr/goose-docker:3.24.3
 
 ENV GOOSE_DRIVER=mysql
 
