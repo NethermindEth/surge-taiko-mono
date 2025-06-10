@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	Endpoint  = "http://localhost:26658"
-	AuthToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiXX0.cSrJjpfUdTNFtzGho69V0D_8kyECn9Mzv8ghJSpKRDE"
-	Namespace = "0x71756f746573"
+	Endpoint          = "http://localhost:26658"
+	AuthToken         = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiXX0.cSrJjpfUdTNFtzGho69V0D_8kyECn9Mzv8ghJSpKRDE"
+	Namespace         = "0xDEADBEEF"
+	ExpectedNamespace = "00000000000000000000000000000000000000000000000000deadbeef"
 )
 
 func TestInitCelestiaConfigsFromCliCelestiaDisabled(t *testing.T) {
@@ -20,8 +21,9 @@ func TestInitCelestiaConfigsFromCliCelestiaDisabled(t *testing.T) {
 	app.Flags = append(app.Flags, flags.CelestiaFlags...)
 
 	app.Action = func(cliCtx *cli.Context) error {
-		celestiaConfigs := InitCelestiaConfigsFromCli(cliCtx)
+		celestiaConfigs, err := InitCelestiaConfigsFromCli(cliCtx)
 
+		require.NoError(t, err)
 		require.Equal(t, false, celestiaConfigs.Enabled)
 
 		return nil
@@ -37,12 +39,13 @@ func TestInitCelestiaConfigsFromCliCelestiaEnabled(t *testing.T) {
 	app.Flags = append(app.Flags, flags.CelestiaFlags...)
 
 	app.Action = func(cliCtx *cli.Context) error {
-		celestiaConfigs := InitCelestiaConfigsFromCli(cliCtx)
+		celestiaConfigs, err := InitCelestiaConfigsFromCli(cliCtx)
 
+		require.NoError(t, err)
 		require.Equal(t, true, celestiaConfigs.Enabled)
 		require.Equal(t, Endpoint, celestiaConfigs.Endpoint)
 		require.Equal(t, AuthToken, celestiaConfigs.AuthToken)
-		require.Equal(t, Namespace, celestiaConfigs.Namespace)
+		require.Equal(t, ExpectedNamespace, celestiaConfigs.Namespace.String())
 
 		return nil
 	}
