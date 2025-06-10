@@ -68,6 +68,11 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		)
 	}
 
+	celestiaConfigs, err := pkgFlags.InitCelestiaConfigsFromCli(c)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		ClientConfig: &rpc.ClientConfig{
 			L1Endpoint:                  c.String(flags.L1WSEndpoint.Name),
@@ -105,6 +110,6 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			l1ProposerPrivKey,
 			c,
 		),
-		CelestiaConfigs: pkgFlags.InitCelestiaConfigsFromCli(c),
+		CelestiaConfigs: celestiaConfigs,
 	}, nil
 }
