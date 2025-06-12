@@ -32,6 +32,7 @@ type Config struct {
 	BlobAllowed             bool
 	FallbackToCalldata      bool
 	RevertProtectionEnabled bool
+	CheckProfitability      bool
 	TxmgrConfigs            *txmgr.CLIConfig
 	PrivateTxmgrConfigs     *txmgr.CLIConfig
 }
@@ -104,5 +105,6 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			l1ProposerPrivKey,
 			c,
 		),
+		CheckProfitability: c.Bool(flags.CheckProfitability.Name),
 	}, nil
 }

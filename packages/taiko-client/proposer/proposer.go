@@ -22,6 +22,7 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/bridge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
@@ -59,6 +60,8 @@ type Proposer struct {
 	ctx context.Context
 	wg  sync.WaitGroup
 
+	checkProfitability bool
+
 	forceProposeOnce bool // TODO: to verify that this works as expected
 
 	// Bridge message monitoring
@@ -86,6 +89,7 @@ func (p *Proposer) InitFromConfig(
 	p.ctx = ctx
 	p.Config = cfg
 	p.lastProposedAt = time.Now()
+	p.checkProfitability = cfg.CheckProfitability
 
 	// RPC clients
 	if p.rpc, err = rpc.NewClient(p.ctx, cfg.ClientConfig); err != nil {
@@ -481,10 +485,6 @@ func (p *Proposer) ProposeTxListPacaya(
 		return fmt.Errorf("tx batch size is larger than the maxBlocksPerBatch")
 	}
 
-	for _, txList := range txBatch {
-		txs += uint64(len(txList))
-	}
-
 	// Check balance.
 	if p.Config.ClientConfig.ProverSetAddress != rpc.ZeroAddress {
 		proposerAddress = p.Config.ClientConfig.ProverSetAddress
@@ -530,6 +530,24 @@ func (p *Proposer) ProposeTxListPacaya(
 		)
 	}
 
+	// Check profitability if enabled
+	if p.checkProfitability {
+		profitable, filteredTxBatch, err := p.isProfitable(ctx, txBatch, forcedInclusion)
+		if err != nil {
+			return err
+		}
+		if !profitable {
+			log.Info("Proposing transaction is not profitable")
+			return nil
+		}
+
+		txBatch = filteredTxBatch
+	}
+
+	for _, txList := range txBatch {
+		txs += uint64(len(txList))
+	}
+
 	// Build the transaction to propose batch.
 	txCandidate, err := p.txBuilder.BuildPacaya(ctx, txBatch, forcedInclusion, minTxsPerForcedInclusion, parentMetaHash)
 	if err != nil {
@@ -555,6 +573,126 @@ func (p *Proposer) ProposeTxListPacaya(
 	metrics.ProposerProposedTxsCounter.Add(float64(txs))
 
 	return nil
+}
+
+func (p *Proposer) isProfitable(
+	ctx context.Context,
+	txBatch []types.Transactions,
+	forcedInclusion *pacaya.IForcedInclusionStoreForcedInclusion,
+) (bool, []types.Transactions, error) {
+	// Get previous block header for EIP-1559 calculations
+	previousHeader, err := p.rpc.L2.HeaderByNumber(ctx, nil)
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to get previous block header: %w", err)
+	}
+
+	// Calculate baseFee for the next block using EIP-1559 rules
+	gasUsed := big.NewInt(int64(previousHeader.GasUsed))
+	gasLimit := big.NewInt(int64(previousHeader.GasLimit))
+	previousBlockBaseFee := previousHeader.BaseFee
+
+	targetGasLimit := new(big.Int).Div(gasLimit, big.NewInt(2))
+	gasDelta := new(big.Int).Sub(gasUsed, targetGasLimit)
+
+	scalingFactor := new(big.Int).Mul(gasDelta, big.NewInt(100))
+	scalingFactor.Div(scalingFactor, targetGasLimit)
+	scalingFactor.Div(scalingFactor, big.NewInt(8))
+
+	// Apply scaling factor to previous base fee
+	newBaseFee := new(big.Int).Mul(previousBlockBaseFee, big.NewInt(100)) // Multiply by 100 for precision
+	newBaseFee.Mul(newBaseFee, big.NewInt(100+scalingFactor.Int64()))     // Multiply by (1 + scaling factor)
+	newBaseFee.Div(newBaseFee, big.NewInt(10000))
+
+	actualFeesCollected, filteredTxBatch := p.computeActualFeesCollected(ctx, txBatch, newBaseFee)
+
+	expectedFees, err := p.computeExpectedFees(ctx, filteredTxBatch)
+	if err != nil {
+		return false, nil, err
+	}
+
+	// Subtract forced inclusion fee from actual fees collected, if present
+	forcedInclusionFee := new(big.Int)
+	if forcedInclusion != nil {
+		forcedInclusionFee = new(big.Int).Mul(
+			big.NewInt(int64(forcedInclusion.FeeInGwei)),
+			big.NewInt(1e9),
+		)
+
+		log.Info(
+			"Forced inclusion cost",
+			"costInWei", forcedInclusionFee,
+			"costInGwei", forcedInclusion.FeeInGwei,
+		)
+		actualFeesCollected.Sub(actualFeesCollected, forcedInclusionFee)
+	}
+
+	isProfitable := actualFeesCollected.Cmp(expectedFees) >= 0
+
+	log.Info("Profitability check",
+		"actualFees", utils.WeiToEther(actualFeesCollected),
+		"expectedFees", utils.WeiToEther(expectedFees),
+		"forcedInclusionFee", utils.WeiToEther(forcedInclusionFee),
+		"isProfitable", isProfitable,
+		"baseFee", utils.WeiToEther(newBaseFee),
+		"originalTxCount", len(txBatch),
+		"filteredTxCount", len(filteredTxBatch),
+	)
+
+	return isProfitable, filteredTxBatch, nil
+}
+
+func (p *Proposer) computeActualFeesCollected(
+	ctx context.Context,
+	txBatch []types.Transactions,
+	newBaseFee *big.Int,
+) (*big.Int, []types.Transactions) {
+	actualFeesCollected := new(big.Int)
+	filteredTxBatch := make([]types.Transactions, len(txBatch))
+
+	for i, txs := range txBatch {
+		filteredTxs := make(types.Transactions, 0, len(txs))
+		var batchFees big.Int
+
+		for _, tx := range txs {
+			effectiveTip, err := tx.EffectiveGasTip(newBaseFee)
+			if err != nil {
+				log.Debug("Skipping transaction due to effective tip calculation error",
+					"txHash", tx.Hash().Hex(),
+					"error", err)
+				continue
+			}
+			tipFeeWithBaseFee := new(big.Int).Add(effectiveTip, newBaseFee)
+			gasConsumed := big.NewInt(int64(tx.Gas()))
+			feesFromTx := new(big.Int).Mul(gasConsumed, tipFeeWithBaseFee)
+			batchFees.Add(&batchFees, feesFromTx)
+			filteredTxs = append(filteredTxs, tx)
+		}
+
+		actualFeesCollected.Add(actualFeesCollected, &batchFees)
+		filteredTxBatch[i] = filteredTxs
+	}
+
+	return actualFeesCollected, filteredTxBatch
+}
+
+func (p *Proposer) computeExpectedFees(ctx context.Context, filteredTxBatch []types.Transactions) (*big.Int, error) {
+	// Get L2 suggested gas price, which includes the L1 fees
+	suggestedGasPrice, err := p.rpc.L2.SuggestGasPrice(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get L2 suggested gas price: %w", err)
+	}
+
+	// Calculate expected fees using the suggested gas price
+	expectedFees := new(big.Int)
+	for _, txs := range filteredTxBatch {
+		for _, tx := range txs {
+			gasConsumed := big.NewInt(int64(tx.Gas()))
+			expectedFee := new(big.Int).Mul(gasConsumed, suggestedGasPrice)
+			expectedFees.Add(expectedFees, expectedFee)
+		}
+	}
+
+	return expectedFees, nil
 }
 
 func retryOnError(operation func() error, retryon string, maxRetries int, delay time.Duration) error {
