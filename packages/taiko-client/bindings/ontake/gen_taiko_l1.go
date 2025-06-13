@@ -35,7 +35,7 @@ type LibSharedDataBaseFeeConfig struct {
 	SharingPctg            uint8
 	GasIssuancePerSecond   uint32
 	MinGasExcess           uint64
-	MaxGasIssuancePerBlock uint32
+	MaxGasIssuancePerBlock uint64
 }
 
 // TaikoDataBlock is an auto generated low-level Go binding around an user-defined struct.
