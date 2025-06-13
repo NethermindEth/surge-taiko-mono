@@ -34,6 +34,7 @@ type Config struct {
 	RevertProtectionEnabled bool
 	TxmgrConfigs            *txmgr.CLIConfig
 	PrivateTxmgrConfigs     *txmgr.CLIConfig
+	CelestiaConfigs         *rpc.CelestiaConfig
 }
 
 // NewConfigFromCliContext initializes a Config instance from
@@ -65,6 +66,11 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			eth.MaxBlobsPerBlobTx,
 			maxTxListsPerEpoch,
 		)
+	}
+
+	celestiaConfigs, err := pkgFlags.InitCelestiaConfigsFromCli(c)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Config{
@@ -104,5 +110,6 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			l1ProposerPrivKey,
 			c,
 		),
+		CelestiaConfigs: celestiaConfigs,
 	}, nil
 }
