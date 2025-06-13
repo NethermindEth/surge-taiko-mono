@@ -118,9 +118,7 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			l1ProposerPrivKey,
 			c,
 		),
-		CheckProfitability: c.Bool(flags.CheckProfitability.Name),
-
-		// L2 cost estimation parameters
+		CheckProfitability:          c.Bool(flags.CheckProfitability.Name),
 		ProvingCostPerL2Batch:       provingCostPerL2Batch,
 		BatchPostingGasWithCalldata: batchPostingGasWithCalldata,
 		BatchPostingGasWithBlobs:    batchPostingGasWithBlobs,
