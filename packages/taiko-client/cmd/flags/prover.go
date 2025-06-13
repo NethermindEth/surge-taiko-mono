@@ -15,12 +15,12 @@ var (
 		Category: proverCategory,
 		EnvVars:  []string{"L1_PROVER_PRIV_KEY"},
 	}
-	RaikoHostEndpoint = &cli.StringFlag{
-		Name:     "raiko.host",
-		Usage:    "RPC endpoint of a Raiko host service",
+	RaikoSGXHostEndpoint = &cli.StringFlag{
+		Name:     "raiko.host.sgx",
+		Usage:    "RPC endpoint of a Raiko SGX host service",
 		Required: true,
 		Category: proverCategory,
-		EnvVars:  []string{"RAIKO_HOST"},
+		EnvVars:  []string{"RAIKO_HOST_SGX"},
 	}
 	RaikoZKVMHostEndpoint = &cli.StringFlag{
 		Name:     "raiko.host.zkvm",
@@ -127,7 +127,7 @@ var (
 var ProverFlags = MergeFlags(CommonFlags, []cli.Flag{
 	L2WSEndpoint,
 	L2HTTPEndpoint,
-	RaikoHostEndpoint,
+	RaikoSGXHostEndpoint,
 	RaikoJWTPath,
 	L1ProverPrivKey,
 	StartingBatchID,

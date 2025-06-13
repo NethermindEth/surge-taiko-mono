@@ -22,16 +22,15 @@ import (
 
 var (
 	MaxNumSupportedZkTypes    = 2
-	MaxNumSupportedProofTypes = 4
+	MaxNumSupportedProofTypes = 3
 )
 
 // ProofSubmitterPacaya is responsible requesting proofs for the given L2
 // blocks, and submitting the generated proofs to the TaikoInbox smart contract.
 type ProofSubmitterPacaya struct {
 	rpc *rpc.Client
-	// Proof producers
-	baseLevelProofProducer proofProducer.ProofProducer
-	zkvmProofProducer      proofProducer.ProofProducer
+	// Proof producer
+	proofProducer proofProducer.ProofProducer
 	// Channels
 	batchResultCh          chan *proofProducer.BatchProofs
 	batchAggregationNotify chan proofProducer.ProofType
@@ -62,8 +61,7 @@ type SenderOptions struct {
 
 // NewProofSubmitter creates a new ProofSubmitter instance.
 func NewProofSubmitterPacaya(
-	baseLevelProver proofProducer.ProofProducer,
-	zkvmProofProducer proofProducer.ProofProducer,
+	proofProducer proofProducer.ProofProducer,
 	batchResultCh chan *proofProducer.BatchProofs,
 	batchAggregationNotify chan proofProducer.ProofType,
 	proofSubmissionCh chan *proofProducer.ProofRequestBody,
@@ -81,8 +79,7 @@ func NewProofSubmitterPacaya(
 
 	return &ProofSubmitterPacaya{
 		rpc:                    senderOpts.RPCClient,
-		baseLevelProofProducer: baseLevelProver,
-		zkvmProofProducer:      zkvmProofProducer,
+		proofProducer:          proofProducer,
 		batchResultCh:          batchResultCh,
 		batchAggregationNotify: batchAggregationNotify,
 		proofSubmissionCh:      proofSubmissionCh,
@@ -169,11 +166,7 @@ func (s *ProofSubmitterPacaya) RequestProof(ctx context.Context, meta metadata.T
 				return nil
 			}
 
-			if s.zkvmProofProducer == nil {
-				return fmt.Errorf("zkvm proof producer is not enabled, please check the configuration")
-			}
-
-			if proofResponse, err = s.zkvmProofProducer.RequestProof(
+			if proofResponse, err = s.proofProducer.RequestProof(
 				ctx,
 				opts,
 				meta.Pacaya().GetBatchID(),
@@ -182,13 +175,9 @@ func (s *ProofSubmitterPacaya) RequestProof(ctx context.Context, meta metadata.T
 			); err != nil {
 				if errors.Is(err, proofProducer.ErrZkAnyNotDrawn) {
 					// If zk proof is not drawn
-					log.Debug("ZK proof was not chosen, attempting to request SGX proof", "batchID", opts.BatchID)
+					log.Debug("ZK proof was not chosen for some reason, check raiko host", "batchID", opts.BatchID)
 				}
 				return fmt.Errorf("failed to request zk proof, error: %w", err)
-			}
-
-			if proofResponse == nil {
-				return fmt.Errorf("ZK proof response is nil")
 			}
 
 			// Try to add the proof to the buffer.
@@ -206,11 +195,11 @@ func (s *ProofSubmitterPacaya) RequestProof(ctx context.Context, meta metadata.T
 				)
 			}
 			log.Info(
-				"Proof generated",
+				"Proof generated (SGX + ZK)",
 				"batchID", meta.Pacaya().GetBatchID(),
 				"bufferSize", bufferSize,
 				"maxBufferSize", proofBuffer.MaxLength,
-				"proofType", proofResponse.ProofType,
+				"zkProofType", proofResponse.ProofType,
 				"bufferIsAggregating", proofBuffer.IsAggregating(),
 				"bufferFirstItemAt", proofBuffer.FirstItemAt(),
 			)
@@ -329,10 +318,8 @@ func (s *ProofSubmitterPacaya) AggregateProofsByType(ctx context.Context, proofT
 	// nolint:exhaustive
 	// We deliberately handle only known proof types and catch others in default case
 	switch proofType {
-	case proofProducer.ProofTypeOp, proofProducer.ProofTypeSgx:
-		producer = s.baseLevelProofProducer
-	case proofProducer.ProofTypeZKR0, proofProducer.ProofTypeZKSP1:
-		producer = s.zkvmProofProducer
+	case proofProducer.ProofTypeSgx, proofProducer.ProofTypeZKR0, proofProducer.ProofTypeZKSP1:
+		producer = s.proofProducer
 	default:
 		return fmt.Errorf("unknown proof type: %s", proofType)
 	}
@@ -352,12 +339,12 @@ func (s *ProofSubmitterPacaya) AggregateProofsByType(ctx context.Context, proofT
 			if err != nil {
 				if errors.Is(err, proofProducer.ErrProofInProgress) || errors.Is(err, proofProducer.ErrRetry) {
 					log.Debug(
-						"Aggregating proofs",
+						"Aggregating proofs (SGX + ZK)",
 						"status", err,
 						"batchSize", len(buffer),
 						"firstID", buffer[0].BatchID,
 						"lastID", buffer[len(buffer)-1].BatchID,
-						"proofType", proofType,
+						"zkProofType", proofType,
 					)
 				} else {
 					log.Error("Failed to request proof aggregation", "err", err)
