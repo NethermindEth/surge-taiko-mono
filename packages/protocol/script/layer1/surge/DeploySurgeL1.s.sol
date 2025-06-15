@@ -419,8 +419,8 @@ contract DeploySurgeL1 is DeployCapability {
         console2.log("PemCertChainLib", address(pemCertChainLib));
 
         // Write sigVerifyLib and pemCertChainLib to json file
-        writeJson("sigVerifyLib", address(sigVerifyLib));
-        writeJson("pemCertChainLib", address(pemCertChainLib));
+        writeJson("sig_verify_lib", address(sigVerifyLib));
+        writeJson("pem_cert_chain_lib", address(pemCertChainLib));
 
         verifiers.pemCertChainLibAddr = address(pemCertChainLib);
 
