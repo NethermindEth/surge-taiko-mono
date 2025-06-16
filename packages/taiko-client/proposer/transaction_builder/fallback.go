@@ -27,6 +27,7 @@ import (
 type TxBuilderWithFallback struct {
 	rpc                        *rpc.Client
 	blobTransactionBuilder     *BlobTransactionBuilder
+	celestiaTransactionBuilder *CelestiaTransactionBuilder
 	calldataTransactionBuilder *CalldataTransactionBuilder
 	txmgrSelector              *utils.TxMgrSelector
 	fallback                   bool
@@ -46,10 +47,25 @@ func NewBuilderWithFallback(
 	revertProtectionEnabled bool,
 	blobAllowed bool,
 	fallback bool,
+	useCelestia bool,
 ) *TxBuilderWithFallback {
 	builder := &TxBuilderWithFallback{rpc: rpc, fallback: fallback, txmgrSelector: txmgrSelector}
 
 	log.Info("Using the transaction builder with fallback", "blobAllowed", blobAllowed, "fallback", fallback)
+	
+	if useCelestia {
+		builder.celestiaTransactionBuilder = NewCelestiaTransactionBuilder(
+			rpc,
+			proposerPrivateKey,
+			taikoInboxAddress,
+			taikoWrapperAddress,
+			proverSetAddress,
+			l2SuggestedFeeRecipient,
+			gasLimit,
+			chainConfig,
+			revertProtectionEnabled,
+		)
+	}
 
 	if blobAllowed {
 		builder.blobTransactionBuilder = NewBlobTransactionBuilder(
@@ -89,6 +105,10 @@ func (b *TxBuilderWithFallback) BuildPacaya(
 	parentMetahash common.Hash,
 	baseFee *big.Int,
 ) (*txmgr.TxCandidate, error) {
+	// If Celestia is enabled, just use it.
+	if b.celestiaTransactionBuilder != nil {
+		return b.celestiaTransactionBuilder.BuildPacaya(ctx, txBatch, forcedInclusion, minTxsPerForcedInclusion, parentMetahash)
+	}
 	// If calldata is the only option, just use it.
 	if b.blobTransactionBuilder == nil {
 		return b.calldataTransactionBuilder.BuildPacaya(

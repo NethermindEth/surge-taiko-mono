@@ -44,6 +44,8 @@ type Client struct {
 	L1Beacon *BeaconClient
 	// Protocol contracts clients
 	PacayaClients *PacayaClients
+	// DA layer clients
+	CelestiaDA *CelestiaClient
 }
 
 // ClientConfig contains all configs which will be used to initializing an
@@ -66,6 +68,7 @@ type ClientConfig struct {
 	L2EngineEndpoint            string
 	JwtSecret                   string
 	Timeout                     time.Duration
+	CelestiaConfigs             *CelestiaConfig
 }
 
 // NewClient initializes all RPC clients used by Taiko client software.
@@ -124,12 +127,21 @@ func NewClient(ctx context.Context, cfg *ClientConfig) (*Client, error) {
 		}
 	}
 
+	var celestiaDAClient *CelestiaClient
+	if cfg.CelestiaConfigs.Enabled {
+		celestiaDAClient, err = NewCelestiaClient(cfg.CelestiaConfigs)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	c := &Client{
 		L1:           l1Client,
 		L1Beacon:     l1BeaconClient,
 		L2:           l2Client,
 		L2CheckPoint: l2CheckPoint,
 		L2Engine:     l2AuthClient,
+		CelestiaDA:   celestiaDAClient,
 	}
 
 	// Initialize all smart contract clients.

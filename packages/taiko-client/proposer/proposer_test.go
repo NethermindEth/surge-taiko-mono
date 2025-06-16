@@ -143,6 +143,7 @@ func (s *ProposerTestSuite) TestProposeWithRevertProtection() {
 		true,
 		true,
 		true,
+		false,
 	)
 	s.Nil(s.s.ProcessL1Blocks(context.Background()))
 
