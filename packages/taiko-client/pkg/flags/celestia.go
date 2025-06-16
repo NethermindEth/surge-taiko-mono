@@ -29,6 +29,6 @@ func InitCelestiaConfigsFromCli(c *cli.Context) (*rpc.CelestiaConfig, error) {
 		Enabled:   c.Bool(flags.CelestiaEnabled.Name),
 		Endpoint:  c.String(flags.CelestiaEndpoint.Name),
 		AuthToken: c.String(flags.CelestiaAuthToken.Name),
-		Namespace: namespace,
+		Namespace: &namespace,
 	}, nil
 }
