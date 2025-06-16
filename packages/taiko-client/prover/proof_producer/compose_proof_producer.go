@@ -72,14 +72,16 @@ func (s *ComposeProofProducer) RequestProof(
 
 	g.Go(func() error {
 		// SGX proof request raiko-host service
-		// Note that - unlike `taiko-mono` upstream - we don't request the SGXGeth in Surge, instead we request the normal SGX proof
+		// Note that - unlike `taiko-mono` upstream - we don't request the SGXGeth in Surge,
+		// instead we request the normal SGX proof
 		if s.Dummy {
 			log.Debug("Dummy proof producer requested SGX proof", "batchID", batchID)
 
 			// The following line is a no-op; this is just to showcase the dummy proof producer
 			_, _ = s.DummyProofProducer.RequestProof(opts, batchID, meta, requestAt)
 		} else {
-			// By design we drop the SGX proof response in the following line because at this point we only need to record that it succeeded and we actually collect it during the next aggregation step
+			// By design we drop the SGX proof response in the following line because at this point we
+			// only need to record that it succeeded and we actually collect it during the next aggregation step
 			if _, err := s.requestBatchProof(
 				ctx,
 				batches,
