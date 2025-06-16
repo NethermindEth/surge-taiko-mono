@@ -146,6 +146,7 @@ func (p *Proposer) InitFromConfig(
 		cfg.RevertProtectionEnabled,
 		cfg.BlobAllowed,
 		cfg.FallbackToCalldata,
+		cfg.CelestiaConfigs.Enabled,
 	)
 
 	if (cfg.ClientConfig.InboxAddress != common.Address{}) {
