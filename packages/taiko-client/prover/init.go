@@ -133,6 +133,8 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 	if len(verifiers) == 0 {
 		return fmt.Errorf("at least one of the zk verifiers (risc0, sp1) must be set")
 	} else {
+		log.Info("Initialize prover", "type", producer.ProofTypeZKAny, "verifiers", verifiers)
+
 		proofProducer = &producer.ComposeProofProducer{
 			Verifiers:             verifiers,
 			RaikoSGXHostEndpoint:  p.cfg.RaikoSGXHostEndpoint,
