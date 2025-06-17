@@ -74,11 +74,12 @@ type ClientConfig struct {
 // NewClient initializes all RPC clients used by Taiko client software.
 func NewClient(ctx context.Context, cfg *ClientConfig) (*Client, error) {
 	var (
-		l1Client       *EthClient
-		l2Client       *EthClient
-		l1BeaconClient *BeaconClient
-		l2CheckPoint   *EthClient
-		err            error
+		l1Client         *EthClient
+		l2Client         *EthClient
+		l1BeaconClient   *BeaconClient
+		l2CheckPoint     *EthClient
+		celestiaDAClient *CelestiaClient
+		err              error
 	)
 
 	// Keep retrying to connect to the RPC endpoints until success or context is cancelled.
@@ -112,6 +113,14 @@ func NewClient(ctx context.Context, cfg *ClientConfig) (*Client, error) {
 			}
 		}
 
+		if cfg.CelestiaConfigs.Enabled {
+			celestiaDAClient, err = NewCelestiaClient(ctxWithTimeout, cfg.CelestiaConfigs, cfg.Timeout)
+			if err != nil {
+				log.Error("Failed to connect to Celestia node endpoint, retrying", "endpoint", cfg.CelestiaConfigs.Endpoint, "err", err)
+				return err
+			}
+		}
+
 		return nil
 	}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx)); err != nil {
 		return nil, err
@@ -122,14 +131,6 @@ func NewClient(ctx context.Context, cfg *ClientConfig) (*Client, error) {
 	var l2AuthClient *EngineClient
 	if len(cfg.L2EngineEndpoint) != 0 && len(cfg.JwtSecret) != 0 {
 		l2AuthClient, err = NewJWTEngineClient(cfg.L2EngineEndpoint, cfg.JwtSecret)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	var celestiaDAClient *CelestiaClient
-	if cfg.CelestiaConfigs.Enabled {
-		celestiaDAClient, err = NewCelestiaClient(cfg.CelestiaConfigs)
 		if err != nil {
 			return nil, err
 		}
