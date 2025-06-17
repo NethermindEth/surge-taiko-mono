@@ -37,6 +37,7 @@ type BatchParams struct {
 }
 
 // SubProof should be same with ComposeVerifier.SubProof.
+// TODO: SubProof needs to match with ISurgeVerifier.SubProof instead. The users need to use the new version.
 type SubProof struct {
 	Verifier common.Address
 	Proof    []byte
