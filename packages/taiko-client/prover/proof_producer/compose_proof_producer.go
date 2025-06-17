@@ -79,24 +79,25 @@ func (s *ComposeProofProducer) RequestProof(
 
 			// The following line is a no-op; this is just to showcase the dummy proof producer
 			_, _ = s.DummyProofProducer.RequestProof(opts, batchID, meta, requestAt)
-		} else {
-			// By design we drop the SGX proof response in the following line because at this point we
-			// only need to record that it succeeded and we actually collect it during the next aggregation step
-			if _, err := s.requestBatchProof(
-				ctx,
-				batches,
-				opts.GetProverAddress(),
-				false,
-				ProofTypeSgx,
-				requestAt,
-				opts.PacayaOptions().IsRethSGXProofGenerated,
-			); err != nil {
-				return err
-			} else {
-				// Note: we mark the `IsRethSGXProofGenerated` with true to record if it is first time generated
-				opts.PacayaOptions().IsRethSGXProofGenerated = true
-			}
+			return nil
 		}
+
+		// By design we drop the SGX proof response in the following line because at this point we
+		// only need to record that it succeeded and we actually collect it during the next aggregation step
+		if _, err := s.requestBatchProof(
+			ctx,
+			batches,
+			opts.GetProverAddress(),
+			false,
+			ProofTypeSgx,
+			requestAt,
+			opts.PacayaOptions().IsRethSGXProofGenerated,
+		); err != nil {
+			return err
+		}
+
+		// Note: we mark the `IsRethSGXProofGenerated` with true to record if it is first time generated
+		opts.PacayaOptions().IsRethSGXProofGenerated = true
 		return nil
 	})
 	g.Go(func() error {
@@ -112,27 +113,31 @@ func (s *ComposeProofProducer) RequestProof(
 			} else {
 				proof = resp.Proof
 			}
-		} else {
-			if resp, err := s.requestBatchProof(
-				ctx,
-				batches,
-				opts.GetProverAddress(),
-				false,
-				s.ProofType,
-				requestAt,
-				opts.PacayaOptions().IsRethZKProofGenerated,
-			); err != nil {
-				return err
-			} else {
-				proofType = resp.ProofType
-				// Note: we mark the `IsRethZKProofGenerated` with true to record if it is first time generated
-				opts.PacayaOptions().IsRethZKProofGenerated = true
-				// Note: Since the single sp1 proof from raiko is null, we need to ignore the case.
-				if ProofTypeZKSP1 != proofType {
-					proof = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
-				}
-			}
+
+			return nil
 		}
+
+		resp, err := s.requestBatchProof(
+			ctx,
+			batches,
+			opts.GetProverAddress(),
+			false,
+			s.ProofType,
+			requestAt,
+			opts.PacayaOptions().IsRethZKProofGenerated,
+		)
+		if err != nil {
+			return err
+		}
+
+		proofType = resp.ProofType
+		// Note: we mark the `IsRethZKProofGenerated` with true to record if it is first time generated
+		opts.PacayaOptions().IsRethZKProofGenerated = true
+		// Note: Since the single sp1 proof from raiko is null, we need to ignore the case.
+		if ProofTypeZKSP1 != proofType {
+			proof = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
+		}
+
 		return nil
 	})
 
@@ -159,7 +164,8 @@ func (s *ComposeProofProducer) Aggregate(
 		return nil, ErrInvalidLength
 	}
 	// TODO(@jmadibekov): manually test the scenario when risc0 and sp1 proofs are mixed in the same group of batches.
-	proofType := items[0].ProofType
+	firstItem := items[0]
+	proofType := firstItem.ProofType
 	verifier, exist := s.Verifiers[proofType]
 	if !exist {
 		return nil, fmt.Errorf("unknown proof type from raiko %s", proofType)
@@ -168,7 +174,7 @@ func (s *ComposeProofProducer) Aggregate(
 		"Aggregate batch proofs from raiko-host service",
 		"proofType", proofType,
 		"batchSize", len(items),
-		"firstID", items[0].BatchID,
+		"firstID", firstItem.BatchID,
 		"lastID", items[len(items)-1].BatchID,
 		"time", time.Since(requestAt),
 	)
@@ -192,24 +198,27 @@ func (s *ComposeProofProducer) Aggregate(
 
 			resp, _ := s.DummyProofProducer.RequestBatchProofs(items, ProofTypeSgx)
 			sgxBatchProofs = resp.BatchProof
-		} else {
-			if resp, err := s.requestBatchProof(
-				ctx,
-				batches,
-				items[0].Opts.GetProverAddress(),
-				true,
-				ProofTypeSgx,
-				requestAt,
-				items[0].Opts.PacayaOptions().IsRethSGXProofAggregationGenerated,
-			); err != nil {
-				return err
-			} else {
-				// Note: we mark the `IsRethSGXProofAggregationGenerated` in the first item with true
-				// to record if it is first time generated
-				items[0].Opts.PacayaOptions().IsRethSGXProofAggregationGenerated = true
-				sgxBatchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
-			}
+			return nil
 		}
+
+		resp, err := s.requestBatchProof(
+			ctx,
+			batches,
+			firstItem.Opts.GetProverAddress(),
+			true,
+			ProofTypeSgx,
+			requestAt,
+			firstItem.Opts.PacayaOptions().IsRethSGXProofAggregationGenerated,
+		)
+		if err != nil {
+			return err
+		}
+
+		// Note: we mark the `IsRethSGXProofAggregationGenerated` in the first item with true
+		// to record if it is first time generated
+		firstItem.Opts.PacayaOptions().IsRethSGXProofAggregationGenerated = true
+		sgxBatchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
+
 		return nil
 	})
 	g.Go(func() error {
@@ -219,24 +228,27 @@ func (s *ComposeProofProducer) Aggregate(
 			proofType = s.ProofType
 			resp, _ := s.DummyProofProducer.RequestBatchProofs(items, s.ProofType)
 			batchProofs = resp.BatchProof
-		} else {
-			if resp, err := s.requestBatchProof(
-				ctx,
-				batches,
-				items[0].Opts.GetProverAddress(),
-				true,
-				proofType,
-				requestAt,
-				items[0].Opts.PacayaOptions().IsRethZKProofAggregationGenerated,
-			); err != nil {
-				return err
-			} else {
-				// Note: we mark the `IsRethZKProofAggregationGenerated` in the first item with true
-				// to record if it is first time generated
-				items[0].Opts.PacayaOptions().IsRethZKProofAggregationGenerated = true
-				batchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
-			}
+			return nil
 		}
+
+		resp, err := s.requestBatchProof(
+			ctx,
+			batches,
+			firstItem.Opts.GetProverAddress(),
+			true,
+			proofType,
+			requestAt,
+			firstItem.Opts.PacayaOptions().IsRethZKProofAggregationGenerated,
+		)
+		if err != nil {
+			return err
+		}
+
+		// Note: we mark the `IsRethZKProofAggregationGenerated` in the first item with true
+		// to record if it is first time generated
+		firstItem.Opts.PacayaOptions().IsRethZKProofAggregationGenerated = true
+		batchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
+
 		return nil
 	})
 	if err := g.Wait(); err != nil {

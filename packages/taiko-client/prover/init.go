@@ -89,7 +89,6 @@ func (p *Prover) setApprovalAmount(ctx context.Context, contract common.Address)
 // initPacayaProofSubmitter initializes the proof submitter from the non-zero verifier addresses set in protocol.
 func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxBuilder) error {
 	var (
-		// Proof producer.
 		proofProducer producer.ProofProducer
 
 		// Proof verifiers addresses.
@@ -132,18 +131,18 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 
 	if len(verifiers) == 0 {
 		return fmt.Errorf("at least one of the zk verifiers (risc0, sp1) must be set")
-	} else {
-		log.Info("Initialize prover", "type", producer.ProofTypeZKAny, "verifiers", verifiers)
+	}
 
-		proofProducer = &producer.ComposeProofProducer{
-			Verifiers:             verifiers,
-			RaikoSGXHostEndpoint:  p.cfg.RaikoSGXHostEndpoint,
-			RaikoZKVMHostEndpoint: p.cfg.RaikoZKVMHostEndpoint,
-			JWT:                   p.cfg.RaikoJWT,
-			RaikoRequestTimeout:   p.cfg.RaikoRequestTimeout,
-			ProofType:             producer.ProofTypeZKAny,
-			Dummy:                 p.cfg.Dummy,
-		}
+	log.Info("Initialize prover", "type", producer.ProofTypeZKAny, "verifiers", verifiers)
+
+	proofProducer = &producer.ComposeProofProducer{
+		Verifiers:             verifiers,
+		RaikoSGXHostEndpoint:  p.cfg.RaikoSGXHostEndpoint,
+		RaikoZKVMHostEndpoint: p.cfg.RaikoZKVMHostEndpoint,
+		JWT:                   p.cfg.RaikoJWT,
+		RaikoRequestTimeout:   p.cfg.RaikoRequestTimeout,
+		ProofType:             producer.ProofTypeZKAny,
+		Dummy:                 p.cfg.Dummy,
 	}
 
 	// Init proof buffers.

@@ -28,8 +28,7 @@ var (
 // ProofSubmitterPacaya is responsible requesting proofs for the given L2
 // blocks, and submitting the generated proofs to the TaikoInbox smart contract.
 type ProofSubmitterPacaya struct {
-	rpc *rpc.Client
-	// Proof producer
+	rpc           *rpc.Client
 	proofProducer proofProducer.ProofProducer
 	// Channels
 	batchResultCh          chan *proofProducer.BatchProofs
