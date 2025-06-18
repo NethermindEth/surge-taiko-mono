@@ -56,7 +56,7 @@ var (
 		{Name: "stateRoot", Type: "bytes32"},
 	}
 	SubProofComponents = []abi.ArgumentMarshaling{
-		{Name: "verifier", Type: "address"},
+		{Name: "proofType", Type: "uint16"},
 		{Name: "proof", Type: "bytes"},
 	}
 )

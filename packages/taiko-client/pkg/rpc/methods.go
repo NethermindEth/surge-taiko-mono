@@ -1017,15 +1017,6 @@ func (c *Client) GetSP1VerifierPacaya(opts *bind.CallOpts) (common.Address, erro
 	return getImmutableAddressFromStructPacaya(c, opts, c.PacayaClients.SurgeVerifier.Sp1RethVerifier)
 }
 
-// GetSgxGethVerifierPacaya resolves the Pacaya sgx geth verifier address.
-func (c *Client) GetSgxGethVerifierPacaya(opts *bind.CallOpts) (common.Address, error) {
-	if c.PacayaClients.SurgeVerifier == nil {
-		return common.Address{}, errors.New("surgeVerifier contract is not set")
-	}
-
-	return getImmutableAddressFromStructPacaya(c, opts, c.PacayaClients.SurgeVerifier.SgxRethVerifier)
-}
-
 // GetPreconfRouterPacaya resolves the preconfirmation router address.
 func (c *Client) GetPreconfRouterPacaya(opts *bind.CallOpts) (common.Address, error) {
 	if c.PacayaClients.TaikoWrapper == nil {
