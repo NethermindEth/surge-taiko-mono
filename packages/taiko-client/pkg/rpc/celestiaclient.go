@@ -6,7 +6,13 @@ import (
 	"time"
 
 	"github.com/celestiaorg/celestia-node/api/rpc/client"
+	"github.com/celestiaorg/celestia-node/state"
 	"github.com/celestiaorg/go-square/v2/share"
+)
+
+const (
+	// https://docs.celestia.org/how-to-guides/submit-data#maximum-blob-size
+	AdvisableCelestiaBlobSize = 500000
 )
 
 // CelestiaConfig contains all configs which will be used to initializing a Celestia RPC client.
@@ -72,4 +78,24 @@ func (c *CelestiaClient) CheckBalance(ctx context.Context) (bool, error) {
 	}
 
 	return balance.Amount > 0, nil
+}
+
+func (c *CelestiaClient) Submit(ctx context.Context, blobs []*Blob) (uint64, error) {
+	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, c.Timeout)
+	defer cancel()
+
+	client, err := client.NewClient(ctxWithTimeout, c.Endpoint, c.AuthToken)
+	if err != nil {
+		return 0, err
+	}
+	defer client.Close()
+
+	options := state.NewTxConfig()
+
+	height, err := client.Blob.Submit(ctxWithTimeout, blobs, options)
+	if err != nil {
+		return 0, err
+	}
+
+	return height, nil
 }
