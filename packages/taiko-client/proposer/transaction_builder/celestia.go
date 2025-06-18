@@ -9,10 +9,15 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/celestiaorg/celestia-node/blob"
+
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
 
 // CelestiaTransactionBuilder is responsible for building a TaikoInbox.proposeBatch transaction with txList bytes saved in Celestia.
@@ -61,5 +66,76 @@ func (b *CelestiaTransactionBuilder) BuildPacaya(
 	minTxsPerForcedInclusion *big.Int,
 	parentMetahash common.Hash,
 ) (*txmgr.TxCandidate, error) {
+	// ABI encode the TaikoWrapper.proposeBatch / ProverSet.proposeBatch parameters.
+	var (
+		to       = &b.taikoWrapperAddress
+		proposer = crypto.PubkeyToAddress(b.proposerPrivateKey.PublicKey)
+		//data                  []byte
+		//encodedParams         []byte
+		blockParams           []pacayaBindings.ITaikoInboxBlockParams
+		forcedInclusionParams *encoding.BatchParams
+		allTxs                types.Transactions
+	)
+
+	if b.proverSetAddress != rpc.ZeroAddress {
+		to = &b.proverSetAddress
+		proposer = b.proverSetAddress
+	}
+
+	if forcedInclusion != nil {
+		blobParams, blockParams := buildParamsForForcedInclusion(forcedInclusion, minTxsPerForcedInclusion)
+		forcedInclusionParams = &encoding.BatchParams{
+			Proposer:                 proposer,
+			Coinbase:                 b.l2SuggestedFeeRecipient,
+			RevertIfNotFirstProposal: b.revertProtectionEnabled,
+			BlobParams:               *blobParams,
+			Blocks:                   blockParams,
+		}
+	}
+
+	for _, txs := range txBatch {
+		allTxs = append(allTxs, txs...)
+		blockParams = append(blockParams, pacayaBindings.ITaikoInboxBlockParams{
+			NumTransactions: uint16(len(txs)),
+			TimeShift:       0,
+			SignalSlots:     make([][32]byte, 0),
+		})
+	}
+
+	txListsBytes, err := utils.EncodeAndCompressTxList(allTxs)
+	if err != nil {
+		return nil, err
+	}
+
+	celestiaBlobs, err = b.splitToCelestiaBlobs(txListsBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	celestiaHeight, err = b.rpc.CelestiaDA.Submit(ctx, celestiaBlobs)
+	if err != nil {
+		return nil, err
+	}
+
 	return nil, errors.New("not implemented")
+}
+
+// splitToCelestiaBlobs splits the txListBytes into multiple Celestia blobs.
+func (b *CelestiaTransactionBuilder) splitToCelestiaBlobs(txListBytes []byte) ([]*Blob, error) {
+	var blobs []*Blob
+	for start := 0; start < len(txListBytes); start += rpc.AdvisableCelestiaBlobSize {
+		end := start + rpc.AdvisableCelestiaBlobSize
+		if end > len(txListBytes) {
+			end = len(txListBytes)
+		}
+
+		blob, err := blob.NewBlobV0(b.rpc.CelestiaDA.Namespace, txListBytes[start:end])
+		if err != nil {
+			return nil, err
+		}
+
+		blobs = append(blobs, blob)
+	}
+
+	return blobs, nil
 }
