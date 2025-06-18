@@ -56,15 +56,20 @@ func NewCelestiaClient(ctx context.Context, cfg *CelestiaConfig, timeout time.Du
 	}, nil
 }
 
-func (c *CelestiaClient) SuggestGasPrice(ctx context.Context) error {
+func (c *CelestiaClient) CheckBalance(ctx context.Context) (bool, error) {
 	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, c.Timeout)
 	defer cancel()
 
 	client, err := client.NewClient(ctxWithTimeout, c.Endpoint, c.AuthToken)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer client.Close()
 
-	return nil
+	balance, err := client.State.Balance(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	return balance.Amount > 0, nil
 }
