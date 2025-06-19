@@ -67,15 +67,16 @@ func NewBeaconClient(endpoint string, timeout time.Duration) (*BeaconClient, err
 	log.Info("L1 genesis time", "time", genesisTime)
 
 	// Get the seconds per slot.
-	spec, err := cli.GetConfigSpec(ctx)
-	if err != nil {
-		return nil, err
-	}
+	// spec, err := cli.GetConfigSpec(ctx)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	secondsPerSlot, err := strconv.Atoi(spec.Data.(map[string]interface{})["SECONDS_PER_SLOT"].(string))
-	if err != nil {
-		return nil, err
-	}
+	// secondsPerSlot, err := strconv.Atoi(spec.Data.(map[string]interface{})["SECONDS_PER_SLOT"].(string))
+	// if err != nil {
+	// 	return nil, err
+	// }
+	secondsPerSlot := 12
 
 	log.Info("L1 seconds per slot", "seconds", secondsPerSlot)
 
