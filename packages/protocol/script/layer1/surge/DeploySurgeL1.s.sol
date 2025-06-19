@@ -62,6 +62,7 @@ contract DeploySurgeL1 is DeployCapability {
 
     // Timelock configuration
     // ---------------------------------------------------------------
+    bool internal immutable useTimelockedOwner = vm.envBool("USE_TIMELOCKED_OWNER");
     uint256 internal immutable timelockPeriod = uint64(vm.envUint("TIMELOCK_PERIOD"));
     address internal immutable ownerMultisig = vm.envAddress("OWNER_MULTISIG");
 
@@ -149,28 +150,38 @@ contract DeploySurgeL1 is DeployCapability {
         require(minVerificationStreak != 0, "config: MIN_LIVENESS_STREAK");
         require(livenessBondBase != 0, "config: LIVENESS_BOND_BASE");
         require(livenessBondPerBlock != 0, "config: LIVENESS_BOND_PER_BLOCK");
-        require(ownerMultisig != address(0), "Config: OWNER_MULTISIG");
 
-        // Array built via env can only be in memory
-        address[] memory ownerMultisigSigners = vm.envAddress("OWNER_MULTISIG_SIGNERS", ",");
-        require(ownerMultisigSigners.length > 0, "Config: OWNER_MULTISIG_SIGNERS");
-        for (uint256 i = 0; i < ownerMultisigSigners.length; i++) {
-            require(ownerMultisigSigners[i] != address(0), "Config: OWNER_MULTISIG_SIGNERS");
+        address l1Owner = msg.sender;
+
+        // Timelock variables
+        address[] memory executors;
+        address[] memory proposers;
+
+        if (useTimelockedOwner) {
+            require(ownerMultisig != address(0), "config: OWNER_MULTISIG");
+
+            // Deploy timelock controller
+            // ---------------------------------------------------------------
+
+            // Array built via env can only be in memory
+            address[] memory ownerMultisigSigners = vm.envAddress("OWNER_MULTISIG_SIGNERS", ",");
+            require(ownerMultisigSigners.length > 0, "Config: OWNER_MULTISIG_SIGNERS");
+            for (uint256 i = 0; i < ownerMultisigSigners.length; i++) {
+                require(ownerMultisigSigners[i] != address(0), "Config: OWNER_MULTISIG_SIGNERS");
+            }
+
+            executors = ownerMultisigSigners;
+
+            proposers = new address[](1);
+            proposers[0] = ownerMultisig;
+
+            // The timelock controller will serve as the owner of all the surge contracts
+            l1Owner = deployTimelockController();
         }
-
-        // Deploy timelock controller
-        // ---------------------------------------------------------------
-        address[] memory executors = ownerMultisigSigners;
-
-        address[] memory proposers = new address[](1);
-        proposers[0] = ownerMultisig;
-
-        // This will serve as the owner of all the surge contracts
-        address timelockController = deployTimelockController();
 
         // Deploy shared contracts
         // ---------------------------------------------------------------
-        SharedContracts memory sharedContracts = deploySharedContracts(timelockController);
+        SharedContracts memory sharedContracts = deploySharedContracts(l1Owner);
 
         // Empty implementation for temporary use
         address emptyImpl = address(new EmptyImpl());
@@ -194,7 +205,7 @@ contract DeploySurgeL1 is DeployCapability {
         SignalService signalService = SignalService(sharedContracts.signalService);
 
         SignalService(sharedContracts.signalService).authorize(rollupContracts.taikoInbox, true);
-        signalService.transferOwnership(timelockController);
+        signalService.transferOwnership(l1Owner);
 
         {
             // Build L2 addresses
@@ -223,7 +234,7 @@ contract DeploySurgeL1 is DeployCapability {
         // Deploy preconf contracts
         // ---------------------------------------------------------------
         PreconfContracts memory preconfContracts = deployPreconfContracts(
-            timelockController,
+            l1Owner,
             rollupContracts.proofVerifier,
             rollupContracts.taikoInbox,
             sharedContracts.signalService,
@@ -236,58 +247,52 @@ contract DeploySurgeL1 is DeployCapability {
             setupVerifiers(verifiers);
         }
 
-        // Initialise and transfer ownership to timelock controller
-        // ----------------------------------------------------------------
-        SurgeTimelockController(payable(timelockController)).init(
-            timelockPeriod,
-            proposers,
-            executors,
-            rollupContracts.taikoInbox,
-            rollupContracts.proofVerifier,
-            minVerificationStreak
-        );
-        console2.log("** timelockController initialised");
+        // Initialise and transfer ownership to either the timelock controller or the deployer
+        // -----------------------------------------------------------------------------------
+        if (useTimelockedOwner) {
+            SurgeTimelockController(payable(l1Owner)).init(
+                timelockPeriod,
+                proposers,
+                executors,
+                rollupContracts.taikoInbox,
+                rollupContracts.proofVerifier,
+                minVerificationStreak
+            );
+            console2.log("** timelockController initialised");
+        }
 
-        SgxVerifier(verifiers.sgxRethVerifier).transferOwnership(timelockController);
-        console2.log("** sgxRethVerifier ownership transferred to:", timelockController);
+        SgxVerifier(verifiers.sgxRethVerifier).transferOwnership(l1Owner);
+        console2.log("** sgxRethVerifier ownership transferred to:", l1Owner);
 
-        Risc0Verifier(verifiers.risc0RethVerifier).transferOwnership(timelockController);
-        console2.log("** risc0RethVerifier ownership transferred to:", timelockController);
+        Risc0Verifier(verifiers.risc0RethVerifier).transferOwnership(l1Owner);
+        console2.log("** risc0RethVerifier ownership transferred to:", l1Owner);
 
-        SP1Verifier(verifiers.sp1RethVerifier).transferOwnership(timelockController);
-        console2.log("** sp1RethVerifier ownership transferred to:", timelockController);
+        SP1Verifier(verifiers.sp1RethVerifier).transferOwnership(l1Owner);
+        console2.log("** sp1RethVerifier ownership transferred to:", l1Owner);
 
-        AutomataDcapV3Attestation(verifiers.automataProxy).transferOwnership(timelockController);
-        console2.log("** automataProxy ownership transferred to:", timelockController);
+        AutomataDcapV3Attestation(verifiers.automataProxy).transferOwnership(l1Owner);
+        console2.log("** automataProxy ownership transferred to:", l1Owner);
 
-        TaikoInbox(payable(rollupContracts.taikoInbox)).init(timelockController, l2GenesisHash);
-        console2.log("** taikoInbox initialised and ownership transferred to:", timelockController);
+        TaikoInbox(payable(rollupContracts.taikoInbox)).init(l1Owner, l2GenesisHash);
+        console2.log("** taikoInbox initialised and ownership transferred to:", l1Owner);
 
         SurgeVerifier(rollupContracts.proofVerifier).init(
-            timelockController,
+            l1Owner,
             verifiers.sgxRethVerifier,
             address(0), // TDX Reth verifier is not deployed yet
             verifiers.risc0RethVerifier,
             verifiers.sp1RethVerifier
         );
-        console2.log(
-            "** proofVerifier initialised and ownership transferred to:", timelockController
-        );
+        console2.log("** proofVerifier initialised and ownership transferred to:", l1Owner);
 
-        ForcedInclusionStore(preconfContracts.store).init(timelockController);
-        console2.log(
-            "** forcedInclusionStore initialised and ownership transferred to:", timelockController
-        );
+        ForcedInclusionStore(preconfContracts.store).init(l1Owner);
+        console2.log("** forcedInclusionStore initialised and ownership transferred to:", l1Owner);
 
-        TaikoWrapper(preconfContracts.taikoWrapper).init(timelockController);
-        console2.log(
-            "** taikoWrapper initialised and ownership transferred to:", timelockController
-        );
+        TaikoWrapper(preconfContracts.taikoWrapper).init(l1Owner);
+        console2.log("** taikoWrapper initialised and ownership transferred to:", l1Owner);
 
-        DefaultResolver(sharedContracts.sharedResolver).transferOwnership(timelockController);
-        console2.log(
-            "** sharedResolver initialised and ownership transferred to:", timelockController
-        );
+        DefaultResolver(sharedContracts.sharedResolver).transferOwnership(l1Owner);
+        console2.log("** sharedResolver initialised and ownership transferred to:", l1Owner);
 
         // Verify deployment
         // ---------------------------------------------------------------
@@ -297,7 +302,7 @@ contract DeploySurgeL1 is DeployCapability {
             preconfContracts,
             verifiers,
             sharedContracts.sharedResolver,
-            timelockController
+            l1Owner
         );
     }
 
