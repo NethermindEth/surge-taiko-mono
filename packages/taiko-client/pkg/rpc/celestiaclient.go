@@ -5,8 +5,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/celestiaorg/celestia-node/api/rpc/client"
-	"github.com/celestiaorg/celestia-node/state"
+	// TODO: Resolved the celestia-node dependencies issues or write our own minimalistic client
+	// "github.com/celestiaorg/celestia-node/api/rpc/client"
+	// "github.com/celestiaorg/celestia-node/blob"
+	// "github.com/celestiaorg/celestia-node/state"
 	"github.com/celestiaorg/go-square/v2/share"
 )
 
@@ -14,6 +16,9 @@ const (
 	// https://docs.celestia.org/how-to-guides/submit-data#maximum-blob-size
 	AdvisableCelestiaBlobSize = 500000
 )
+
+type Blob struct {
+}
 
 // CelestiaConfig contains all configs which will be used to initializing a Celestia RPC client.
 type CelestiaConfig struct {
@@ -43,16 +48,19 @@ func NewCelestiaClient(ctx context.Context, cfg *CelestiaConfig, timeout time.Du
 		timeoutVal = timeout
 	}
 
-	client, err := client.NewClient(ctx, cfg.Endpoint, cfg.AuthToken)
-	if err != nil {
-		return nil, err
-	}
-	defer client.Close()
+	// TODO: Resolved the celestia-node dependencies issues or write our own minimalistic client
+	/*
+		client, err := client.NewClient(ctx, cfg.Endpoint, cfg.AuthToken)
+		if err != nil {
+			return nil, err
+		}
+		defer client.Close()
 
-	// Get network head to verify connectivity
-	if _, err := client.Header.NetworkHead(ctx); err != nil {
-		return nil, err
-	}
+		// Get network head to verify connectivity
+		if _, err := client.Header.NetworkHead(ctx); err != nil {
+			return nil, err
+		}
+	*/
 
 	return &CelestiaClient{
 		Endpoint:  cfg.Endpoint,
@@ -63,39 +71,47 @@ func NewCelestiaClient(ctx context.Context, cfg *CelestiaConfig, timeout time.Du
 }
 
 func (c *CelestiaClient) CheckBalance(ctx context.Context) (bool, error) {
-	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, c.Timeout)
-	defer cancel()
+	// TODO: Resolved the celestia-node dependencies issues or write our own minimalistic client
+	/*
+		ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, c.Timeout)
+		defer cancel()
 
-	client, err := client.NewClient(ctxWithTimeout, c.Endpoint, c.AuthToken)
-	if err != nil {
-		return false, err
-	}
-	defer client.Close()
+		client, err := client.NewClient(ctxWithTimeout, c.Endpoint, c.AuthToken)
+		if err != nil {
+			return false, err
+		}
+		defer client.Close()
 
-	balance, err := client.State.Balance(ctx)
-	if err != nil {
-		return false, err
-	}
+		balance, err := client.State.Balance(ctx)
+		if err != nil {
+			return false, err
+		}
 
-	return balance.Amount > 0, nil
+		return balance.Amount > 0, nil
+	*/
+	return false, nil
 }
 
 func (c *CelestiaClient) Submit(ctx context.Context, blobs []*Blob) (uint64, error) {
-	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, c.Timeout)
-	defer cancel()
+	// TODO: Resolved the celestia-node dependencies issues or write our own minimalistic client
+	/*
+		ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, c.Timeout)
+		defer cancel()
 
-	client, err := client.NewClient(ctxWithTimeout, c.Endpoint, c.AuthToken)
-	if err != nil {
-		return 0, err
-	}
-	defer client.Close()
+		client, err := client.NewClient(ctxWithTimeout, c.Endpoint, c.AuthToken)
+		if err != nil {
+			return 0, err
+		}
+		defer client.Close()
 
-	options := state.NewTxConfig()
+		options := state.NewTxConfig()
 
-	height, err := client.Blob.Submit(ctxWithTimeout, blobs, options)
-	if err != nil {
-		return 0, err
-	}
+		height, err := client.Blob.Submit(ctxWithTimeout, blobs, options)
+		if err != nil {
+			return 0, err
+		}
 
-	return height, nil
+		return height, nil
+	*/
+	return 0, nil
 }
