@@ -21,6 +21,12 @@ type BlobParams struct {
 	CreatedIn      uint64
 }
 
+// CelestiaParams should be same with ITaikoInbox.CelestiaBlobParams.
+type CelestiaBlobParams struct {
+	Height    uint64
+	Namespace []byte
+}
+
 // BatchParams should be same with ITaikoInbox.BatchParams.
 type BatchParams struct {
 	Proposer                 common.Address
@@ -30,6 +36,7 @@ type BatchParams struct {
 	LastBlockTimestamp       uint64
 	RevertIfNotFirstProposal bool
 	BlobParams               BlobParams
+	CelestiaBlobParams       CelestiaBlobParams
 	Blocks                   []pacayaBindings.ITaikoInboxBlockParams
 }
 

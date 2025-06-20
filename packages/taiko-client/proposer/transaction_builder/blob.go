@@ -122,6 +122,9 @@ func (b *BlobTransactionBuilder) BuildPacaya(
 			ByteOffset:     0,
 			ByteSize:       uint32(len(txListsBytes)),
 		},
+		CelestiaBlobParams: encoding.CelestiaBlobParams{
+			Height: 0,
+		},
 		Blocks: blockParams,
 	}
 
