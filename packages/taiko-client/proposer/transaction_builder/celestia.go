@@ -5,11 +5,13 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 
-	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+
+	// TODO: Resolved the celestia-node dependencies issues or write our own minimalistic client
+	// "github.com/celestiaorg/celestia-node/blob"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
@@ -18,9 +20,8 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
 
-// BlobTransactionBuilder is responsible for building a TaikoInbox.proposeBatch transaction with txList
-// bytes saved in blob.
-type BlobTransactionBuilder struct {
+// CelestiaTransactionBuilder is responsible for building a TaikoInbox.proposeBatch transaction with txList bytes saved in Celestia.
+type CelestiaTransactionBuilder struct {
 	rpc                     *rpc.Client
 	proposerPrivateKey      *ecdsa.PrivateKey
 	taikoInboxAddress       common.Address
@@ -32,8 +33,8 @@ type BlobTransactionBuilder struct {
 	revertProtectionEnabled bool
 }
 
-// NewBlobTransactionBuilder creates a new BlobTransactionBuilder instance based on giving configurations.
-func NewBlobTransactionBuilder(
+// NewCelestiaTransactionBuilder creates a new CelestiaTransactionBuilder instance based on giving configurations.
+func NewCelestiaTransactionBuilder(
 	rpc *rpc.Client,
 	proposerPrivateKey *ecdsa.PrivateKey,
 	taikoInboxAddress common.Address,
@@ -43,8 +44,8 @@ func NewBlobTransactionBuilder(
 	gasLimit uint64,
 	chainConfig *config.ChainConfig,
 	revertProtectionEnabled bool,
-) *BlobTransactionBuilder {
-	return &BlobTransactionBuilder{
+) *CelestiaTransactionBuilder {
+	return &CelestiaTransactionBuilder{
 		rpc,
 		proposerPrivateKey,
 		taikoInboxAddress,
@@ -58,7 +59,7 @@ func NewBlobTransactionBuilder(
 }
 
 // BuildPacaya implements the ProposeBatchTransactionBuilder interface.
-func (b *BlobTransactionBuilder) BuildPacaya(
+func (b *CelestiaTransactionBuilder) BuildPacaya(
 	ctx context.Context,
 	txBatch []types.Transactions,
 	forcedInclusion *pacayaBindings.IForcedInclusionStoreForcedInclusion,
@@ -70,7 +71,6 @@ func (b *BlobTransactionBuilder) BuildPacaya(
 		to                    = &b.taikoWrapperAddress
 		proposer              = crypto.PubkeyToAddress(b.proposerPrivateKey.PublicKey)
 		data                  []byte
-		blobs                 []*eth.Blob
 		encodedParams         []byte
 		blockParams           []pacayaBindings.ITaikoInboxBlockParams
 		forcedInclusionParams *encoding.BatchParams
@@ -107,7 +107,13 @@ func (b *BlobTransactionBuilder) BuildPacaya(
 		return nil, err
 	}
 
-	if blobs, err = b.splitToBlobs(txListsBytes); err != nil {
+	celestiaBlobs, err := b.splitToCelestiaBlobs(txListsBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	celestiaHeight, err := b.rpc.CelestiaDA.Submit(ctx, celestiaBlobs)
+	if err != nil {
 		return nil, err
 	}
 
@@ -116,14 +122,12 @@ func (b *BlobTransactionBuilder) BuildPacaya(
 		Coinbase:                 b.l2SuggestedFeeRecipient,
 		RevertIfNotFirstProposal: b.revertProtectionEnabled,
 		BlobParams: encoding.BlobParams{
-			BlobHashes:     [][32]byte{},
-			FirstBlobIndex: 0,
-			NumBlobs:       uint8(len(blobs)),
-			ByteOffset:     0,
-			ByteSize:       uint32(len(txListsBytes)),
+			ByteOffset: 0,
+			ByteSize:   uint32(len(txListsBytes)),
 		},
 		CelestiaBlobParams: encoding.CelestiaBlobParams{
-			Height: 0,
+			Height:    celestiaHeight,
+			Namespace: b.rpc.CelestiaDA.Namespace.Bytes(),
 		},
 		Blocks: blockParams,
 	}
@@ -152,27 +156,31 @@ func (b *BlobTransactionBuilder) BuildPacaya(
 
 	return &txmgr.TxCandidate{
 		TxData:   data,
-		Blobs:    blobs,
+		Blobs:    nil,
 		To:       to,
 		GasLimit: b.gasLimit,
 	}, nil
 }
 
-// splitToBlobs splits the txListBytes into multiple blobs.
-func (b *BlobTransactionBuilder) splitToBlobs(txListBytes []byte) ([]*eth.Blob, error) {
-	var blobs []*eth.Blob
-	for start := 0; start < len(txListBytes); start += eth.MaxBlobDataSize {
-		end := start + eth.MaxBlobDataSize
+// splitToCelestiaBlobs splits the txListBytes into multiple Celestia blobs.
+func (b *CelestiaTransactionBuilder) splitToCelestiaBlobs(txListBytes []byte) ([]*rpc.Blob, error) {
+	var blobs []*rpc.Blob
+	for start := 0; start < len(txListBytes); start += rpc.AdvisableCelestiaBlobSize {
+		end := start + rpc.AdvisableCelestiaBlobSize
 		if end > len(txListBytes) {
 			end = len(txListBytes)
 		}
 
-		var blob = &eth.Blob{}
-		if err := blob.FromData(txListBytes[start:end]); err != nil {
-			return nil, err
-		}
+		// TODO: Resolved the celestia-node dependencies issues or write our own minimalistic client
+		/*
+			blob, err := blob.NewBlobV0(b.rpc.CelestiaDA.Namespace, txListBytes[start:end])
+			if err != nil {
+				return nil, err
+			}
 
-		blobs = append(blobs, blob)
+			blobs = append(blobs, blob)
+		*/
+		blobs = append(blobs, &rpc.Blob{})
 	}
 
 	return blobs, nil

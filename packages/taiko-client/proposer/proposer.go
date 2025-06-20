@@ -146,6 +146,7 @@ func (p *Proposer) InitFromConfig(
 		cfg.RevertProtectionEnabled,
 		cfg.BlobAllowed,
 		cfg.FallbackToCalldata,
+		cfg.CelestiaConfigs.Enabled,
 	)
 
 	if (cfg.ClientConfig.InboxAddress != common.Address{}) {
@@ -508,6 +509,20 @@ func (p *Proposer) ProposeTxListPacaya(
 
 	if !ok {
 		return fmt.Errorf("insufficient proposer (%s) balance", proposerAddress.Hex())
+	}
+
+	// If needed, check Celestia node balance.
+	if p.Config.CelestiaConfigs.Enabled {
+		ok, err := p.rpc.CelestiaDA.CheckBalance(ctx)
+
+		if err != nil {
+			log.Warn("Failed to check Celestia node balance", "error", err)
+			return err
+		}
+
+		if !ok {
+			return errors.New("insufficient Celestia node balance")
+		}
 	}
 
 	// Check forced inclusion.
