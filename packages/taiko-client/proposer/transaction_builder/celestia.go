@@ -3,7 +3,6 @@ package builder
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"math/big"
 
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
@@ -11,7 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/celestiaorg/celestia-node/blob"
+	// TODO: Resolved the celestia-node dependencies issues or write our own minimalistic client
+	// "github.com/celestiaorg/celestia-node/blob"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
@@ -68,10 +68,10 @@ func (b *CelestiaTransactionBuilder) BuildPacaya(
 ) (*txmgr.TxCandidate, error) {
 	// ABI encode the TaikoWrapper.proposeBatch / ProverSet.proposeBatch parameters.
 	var (
-		to       = &b.taikoWrapperAddress
-		proposer = crypto.PubkeyToAddress(b.proposerPrivateKey.PublicKey)
-		//data                  []byte
-		//encodedParams         []byte
+		to                    = &b.taikoWrapperAddress
+		proposer              = crypto.PubkeyToAddress(b.proposerPrivateKey.PublicKey)
+		data                  []byte
+		encodedParams         []byte
 		blockParams           []pacayaBindings.ITaikoInboxBlockParams
 		forcedInclusionParams *encoding.BatchParams
 		allTxs                types.Transactions
@@ -107,34 +107,80 @@ func (b *CelestiaTransactionBuilder) BuildPacaya(
 		return nil, err
 	}
 
-	celestiaBlobs, err = b.splitToCelestiaBlobs(txListsBytes)
+	celestiaBlobs, err := b.splitToCelestiaBlobs(txListsBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	celestiaHeight, err = b.rpc.CelestiaDA.Submit(ctx, celestiaBlobs)
+	celestiaHeight, err := b.rpc.CelestiaDA.Submit(ctx, celestiaBlobs)
 	if err != nil {
 		return nil, err
 	}
 
-	return nil, errors.New("not implemented")
+	params := &encoding.BatchParams{
+		Proposer:                 proposer,
+		Coinbase:                 b.l2SuggestedFeeRecipient,
+		RevertIfNotFirstProposal: b.revertProtectionEnabled,
+		BlobParams: encoding.BlobParams{
+			ByteOffset: 0,
+			ByteSize:   uint32(len(txListsBytes)),
+		},
+		CelestiaBlobParams: encoding.CelestiaBlobParams{
+			Height:    celestiaHeight,
+			Namespace: b.rpc.CelestiaDA.Namespace.Bytes(),
+		},
+		Blocks: blockParams,
+	}
+
+	if b.revertProtectionEnabled {
+		if forcedInclusionParams != nil {
+			forcedInclusionParams.ParentMetaHash = parentMetahash
+		} else {
+			params.ParentMetaHash = parentMetahash
+		}
+	}
+
+	if encodedParams, err = encoding.EncodeBatchParamsWithForcedInclusion(forcedInclusionParams, params); err != nil {
+		return nil, err
+	}
+
+	if b.proverSetAddress != rpc.ZeroAddress {
+		if data, err = encoding.ProverSetPacayaABI.Pack("proposeBatch", encodedParams, []byte{}); err != nil {
+			return nil, err
+		}
+	} else {
+		if data, err = encoding.TaikoWrapperABI.Pack("proposeBatch", encodedParams, []byte{}); err != nil {
+			return nil, err
+		}
+	}
+
+	return &txmgr.TxCandidate{
+		TxData:   data,
+		Blobs:    nil,
+		To:       to,
+		GasLimit: b.gasLimit,
+	}, nil
 }
 
 // splitToCelestiaBlobs splits the txListBytes into multiple Celestia blobs.
-func (b *CelestiaTransactionBuilder) splitToCelestiaBlobs(txListBytes []byte) ([]*Blob, error) {
-	var blobs []*Blob
+func (b *CelestiaTransactionBuilder) splitToCelestiaBlobs(txListBytes []byte) ([]*rpc.Blob, error) {
+	var blobs []*rpc.Blob
 	for start := 0; start < len(txListBytes); start += rpc.AdvisableCelestiaBlobSize {
 		end := start + rpc.AdvisableCelestiaBlobSize
 		if end > len(txListBytes) {
 			end = len(txListBytes)
 		}
 
-		blob, err := blob.NewBlobV0(b.rpc.CelestiaDA.Namespace, txListBytes[start:end])
-		if err != nil {
-			return nil, err
-		}
+		// TODO: Resolved the celestia-node dependencies issues or write our own minimalistic client
+		/*
+			blob, err := blob.NewBlobV0(b.rpc.CelestiaDA.Namespace, txListBytes[start:end])
+			if err != nil {
+				return nil, err
+			}
 
-		blobs = append(blobs, blob)
+			blobs = append(blobs, blob)
+		*/
+		blobs = append(blobs, &rpc.Blob{})
 	}
 
 	return blobs, nil
