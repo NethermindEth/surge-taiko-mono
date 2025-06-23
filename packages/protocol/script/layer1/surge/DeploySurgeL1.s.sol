@@ -616,6 +616,7 @@ contract DeploySurgeL1 is DeployCapability {
 
         // Register SGX instance with quote if provided
         bytes memory v3QuoteBytes = vm.envBytes("V3_QUOTE_BYTES");
+        console2.log("** V3 quote bytes length", v3QuoteBytes.length);
         if (v3QuoteBytes.length > 0) {
             // Parse bytes input
             V3Struct.ParsedV3QuoteStruct memory v3quote =
