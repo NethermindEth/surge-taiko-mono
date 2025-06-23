@@ -93,7 +93,11 @@ func (s *State) init(ctx context.Context) error {
 	log.Info("L2 execution engine head", "height", l2Head.Number, "hash", l2Head.Hash())
 	s.setL2Head(l2Head)
 
+	// Updates driver_l2Head_id gauge.
 	s.setHeadBlockID(new(big.Int).SetUint64(stateVars.B.NumBlocks - 1))
+
+	// Updates driver_l2Verified_id gauge.
+	metrics.DriverL2VerifiedHeightGauge.Set(float64(stateVars.B.LastVerifiedBlockId))
 
 	return nil
 }
