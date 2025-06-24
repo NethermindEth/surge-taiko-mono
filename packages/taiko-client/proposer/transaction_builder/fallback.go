@@ -95,7 +95,9 @@ func (b *TxBuilderWithFallback) BuildPacaya(
 	}
 	// If blob is enabled, and fallback is not enabled, just build a blob transaction.
 	if !b.fallback {
-		return b.blobTransactionBuilder.BuildPacaya(ctx, txBatch, forcedInclusion, minTxsPerForcedInclusion, parentMetahash, baseFee)
+		return b.blobTransactionBuilder.BuildPacaya(
+			ctx, txBatch, forcedInclusion, minTxsPerForcedInclusion, parentMetahash, baseFee,
+		)
 	}
 
 	// Otherwise, compare the cost, and choose the cheaper option.
@@ -145,7 +147,9 @@ func (b *TxBuilderWithFallback) BuildPacaya(
 		log.Error("Failed to estimate transactions cost, will build a type-3 transaction", "error", err)
 		metrics.ProposerCostEstimationError.Inc()
 		// If there is an error, just build a blob transaction.
-		return b.blobTransactionBuilder.BuildPacaya(ctx, txBatch, forcedInclusion, minTxsPerForcedInclusion, parentMetahash, baseFee)
+		return b.blobTransactionBuilder.BuildPacaya(
+			ctx, txBatch, forcedInclusion, minTxsPerForcedInclusion, parentMetahash, baseFee,
+		)
 	}
 
 	var (

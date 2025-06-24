@@ -543,7 +543,14 @@ func (p *Proposer) ProposeTxListPacaya(
 	}
 
 	// Build the transaction to propose batch.
-	txCandidate, err := p.txBuilder.BuildPacaya(ctx, txBatch, forcedInclusion, minTxsPerForcedInclusion, parentMetaHash, l2BaseFee)
+	txCandidate, err := p.txBuilder.BuildPacaya(
+		ctx,
+		txBatch,
+		forcedInclusion,
+		minTxsPerForcedInclusion,
+		parentMetaHash,
+		l2BaseFee,
+	)
 	if err != nil {
 		log.Warn("Failed to build TaikoInbox.proposeBatch transaction", "error", encoding.TryParsingCustomError(err))
 		return err
