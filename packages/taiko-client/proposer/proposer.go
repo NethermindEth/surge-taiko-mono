@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"math/big"
 	"math/rand"
 	"strings"
@@ -540,9 +541,16 @@ func (p *Proposer) ProposeTxListPacaya(
 		)
 	}
 
+	// Build the transaction to propose batch.
+	txCandidate, err := p.txBuilder.BuildPacaya(ctx, txBatch, forcedInclusion, minTxsPerForcedInclusion, parentMetaHash, l2BaseFee)
+	if err != nil {
+		log.Warn("Failed to build TaikoInbox.proposeBatch transaction", "error", encoding.TryParsingCustomError(err))
+		return err
+	}
+
 	// Check profitability if enabled
 	if p.checkProfitability {
-		profitable, err := p.isProfitable(ctx, txBatch, l2BaseFee)
+		profitable, err := p.isProfitable(ctx, txBatch, l2BaseFee, txCandidate)
 		if err != nil {
 			return err
 		}
@@ -550,13 +558,6 @@ func (p *Proposer) ProposeTxListPacaya(
 			log.Info("Proposing transaction is not profitable")
 			return nil
 		}
-	}
-
-	// Build the transaction to propose batch.
-	txCandidate, err := p.txBuilder.BuildPacaya(ctx, txBatch, forcedInclusion, minTxsPerForcedInclusion, parentMetaHash, l2BaseFee)
-	if err != nil {
-		log.Warn("Failed to build TaikoInbox.proposeBatch transaction", "error", encoding.TryParsingCustomError(err))
-		return err
 	}
 
 	err = retryOnError(
@@ -583,8 +584,9 @@ func (p *Proposer) isProfitable(
 	ctx context.Context,
 	txBatch []types.Transactions,
 	l2BaseFee *big.Int,
+	candidate *txmgr.TxCandidate,
 ) (bool, error) {
-	estimatedCost, err := p.estimateL2Cost(ctx, txBatch)
+	estimatedCost, err := p.estimateL2Cost(ctx, candidate)
 	if err != nil {
 		return false, fmt.Errorf("failed to estimate L2 cost: %w", err)
 	}
@@ -606,38 +608,46 @@ func (p *Proposer) isProfitable(
 
 func (p *Proposer) estimateL2Cost(
 	ctx context.Context,
-	txBatch []types.Transactions,
+	candidate *txmgr.TxCandidate,
 ) (*big.Int, error) {
 	l1BaseFee, err := p.rpc.L1.SuggestGasPrice(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get L1 base fee: %w", err)
 	}
 
-	// Calculate batch posting cost with calldata
-	costWithCalldata := new(big.Int).Mul(
-		big.NewInt(int64(p.BatchPostingGasWithCalldata)),
-		l1BaseFee,
-	)
-	totalCost := costWithCalldata
-
-	// If blobs are allowed, calculate batch posting cost with blobs
+	// If blobs are used, calculate batch posting cost with blobs
 	blobBaseFee := new(big.Int)
 	costWithBlobs := new(big.Int)
-	if p.BlobAllowed {
+	costWithCalldata := new(big.Int)
+	totalCost := new(big.Int)
+	if len(candidate.Blobs) > 0 {
 		blobBaseFee, err = p.rpc.L1.BlobBaseFee(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get L1 blob base fee: %w", err)
 		}
 
 		costWithBlobs = new(big.Int).Mul(
-			big.NewInt(int64(p.BatchPostingGasWithBlobs)),
-			blobBaseFee,
+			new(big.Int).SetUint64(p.BatchPostingGasWithBlobs),
+			l1BaseFee,
 		)
 
-		// Take the minimum of the two costs
-		if costWithBlobs.Cmp(costWithCalldata) < 0 {
-			totalCost = costWithBlobs
-		}
+		costOfBlobs := new(big.Int).Mul(
+			blobBaseFee,
+			big.NewInt(eth.BlobSize*int64(len(candidate.Blobs))),
+		)
+
+		costWithBlobs = new(big.Int).Add(
+			costWithBlobs,
+			costOfBlobs,
+		)
+		totalCost = costWithBlobs
+	} else {
+		// Calculate batch posting cost with calldata
+		costWithCalldata = new(big.Int).Mul(
+			big.NewInt(int64(p.BatchPostingGasWithCalldata)),
+			l1BaseFee,
+		)
+		totalCost = costWithCalldata
 	}
 
 	// Add proving and proof posting cost
