@@ -5,12 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"math/big"
 	"math/rand"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ethereum-optimism/optimism/op-service/eth"
 
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 	"github.com/ethereum/go-ethereum"
@@ -615,11 +616,12 @@ func (p *Proposer) estimateL2Cost(
 		return nil, fmt.Errorf("failed to get L1 base fee: %w", err)
 	}
 
-	// If blobs are used, calculate batch posting cost with blobs
 	blobBaseFee := new(big.Int)
 	costWithBlobs := new(big.Int)
 	costWithCalldata := new(big.Int)
 	totalCost := new(big.Int)
+
+	// If blobs are used, calculate batch posting cost with blobs
 	if len(candidate.Blobs) > 0 {
 		blobBaseFee, err = p.rpc.L1.BlobBaseFee(ctx)
 		if err != nil {
