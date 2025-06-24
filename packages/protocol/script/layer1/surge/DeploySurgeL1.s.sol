@@ -84,6 +84,7 @@ contract DeploySurgeL1 is DeployCapability {
 
     // Inclusion configuration
     // ---------------------------------------------------------------
+    bool internal immutable usePreconf = vm.envBool("USE_PRECONF");
     uint8 internal immutable inclusionWindow = uint8(vm.envUint("INCLUSION_WINDOW"));
     uint64 internal immutable inclusionFeeInGwei = uint64(vm.envUint("INCLUSION_FEE_IN_GWEI"));
     address internal immutable fallbackPreconf = vm.envOr("FALLBACK_PRECONF", address(0));
@@ -233,12 +234,24 @@ contract DeploySurgeL1 is DeployCapability {
 
         // Deploy preconf contracts
         // ---------------------------------------------------------------
-        PreconfContracts memory preconfContracts = deployPreconfContracts(
-            l1Owner,
+        PreconfContracts memory preconfContracts;
+        if (usePreconf) {
+            preconfContracts = deployPreconfContracts(
+                l1Owner,
+                rollupContracts.proofVerifier,
+                rollupContracts.taikoInbox,
+                sharedContracts.signalService,
+                emptyImpl
+            );
+        }
+
+        // Deploy fork router
+        // ---------------------------------------------------------------
+        deployForkRouter(
+            preconfContracts.taikoWrapper,
             rollupContracts.proofVerifier,
-            rollupContracts.taikoInbox,
             sharedContracts.signalService,
-            emptyImpl
+            rollupContracts.taikoInbox
         );
 
         // Setup verifiers
@@ -285,11 +298,15 @@ contract DeploySurgeL1 is DeployCapability {
         );
         console2.log("** proofVerifier initialised and ownership transferred to:", l1Owner);
 
-        ForcedInclusionStore(preconfContracts.store).init(l1Owner);
-        console2.log("** forcedInclusionStore initialised and ownership transferred to:", l1Owner);
+        if (usePreconf) {
+            ForcedInclusionStore(preconfContracts.store).init(l1Owner);
+            console2.log(
+                "** forcedInclusionStore initialised and ownership transferred to:", l1Owner
+            );
 
-        TaikoWrapper(preconfContracts.taikoWrapper).init(l1Owner);
-        console2.log("** taikoWrapper initialised and ownership transferred to:", l1Owner);
+            TaikoWrapper(preconfContracts.taikoWrapper).init(l1Owner);
+            console2.log("** taikoWrapper initialised and ownership transferred to:", l1Owner);
+        }
 
         DefaultResolver(sharedContracts.sharedResolver).transferOwnership(l1Owner);
         console2.log("** sharedResolver initialised and ownership transferred to:", l1Owner);
@@ -501,28 +518,6 @@ contract DeploySurgeL1 is DeployCapability {
         preconfContracts.taikoWrapper =
             deployProxy({ name: "taiko_wrapper", impl: _emptyImpl, data: "" });
 
-        // Since this is a fresh protocol deployment, we don't have an old fork to use.
-        address oldFork = address(0);
-        address newFork = address(
-            new SurgeHoodiInbox(
-                SurgeHoodiInbox.ConfigParams({
-                    chainId: l2ChainId,
-                    maxVerificationDelay: maxVerificationDelay,
-                    livenessBondBase: livenessBondBase,
-                    livenessBondPerBlock: livenessBondPerBlock
-                }),
-                preconfContracts.taikoWrapper,
-                dao,
-                _proofVerifier,
-                address(0),
-                _signalService
-            )
-        );
-
-        UUPSUpgradeable(_taikoInbox).upgradeTo({
-            newImplementation: address(new PacayaForkRouter(oldFork, newFork))
-        });
-
         UUPSUpgradeable(preconfContracts.store).upgradeTo(
             address(
                 new ForcedInclusionStore(
@@ -545,6 +540,37 @@ contract DeploySurgeL1 is DeployCapability {
             newImplementation: address(
                 new TaikoWrapper(_taikoInbox, preconfContracts.store, preconfContracts.router)
             )
+        });
+    }
+
+    function deployForkRouter(
+        address _taikoWrapper,
+        address _proofVerifier,
+        address _signalService,
+        address _taikoInbox
+    )
+        internal
+    {
+        // Since this is a fresh protocol deployment, we don't have an old fork to use.
+        address oldFork = address(0);
+        address newFork = address(
+            new SurgeHoodiInbox(
+                SurgeHoodiInbox.ConfigParams({
+                    chainId: l2ChainId,
+                    maxVerificationDelay: maxVerificationDelay,
+                    livenessBondBase: livenessBondBase,
+                    livenessBondPerBlock: livenessBondPerBlock
+                }),
+                _taikoWrapper,
+                dao,
+                _proofVerifier,
+                address(0),
+                _signalService
+            )
+        );
+
+        UUPSUpgradeable(_taikoInbox).upgradeTo({
+            newImplementation: address(new PacayaForkRouter(oldFork, newFork))
         });
     }
 
@@ -737,6 +763,10 @@ contract DeploySurgeL1 is DeployCapability {
 
     function verifyOwnership(address[] memory _contracts, address _expectedOwner) internal view {
         for (uint256 i; i < _contracts.length; ++i) {
+            if (_contracts[i] == address(0)) {
+                continue;
+            }
+
             require(
                 OwnableUpgradeable(_contracts[i]).owner() == _expectedOwner,
                 string.concat("verifyOwnership: ", Strings.toHexString(uint160(_contracts[i]), 20))
