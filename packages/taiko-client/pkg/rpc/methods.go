@@ -24,7 +24,6 @@ import (
 	ontakeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/ontake"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
 
 var (
@@ -382,7 +381,7 @@ func (c *Client) WaitL2Header(ctx context.Context, blockID *big.Int) (*types.Hea
 }
 
 // CalculateBaseFee calculates the base fee from the L2 protocol.
-func (c *Client) CalculateBaseFee(
+/*func (c *Client) CalculateBaseFee(
 	ctx context.Context,
 	l2Head *types.Header,
 	baseFeeConfig *pacayaBindings.LibSharedDataBaseFeeConfig,
@@ -400,7 +399,7 @@ func (c *Client) CalculateBaseFee(
 	log.Info("Base fee information", "fee", utils.WeiToGWei(baseFee), "l2Head", l2Head.Number)
 
 	return baseFee, nil
-}
+}*/
 
 // GetPoolContent fetches the transactions list from L2 execution engine's transactions pool with given
 // upper limit.
@@ -412,21 +411,10 @@ func (c *Client) GetPoolContent(
 	locals []common.Address,
 	maxTransactionsLists uint64,
 	minTip uint64,
-	chainConfig *config.ChainConfig,
-	baseFeeConfig *pacayaBindings.LibSharedDataBaseFeeConfig,
+	baseFee *big.Int,
 ) ([]*miner.PreBuiltTxList, error) {
 	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, defaultTimeout)
 	defer cancel()
-
-	l2Head, err := c.L2.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	baseFee, err := c.CalculateBaseFee(ctx, l2Head, baseFeeConfig, uint64(time.Now().Unix()))
-	if err != nil {
-		return nil, err
-	}
 
 	var localsArg []string
 	for _, local := range locals {

@@ -330,7 +330,7 @@ func (p *Proposer) Close(_ context.Context) {
 }
 
 // fetchPoolContent fetches the transaction pool content from L2 execution engine.
-func (p *Proposer) fetchPoolContent(allowEmptyPoolContent bool) ([]types.Transactions, error) {
+func (p *Proposer) fetchPoolContent(allowEmptyPoolContent bool, l2BaseFee *big.Int) ([]types.Transactions, error) {
 	var (
 		minTip  = p.MinTip
 		startAt = time.Now()
@@ -350,8 +350,7 @@ func (p *Proposer) fetchPoolContent(allowEmptyPoolContent bool) ([]types.Transac
 		[]common.Address{},
 		p.MaxTxListsPerEpoch,
 		minTip,
-		p.chainConfig,
-		p.protocolConfigs.BaseFeeConfig(),
+		l2BaseFee,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch transaction pool content: %w", err)
@@ -406,6 +405,12 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 		return fmt.Errorf("failed to wait until L2 execution engine synced: %w", err)
 	}
 
+	// Get the current base fee from L2 RPC
+	l2BaseFee, err := p.rpc.L2.SuggestGasPrice(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get base fee from L2 RPC: %w", err)
+	}
+
 	// Add pending Bridge messages to the transaction list
 	txList := types.Transactions{}
 	p.bridgeMsgMu.Lock()
@@ -441,7 +446,7 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 	}
 
 	// Fetch pending L2 transactions from mempool.
-	txLists, err := p.fetchPoolContent(allowEmptyPoolContent)
+	txLists, err := p.fetchPoolContent(allowEmptyPoolContent, l2BaseFee)
 	if err != nil {
 		return err
 	}
@@ -452,7 +457,7 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 	}
 
 	// Propose the transactions lists.
-	return p.ProposeTxLists(ctx, txLists, parentMetaHash)
+	return p.ProposeTxLists(ctx, txLists, parentMetaHash, l2BaseFee)
 }
 
 // ProposeTxList proposes the given transactions lists to TaikoInbox smart contract.
@@ -460,8 +465,9 @@ func (p *Proposer) ProposeTxLists(
 	ctx context.Context,
 	txLists []types.Transactions,
 	parentMetaHash common.Hash,
+	l2BaseFee *big.Int,
 ) error {
-	if err := p.ProposeTxListPacaya(ctx, txLists, parentMetaHash); err != nil {
+	if err := p.ProposeTxListPacaya(ctx, txLists, parentMetaHash, l2BaseFee); err != nil {
 		return err
 	}
 	p.lastProposedAt = time.Now()
@@ -473,6 +479,7 @@ func (p *Proposer) ProposeTxListPacaya(
 	ctx context.Context,
 	txBatch []types.Transactions,
 	parentMetaHash common.Hash,
+	l2BaseFee *big.Int,
 ) error {
 	var (
 		proposerAddress = p.proposerAddress
@@ -531,12 +538,6 @@ func (p *Proposer) ProposeTxListPacaya(
 			"blobByteSize", forcedInclusion.BlobByteSize,
 			"minTxsPerForcedInclusion", minTxsPerForcedInclusion,
 		)
-	}
-
-	// Get the current base fee from L2 RPC
-	l2BaseFee, err := p.rpc.L2.SuggestGasPrice(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get base fee from L2 RPC: %w", err)
 	}
 
 	// Check profitability if enabled
