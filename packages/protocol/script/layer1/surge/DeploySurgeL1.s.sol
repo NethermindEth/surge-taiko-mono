@@ -236,13 +236,8 @@ contract DeploySurgeL1 is DeployCapability {
         // ---------------------------------------------------------------
         PreconfContracts memory preconfContracts;
         if (usePreconf) {
-            preconfContracts = deployPreconfContracts(
-                l1Owner,
-                rollupContracts.proofVerifier,
-                rollupContracts.taikoInbox,
-                sharedContracts.signalService,
-                emptyImpl
-            );
+            preconfContracts =
+                deployPreconfContracts(l1Owner, rollupContracts.taikoInbox, emptyImpl);
         }
 
         // Deploy fork router
@@ -498,9 +493,7 @@ contract DeploySurgeL1 is DeployCapability {
 
     function deployPreconfContracts(
         address _owner,
-        address _proofVerifier,
         address _taikoInbox,
-        address _signalService,
         address _emptyImpl
     )
         private
