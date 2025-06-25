@@ -3,19 +3,23 @@ package rpc
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/http"
 	"time"
 
-	// TODO: Resolved the celestia-node dependencies issues or write our own minimalistic client
-	// "github.com/celestiaorg/celestia-node/api/rpc/client"
-	// "github.com/celestiaorg/celestia-node/blob"
-	// "github.com/celestiaorg/celestia-node/state"
 	"github.com/celestiaorg/go-square/v2/share"
+	"github.com/filecoin-project/go-jsonrpc"
 )
 
 const (
+	CelestiaHeaderNamespace = "header"
 	// https://docs.celestia.org/how-to-guides/submit-data#maximum-blob-size
 	AdvisableCelestiaBlobSize = 500000
 )
+
+type CelestiaHeaderHandler struct {
+	NetworkHead func(ctx context.Context) error
+}
 
 type Blob struct {
 }
@@ -30,9 +34,9 @@ type CelestiaConfig struct {
 
 // CelestiaClient is a client for the Celestia node.
 type CelestiaClient struct {
-	Endpoint  string
-	AuthToken string
-	Namespace *share.Namespace
+	Endpoint   string
+	AuthHeader http.Header
+	Namespace  *share.Namespace
 
 	Timeout time.Duration
 }
@@ -48,25 +52,25 @@ func NewCelestiaClient(ctx context.Context, cfg *CelestiaConfig, timeout time.Du
 		timeoutVal = timeout
 	}
 
-	// TODO: Resolved the celestia-node dependencies issues or write our own minimalistic client
-	/*
-		client, err := client.NewClient(ctx, cfg.Endpoint, cfg.AuthToken)
-		if err != nil {
-			return nil, err
-		}
-		defer client.Close()
+	authHeader := http.Header{"Authorization": []string{fmt.Sprintf("Bearer %s", cfg.AuthToken)}}
 
-		// Get network head to verify connectivity
-		if _, err := client.Header.NetworkHead(ctx); err != nil {
-			return nil, err
-		}
-	*/
+	client := CelestiaHeaderHandler{}
+	closer, err := jsonrpc.NewClient(ctx, cfg.Endpoint, CelestiaHeaderNamespace, &client, authHeader)
+	if err != nil {
+		return nil, err
+	}
+	defer closer()
+
+	// Get network head to verify connectivity
+	if err := client.NetworkHead(ctx); err != nil {
+		return nil, err
+	}
 
 	return &CelestiaClient{
-		Endpoint:  cfg.Endpoint,
-		AuthToken: cfg.AuthToken,
-		Namespace: cfg.Namespace,
-		Timeout:   timeoutVal,
+		Endpoint:   cfg.Endpoint,
+		AuthHeader: authHeader,
+		Namespace:  cfg.Namespace,
+		Timeout:    timeoutVal,
 	}, nil
 }
 

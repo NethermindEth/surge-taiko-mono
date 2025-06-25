@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConnectivity(t *testing.T) {
+func TestNewCelestiaClient(t *testing.T) {
 	if shouldSkipCelestiaTests() {
 		t.Skip("Skipping as Celestia is not enabled in the test context.")
 	}
