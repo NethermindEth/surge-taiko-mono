@@ -82,12 +82,15 @@ contract DeploySurgeL1 is DeployCapability {
     uint96 internal immutable livenessBondBase = uint96(vm.envUint("LIVENESS_BOND_BASE"));
     uint96 internal immutable livenessBondPerBlock = uint96(vm.envUint("LIVENESS_BOND_PER_BLOCK"));
 
-    // Inclusion configuration
+    // Preconf configuration
     // ---------------------------------------------------------------
     bool internal immutable usePreconf = vm.envBool("USE_PRECONF");
+    address internal immutable fallbackPreconf = vm.envOr("FALLBACK_PRECONF", address(0));
+
+    // Forced inclusion configuration
+    // ---------------------------------------------------------------
     uint8 internal immutable inclusionWindow = uint8(vm.envUint("INCLUSION_WINDOW"));
     uint64 internal immutable inclusionFeeInGwei = uint64(vm.envUint("INCLUSION_FEE_IN_GWEI"));
-    address internal immutable fallbackPreconf = vm.envOr("FALLBACK_PRECONF", address(0));
 
     // Verifier configuration
     // ---------------------------------------------------------------
@@ -130,11 +133,11 @@ contract DeploySurgeL1 is DeployCapability {
         address pemCertChainLibAddr;
     }
 
-    struct PreconfContracts {
-        address whitelist;
-        address router;
-        address store;
+    struct WrapperContracts {
+        address forcedInclusionStore;
         address taikoWrapper;
+        address preconfWhitelist;
+        address preconfRouter;
     }
 
     modifier broadcast() {
@@ -232,18 +235,15 @@ contract DeploySurgeL1 is DeployCapability {
             );
         }
 
-        // Deploy preconf contracts
+        // Deploy wrapper contracts
         // ---------------------------------------------------------------
-        PreconfContracts memory preconfContracts;
-        if (usePreconf) {
-            preconfContracts =
-                deployPreconfContracts(l1Owner, rollupContracts.taikoInbox, emptyImpl);
-        }
+        WrapperContracts memory wrapperContracts =
+            deployWrapperContracts(l1Owner, rollupContracts.taikoInbox, emptyImpl);
 
         // Deploy fork router
         // ---------------------------------------------------------------
         deployForkRouter(
-            preconfContracts.taikoWrapper,
+            wrapperContracts.taikoWrapper,
             rollupContracts.proofVerifier,
             sharedContracts.signalService,
             rollupContracts.taikoInbox
@@ -293,15 +293,11 @@ contract DeploySurgeL1 is DeployCapability {
         );
         console2.log("** proofVerifier initialised and ownership transferred to:", l1Owner);
 
-        if (usePreconf) {
-            ForcedInclusionStore(preconfContracts.store).init(l1Owner);
-            console2.log(
-                "** forcedInclusionStore initialised and ownership transferred to:", l1Owner
-            );
+        ForcedInclusionStore(wrapperContracts.forcedInclusionStore).init(l1Owner);
+        console2.log("** forcedInclusionStore initialised and ownership transferred to:", l1Owner);
 
-            TaikoWrapper(preconfContracts.taikoWrapper).init(l1Owner);
-            console2.log("** taikoWrapper initialised and ownership transferred to:", l1Owner);
-        }
+        TaikoWrapper(wrapperContracts.taikoWrapper).init(l1Owner);
+        console2.log("** taikoWrapper initialised and ownership transferred to:", l1Owner);
 
         DefaultResolver(sharedContracts.sharedResolver).transferOwnership(l1Owner);
         console2.log("** sharedResolver initialised and ownership transferred to:", l1Owner);
@@ -311,7 +307,7 @@ contract DeploySurgeL1 is DeployCapability {
         verifyDeployment(
             sharedContracts,
             rollupContracts,
-            preconfContracts,
+            wrapperContracts,
             verifiers,
             sharedContracts.sharedResolver,
             l1Owner
@@ -491,47 +487,53 @@ contract DeploySurgeL1 is DeployCapability {
         });
     }
 
-    function deployPreconfContracts(
+    function deployWrapperContracts(
         address _owner,
         address _taikoInbox,
         address _emptyImpl
     )
         private
-        returns (PreconfContracts memory preconfContracts)
+        returns (WrapperContracts memory wrapperContracts)
     {
-        preconfContracts.whitelist = deployProxy({
-            name: "preconf_whitelist",
-            impl: address(new PreconfWhitelist()),
-            data: abi.encodeCall(PreconfWhitelist.init, (_owner, 2))
-        });
-
-        preconfContracts.store =
+        wrapperContracts.forcedInclusionStore =
             deployProxy({ name: "forced_inclusion_store", impl: _emptyImpl, data: "" });
 
-        preconfContracts.taikoWrapper =
+        wrapperContracts.taikoWrapper =
             deployProxy({ name: "taiko_wrapper", impl: _emptyImpl, data: "" });
 
-        UUPSUpgradeable(preconfContracts.store).upgradeTo(
+        UUPSUpgradeable(wrapperContracts.forcedInclusionStore).upgradeTo(
             address(
                 new ForcedInclusionStore(
-                    inclusionWindow, inclusionFeeInGwei, _taikoInbox, preconfContracts.taikoWrapper
+                    inclusionWindow, inclusionFeeInGwei, _taikoInbox, wrapperContracts.taikoWrapper
                 )
             )
         );
 
-        preconfContracts.router = deployProxy({
-            name: "preconf_router",
-            impl: address(
-                new PreconfRouter(
-                    preconfContracts.taikoWrapper, preconfContracts.whitelist, fallbackPreconf
-                )
-            ),
-            data: abi.encodeCall(PreconfRouter.init, (_owner))
-        });
+        if (usePreconf) {
+            wrapperContracts.preconfWhitelist = deployProxy({
+                name: "preconf_whitelist",
+                impl: address(new PreconfWhitelist()),
+                data: abi.encodeCall(PreconfWhitelist.init, (_owner, 2))
+            });
 
-        UUPSUpgradeable(preconfContracts.taikoWrapper).upgradeTo({
+            wrapperContracts.preconfRouter = deployProxy({
+                name: "preconf_router",
+                impl: address(
+                    new PreconfRouter(
+                        wrapperContracts.taikoWrapper,
+                        wrapperContracts.preconfWhitelist,
+                        fallbackPreconf
+                    )
+                ),
+                data: abi.encodeCall(PreconfRouter.init, (_owner))
+            });
+        }
+
+        UUPSUpgradeable(wrapperContracts.taikoWrapper).upgradeTo({
             newImplementation: address(
-                new TaikoWrapper(_taikoInbox, preconfContracts.store, preconfContracts.router)
+                new TaikoWrapper(
+                    _taikoInbox, wrapperContracts.forcedInclusionStore, wrapperContracts.preconfRouter
+                )
             )
         });
     }
@@ -653,7 +655,7 @@ contract DeploySurgeL1 is DeployCapability {
     function verifyDeployment(
         SharedContracts memory _sharedContracts,
         RollupContracts memory _rollupContracts,
-        PreconfContracts memory _preconfContracts,
+        WrapperContracts memory _wrapperContracts,
         VerifierContracts memory _verifiers,
         address _sharedResolver,
         address _timelockController
@@ -679,10 +681,10 @@ contract DeploySurgeL1 is DeployCapability {
         l1Contracts[4] = _sharedContracts.erc1155Vault;
         l1Contracts[5] = _rollupContracts.proofVerifier;
         l1Contracts[6] = _rollupContracts.taikoInbox;
-        l1Contracts[7] = _preconfContracts.whitelist;
-        l1Contracts[8] = _preconfContracts.router;
-        l1Contracts[9] = _preconfContracts.store;
-        l1Contracts[10] = _preconfContracts.taikoWrapper;
+        l1Contracts[7] = _wrapperContracts.forcedInclusionStore;
+        l1Contracts[8] = _wrapperContracts.taikoWrapper;
+        l1Contracts[9] = _wrapperContracts.preconfWhitelist;
+        l1Contracts[10] = _wrapperContracts.preconfRouter;
         l1Contracts[11] = _verifiers.automataProxy;
         l1Contracts[12] = _verifiers.risc0RethVerifier;
         l1Contracts[13] = _verifiers.sp1RethVerifier;
