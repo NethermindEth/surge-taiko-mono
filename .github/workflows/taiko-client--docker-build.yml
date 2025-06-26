@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   build:
-    uses: NethermindEth/github-workflows/.github/workflows/docker-build-push-dockerhub.yaml@v1.3.1
+    uses: NethermindEth/github-workflows/.github/workflows/docker-build-push-dockerhub.yaml@v1.3.4
     with:
       image_name: taiko-client
       platforms: "linux/amd64,linux/arm64"

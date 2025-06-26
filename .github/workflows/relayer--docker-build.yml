@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   build-migrations:
-    uses: NethermindEth/github-workflows/.github/workflows/docker-build-push-dockerhub.yaml@v1.3.1
+    uses: NethermindEth/github-workflows/.github/workflows/docker-build-push-dockerhub.yaml@v1.3.4
     with:
       image_name: relayer-migrations
       platforms: "linux/amd64,linux/arm64"
@@ -39,7 +39,7 @@ jobs:
       dockerhub_password: ${{ secrets.DOCKER_PASSWORD }}
 
   build-relayer:
-    uses: NethermindEth/github-workflows/.github/workflows/docker-build-push-dockerhub.yaml@v1.3.1
+    uses: NethermindEth/github-workflows/.github/workflows/docker-build-push-dockerhub.yaml@v1.3.4
     with:
       image_name: relayer
       platforms: "linux/amd64,linux/arm64"
