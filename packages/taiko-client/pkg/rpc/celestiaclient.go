@@ -4,22 +4,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"time"
 
 	"github.com/celestiaorg/go-square/v2/share"
 	"github.com/filecoin-project/go-jsonrpc"
+
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/celestia"
 )
 
 const (
-	CelestiaHeaderNamespace = "header"
 	// https://docs.celestia.org/how-to-guides/submit-data#maximum-blob-size
 	AdvisableCelestiaBlobSize = 500000
 )
 
-type CelestiaHeaderHandler struct {
-	NetworkHead func(ctx context.Context) error
-}
+var (
+	// Minimum gas price (0.2 TIA --> 200000 utia) https://docs.celestia.org/how-to-guides/submit-data#fee-market-and-mempool
+	MinimumGasPrice = big.NewInt(200000)
+)
 
 type Blob struct {
 }
@@ -54,8 +57,8 @@ func NewCelestiaClient(ctx context.Context, cfg *CelestiaConfig, timeout time.Du
 
 	authHeader := http.Header{"Authorization": []string{fmt.Sprintf("Bearer %s", cfg.AuthToken)}}
 
-	client := CelestiaHeaderHandler{}
-	closer, err := jsonrpc.NewClient(ctx, cfg.Endpoint, CelestiaHeaderNamespace, &client, authHeader)
+	client := celestia.CelestiaHeaderHandler{}
+	closer, err := jsonrpc.NewClient(ctx, cfg.Endpoint, celestia.CelestiaHeaderNamespace, &client, authHeader)
 	if err != nil {
 		return nil, err
 	}
@@ -75,25 +78,23 @@ func NewCelestiaClient(ctx context.Context, cfg *CelestiaConfig, timeout time.Du
 }
 
 func (c *CelestiaClient) CheckBalance(ctx context.Context) (bool, error) {
-	// TODO: Resolved the celestia-node dependencies issues or write our own minimalistic client
-	/*
-		ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, c.Timeout)
-		defer cancel()
+	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, c.Timeout)
+	defer cancel()
 
-		client, err := client.NewClient(ctxWithTimeout, c.Endpoint, c.AuthToken)
-		if err != nil {
-			return false, err
-		}
-		defer client.Close()
+	client := celestia.CelestiaStateHandler{}
+	closer, err := jsonrpc.NewClient(ctxWithTimeout, c.Endpoint, celestia.CelestiaStateNamespace, &client, c.AuthHeader)
+	if err != nil {
+		return false, err
+	}
+	defer closer()
 
-		balance, err := client.State.Balance(ctx)
-		if err != nil {
-			return false, err
-		}
+	balance, err := client.Balance(ctx)
+	if err != nil {
+		return false, err
+	}
 
-		return balance.Amount > 0, nil
-	*/
-	return false, nil
+	amount, success := new(big.Int).SetString(balance.Amount, 0)
+	return success && (amount.Cmp(MinimumGasPrice) > 0), nil
 }
 
 func (c *CelestiaClient) Submit(ctx context.Context, blobs []*Blob) (uint64, error) {
