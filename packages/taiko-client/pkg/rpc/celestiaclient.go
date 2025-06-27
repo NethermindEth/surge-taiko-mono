@@ -20,12 +20,10 @@ const (
 )
 
 var (
-	// Minimum gas price (0.2 TIA --> 200000 utia) https://docs.celestia.org/how-to-guides/submit-data#fee-market-and-mempool
-	MinimumGasPrice = big.NewInt(200000)
+	// https://docs.celestia.org/how-to-guides/submit-data#fee-market-and-mempool
+	// https://docs.celestia.org/learn/tia
+	MinimalBalancee = big.NewInt(celestia.DefaultMaxGasPrice * 1000000)
 )
-
-type Blob struct {
-}
 
 // CelestiaConfig contains all configs which will be used to initializing a Celestia RPC client.
 type CelestiaConfig struct {
@@ -39,15 +37,15 @@ type CelestiaConfig struct {
 type CelestiaClient struct {
 	Endpoint   string
 	AuthHeader http.Header
-	Namespace  *share.Namespace
+	Namespace  share.Namespace
 
 	Timeout time.Duration
 }
 
 // NewCelestiaClient creates a new CelestiaClient.
 func NewCelestiaClient(ctx context.Context, cfg *CelestiaConfig, timeout time.Duration) (*CelestiaClient, error) {
-	if cfg.Endpoint == "" || cfg.AuthToken == "" || cfg.Namespace == nil {
-		return nil, errors.New("endpoint, authentication token, or namespace is empty")
+	if cfg.Endpoint == "" || cfg.AuthToken == "" {
+		return nil, errors.New("endpoint, authentication token is empty")
 	}
 
 	var timeoutVal = defaultTimeout
@@ -72,7 +70,7 @@ func NewCelestiaClient(ctx context.Context, cfg *CelestiaConfig, timeout time.Du
 	return &CelestiaClient{
 		Endpoint:   cfg.Endpoint,
 		AuthHeader: authHeader,
-		Namespace:  cfg.Namespace,
+		Namespace:  *cfg.Namespace,
 		Timeout:    timeoutVal,
 	}, nil
 }
@@ -94,29 +92,26 @@ func (c *CelestiaClient) CheckBalance(ctx context.Context) (bool, error) {
 	}
 
 	amount, success := new(big.Int).SetString(balance.Amount, 0)
-	return success && (amount.Cmp(MinimumGasPrice) > 0), nil
+	return success && (amount.Cmp(MinimalBalancee) > 0), nil
 }
 
-func (c *CelestiaClient) Submit(ctx context.Context, blobs []*Blob) (uint64, error) {
-	// TODO: Resolved the celestia-node dependencies issues or write our own minimalistic client
-	/*
-		ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, c.Timeout)
-		defer cancel()
+func (c *CelestiaClient) Submit(ctx context.Context, blobs []*celestia.Blob) (uint64, error) {
+	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, c.Timeout)
+	defer cancel()
 
-		client, err := client.NewClient(ctxWithTimeout, c.Endpoint, c.AuthToken)
-		if err != nil {
-			return 0, err
-		}
-		defer client.Close()
+	client := celestia.CelestiaBlobHandler{}
+	closer, err := jsonrpc.NewClient(ctxWithTimeout, c.Endpoint, celestia.CelestiaBlobNamespace, &client, c.AuthHeader)
+	if err != nil {
+		return 0, err
+	}
+	defer closer()
 
-		options := state.NewTxConfig()
+	options := celestia.NewSubmitOptions()
 
-		height, err := client.Blob.Submit(ctxWithTimeout, blobs, options)
-		if err != nil {
-			return 0, err
-		}
+	height, err := client.Submit(ctxWithTimeout, blobs, options)
+	if err != nil {
+		return 0, err
+	}
 
-		return height, nil
-	*/
-	return 0, nil
+	return height, nil
 }
