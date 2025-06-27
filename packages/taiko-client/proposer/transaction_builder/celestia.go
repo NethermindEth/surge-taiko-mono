@@ -10,11 +10,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	// TODO: Resolved the celestia-node dependencies issues or write our own minimalistic client
-	// "github.com/celestiaorg/celestia-node/blob"
-
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/celestia"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
@@ -163,24 +161,20 @@ func (b *CelestiaTransactionBuilder) BuildPacaya(
 }
 
 // splitToCelestiaBlobs splits the txListBytes into multiple Celestia blobs.
-func (b *CelestiaTransactionBuilder) splitToCelestiaBlobs(txListBytes []byte) ([]*rpc.Blob, error) {
-	var blobs []*rpc.Blob
+func (b *CelestiaTransactionBuilder) splitToCelestiaBlobs(txListBytes []byte) ([]*celestia.Blob, error) {
+	var blobs []*celestia.Blob
 	for start := 0; start < len(txListBytes); start += rpc.AdvisableCelestiaBlobSize {
 		end := start + rpc.AdvisableCelestiaBlobSize
 		if end > len(txListBytes) {
 			end = len(txListBytes)
 		}
 
-		// TODO: Resolved the celestia-node dependencies issues or write our own minimalistic client
-		/*
-			blob, err := blob.NewBlobV0(b.rpc.CelestiaDA.Namespace, txListBytes[start:end])
-			if err != nil {
-				return nil, err
-			}
+		blob, err := celestia.NewBlobV0(b.rpc.CelestiaDA.Namespace, txListBytes[start:end])
+		if err != nil {
+			return nil, err
+		}
 
-			blobs = append(blobs, blob)
-		*/
-		blobs = append(blobs, &rpc.Blob{})
+		blobs = append(blobs, blob)
 	}
 
 	return blobs, nil
