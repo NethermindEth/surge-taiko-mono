@@ -121,9 +121,18 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
             }
 
             bool calldataUsed = _txList.length != 0;
+            bool celestiaUsed = params.celestiaBlobParams.height > 0;
 
             if (calldataUsed) {
                 // calldata is used for data availability
+                require(params.blobParams.firstBlobIndex == 0, InvalidBlobParams());
+                require(params.blobParams.numBlobs == 0, InvalidBlobParams());
+                require(params.blobParams.createdIn == 0, InvalidBlobCreatedIn());
+                require(params.blobParams.blobHashes.length == 0, InvalidBlobParams());
+                require(params.celestiaBlobParams.height == 0, InvalidCelestiaBlobParams());
+                require(params.celestiaBlobParams.namespace.length == 0, InvalidCelestiaBlobParams());
+            } else if (celestiaUsed) {
+                // Celestia is used for data availability
                 require(params.blobParams.firstBlobIndex == 0, InvalidBlobParams());
                 require(params.blobParams.numBlobs == 0, InvalidBlobParams());
                 require(params.blobParams.createdIn == 0, InvalidBlobCreatedIn());
@@ -179,6 +188,8 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
                 gasLimit: config.blockMaxGasLimit,
                 // Surge: custom L2 basefee set by the proposer
                 baseFee: params.baseFee,
+                // Surge: Provided when Celestia is being used as an alternative DA layer
+                celestiaBlobParams: params.celestiaBlobParams,
                 lastBlockId: 0, // to be initialised later
                 lastBlockTimestamp: lastBlockTimestamp,
                 //

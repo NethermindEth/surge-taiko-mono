@@ -32,6 +32,7 @@ contract MockTaikoInbox is EssentialContract {
             coinbase: params.coinbase == address(0) ? params.proposer : params.coinbase,
             gasLimit: 0, // Mock value
             baseFee: 0,
+            celestiaBlobParams: params.celestiaBlobParams,
             lastBlockId: 0,
             lastBlockTimestamp: 0,
             proposedIn: uint64(block.number),
