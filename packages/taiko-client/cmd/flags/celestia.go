@@ -37,9 +37,15 @@ var (
 	}
 )
 
-var CelestiaFlags = []cli.Flag{
+var CelestiaProposerFlags = []cli.Flag{
 	CelestiaEnabled,
 	CelestiaEndpoint,
 	CelestiaAuthToken,
 	CelestiaNamespace,
+}
+
+var CelestiaDriverFlags = []cli.Flag{
+	CelestiaEnabled,
+	CelestiaEndpoint,
+	CelestiaAuthToken,
 }
