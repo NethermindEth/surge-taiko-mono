@@ -18,7 +18,7 @@ var (
 
 func TestInitCelestiaConfigsFromCliCelestiaDisabled(t *testing.T) {
 	app := cli.NewApp()
-	app.Flags = append(app.Flags, flags.CelestiaFlags...)
+	app.Flags = append(app.Flags, flags.CelestiaProposerFlags...)
 
 	app.Action = func(cliCtx *cli.Context) error {
 		celestiaConfigs, err := InitCelestiaConfigsFromCli(cliCtx)
@@ -36,7 +36,7 @@ func TestInitCelestiaConfigsFromCliCelestiaDisabled(t *testing.T) {
 
 func TestInitCelestiaConfigsFromCliCelestiaEnabled(t *testing.T) {
 	app := cli.NewApp()
-	app.Flags = append(app.Flags, flags.CelestiaFlags...)
+	app.Flags = append(app.Flags, flags.CelestiaProposerFlags...)
 
 	app.Action = func(cliCtx *cli.Context) error {
 		celestiaConfigs, err := InitCelestiaConfigsFromCli(cliCtx)
