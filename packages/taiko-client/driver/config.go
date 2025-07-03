@@ -17,6 +17,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/cmd/flags"
+	pkgFlags "github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/flags"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/jwt"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 )
@@ -81,6 +82,11 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		}
 	}
 
+	celestiaConfigs, err := pkgFlags.InitDriverCelestiaConfigsFromCli(c)
+	if err != nil {
+		return nil, err
+	}
+
 	// Check P2P network flags and create the P2P configurations.
 	var (
 		clientConfig = &rpc.ClientConfig{
@@ -94,6 +100,7 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			L2EngineEndpoint:        c.String(flags.L2AuthEndpoint.Name),
 			JwtSecret:               string(jwtSecret),
 			Timeout:                 c.Duration(flags.RPCTimeout.Name),
+			CelestiaConfigs:         celestiaConfigs,
 		}
 		p2pConfigs    *p2p.Config
 		signerConfigs p2p.SignerSetup

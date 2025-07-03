@@ -12,8 +12,8 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 )
 
-// InitCelestiaConfigsFromCli initializes the Celestia RPC client configs from the command line flags.
-func InitCelestiaConfigsFromCli(c *cli.Context) (*rpc.CelestiaConfig, error) {
+// InitProposerCelestiaConfigsFromCli initializes the Celestia RPC client configs from the proposer command line flags.
+func InitProposerCelestiaConfigsFromCli(c *cli.Context) (*rpc.CelestiaConfig, error) {
 	namespaceValueString := strings.Replace(c.String(flags.CelestiaNamespace.Name), "0x", "", -1)
 	namespaceValue, err := hex.DecodeString(namespaceValueString)
 	if err != nil {
@@ -30,5 +30,14 @@ func InitCelestiaConfigsFromCli(c *cli.Context) (*rpc.CelestiaConfig, error) {
 		Endpoint:  c.String(flags.CelestiaEndpoint.Name),
 		AuthToken: c.String(flags.CelestiaAuthToken.Name),
 		Namespace: &namespace,
+	}, nil
+}
+
+// InitProposerCelestiaConfigsFromCli initializes the Celestia RPC client configs from the driver command line flags.
+func InitDriverCelestiaConfigsFromCli(c *cli.Context) (*rpc.CelestiaConfig, error) {
+	return &rpc.CelestiaConfig{
+		Enabled:   c.Bool(flags.CelestiaEnabled.Name),
+		Endpoint:  c.String(flags.CelestiaEndpoint.Name),
+		AuthToken: c.String(flags.CelestiaAuthToken.Name),
 	}, nil
 }

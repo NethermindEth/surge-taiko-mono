@@ -80,8 +80,8 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 	batchPostingGasWithCalldata := uint64(260_000)
 	batchPostingGasWithBlobs := uint64(160_000)
 	proofPostingGas := uint64(750_000)
-	
-	celestiaConfigs, err := pkgFlags.InitCelestiaConfigsFromCli(c)
+
+	celestiaConfigs, err := pkgFlags.InitProposerCelestiaConfigsFromCli(c)
 	if err != nil {
 		return nil, err
 	}
