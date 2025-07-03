@@ -28,11 +28,11 @@ jobs:
   build-migrations:
     uses: NethermindEth/github-workflows/.github/workflows/docker-build-push-dockerhub.yaml@v1.3.4
     with:
-      image_name: relayer-migrations
+      image_name: relayer
       platforms: "linux/amd64,linux/arm64"
       push: ${{ github.event_name != 'pull_request' }}
       context: packages/relayer
-      dockerfile_path: packages/relayer/Dockerfile.migrations
+      dockerfile_path: packages/relayer/Dockerfile
       ignore_trivy: true # TODO: remove this once security issues are fixed
     secrets:
       dockerhub_username: ${{ secrets.DOCKER_USERNAME }}
