@@ -39,6 +39,7 @@ type BlocksInserterPacaya struct {
 	anchorConstructor    *anchorTxConstructor.AnchorTxConstructor // TaikoAnchor.anchorV3 transactions constructor
 	calldataFetcher      txlistFetcher.TxListFetcher
 	blobFetcher          txlistFetcher.TxListFetcher
+	celestiaFetcher      txlistFetcher.TxListFetcher
 	latestSeenProposalCh chan *encoding.LastSeenProposal
 	mutex                sync.Mutex
 }
@@ -52,6 +53,7 @@ func NewBlocksInserterPacaya(
 	anchorConstructor *anchorTxConstructor.AnchorTxConstructor,
 	calldataFetcher txlistFetcher.TxListFetcher,
 	blobFetcher txlistFetcher.TxListFetcher,
+	celestiaFetcher txlistFetcher.TxListFetcher,
 	latestSeenProposalCh chan *encoding.LastSeenProposal,
 ) *BlocksInserterPacaya {
 	return &BlocksInserterPacaya{
@@ -62,6 +64,7 @@ func NewBlocksInserterPacaya(
 		anchorConstructor:    anchorConstructor,
 		calldataFetcher:      calldataFetcher,
 		blobFetcher:          blobFetcher,
+		celestiaFetcher:      celestiaFetcher,
 		latestSeenProposalCh: latestSeenProposalCh,
 	}
 }
@@ -98,7 +101,11 @@ func (i *BlocksInserterPacaya) InsertBlocks(
 	)
 
 	// Fetch transactions list.
-	if len(meta.GetBlobHashes()) != 0 {
+	if meta.GetCelestiaBlobsHeight() > 0 {
+		if txListBytes, err = i.celestiaFetcher.FetchPacaya(ctx, meta); err != nil {
+			return fmt.Errorf("failed to fetch tx list from Celestia: %w", err)
+		}
+	} else if len(meta.GetBlobHashes()) != 0 {
 		if txListBytes, err = i.blobFetcher.FetchPacaya(ctx, meta); err != nil {
 			return fmt.Errorf("failed to fetch tx list from blob: %w", err)
 		}
