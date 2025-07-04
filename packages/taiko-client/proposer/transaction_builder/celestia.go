@@ -12,44 +12,44 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/celestia"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
 
-// CalldataTransactionBuilder is responsible for building a TaikoInbox.proposeBatch transaction with txList
-// bytes saved in calldata.
-type CalldataTransactionBuilder struct {
+// CelestiaTransactionBuilder is responsible for building a TaikoInbox.proposeBatch transaction with txList bytes saved in Celestia.
+type CelestiaTransactionBuilder struct {
 	rpc                     *rpc.Client
 	proposerPrivateKey      *ecdsa.PrivateKey
-	l2SuggestedFeeRecipient common.Address
 	taikoInboxAddress       common.Address
 	taikoWrapperAddress     common.Address
 	proverSetAddress        common.Address
+	l2SuggestedFeeRecipient common.Address
 	gasLimit                uint64
 	chainConfig             *config.ChainConfig
 	revertProtectionEnabled bool
 }
 
-// NewCalldataTransactionBuilder creates a new CalldataTransactionBuilder instance based on giving configurations.
-func NewCalldataTransactionBuilder(
+// NewCelestiaTransactionBuilder creates a new CelestiaTransactionBuilder instance based on giving configurations.
+func NewCelestiaTransactionBuilder(
 	rpc *rpc.Client,
 	proposerPrivateKey *ecdsa.PrivateKey,
-	l2SuggestedFeeRecipient common.Address,
 	taikoInboxAddress common.Address,
 	taikoWrapperAddress common.Address,
 	proverSetAddress common.Address,
+	l2SuggestedFeeRecipient common.Address,
 	gasLimit uint64,
 	chainConfig *config.ChainConfig,
 	revertProtectionEnabled bool,
-) *CalldataTransactionBuilder {
-	return &CalldataTransactionBuilder{
+) *CelestiaTransactionBuilder {
+	return &CelestiaTransactionBuilder{
 		rpc,
 		proposerPrivateKey,
-		l2SuggestedFeeRecipient,
 		taikoInboxAddress,
 		taikoWrapperAddress,
 		proverSetAddress,
+		l2SuggestedFeeRecipient,
 		gasLimit,
 		chainConfig,
 		revertProtectionEnabled,
@@ -57,13 +57,12 @@ func NewCalldataTransactionBuilder(
 }
 
 // BuildPacaya implements the ProposeBatchTransactionBuilder interface.
-func (b *CalldataTransactionBuilder) BuildPacaya(
+func (b *CelestiaTransactionBuilder) BuildPacaya(
 	ctx context.Context,
 	txBatch []types.Transactions,
 	forcedInclusion *pacayaBindings.IForcedInclusionStoreForcedInclusion,
 	minTxsPerForcedInclusion *big.Int,
 	parentMetahash common.Hash,
-	baseFee *big.Int,
 ) (*txmgr.TxCandidate, error) {
 	// ABI encode the TaikoWrapper.proposeBatch / ProverSet.proposeBatch parameters.
 	var (
@@ -89,7 +88,6 @@ func (b *CalldataTransactionBuilder) BuildPacaya(
 			RevertIfNotFirstProposal: b.revertProtectionEnabled,
 			BlobParams:               *blobParams,
 			Blocks:                   blockParams,
-			BaseFee:                  baseFee,
 		}
 	}
 
@@ -107,6 +105,16 @@ func (b *CalldataTransactionBuilder) BuildPacaya(
 		return nil, err
 	}
 
+	celestiaBlobs, err := b.splitToCelestiaBlobs(txListsBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	celestiaHeight, err := b.rpc.CelestiaDA.Submit(ctx, celestiaBlobs)
+	if err != nil {
+		return nil, err
+	}
+
 	params := &encoding.BatchParams{
 		Proposer:                 proposer,
 		Coinbase:                 b.l2SuggestedFeeRecipient,
@@ -115,11 +123,11 @@ func (b *CalldataTransactionBuilder) BuildPacaya(
 			ByteOffset: 0,
 			ByteSize:   uint32(len(txListsBytes)),
 		},
-		Blocks:  blockParams,
-		BaseFee: baseFee,
 		CelestiaBlobParams: encoding.CelestiaBlobParams{
-			Height: 0,
+			Height:    celestiaHeight,
+			Namespace: b.rpc.CelestiaDA.Namespace.Bytes(),
 		},
+		Blocks: blockParams,
 	}
 
 	if b.revertProtectionEnabled {
@@ -135,11 +143,11 @@ func (b *CalldataTransactionBuilder) BuildPacaya(
 	}
 
 	if b.proverSetAddress != rpc.ZeroAddress {
-		if data, err = encoding.ProverSetPacayaABI.Pack("proposeBatch", encodedParams, txListsBytes); err != nil {
+		if data, err = encoding.ProverSetPacayaABI.Pack("proposeBatch", encodedParams, []byte{}); err != nil {
 			return nil, err
 		}
 	} else {
-		if data, err = encoding.TaikoWrapperABI.Pack("proposeBatch", encodedParams, txListsBytes); err != nil {
+		if data, err = encoding.TaikoWrapperABI.Pack("proposeBatch", encodedParams, []byte{}); err != nil {
 			return nil, err
 		}
 	}
@@ -150,4 +158,24 @@ func (b *CalldataTransactionBuilder) BuildPacaya(
 		To:       to,
 		GasLimit: b.gasLimit,
 	}, nil
+}
+
+// splitToCelestiaBlobs splits the txListBytes into multiple Celestia blobs.
+func (b *CelestiaTransactionBuilder) splitToCelestiaBlobs(txListBytes []byte) ([]*celestia.Blob, error) {
+	var blobs []*celestia.Blob
+	for start := 0; start < len(txListBytes); start += rpc.AdvisableCelestiaBlobSize {
+		end := start + rpc.AdvisableCelestiaBlobSize
+		if end > len(txListBytes) {
+			end = len(txListBytes)
+		}
+
+		blob, err := celestia.NewBlobV0(b.rpc.CelestiaDA.Namespace, txListBytes[start:end])
+		if err != nil {
+			return nil, err
+		}
+
+		blobs = append(blobs, blob)
+	}
+
+	return blobs, nil
 }

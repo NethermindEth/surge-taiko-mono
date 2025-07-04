@@ -38,6 +38,11 @@ contract PreconfRouterTest is PreconfRouterTestBase {
 
         ITaikoInbox.BlobParams memory blobParams;
 
+        ITaikoInbox.CelestiaBlobParams memory celestiaBlobParams = ITaikoInbox.CelestiaBlobParams({
+            height: 0,
+            namespace: ""
+        });
+
         // Create batch params with correct structure
         ITaikoInbox.BatchParams memory params = ITaikoInbox.BatchParams({
             proposer: Carol,
@@ -48,6 +53,7 @@ contract PreconfRouterTest is PreconfRouterTestBase {
             lastBlockTimestamp: uint64(block.timestamp),
             revertIfNotFirstProposal: false,
             blobParams: blobParams,
+            celestiaBlobParams: celestiaBlobParams,
             blocks: blockParams
         });
 
@@ -125,6 +131,11 @@ contract PreconfRouterTest is PreconfRouterTestBase {
 
         ITaikoInbox.BlobParams memory blobParams;
 
+        ITaikoInbox.CelestiaBlobParams memory celestiaBlobParams = ITaikoInbox.CelestiaBlobParams({
+            height: 0,
+            namespace: ""
+        });
+
         // Create batch params with DIFFERENT proposer than sender
         ITaikoInbox.BatchParams memory params = ITaikoInbox.BatchParams({
             proposer: Bob, // Set different proposer than sender (Carol)
@@ -135,6 +146,7 @@ contract PreconfRouterTest is PreconfRouterTestBase {
             lastBlockTimestamp: uint64(block.timestamp),
             revertIfNotFirstProposal: false,
             blobParams: blobParams,
+            celestiaBlobParams: celestiaBlobParams,
             blocks: blockParams
         });
 

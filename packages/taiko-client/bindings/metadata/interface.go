@@ -46,4 +46,6 @@ type TaikoBatchMetaDataPacaya interface {
 	GetTxHash() common.Hash
 	InnerMetadata() *pacayaBindings.ITaikoInboxBatchMetadata
 	GetBaseFee() *big.Int
+	GetCelestiaBlobsHeight() uint64
+	GetCelestiaBlobsNamespace() []byte
 }
