@@ -97,6 +97,7 @@ func (i *BlocksInserterPacaya) InsertBlocks(
 		"lastTimestamp", meta.GetLastBlockTimestamp(),
 		"coinbase", meta.GetCoinbase(),
 		"numBlobs", len(meta.GetBlobHashes()),
+		"celestiaHeight", meta.GetCelestiaBlobsHeight(),
 		"blocks", len(meta.GetBlocks()),
 	)
 
@@ -116,7 +117,7 @@ func (i *BlocksInserterPacaya) InsertBlocks(
 	}
 
 	var (
-		allTxs          = i.txListDecompressor.TryDecompress(txListBytes, len(meta.GetBlobHashes()) != 0)
+		allTxs          = i.txListDecompressor.TryDecompress(txListBytes, meta.GetCelestiaBlobsHeight() > 0 || len(meta.GetBlobHashes()) != 0)
 		parent          *types.Header
 		lastPayloadData *engine.ExecutableData
 	)

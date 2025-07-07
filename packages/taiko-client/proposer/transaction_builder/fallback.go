@@ -107,7 +107,7 @@ func (b *TxBuilderWithFallback) BuildPacaya(
 ) (*txmgr.TxCandidate, error) {
 	// If Celestia is enabled, just use it.
 	if b.celestiaTransactionBuilder != nil {
-		return b.celestiaTransactionBuilder.BuildPacaya(ctx, txBatch, forcedInclusion, minTxsPerForcedInclusion, parentMetahash)
+		return b.celestiaTransactionBuilder.BuildPacaya(ctx, txBatch, forcedInclusion, minTxsPerForcedInclusion, parentMetahash, baseFee)
 	}
 	// If calldata is the only option, just use it.
 	if b.blobTransactionBuilder == nil {

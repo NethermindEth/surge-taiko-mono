@@ -63,6 +63,7 @@ func (b *CelestiaTransactionBuilder) BuildPacaya(
 	forcedInclusion *pacayaBindings.IForcedInclusionStoreForcedInclusion,
 	minTxsPerForcedInclusion *big.Int,
 	parentMetahash common.Hash,
+	baseFee *big.Int,
 ) (*txmgr.TxCandidate, error) {
 	// ABI encode the TaikoWrapper.proposeBatch / ProverSet.proposeBatch parameters.
 	var (
@@ -88,6 +89,7 @@ func (b *CelestiaTransactionBuilder) BuildPacaya(
 			RevertIfNotFirstProposal: b.revertProtectionEnabled,
 			BlobParams:               *blobParams,
 			Blocks:                   blockParams,
+			BaseFee:                  baseFee,
 		}
 	}
 
@@ -127,7 +129,8 @@ func (b *CelestiaTransactionBuilder) BuildPacaya(
 			Height:    celestiaHeight,
 			Namespace: b.rpc.CelestiaDA.Namespace.Bytes(),
 		},
-		Blocks: blockParams,
+		Blocks:  blockParams,
+		BaseFee: baseFee,
 	}
 
 	if b.revertProtectionEnabled {

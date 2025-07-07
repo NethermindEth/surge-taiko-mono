@@ -115,3 +115,22 @@ func (c *CelestiaClient) Submit(ctx context.Context, blobs []*celestia.Blob) (ui
 
 	return height, nil
 }
+
+func (c *CelestiaClient) GetAll(ctx context.Context, height uint64, namespace share.Namespace) ([]*celestia.Blob, error) {
+	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, c.Timeout)
+	defer cancel()
+
+	client := celestia.CelestiaBlobHandler{}
+	closer, err := jsonrpc.NewClient(ctxWithTimeout, c.Endpoint, celestia.CelestiaBlobNamespace, &client, c.AuthHeader)
+	if err != nil {
+		return nil, err
+	}
+	defer closer()
+
+	blobs, err := client.GetAll(ctxWithTimeout, height, []share.Namespace{namespace})
+	if err != nil {
+		return nil, err
+	}
+
+	return blobs, nil
+}

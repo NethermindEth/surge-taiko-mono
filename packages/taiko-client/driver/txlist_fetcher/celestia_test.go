@@ -1,4 +1,4 @@
-package builder
+package txlistfetcher
 
 import (
 	"context"
@@ -10,56 +10,51 @@ import (
 	"time"
 
 	"github.com/celestiaorg/go-square/v2/share"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
-
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
-
 	"github.com/stretchr/testify/require"
+
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
+	txListDecompressor "github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/txlist_decompressor"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 )
 
-func TestCelestiaBuildPacaya(t *testing.T) {
+func TestCelestiaFetchPacaya(t *testing.T) {
 	if shouldSkipCelestiaTests() {
 		t.Skip("Skipping as Celestia is not enabled in the test context.")
 	}
 
-	proposerPrivateKey, _ := crypto.GenerateKey()
-
-	celestiaTxBuilder := NewCelestiaTransactionBuilder(
+	txListFetcherCelestia := NewCelestiaFetcher(
 		&rpc.Client{
 			CelestiaDA: newTestCelestiaClient(t),
 		},
-		proposerPrivateKey,
-		common.Address{},
-		common.Address{},
-		common.Address{},
-		common.Address{},
-		0,
-		config.NewChainConfig(
-			common.Big0,
-			0,
-			0,
-		),
-		false,
 	)
 
-	var txsToPropose []types.Transactions
-	for i := 0; i < 100; i++ {
-		txsToPropose = append(txsToPropose, []*types.Transaction{types.NewTransaction(
-			uint64(i),
-			common.Address{},
-			common.Big0,
-			0,
-			common.Big0,
-			nil,
-		)})
-	}
+	txListDecompressor := txListDecompressor.NewTxListDecompressor(
+		uint64(240_000_000),
+		rpc.BlockMaxTxListBytes,
+	)
 
-	_, err := celestiaTxBuilder.BuildPacaya(context.Background(), txsToPropose, nil, nil, common.Hash{}, common.Big0)
-
+	namespace, err := getTestCelestiaNamespace()
 	require.Nil(t, err)
+
+	metadata := metadata.NewTaikoDataBlockMetadataPacaya(
+		&pacaya.TaikoInboxClientBatchProposed{
+			Info: pacaya.ITaikoInboxBatchInfo{
+				CelestiaBlobParams: pacaya.ITaikoInboxCelestiaBlobParams{
+					Height:    7016504,
+					Namespace: namespace.Bytes(),
+				},
+			},
+		},
+	)
+	meta := metadata.Pacaya()
+
+	txListBytes, err := txListFetcherCelestia.FetchPacaya(context.Background(), meta)
+	require.Nil(t, err)
+
+	allTxs := txListDecompressor.TryDecompress(txListBytes, meta.GetCelestiaBlobsHeight() > 0 || len(meta.GetBlobHashes()) != 0)
+
+	require.Greater(t, allTxs.Len(), 0)
 }
 
 func shouldSkipCelestiaTests() bool {
@@ -86,15 +81,12 @@ func getTestCelestiaNamespace() (*share.Namespace, error) {
 }
 
 func newTestCelestiaClient(t *testing.T) *rpc.CelestiaClient {
-	namespace, err := getTestCelestiaNamespace()
-
-	require.Nil(t, err)
 
 	client, err := rpc.NewCelestiaClient(context.Background(), &rpc.CelestiaConfig{
 		Enabled:   true,
 		Endpoint:  os.Getenv("CELESTIA_ENDPOINT"),
 		AuthToken: os.Getenv("CELESTIA_AUTH_TOKEN"),
-		Namespace: namespace,
+		Namespace: &share.Namespace{},
 	}, 5*time.Second)
 
 	require.Nil(t, err)

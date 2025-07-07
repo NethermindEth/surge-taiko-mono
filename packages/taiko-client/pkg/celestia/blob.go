@@ -42,6 +42,7 @@ type SubmitOptions struct {
 
 type CelestiaBlobHandler struct {
 	Submit func(context.Context, []*Blob, *SubmitOptions) (uint64, error)
+	GetAll func(context.Context, uint64, []share.Namespace) ([]*Blob, error)
 }
 
 func NewBlobV0(namespace share.Namespace, data []byte) (*Blob, error) {

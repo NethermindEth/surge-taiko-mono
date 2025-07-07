@@ -39,5 +39,6 @@ func InitDriverCelestiaConfigsFromCli(c *cli.Context) (*rpc.CelestiaConfig, erro
 		Enabled:   c.Bool(flags.CelestiaEnabled.Name),
 		Endpoint:  c.String(flags.CelestiaEndpoint.Name),
 		AuthToken: c.String(flags.CelestiaAuthToken.Name),
+		Namespace: &share.Namespace{},
 	}, nil
 }
