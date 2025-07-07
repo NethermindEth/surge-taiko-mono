@@ -633,7 +633,7 @@ func (p *Proposer) estimateL2Cost(
 	if len(feeHistory.BaseFee) == 0 {
 		return nil, fmt.Errorf("no base fee data available")
 	}
-	l1BaseFee := feeHistory.BaseFee[0]
+	l1BaseFee := feeHistory.BaseFee[len(feeHistory.BaseFee)-1]
 
 	blobBaseFee := new(big.Int)
 	costWithBlobs := new(big.Int)
