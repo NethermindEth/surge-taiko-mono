@@ -23,6 +23,11 @@ func TestCelestiaFetchPacaya(t *testing.T) {
 		t.Skip("Skipping as Celestia is not enabled in the test context.")
 	}
 
+	celestiaBlobHeight := getTestCelestiaBlobHeight()
+	if celestiaBlobHeight <= 0 {
+		t.Skip("Skipping as Celestia blob for the test was not provided.")
+	}
+
 	txListFetcherCelestia := NewCelestiaFetcher(
 		&rpc.Client{
 			CelestiaDA: newTestCelestiaClient(t),
@@ -41,9 +46,11 @@ func TestCelestiaFetchPacaya(t *testing.T) {
 		&pacaya.TaikoInboxClientBatchProposed{
 			Info: pacaya.ITaikoInboxBatchInfo{
 				CelestiaBlobParams: pacaya.ITaikoInboxCelestiaBlobParams{
-					Height:    7016504,
+					Height:    celestiaBlobHeight,
 					Namespace: namespace.Bytes(),
 				},
+				BlobByteOffset: 0,
+				BlobByteSize:   getTestCelestiaBlobByteSize(),
 			},
 		},
 	)
@@ -78,6 +85,22 @@ func getTestCelestiaNamespace() (*share.Namespace, error) {
 	}
 
 	return &namespace, nil
+}
+
+func getTestCelestiaBlobHeight() uint64 {
+	if celestiaBlobHeight, err := strconv.ParseUint(os.Getenv("CELESTIA_BLOB_HEIGHT"), 10, 64); err == nil {
+		return celestiaBlobHeight
+	}
+
+	return 0
+}
+
+func getTestCelestiaBlobByteSize() uint32 {
+	if celestiaBlobByteSize, err := strconv.ParseUint(os.Getenv("CELESTIA_BLOB_BYTE_SIZE"), 10, 32); err == nil {
+		return uint32(celestiaBlobByteSize)
+	}
+
+	return 0
 }
 
 func newTestCelestiaClient(t *testing.T) *rpc.CelestiaClient {
