@@ -26,6 +26,10 @@ func (d *CelestiaFetcher) FetchPacaya(ctx context.Context, meta metadata.TaikoBa
 		return nil, errors.New("celestia is not used")
 	}
 
+	if d.rpc.CelestiaDA == nil {
+		return nil, errors.New("celestia is not enabled")
+	}
+
 	namespace, err := share.NewNamespaceFromBytes(meta.GetCelestiaBlobsNamespace())
 	if err != nil {
 		return nil, err
