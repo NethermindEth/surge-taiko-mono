@@ -30,14 +30,14 @@ type Blob struct {
 }
 
 type SubmitOptions struct {
-	signerAddress     string
-	keyName           string
-	gasPrice          float64
-	isGasPriceSet     bool
-	maxGasPrice       float64
-	gas               uint64
-	priority          int
-	feeGranterAddress string
+	SignerAddress     string  `json:"signer_address,omitempty"`
+	KeyName           string  `json:"key_name,omitempty"`
+	GasPrice          float64 `json:"gas_price,omitempty"`
+	IsGasPriceSet     bool    `json:"is_gas_price_set,omitempty"`
+	MaxGasPrice       float64 `json:"max_gas_price"`
+	Gas               uint64  `json:"gas,omitempty"`
+	Priority          int     `json:"tx_priority,omitempty"`
+	FeeGranterAddress string  `json:"fee_granter_address,omitempty"`
 }
 
 type CelestiaBlobHandler struct {
@@ -113,7 +113,7 @@ func (b *Blob) UnmarshalJSON(data []byte) error {
 
 func NewSubmitOptions() *SubmitOptions {
 	return &SubmitOptions{
-		gasPrice:    DefaultGasPrice,
-		maxGasPrice: DefaultMaxGasPrice,
+		GasPrice:    DefaultGasPrice,
+		MaxGasPrice: DefaultMaxGasPrice,
 	}
 }

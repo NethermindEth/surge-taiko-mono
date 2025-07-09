@@ -89,7 +89,7 @@ func (d *Driver) InitFromConfig(ctx context.Context, cfg *Config) (err error) {
 	}
 
 	if cfg.CelestiaConfigs.Enabled && !cfg.P2PSync {
-		log.Warn("Celestia as an alternative DA layer enabled, but P2P syncing not enabled - if the RPC endpoint of the Celestia node is not pointing to an archival node, historical data may not be synced")
+		log.Warn("Celestia enabled, P2P syncing disabled - Celestia RPC endpoint should point to archival node")
 	}
 
 	latestSeenProposalCh := make(chan *encoding.LastSeenProposal, 1024)

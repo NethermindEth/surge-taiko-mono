@@ -18,7 +18,8 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
 
-// CelestiaTransactionBuilder is responsible for building a TaikoInbox.proposeBatch transaction with txList bytes saved in Celestia.
+// CelestiaTransactionBuilder is responsible for building a TaikoInbox.proposeBatch transaction with txList
+// bytes saved in Celestia.
 type CelestiaTransactionBuilder struct {
 	rpc                     *rpc.Client
 	proposerPrivateKey      *ecdsa.PrivateKey

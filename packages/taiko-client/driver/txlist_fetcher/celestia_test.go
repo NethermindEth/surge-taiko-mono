@@ -59,7 +59,8 @@ func TestCelestiaFetchPacaya(t *testing.T) {
 	txListBytes, err := txListFetcherCelestia.FetchPacaya(context.Background(), meta)
 	require.Nil(t, err)
 
-	allTxs := txListDecompressor.TryDecompress(txListBytes, meta.GetCelestiaBlobsHeight() > 0 || len(meta.GetBlobHashes()) != 0)
+	blobUsed := meta.GetCelestiaBlobsHeight() > 0 || len(meta.GetBlobHashes()) != 0
+	allTxs := txListDecompressor.TryDecompress(txListBytes, blobUsed)
 
 	require.Greater(t, allTxs.Len(), 0)
 }
@@ -104,7 +105,6 @@ func getTestCelestiaBlobByteSize() uint32 {
 }
 
 func newTestCelestiaClient(t *testing.T) *rpc.CelestiaClient {
-
 	client, err := rpc.NewCelestiaClient(context.Background(), &rpc.CelestiaConfig{
 		Enabled:   true,
 		Endpoint:  os.Getenv("CELESTIA_ENDPOINT"),

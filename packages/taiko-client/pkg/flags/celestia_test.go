@@ -13,7 +13,7 @@ import (
 
 var (
 	Endpoint          = "http://localhost:26658"
-	AuthToken         = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiXX0.cSrJjpfUdTNFtzGho69V0D_8kyECn9Mzv8ghJSpKRDE"
+	AuthToken         = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJwdWJsaWMiLCJyZWFkIiwid3JpdGUiXX0"
 	Namespace         = "0xDEADBEEF"
 	ExpectedNamespace = "00000000000000000000000000000000000000000000000000deadbeef"
 )
@@ -35,9 +35,9 @@ func TestInitProposerCelestiaConfigsFromCliCelestiaDisabled(t *testing.T) {
 		return nil
 	}
 
-	app.Run([]string{
+	require.Nil(t, app.Run([]string{
 		"TestNewConfigFromCliContext",
-	})
+	}))
 }
 
 func TestProposerInitCelestiaConfigsFromCliCelestiaEnabled(t *testing.T) {
@@ -56,13 +56,13 @@ func TestProposerInitCelestiaConfigsFromCliCelestiaEnabled(t *testing.T) {
 		return nil
 	}
 
-	app.Run([]string{
+	require.Nil(t, app.Run([]string{
 		"TestNewConfigFromCliContext",
 		"--" + flags.CelestiaEnabled.Name,
 		"--" + flags.CelestiaEndpoint.Name, Endpoint,
 		"--" + flags.CelestiaAuthToken.Name, AuthToken,
 		"--" + flags.CelestiaNamespace.Name, Namespace,
-	})
+	}))
 }
 
 func TestInitDriverCelestiaConfigsFromCliCelestiaDisabled(t *testing.T) {
@@ -82,9 +82,9 @@ func TestInitDriverCelestiaConfigsFromCliCelestiaDisabled(t *testing.T) {
 		return nil
 	}
 
-	app.Run([]string{
+	require.Nil(t, app.Run([]string{
 		"TestNewConfigFromCliContext",
-	})
+	}))
 }
 
 func TestDriverInitCelestiaConfigsFromCliCelestiaEnabled(t *testing.T) {
@@ -102,12 +102,12 @@ func TestDriverInitCelestiaConfigsFromCliCelestiaEnabled(t *testing.T) {
 		return nil
 	}
 
-	app.Run([]string{
+	require.Nil(t, app.Run([]string{
 		"TestNewConfigFromCliContext",
 		"--" + flags.CelestiaEnabled.Name,
 		"--" + flags.CelestiaEndpoint.Name, Endpoint,
 		"--" + flags.CelestiaAuthToken.Name, AuthToken,
-	})
+	}))
 }
 
 func isCelestiaEnabledInEnv() bool {

@@ -117,7 +117,8 @@ func (i *BlocksInserterPacaya) InsertBlocks(
 	}
 
 	var (
-		allTxs          = i.txListDecompressor.TryDecompress(txListBytes, meta.GetCelestiaBlobsHeight() > 0 || len(meta.GetBlobHashes()) != 0)
+		blobUsed        = meta.GetCelestiaBlobsHeight() > 0 || len(meta.GetBlobHashes()) != 0
+		allTxs          = i.txListDecompressor.TryDecompress(txListBytes, blobUsed)
 		parent          *types.Header
 		lastPayloadData *engine.ExecutableData
 	)

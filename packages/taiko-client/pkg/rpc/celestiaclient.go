@@ -116,7 +116,11 @@ func (c *CelestiaClient) Submit(ctx context.Context, blobs []*celestia.Blob) (ui
 	return height, nil
 }
 
-func (c *CelestiaClient) GetAll(ctx context.Context, height uint64, namespace share.Namespace) ([]*celestia.Blob, error) {
+func (c *CelestiaClient) GetAll(
+	ctx context.Context,
+	height uint64,
+	namespace share.Namespace,
+) ([]*celestia.Blob, error) {
 	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, c.Timeout)
 	defer cancel()
 

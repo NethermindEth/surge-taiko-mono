@@ -116,7 +116,7 @@ func NewClient(ctx context.Context, cfg *ClientConfig) (*Client, error) {
 		if cfg.CelestiaConfigs.Enabled {
 			celestiaDAClient, err = NewCelestiaClient(ctxWithTimeout, cfg.CelestiaConfigs, cfg.Timeout)
 			if err != nil {
-				log.Error("Failed to connect to Celestia node endpoint, retrying", "endpoint", cfg.CelestiaConfigs.Endpoint, "err", err)
+				log.Error("Failed to connect to Celestia node, retrying", "endpoint", cfg.CelestiaConfigs.Endpoint, "err", err)
 				return err
 			}
 		}
