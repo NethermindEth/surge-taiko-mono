@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
@@ -148,7 +149,7 @@ func (c *EngineClient) UpdateL1Origin(ctx context.Context, l1Origin *rawdb.L1Ori
 func (c *EngineClient) SetHeadL1Origin(ctx context.Context, blockID *big.Int) (*big.Int, error) {
 	var res *big.Int
 
-	if err := c.CallContext(ctx, &res, "taikoAuth_setHeadL1Origin", blockID); err != nil {
+	if err := c.CallContext(ctx, &res, "taikoAuth_setHeadL1Origin", hexutil.EncodeBig(blockID)); err != nil {
 		return nil, err
 	}
 
