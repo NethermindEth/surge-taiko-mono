@@ -99,8 +99,7 @@ contract ERC20VaultL2 is BaseVault {
     mapping(uint256 chainId => mapping(address ctoken => uint256 timestamp)) public
         lastMigrationStart;
 
-    /// @notice Mapping from solver condition to the address of solver
-    mapping(bytes32 solverCondition => address solver) public solverConditionToSolver;
+    // Surge: remove solver mapping
 
     uint256[45] private __gap;
 
@@ -192,23 +191,15 @@ contract ERC20VaultL2 is BaseVault {
         uint256 solverFee
     );
 
-    /// @notice Emitted when a bridging intent is solved
-    /// @param solverCondition The solver condition hash
-    /// @param solver The address of the solver
-    event ERC20Solved(bytes32 indexed solverCondition, address solver);
+    // Surge: remove solver event
 
-    error VAULT_INSUFFICIENT_ETHER();
-    error VAULT_ALREADY_SOLVED();
     error VAULT_BTOKEN_BLACKLISTED();
     error VAULT_CTOKEN_MISMATCH();
-    error VAULT_ETHER_TRANSFER_FAILED();
-    error VAULT_INVALID_TOKEN();
     error VAULT_INVALID_AMOUNT();
     error VAULT_INVALID_CTOKEN();
     error VAULT_INVALID_NEW_BTOKEN();
+    error VAULT_INVALID_VALUE();
     error VAULT_LAST_MIGRATION_TOO_CLOSE();
-    error VAULT_METAHASH_MISMATCH();
-    error VAULT_NOT_ON_L1();
 
     constructor(
         address _resolver,
@@ -311,8 +302,9 @@ contract ERC20VaultL2 is BaseVault {
             if (_op.amount == 0) revert VAULT_INVALID_AMOUNT();
 
             uint256 etherToBridge = (_op.token == address(0) ? _op.amount + _op.solverFee : 0);
-            if (msg.value < _op.fee + etherToBridge) {
-                revert VAULT_INSUFFICIENT_ETHER();
+            // Surge: use strict value check
+            if (msg.value != _op.fee + etherToBridge) {
+                revert VAULT_INVALID_VALUE();
             }
 
             if (_op.token != address(0) && btokenDenylist[_op.token]) {
@@ -321,7 +313,7 @@ contract ERC20VaultL2 is BaseVault {
             checkToAddressOnSrcChain(_op.to, _op.destChainId);
         }
 
-        address bridge = resolve(LibStrings.B_BRIDGE, false);
+        address bridge = resolve(LibStrings.B_BRIDGE_L2, false);
 
         (
             bytes memory data,
@@ -362,14 +354,9 @@ contract ERC20VaultL2 is BaseVault {
 
     /// @inheritdoc IMessageInvocable
     function onMessageInvocation(bytes calldata _data) public payable whenNotPaused nonReentrant {
-        (
-            CanonicalERC20 memory ctoken,
-            address from,
-            address to,
-            uint256 amount,
-            uint256 solverFee,
-            bytes32 solverCondition
-        ) = abi.decode(_data, (CanonicalERC20, address, address, uint256, uint256, bytes32));
+        // Surge: remove solver parameters
+        (CanonicalERC20 memory ctoken, address from, address to, uint256 amount) =
+            abi.decode(_data, (CanonicalERC20, address, address, uint256));
 
         // `onlyFromBridge` checked in checkProcessMessageContext
         IBridge.Context memory ctx = checkProcessMessageContext();
@@ -378,50 +365,22 @@ contract ERC20VaultL2 is BaseVault {
         // Don't send the tokens back to `from` because `from` is on the source chain.
         checkToAddressOnDestChain(to);
 
-        address tokenRecipient = to;
+        address token = _transferTokensOrEther(ctoken, to, amount);
 
-        // If the bridging intent is solvable and has been solved, the solver becomes the token
-        // recipient
-        address solver;
-        if (solverFee != 0) {
-            solver = solverConditionToSolver[solverCondition];
-            if (solver != address(0)) {
-                tokenRecipient = solver;
-                delete solverConditionToSolver[solverCondition];
-            }
-        }
-
-        address token;
-        {
-            uint256 amountToTransfer = amount + solverFee;
-            token = _transferTokensOrEther(ctoken, tokenRecipient, amountToTransfer);
-
-            bool succeeded = to.sendEther(
-                ctoken.addr == address(0) ? msg.value - amountToTransfer : msg.value, gasleft(), ""
-            );
-
-            // Only require Ether transfer to succeed if the bridging intent is not solved by a
-            // solver.  The bridging intent owner must ensure that the recipient address can
-            // successfully receive Ether.
-            if (solver == address(0)) {
-                require(succeeded, VAULT_ETHER_TRANSFER_FAILED());
-            } else {
-                // Do not check Ether transfer success. If we did, the bridging intent owner could
-                // intentionally cause the Ether transfer to fail on the destination chain, then
-                // falsely claim the transaction failed and reclaim the Ether on the source chain.
-            }
-        }
+        // Surge: remove solver logic
 
         emit TokenReceived({
             msgHash: ctx.msgHash,
             from: from,
             to: to,
-            solver: solver,
+            // Surge: Solvers solve the bridging intent on L1 side
+            solver: address(0),
             srcChainId: ctx.srcChainId,
             ctoken: ctoken.addr,
             token: token,
             amount: amount,
-            solverFee: solverFee
+            // Surge: Solvers solve the bridging intent on L1 side
+            solverFee: 0
         });
     }
 
@@ -444,11 +403,9 @@ contract ERC20VaultL2 is BaseVault {
             abi.decode(data, (CanonicalERC20, address, address, uint256, uint256, bytes32));
 
         // Transfer the ETH and tokens back to the owner
-        uint256 amountToReturn = amount + solverFee;
-        address token = _transferTokensOrEther(ctoken, _message.srcOwner, amountToReturn);
-        _message.srcOwner.sendEtherAndVerify(
-            ctoken.addr == address(0) ? _message.value - amountToReturn : _message.value
-        );
+        address token = _transferTokensOrEther(ctoken, _message.srcOwner, amount + solverFee);
+        // Surge: remove extra ether transfer since we will never have more ether than
+        // bridged amount in this contract
 
         emit TokenReleased({
             msgHash: _msgHash,
@@ -459,36 +416,7 @@ contract ERC20VaultL2 is BaseVault {
         });
     }
 
-    /// @notice Lets a solver fulfil a bridging intent by transferring tokens/ether to the
-    /// recipient.
-    /// @param _op Parameters for the solve operation
-    function solve(SolverOp memory _op) external payable nonReentrant whenNotPaused {
-        if (_op.l2BatchMetaHash != 0) {
-            // Verify that the required L2 batch containing the intent transaction has been proposed
-            address taiko = resolve(LibStrings.B_TAIKO, false);
-            if (!ITaiko(taiko).isOnL1()) revert VAULT_NOT_ON_L1();
-
-            bytes32 l2BatchMetaHash = ITaikoInbox(taiko).getBatch(_op.l2BatchId).metaHash;
-            if (l2BatchMetaHash != _op.l2BatchMetaHash) revert VAULT_METAHASH_MISMATCH();
-        }
-
-        // Record the solver's address
-        bytes32 solverCondition = getSolverCondition(_op.nonce, _op.token, _op.to, _op.amount);
-        if (solverConditionToSolver[solverCondition] != address(0)) revert VAULT_ALREADY_SOLVED();
-        solverConditionToSolver[solverCondition] = msg.sender;
-
-        // Handle transfer based on token type
-        if (_op.token == address(0)) {
-            // For Ether transfers
-            if (msg.value != _op.amount) revert VAULT_INVALID_AMOUNT();
-            _op.to.sendEtherAndVerify(_op.amount);
-        } else {
-            // For ERC20 tokens
-            IERC20(_op.token).safeTransferFrom(msg.sender, _op.to, _op.amount);
-        }
-
-        emit ERC20Solved(solverCondition, msg.sender);
-    }
+    // Surge: remove solve function
 
     /// @notice Returns the solver condition for a bridging intent
     /// @param _nonce Unique numeric value to prevent nonce collision

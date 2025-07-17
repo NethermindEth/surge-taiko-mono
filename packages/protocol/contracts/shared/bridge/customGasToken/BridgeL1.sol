@@ -203,13 +203,15 @@ contract BridgeL1 is EssentialContract, IBridge {
         _updateMessageStatus(msgHash, Status.RECALLED);
         // Surge: remove ether quota check
 
+        // Surge: refund gas token to the initiator
+        if (_message.value > 0) {
+            IERC20(l2GasToken).safeTransfer(_message.from, _message.value);
+        }
+
         // Execute the recall logic based on the contract's support for the
         // IRecallableSender interface
         if (_message.from.supportsInterface(type(IRecallableSender).interfaceId)) {
             _storeContext(msgHash, address(this), _message.srcChainId);
-
-            // Surge: Return gas token to the initiator contract
-            IERC20(l2GasToken).safeTransfer(_message.from, _message.value);
 
             // Perform recall
             // Surge: Do not send ether with message as the ether locking and accounting
@@ -220,11 +222,6 @@ contract BridgeL1 is EssentialContract, IBridge {
             _storeContext(
                 bytes32(_PLACEHOLDER), address(uint160(_PLACEHOLDER)), uint64(_PLACEHOLDER)
             );
-        } else {
-            // Surge: refund gas token to the source owner
-            IERC20(l2GasToken).safeTransfer(_message.srcOwner, _message.value);
-
-            // Surge: remove native eth refund
         }
     }
 

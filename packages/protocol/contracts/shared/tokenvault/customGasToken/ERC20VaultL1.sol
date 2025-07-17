@@ -195,8 +195,6 @@ contract ERC20VaultL1 is BaseVault {
     error VAULT_ALREADY_SOLVED();
     error VAULT_BTOKEN_BLACKLISTED();
     error VAULT_CTOKEN_MISMATCH();
-    error VAULT_ETHER_TRANSFER_FAILED();
-    error VAULT_INVALID_TOKEN();
     error VAULT_INVALID_AMOUNT();
     error VAULT_INVALID_CTOKEN();
     error VAULT_INVALID_NEW_BTOKEN();
@@ -298,13 +296,17 @@ contract ERC20VaultL1 is BaseVault {
 
             if (_op.token == address(0)) {
                 // Surge: Handle ether bridging
-                require(msg.value == _op.amount, VAULT_INSUFFICIENT_ETHER());
+                if (msg.value != _op.amount) {
+                    revert VAULT_INSUFFICIENT_ETHER();
+                }
             } else if (btokenDenylist[_op.token]) {
                 // Surge: revert blacklisted token bridging
                 revert VAULT_BTOKEN_BLACKLISTED();
             } else {
                 // Surge: revert if ether is sent with non-ether token bridging
-                require(msg.value == 0, VAULT_INVALID_VALUE());
+                if (msg.value != 0) {
+                    revert VAULT_INVALID_VALUE();
+                }
             }
 
             // Surge:
@@ -356,6 +358,9 @@ contract ERC20VaultL1 is BaseVault {
 
     /// @inheritdoc IMessageInvocable
     function onMessageInvocation(bytes calldata _data) public payable whenNotPaused nonReentrant {
+        // Surge: while this function is payable to respect the common interface, ether never
+        // touches this function
+
         (
             CanonicalERC20 memory ctoken,
             address from,
@@ -385,16 +390,12 @@ contract ERC20VaultL1 is BaseVault {
             }
         }
 
-        address token;
-        {
-            uint256 amountToTransfer = amount + solverFee;
-            token = _transferTokensOrEther(ctoken, tokenRecipient, amountToTransfer);
+        address token = _transferTokensOrEther(ctoken, tokenRecipient, amount + solverFee);
 
-            // Surge: remove extra ether transfer since we will never have more ether than
-            // bridged amount in this contract
+        // Surge: remove extra ether transfer since we will never have more ether than
+        // bridged amount in this contract
 
-            // Surge: remove success checks for remaining ether transfer
-        }
+        // Surge: remove success checks for remaining ether transfer
 
         emit TokenReceived({
             msgHash: ctx.msgHash,
@@ -550,8 +551,6 @@ contract ERC20VaultL1 is BaseVault {
             });
 
             if (_op.token == l2GasToken) {
-                // Surge: gas token is expected to be a non fee-on-transfer token to protect
-                // cross chain accounting
                 // Surge: Also extract relayer fees in same txn to save gas
                 IERC20(_op.token).safeTransferFrom(msg.sender, address(this), _op.amount + _op.fee);
                 balanceChangeAmount_ = _op.amount;
