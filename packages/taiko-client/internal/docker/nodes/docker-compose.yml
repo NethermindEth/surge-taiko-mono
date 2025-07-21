@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     pull_policy: always
     ports:
-      - "8545"
+      - "32002:32002"
     entrypoint:
       - anvil
       - --chain-id
@@ -23,7 +23,7 @@ services:
     volumes:
       - .:/host
     ports:
-      - "8545"
+      - "8545:8545"
       - "8546"
       - "8551"
     command:
