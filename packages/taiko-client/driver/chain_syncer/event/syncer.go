@@ -73,6 +73,7 @@ func NewSyncer(
 	var (
 		txListFetcherBlob     = txlistFetcher.NewBlobTxListFetcher(client, blobDataSource)
 		txListFetcherCalldata = txlistFetcher.NewCalldataFetch(client)
+		txListFetcherCelestia = txlistFetcher.NewCelestiaFetcher(client)
 	)
 	return &Syncer{
 		ctx:                ctx,
@@ -88,6 +89,7 @@ func NewSyncer(
 			constructor,
 			txListFetcherCalldata,
 			txListFetcherBlob,
+			txListFetcherCelestia,
 			latestSeenProposalCh,
 		),
 	}, nil

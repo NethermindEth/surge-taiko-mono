@@ -36,6 +36,14 @@ var (
 			},
 		},
 		{
+			Name: "celestiaBlobParams",
+			Type: "tuple",
+			Components: []abi.ArgumentMarshaling{
+				{Name: "height", Type: "uint64"},
+				{Name: "namespace", Type: "bytes"},
+			},
+		},
+		{
 			Name: "blocks",
 			Type: "tuple[]",
 			Components: []abi.ArgumentMarshaling{
