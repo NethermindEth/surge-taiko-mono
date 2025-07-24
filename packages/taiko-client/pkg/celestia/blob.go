@@ -45,10 +45,15 @@ type CelestiaBlobHandler struct {
 	GetAll func(context.Context, uint64, []share.Namespace) ([]*Blob, error)
 }
 
+// NewBlobV0 constructs a new blob from the provided Namespace and data.
+// The blob will be formatted as v0 shares.
 func NewBlobV0(namespace share.Namespace, data []byte) (*Blob, error) {
 	return NewBlob(share.ShareVersionZero, namespace, data, nil)
 }
 
+// NewBlob constructs a new blob from the provided Namespace, data, signer, and share version.
+// There are two possible share versions at this time (v0 and v1) and we only use one, the other is skipped.
+// The implementation fallows https://github.com/celestiaorg/celestia-node/blob/main/blob/blob.go
 func NewBlob(shareVersion uint8, namespace share.Namespace, data, signer []byte) (*Blob, error) {
 	if err := namespace.ValidateForBlob(); err != nil {
 		return nil, fmt.Errorf("invalid user namespace: %w", err)

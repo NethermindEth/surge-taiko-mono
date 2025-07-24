@@ -2,18 +2,13 @@ package builder
 
 import (
 	"context"
-	"encoding/hex"
-	"os"
-	"strconv"
-	"strings"
 	"testing"
-	"time"
 
-	"github.com/celestiaorg/go-square/v2/share"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 
@@ -21,15 +16,18 @@ import (
 )
 
 func TestCelestiaBuildPacaya(t *testing.T) {
-	if shouldSkipCelestiaTests() {
+	if testutils.ShouldSkipCelestiaTests() {
 		t.Skip("Skipping as Celestia is not enabled in the test context.")
 	}
+
+	namespace, err := testutils.GetTestCelestiaNamespace()
+	require.Nil(t, err)
 
 	proposerPrivateKey, _ := crypto.GenerateKey()
 
 	celestiaTxBuilder := NewCelestiaTransactionBuilder(
 		&rpc.Client{
-			CelestiaDA: newTestCelestiaClient(t),
+			CelestiaDA: testutils.NewTestCelestiaClient(t, namespace),
 		},
 		proposerPrivateKey,
 		common.Address{},
@@ -57,48 +55,7 @@ func TestCelestiaBuildPacaya(t *testing.T) {
 		)})
 	}
 
-	_, err := celestiaTxBuilder.BuildPacaya(context.Background(), txsToPropose, nil, nil, common.Hash{}, common.Big0)
+	_, err = celestiaTxBuilder.BuildPacaya(context.Background(), txsToPropose, nil, nil, common.Hash{}, common.Big0)
 
 	require.Nil(t, err)
-}
-
-func shouldSkipCelestiaTests() bool {
-	if celestiaEnabled, err := strconv.ParseBool(os.Getenv("CELESTIA_ENABLED")); err == nil {
-		return !celestiaEnabled
-	}
-
-	return true
-}
-
-func getTestCelestiaNamespace() (*share.Namespace, error) {
-	namespaceValueString := strings.Replace(os.Getenv("CELESTIA_NAMESPACE"), "0x", "", -1)
-	namespaceValue, err := hex.DecodeString(namespaceValueString)
-	if err != nil {
-		return nil, err
-	}
-
-	namespace, err := share.NewV0Namespace(namespaceValue)
-	if err != nil {
-		return nil, err
-	}
-
-	return &namespace, nil
-}
-
-func newTestCelestiaClient(t *testing.T) *rpc.CelestiaClient {
-	namespace, err := getTestCelestiaNamespace()
-
-	require.Nil(t, err)
-
-	client, err := rpc.NewCelestiaClient(context.Background(), &rpc.CelestiaConfig{
-		Enabled:   true,
-		Endpoint:  os.Getenv("CELESTIA_ENDPOINT"),
-		AuthToken: os.Getenv("CELESTIA_AUTH_TOKEN"),
-		Namespace: namespace,
-	}, 5*time.Second)
-
-	require.Nil(t, err)
-	require.NotNil(t, client)
-
-	return client
 }

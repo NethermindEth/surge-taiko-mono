@@ -51,7 +51,11 @@ func NewBuilderWithFallback(
 ) *TxBuilderWithFallback {
 	builder := &TxBuilderWithFallback{rpc: rpc, fallback: fallback, txmgrSelector: txmgrSelector}
 
-	log.Info("Using the transaction builder with fallback", "blobAllowed", blobAllowed, "fallback", fallback)
+	log.Info("Using the transaction builder with fallback",
+		"blobAllowed", blobAllowed,
+		"useCelestia", useCelestia,
+		"fallback", fallback,
+	)
 
 	if useCelestia {
 		builder.celestiaTransactionBuilder = NewCelestiaTransactionBuilder(
