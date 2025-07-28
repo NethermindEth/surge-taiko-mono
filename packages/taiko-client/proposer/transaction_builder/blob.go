@@ -85,6 +85,7 @@ func (b *BlobTransactionBuilder) BuildPacaya(
 
 	if b.surgeProposerWrapperAddress != rpc.ZeroAddress {
 		to = &b.surgeProposerWrapperAddress
+		proposer = b.surgeProposerWrapperAddress
 		log.Info("Using SurgeProposerWrapper for blob transaction at proposeBatch",
 			"surgeProposerWrapper", b.surgeProposerWrapperAddress.Hex(),
 			"taikoWrapper", b.taikoWrapperAddress.Hex())
