@@ -85,6 +85,9 @@ contract ERC20VaultL2 is BaseVault {
     // where, salt: keccak256(abi.encodePacked(address(0)));
     address public immutable l1NativeTokenWrapper;
 
+    // Surge: address of wETH on L1
+    address public immutable l1WethAddress;
+
     /// @notice Mappings from bridged tokens to their canonical tokens.
     mapping(address btoken => CanonicalERC20 canonical) public bridgedToCanonical;
 
@@ -301,9 +304,9 @@ contract ERC20VaultL2 is BaseVault {
         {
             if (_op.amount == 0) revert VAULT_INVALID_AMOUNT();
 
-            uint256 etherToBridge = (_op.token == address(0) ? _op.amount + _op.solverFee : 0);
+            uint256 gasTokenToBridge = (_op.token == address(0) ? _op.amount + _op.solverFee : 0);
             // Surge: use strict value check
-            if (msg.value != _op.fee + etherToBridge) {
+            if (msg.value != _op.fee + gasTokenToBridge) {
                 revert VAULT_INVALID_VALUE();
             }
 
@@ -567,10 +570,21 @@ contract ERC20VaultL2 is BaseVault {
         private
         returns (address btoken)
     {
-        btoken = canonicalToBridged[ctoken.chainId][ctoken.addr];
+        // Surge: wETH on L1 uses the same bridged token as the native ETH.
+        // This is to avoid a second bridged token serving the same purpose as wETH on L1.
+        CanonicalERC20 memory _ctoken = ctoken;
+        if (_ctoken.addr == l1WethAddress) {
+            _ctoken.addr = address(0);
+            _ctoken.chainId = uint64(block.chainid);
+            _ctoken.decimals = 18;
+            _ctoken.symbol = "ETH";
+            _ctoken.name = "Ether";
+        }
+
+        btoken = canonicalToBridged[_ctoken.chainId][_ctoken.addr];
 
         if (btoken == address(0)) {
-            btoken = _deployBridgedToken(ctoken);
+            btoken = _deployBridgedToken(_ctoken);
         }
     }
 

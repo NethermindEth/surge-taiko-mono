@@ -531,6 +531,17 @@ contract ERC20VaultL1 is BaseVault {
         if (_op.token == address(0)) {
             // Surge: Handle ether bridging
             balanceChangeAmount_ = _op.amount;
+
+            // Surge: Create a ctoken for native ETH on L1 to act as a
+            // reference for deploying a bridged Ether wrapper on L2
+            ctoken_ = CanonicalERC20({
+                chainId: uint64(block.chainid),
+                addr: address(0),
+                decimals: 18,
+                symbol: "ETH",
+                name: "Ether"
+            });
+
             // Surge: Remove solver fees balance checks from L1 vault
         } else if (bridgedToCanonical[_op.token].addr != address(0)) {
             // Handle bridged token

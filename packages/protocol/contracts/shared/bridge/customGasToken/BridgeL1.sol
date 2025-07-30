@@ -94,9 +94,9 @@ contract BridgeL1 is EssentialContract, IBridge {
     error B_INVALID_FEE();
     error B_INVALID_GAS_LIMIT();
     error B_INVALID_STATUS();
-    error B_INVALID_VALUE();
     error B_INSUFFICIENT_GAS();
     error B_MESSAGE_NOT_SENT();
+    error B_NATIVE_ETH_NOT_ACCEPTED();
     error B_PERMISSION_DENIED();
     error B_PROOF_TOO_LARGE();
     error B_RETRY_FAILED();
@@ -142,6 +142,11 @@ contract BridgeL1 is EssentialContract, IBridge {
         nonReentrant
         returns (bytes32 msgHash_, Message memory message_)
     {
+        // Surge: Native eth locking and accounting should be handled by the callee contract
+        if (msg.value > 0) {
+            revert B_NATIVE_ETH_NOT_ACCEPTED();
+        }
+
         if (_message.gasLimit == 0) {
             if (_message.fee != 0) revert B_INVALID_FEE();
         } else if (_invocationGasLimit(_message) == 0) {
@@ -153,11 +158,6 @@ contract BridgeL1 is EssentialContract, IBridge {
 
         // Verify destination chain.
         if (!destChainEnabled) revert B_INVALID_CHAINID();
-
-        // Surge: Native eth locking and accounting should be handled by the callee contract
-        if (msg.value > 0) {
-            revert B_INVALID_VALUE();
-        }
 
         // Surge: Extract message value and fees in gas token
         uint256 totalValue = _message.value + _message.fee;
