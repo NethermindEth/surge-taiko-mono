@@ -82,6 +82,7 @@ func (b *CalldataTransactionBuilder) BuildPacaya(
 
 	if b.surgeProposerWrapperAddress != rpc.ZeroAddress {
 		to = &b.surgeProposerWrapperAddress
+		proposer = b.surgeProposerWrapperAddress
 		log.Info("Using SurgeProposerWrapper for calldata transaction at proposeBatch",
 			"surgeProposerWrapper", b.surgeProposerWrapperAddress.Hex(),
 			"taikoWrapper", b.taikoWrapperAddress.Hex())
