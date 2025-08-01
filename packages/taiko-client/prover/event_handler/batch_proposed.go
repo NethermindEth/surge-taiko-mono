@@ -209,7 +209,10 @@ func (h *BatchProposedEventHandler) checkExpirationAndSubmitProofPacaya(
 		log.Info(
 			"Proposed batch is not provable by current prover at the moment",
 			"batchID", meta.Pacaya().GetBatchID(),
-			"prover", meta.GetProposer(),
+			"currentProver", h.proverAddress,
+			"currentProverSet", h.proverSetAddress,
+			"surgeProposerWrapper", h.surgeProposerWrapperAddress,
+			"assignProver", meta.GetProposer(),
 			"timeToExpire", timeToExpire,
 			"localProposerAddresses", h.localProposerAddresses,
 		)
@@ -218,6 +221,9 @@ func (h *BatchProposedEventHandler) checkExpirationAndSubmitProofPacaya(
 			log.Info(
 				"Add proposed block to wait for proof window expiration",
 				"batchID", meta.Pacaya().GetBatchID(),
+				"currentProver", h.proverAddress,
+				"currentProverSet", h.proverSetAddress,
+				"surgeProposerWrapper", h.surgeProposerWrapperAddress,
 				"assignProver", meta.GetProposer(),
 				"timeToExpire", timeToExpire,
 				"localProposerAddresses", h.localProposerAddresses,
@@ -244,6 +250,7 @@ func (h *BatchProposedEventHandler) checkExpirationAndSubmitProofPacaya(
 			"batchID", meta.Pacaya().GetBatchID(),
 			"currentProver", h.proverAddress,
 			"currentProverSet", h.proverSetAddress,
+			"surgeProposerWrapper", h.surgeProposerWrapperAddress,
 			"assignProver", meta.GetProposer(),
 			"localProposerAddresses", h.localProposerAddresses,
 		)
@@ -253,6 +260,9 @@ func (h *BatchProposedEventHandler) checkExpirationAndSubmitProofPacaya(
 	log.Info(
 		"Proposed batch is provable",
 		"batchID", meta.Pacaya().GetBatchID(),
+		"currentProver", h.proverAddress,
+		"currentProverSet", h.proverSetAddress,
+		"surgeProposerWrapper", h.surgeProposerWrapperAddress,
 		"assignProver", meta.GetProposer(),
 		"localProposerAddresses", h.localProposerAddresses,
 	)
