@@ -145,6 +145,7 @@ func (p *Proposer) InitFromConfig(
 		cfg.TaikoInboxAddress,
 		cfg.TaikoWrapperAddress,
 		cfg.ProverSetAddress,
+		cfg.SurgeProposerWrapperAddress,
 		cfg.ProposeBatchTxGasLimit,
 		p.chainConfig,
 		p.txmgrSelector,
@@ -498,8 +499,12 @@ func (p *Proposer) ProposeTxListPacaya(
 	}
 
 	// Check balance.
-	if p.Config.ClientConfig.ProverSetAddress != rpc.ZeroAddress {
-		proposerAddress = p.Config.ClientConfig.ProverSetAddress
+	if p.Config.ClientConfig.SurgeProposerWrapperAddress != rpc.ZeroAddress {
+		// if the proposer wrapper is set (the flag `--surgeProposerWrapper`), use it to check balance
+		proposerAddress = p.Config.ClientConfig.SurgeProposerWrapperAddress
+		log.Info("Using SurgeProposerWrapper for balance checking",
+			"surgeProposerWrapper", proposerAddress.Hex(),
+			"proposerAddress", p.proposerAddress.Hex())
 	}
 
 	ok, err := rpc.CheckProverBalance(
@@ -624,10 +629,16 @@ func (p *Proposer) estimateL2Cost(
 	ctx context.Context,
 	candidate *txmgr.TxCandidate,
 ) (*big.Int, error) {
-	l1BaseFee, err := p.rpc.L1.SuggestGasPrice(ctx)
+	// Fetch the latest L1 base fee
+	feeHistory, err := p.rpc.L1.FeeHistory(ctx, 1, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get L1 base fee: %w", err)
 	}
+
+	if len(feeHistory.BaseFee) == 0 {
+		return nil, fmt.Errorf("no base fee data available")
+	}
+	l1BaseFee := feeHistory.BaseFee[len(feeHistory.BaseFee)-1]
 
 	blobBaseFee := new(big.Int)
 	costWithBlobs := new(big.Int)

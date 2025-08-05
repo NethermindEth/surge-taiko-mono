@@ -40,6 +40,7 @@ func NewBuilderWithFallback(
 	taikoInboxAddress common.Address,
 	taikoWrapperAddress common.Address,
 	proverSetAddress common.Address,
+	surgeProposerWrapperAddress common.Address,
 	gasLimit uint64,
 	chainConfig *config.ChainConfig,
 	txmgrSelector *utils.TxMgrSelector,
@@ -49,6 +50,8 @@ func NewBuilderWithFallback(
 ) *TxBuilderWithFallback {
 	builder := &TxBuilderWithFallback{rpc: rpc, fallback: fallback, txmgrSelector: txmgrSelector}
 
+	log.Info("Using the transaction builder with fallback", "blobAllowed", blobAllowed, "fallback", fallback)
+
 	if blobAllowed {
 		builder.blobTransactionBuilder = NewBlobTransactionBuilder(
 			rpc,
@@ -56,6 +59,7 @@ func NewBuilderWithFallback(
 			taikoInboxAddress,
 			taikoWrapperAddress,
 			proverSetAddress,
+			surgeProposerWrapperAddress,
 			l2SuggestedFeeRecipient,
 			gasLimit,
 			chainConfig,
@@ -70,6 +74,7 @@ func NewBuilderWithFallback(
 		taikoInboxAddress,
 		taikoWrapperAddress,
 		proverSetAddress,
+		surgeProposerWrapperAddress,
 		gasLimit,
 		chainConfig,
 		revertProtectionEnabled,
