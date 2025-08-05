@@ -2,6 +2,7 @@ package encoding
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"strings"
 
@@ -62,7 +63,7 @@ func TryParsingCustomError(originalError error) error {
 		return nil
 	}
 
-	errData := getErrorData(originalError)
+	errData := standardizeErrorData(getErrorData(originalError))
 
 	// if errData is unparsable and returns 0x, we should not match any errors.
 	if errData == "0x" {
@@ -95,11 +96,30 @@ func getErrorData(err error) string {
 	if strings.Contains(err.Error(), "custom error") && strings.Contains(err.Error(), "reason") {
 		return "0x" + err.Error()[len(err.Error())-8:len(err.Error())]
 	}
-	// Anvil node custom errors, example:
-	// "execution reverted: custom error 712eb087:"
-	if strings.Contains(err.Error(), "custom error") {
+	// Anvil node custom errors without reasons but with a colon or parenthesis, example:
+	// "execution reverted: custom error 712eb087:" or
+	// "reverted with an unrecognized custom error (return data: 0x8a1c400f)"
+	if strings.Contains(err.Error(), "custom error") &&
+		(err.Error()[len(err.Error())-1] == ':' || err.Error()[len(err.Error())-1] == ')') {
 		return "0x" + err.Error()[len(err.Error())-9:len(err.Error())-1]
+	}
+	// Anvil node custom errors without reasons, example:
+	// "execution reverted: custom error 712eb087"
+	if strings.Contains(err.Error(), "custom error") && err.Error()[len(err.Error())-1] != ':' {
+		return "0x" + err.Error()[len(err.Error())-8:len(err.Error())]
 	}
 
 	return err.Error()
+}
+
+// standardizeErrorData standardizes the error data to a hex string
+// considering Nethermind's error data format
+func standardizeErrorData(errData string) string {
+	errData = strings.TrimPrefix(errData, "Reverted ")
+
+	if !strings.HasPrefix(errData, "0x") {
+		errData = "0x" + hex.EncodeToString([]byte(errData))
+	}
+
+	return errData
 }

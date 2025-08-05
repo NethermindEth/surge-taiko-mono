@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.28.0](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.27.6...docs-site-v1.28.0) (2025-05-27)
+
+
+### Features
+
+* **docs-site:** post-pacaya docs-site rehaul ([#19549](https://github.com/taikoxyz/taiko-mono/issues/19549)) ([f57bb48](https://github.com/taikoxyz/taiko-mono/commit/f57bb481ac9f33743421ccaa41c32eac5949040d))
+
+## [1.27.6](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.27.5...docs-site-v1.27.6) (2025-05-21)
+
+
+### Chores
+
+* **docs-site:** update proverset guide for pacaya ([#19499](https://github.com/taikoxyz/taiko-mono/issues/19499)) ([7a95c5a](https://github.com/taikoxyz/taiko-mono/commit/7a95c5accd5f7a683454a675cdcac8d2cf3d8a6a))
+
+## [1.27.5](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.27.4...docs-site-v1.27.5) (2025-05-06)
+
+
+### Chores
+
+* **docs-site:** add diff ([#19399](https://github.com/taikoxyz/taiko-mono/issues/19399)) ([2fab924](https://github.com/taikoxyz/taiko-mono/commit/2fab924417b0c7c3bf80c1b8667d82b006bb6ba6))
+* **main:** fix spelling issues ([#19269](https://github.com/taikoxyz/taiko-mono/issues/19269)) ([7b36376](https://github.com/taikoxyz/taiko-mono/commit/7b3637640eede1b34916c66733bcdf2672049a3b))
+
 ## [1.27.4](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.27.3...docs-site-v1.27.4) (2025-04-10)
 
 

@@ -16,6 +16,8 @@ contract StubInbox is ITaikoInbox {
 
     function proveBatches(bytes calldata _params, bytes calldata _proof) external { }
 
+    function verifyBatches(uint64 _length) external { }
+
     function depositBond(uint256 _amount) external payable virtual { }
 
     function withdrawBond(uint256 _amount) external virtual { }
@@ -28,23 +30,23 @@ contract StubInbox is ITaikoInbox {
 
     function getBatch(uint64 _batchId) external view virtual returns (ITaikoInbox.Batch memory) { }
 
-    function getTransitionById(
+    function getTransitionsById(
         uint64 _batchId,
         uint24 _tid
     )
         external
         view
         virtual
-        returns (ITaikoInbox.TransitionState memory)
+        returns (ITaikoInbox.TransitionState[] memory)
     { }
 
-    function getTransitionByParentHash(
+    function getTransitionsByParentHash(
         uint64 _batchId,
         bytes32 _parentHash
     )
         external
         view
-        returns (ITaikoInbox.TransitionState memory)
+        returns (ITaikoInbox.TransitionState[] memory)
     { }
 
     function getLastVerifiedTransition()
@@ -64,6 +66,9 @@ contract StubInbox is ITaikoInbox {
         view
         returns (TransitionState memory)
     { }
+
+    // Surge: to prevent compilation errors
+    function getVerificationStreakStartedAt() external view returns (uint256) { }
 
     function getStats1() external view returns (Stats1 memory) { }
 

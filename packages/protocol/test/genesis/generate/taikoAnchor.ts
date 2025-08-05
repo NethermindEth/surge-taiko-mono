@@ -391,7 +391,8 @@ async function generateContractConfigs(
             variables: {
                 // EssentialContract
                 __reentry: 1, // _FALSE
-                __paused: 2, // _TRUE
+                // Surge: Do not pause ERC20Vault
+                __paused: 1, // _FALSE
                 // EssentialContract => UUPSUpgradeable => Initializable
                 _initialized: 1,
                 _initializing: false,

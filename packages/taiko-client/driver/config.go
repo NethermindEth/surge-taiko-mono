@@ -7,10 +7,12 @@ import (
 	"net/url"
 	"time"
 
+	p2pFlags "github.com/ethereum-optimism/optimism/op-node/flags"
 	"github.com/ethereum-optimism/optimism/op-node/p2p"
 	p2pCli "github.com/ethereum-optimism/optimism/op-node/p2p/cli"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
 
@@ -32,6 +34,7 @@ type Config struct {
 	P2PConfigs                    *p2p.Config
 	P2PSignerConfigs              p2p.SignerSetup
 	PreconfHandoverSkipSlots      uint64
+	PreconfOperatorAddress        common.Address
 }
 
 // NewConfigFromCliContext creates a new config instance from
@@ -85,8 +88,8 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			L1BeaconEndpoint:        beaconEndpoint,
 			L2Endpoint:              c.String(flags.L2WSEndpoint.Name),
 			L2CheckPoint:            l2CheckPoint,
-			TaikoL1Address:          common.HexToAddress(c.String(flags.TaikoL1Address.Name)),
-			TaikoL2Address:          common.HexToAddress(c.String(flags.TaikoL2Address.Name)),
+			TaikoInboxAddress:       common.HexToAddress(c.String(flags.TaikoInboxAddress.Name)),
+			TaikoAnchorAddress:      common.HexToAddress(c.String(flags.TaikoAnchorAddress.Name)),
 			PreconfWhitelistAddress: common.HexToAddress(c.String(flags.PreconfWhitelistAddress.Name)),
 			L2EngineEndpoint:        c.String(flags.L2AuthEndpoint.Name),
 			JwtSecret:               string(jwtSecret),
@@ -118,10 +121,20 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 	preconfHandoverSkipSlots := c.Uint64(flags.PreconfHandoverSkipSlots.Name)
 	if rpc.L1Beacon != nil && preconfHandoverSkipSlots > rpc.L1Beacon.SlotsPerEpoch {
 		return nil, fmt.Errorf(
-			"preconf handover skip slots %d is greater than slots per epoch %d",
+			"preconfirmation handover skip slots %d is greater than slots per epoch %d",
 			preconfHandoverSkipSlots,
 			rpc.L1Beacon.SlotsPerEpoch,
 		)
+	}
+
+	var preconfOperatorAddress common.Address
+	if c.IsSet(p2pFlags.SequencerP2PKeyName) {
+		sequencerP2PKey, err := crypto.ToECDSA(common.FromHex(c.String(p2pFlags.SequencerP2PKeyName)))
+		if err != nil {
+			return nil, err
+		}
+
+		preconfOperatorAddress = crypto.PubkeyToAddress(sequencerP2PKey.PublicKey)
 	}
 
 	return &Config{
@@ -136,5 +149,6 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		P2PConfigs:                    p2pConfigs,
 		P2PSignerConfigs:              signerConfigs,
 		PreconfHandoverSkipSlots:      preconfHandoverSkipSlots,
+		PreconfOperatorAddress:        preconfOperatorAddress,
 	}, nil
 }

@@ -1,7 +1,6 @@
 package builder
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -27,8 +26,8 @@ func (s *TransactionBuilderTestSuite) SetupTest() {
 		l1ProposerPrivKey = s.KeyFromEnv("L1_PROPOSER_PRIVATE_KEY")
 		chainConfig       = config.NewChainConfig(
 			s.RPCClient.L2.ChainID,
-			s.RPCClient.OntakeClients.ForkHeight,
-			s.RPCClient.PacayaClients.ForkHeight,
+			s.RPCClient.PacayaClients.ForkHeights.Ontake,
+			s.RPCClient.PacayaClients.ForkHeights.Pacaya,
 		)
 	)
 
@@ -39,6 +38,7 @@ func (s *TransactionBuilderTestSuite) SetupTest() {
 		common.HexToAddress(os.Getenv("TAIKO_INBOX")),
 		common.HexToAddress(os.Getenv("TAIKO_WRAPPER")),
 		common.Address{},
+		common.Address{}, // surgeProposerWrapperAddress
 		0,
 		chainConfig,
 		false,
@@ -49,7 +49,8 @@ func (s *TransactionBuilderTestSuite) SetupTest() {
 		common.HexToAddress(os.Getenv("TAIKO_INBOX")),
 		common.HexToAddress(os.Getenv("TAIKO_WRAPPER")),
 		common.HexToAddress(os.Getenv("PROVER_SET")),
-		common.HexToAddress(os.Getenv("TAIKO_ANCHOR")),
+		common.Address{}, // surgeProposerWrapperAddress
+		common.HexToAddress(os.Getenv("TAIKO_ANCHOR")), // l2SuggestedFeeRecipient
 		10_000_000,
 		chainConfig,
 		false,
@@ -65,11 +66,6 @@ func (s *TransactionBuilderTestSuite) SetupTest() {
 			nil,
 		)})
 	}
-}
-
-func (s *TransactionBuilderTestSuite) TestBuildCalldata() {
-	_, err := s.calldataTxBuilder.BuildOntake(context.Background(), [][]byte{{1}, {2}}, common.Hash{})
-	s.Nil(err)
 }
 
 func TestTransactionBuilderTestSuite(t *testing.T) {

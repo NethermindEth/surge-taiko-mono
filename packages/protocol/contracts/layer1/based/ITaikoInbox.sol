@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "src/shared/based/LibSharedData.sol";
+import "src/layer1/surge/verifiers/LibProofType.sol";
 
 /// @title TaikoInbox
 /// @notice Acts as the inbox for the Taiko Alethia protocol, a simplified version of the
@@ -15,7 +16,7 @@ import "src/shared/based/LibSharedData.sol";
 ///   delegated to IVerifier contracts.
 ///
 /// @dev Registered in the address resolver as "taiko".
-/// @custom:security-contact security@taiko.xyz
+/// @custom:security-contact security@nethermind.io
 interface ITaikoInbox {
     struct BlockParams {
         // the max number of transactions in this block. Note that if there are not enough
@@ -43,7 +44,8 @@ interface ITaikoInbox {
         uint32 byteOffset;
         // The byte size of the blob.
         uint32 byteSize;
-        // The block number when the blob was created.
+        // The block number when the blob was created. This value is only non-zero when
+        // `blobHashes` are non-empty.
         uint64 createdIn;
     }
 
@@ -51,6 +53,8 @@ interface ITaikoInbox {
         address proposer;
         address coinbase;
         bytes32 parentMetaHash;
+        // Surge: Custom L2 base fee set by the proposer
+        uint96 baseFee;
         uint64 anchorBlockId;
         uint64 lastBlockTimestamp;
         bool revertIfNotFirstProposal;
@@ -73,6 +77,8 @@ interface ITaikoInbox {
         uint32 blobByteOffset;
         uint32 blobByteSize;
         uint32 gasLimit;
+        // Surge: Custom L2 base fee set by the proposer
+        uint96 baseFee;
         uint64 lastBlockId;
         uint64 lastBlockTimestamp;
         // Data for the L2 anchor transaction, shared by all blocks in the batch
@@ -98,14 +104,17 @@ interface ITaikoInbox {
         bytes32 stateRoot;
     }
 
-    //  @notice Struct representing transition storage
-    /// @notice 4 slots used.
+    /// @notice Struct representing transition storage
+    /// @dev Uses 5 slots when no conflicts are present, with 2 slots for every new conflict.
     struct TransitionState {
         bytes32 parentHash;
         bytes32 blockHash;
         bytes32 stateRoot;
-        address prover;
-        bool inProvingWindow;
+        // Surge: add `proofType`
+        LibProofType.ProofType proofType;
+        // Surge: renamed from `prover` to `bondReceiver`
+        address bondReceiver;
+        // Surge: remove `inProvingWindow`
         uint48 createdAt;
     }
 
@@ -119,7 +128,11 @@ interface ITaikoInbox {
         uint64 lastBlockTimestamp;
         uint64 anchorBlockId;
         uint24 nextTransitionId;
-        uint8 reserved4;
+        // Surge: add `finalisingTransitionIndex`
+        // The index of the finalising transition among the conflicting transitions of this batch.
+        // This is only updated and used when this batch is verified as the last one in a
+        // transaction.
+        uint8 finalisingTransitionIndex;
         // The ID of the transaction that is used to verify this batch. However, if this batch is
         // not verified as the last one in a transaction, verifiedTransitionId will remain zero.
         uint24 verifiedTransitionId;
@@ -129,7 +142,9 @@ interface ITaikoInbox {
     /// compiling without any optimization (neither optimizer runs, no compiling --via-ir flag).
     struct Stats1 {
         uint64 genesisHeight;
-        uint64 __reserved2;
+        // Surge: This parameter is required for stage-2.
+        // Last timestamp at which a batch was verified within `Config.maxVerificationDelay`
+        uint64 verificationStreakStartedAt;
         uint64 lastSyncedBatchId;
         uint64 lastSyncedAt;
     }
@@ -173,8 +188,11 @@ interface ITaikoInbox {
         /// @notice Base fee configuration
         LibSharedData.BaseFeeConfig baseFeeConfig;
         /// @notice The proving window in seconds.
-        uint16 provingWindow;
-        /// @notice The time required for a transition to be used for verifying a batch.
+        // Surge: switch from uint18 to uint24
+        uint24 provingWindow;
+        /// @notice The time window after which a transition with just a ZK or TEE proof
+        /// can be used for verifying a batch.
+        /// Surge: modify the usage
         uint24 cooldownWindow;
         /// @notice The maximum number of signals to be received by TaikoL2.
         uint8 maxSignalsToReceive;
@@ -182,6 +200,9 @@ interface ITaikoInbox {
         uint16 maxBlocksPerBatch;
         /// @notice Historical heights of the forks.
         ForkHeights forkHeights;
+        // Surge: This parameter is required for stage-2.
+        /// @notice Defines the maximum allowable duration without a batch verification.
+        uint64 maxVerificationDelay;
     }
 
     /// @notice Struct holding the state variables for the {Taiko} contract.
@@ -191,14 +212,17 @@ interface ITaikoInbox {
         // Indexing to transition ids (ring buffer not possible)
         mapping(uint256 batchId => mapping(bytes32 parentHash => uint24 transitionId)) transitionIds;
         // Ring buffer for transitions
+        // Surge: change `TransitionState` to `TransitionState[]` to accomodate conflicting
+        // transitions
+        // i.e transitions with the same parent hash.
         mapping(
             uint256 batchId_mod_batchRingBufferSize
-                => mapping(uint24 transitionId => TransitionState ts)
+                => mapping(uint24 transitionId => TransitionState[] transitions)
         ) transitions;
         bytes32 __reserve1; // slot 4 - was used as a ring buffer for Ether deposits
         Stats1 stats1; // slot 5
         Stats2 stats2; // slot 6
-        mapping(address account => uint256 bond) bondBalance;
+        mapping(address account => uint256 bond) bondBalance; // Slot 7
         uint256[43] __gap;
     }
 
@@ -274,6 +298,7 @@ interface ITaikoInbox {
     error InvalidBlobParams();
     error InvalidGenesisBlockHash();
     error InvalidParams();
+    error InvalidProofType();
     error InvalidTransitionBlockHash();
     error InvalidTransitionParentHash();
     error InvalidTransitionStateRoot();
@@ -290,6 +315,7 @@ interface ITaikoInbox {
     error TimestampTooSmall();
     error TooManyBatches();
     error TooManyBlocks();
+    error TooManyConflictingProofs();
     error TooManySignals();
     error TransitionNotFound();
     error ZeroAnchorBlockHash();
@@ -313,6 +339,11 @@ interface ITaikoInbox {
     /// - transitions: Array of batch transitions to be proved.
     /// @param _proof The aggregated cryptographic proof proving the batches transitions.
     function proveBatches(bytes calldata _params, bytes calldata _proof) external;
+
+    // Surge: added this function since it was missing in the interface
+    /// @notice Verifies a specified number of batches.
+    /// @param _length The number of batches to verify.
+    function verifyBatches(uint64 _length) external;
 
     /// @notice Deposits TAIKO tokens into the contract to be used as liveness bond.
     /// @param _amount The amount of TAIKO tokens to deposit.
@@ -349,27 +380,27 @@ interface ITaikoInbox {
     /// revert if the transition is not found.
     /// @param _batchId The batch ID.
     /// @param _tid The transition ID.
-    /// @return The specified transition state.
-    function getTransitionById(
+    /// @return The specified transition states.
+    function getTransitionsById(
         uint64 _batchId,
         uint24 _tid
     )
         external
         view
-        returns (ITaikoInbox.TransitionState memory);
+        returns (ITaikoInbox.TransitionState[] memory);
 
     /// @notice Retrieves a specific transition by batch ID and parent Hash. This function may
     /// revert if the transition is not found.
     /// @param _batchId The batch ID.
     /// @param _parentHash The parent hash.
-    /// @return The specified transition state.
-    function getTransitionByParentHash(
+    /// @return The specified transition states.
+    function getTransitionsByParentHash(
         uint64 _batchId,
         bytes32 _parentHash
     )
         external
         view
-        returns (ITaikoInbox.TransitionState memory);
+        returns (ITaikoInbox.TransitionState[] memory);
 
     /// @notice Retrieves the transition used for the last verified batch.
     /// @return batchId_ The batch ID of the last verified transition.
@@ -396,6 +427,12 @@ interface ITaikoInbox {
         external
         view
         returns (TransitionState memory);
+
+    /// @notice Returns the timestamp indicating when the current verification streak began.
+    /// @return The timestamp marking the start of the ongoing verification streak.
+    // Surge: This function returns `State.verificationStreakStartedAt` added as stage-2
+    // requirement.
+    function getVerificationStreakStartedAt() external view returns (uint256);
 
     /// @notice Retrieves the current protocol configuration.
     /// @return The current configuration.

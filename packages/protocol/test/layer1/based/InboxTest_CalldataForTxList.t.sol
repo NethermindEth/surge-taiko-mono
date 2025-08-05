@@ -5,6 +5,8 @@ import "contracts/layer1/based/ITaikoInbox.sol";
 import "./InboxTestBase.sol";
 
 contract InboxTest_CalldataForTxList is InboxTestBase {
+    using LibProofType for LibProofType.ProofType;
+
     function pacayaConfig() internal pure override returns (ITaikoInbox.Config memory) {
         ITaikoInbox.ForkHeights memory forkHeights;
 
@@ -29,7 +31,9 @@ contract InboxTest_CalldataForTxList is InboxTestBase {
             cooldownWindow: 0 hours,
             maxSignalsToReceive: 16,
             maxBlocksPerBatch: 768,
-            forkHeights: forkHeights
+            forkHeights: forkHeights,
+            // Surge: to prevent compilation errors
+            maxVerificationDelay: 0
         });
     }
 
@@ -163,6 +167,10 @@ contract InboxTest_CalldataForTxList is InboxTestBase {
 
         vm.prank(Alice);
         vm.expectRevert(ITaikoInbox.MetaHashMismatch.selector);
-        inbox.proveBatches(abi.encode(metas, transitions), "proof");
+        // Surge: use happy case proof type
+        inbox.proveBatches(
+            abi.encode(LibProofType.sgxReth().combine(LibProofType.sp1Reth()), metas, transitions),
+            "proof"
+        );
     }
 }

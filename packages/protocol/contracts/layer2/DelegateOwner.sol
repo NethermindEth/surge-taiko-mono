@@ -115,11 +115,7 @@ contract DelegateOwner is EssentialContract, IMessageInvocable {
         admin = _admin;
     }
 
-    /// @dev Accepts contract ownership
-    /// @param _target Target addresses.
-    function acceptOwnership(address _target) external nonReentrant onlyOwner {
-        Ownable2StepUpgradeable(_target).acceptOwnership();
-    }
+    // Surge: Remove acceptOwnership function
 
     function transferOwnership(address) public pure override notImplemented { }
 

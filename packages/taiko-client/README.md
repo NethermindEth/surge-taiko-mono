@@ -1,9 +1,8 @@
 # taiko-client
 
-[![CI](https://github.com/taikoxyz/taiko-mono/actions/workflows/taiko-client--test.yml/badge.svg)](https://github.com/taikoxyz/taiko-mono/actions/workflows/taiko-client-test.yml)
+[![CI](https://github.com/taikoxyz/taiko-mono/actions/workflows/taiko-client--test.yml/badge.svg)](https://github.com/taikoxyz/taiko-mono/actions/workflows/taiko-client--test.yml)
 
-<!-- TODO(d1onys1us): fix codecov integration -->
-<!-- [![Codecov](https://img.shields.io/codecov/c/github/taikoxyz/taiko-mono/packages/taiko-client?logo=codecov&token=OH6BJMVP6O)](https://codecov.io/gh/taikoxyz/taiko-mono/packages/taiko-client) -->
+[![Codecov](https://codecov.io/gh/taikoxyz/taiko-mono/graph/badge.svg?&token=E468X2PTJC&flag=taiko-client)](https://codecov.io/gh/taikoxyz/taiko-mono/packages/taiko-client)
 
 Taiko Alethia protocol's client software implementation in Go. Learn more about Taiko Alethia nodes with [the docs](https://docs.taiko.xyz/taiko-alethia-protocol/protocol-architecture/taiko-alethia-nodes).
 
@@ -54,8 +53,8 @@ Then, run the integration tests:
 
 1. Start Docker locally
 2. Perform a `pnpm install` in `taiko-mono/packages/protocol`
-3. Replace `<PATH_TO_TAIKO_MONO_REPO>` and execute:
+3. Replace `<PACAYA_FORK_TAIKO_MONO>` and execute:
 
 ```sh
-make test
+PACAYA_FORK_TAIKO_MONO=<PACAYA_FORK_TAIKO_MONO> make test
 ```

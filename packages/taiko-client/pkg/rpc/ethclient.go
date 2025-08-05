@@ -69,6 +69,10 @@ func NewEthClient(ctx context.Context, url string, timeout time.Duration) (*EthC
 	}, nil
 }
 
+func (c *EthClient) EthClient() *ethclient.Client {
+	return c.ethClient.Client
+}
+
 // BlockByHash returns the given full block.
 //
 // Note that loading full blocks requires two requests. Use HeaderByHash
@@ -80,6 +84,7 @@ func (c *EthClient) BlockByHash(ctx context.Context, hash common.Hash) (*types.B
 	return c.ethClient.BlockByHash(ctxWithTimeout, hash)
 }
 
+// BatchBlocksByHashes requests multiple blocks by their hashes in a batch.
 func (c *EthClient) BatchBlocksByHashes(ctx context.Context, hashes []common.Hash) ([]*types.Block, error) {
 	if len(hashes) < 1 {
 		return nil, ErrInvalidLenOfParams

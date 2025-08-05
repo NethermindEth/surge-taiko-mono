@@ -6,6 +6,8 @@ import (
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 )
 
 // maxTrackedPayloads is the maximum number of prepared payloads the execution
@@ -21,8 +23,9 @@ type payloadQueueItem struct {
 
 // payloadQueue tracks the latest payloads from the P2P gossip messages.
 type payloadQueue struct {
-	payloads []*payloadQueueItem
-	lock     sync.RWMutex
+	payloads    []*payloadQueueItem
+	totalCached uint64
+	lock        sync.RWMutex
 }
 
 // newPayloadQueue creates a pre-initialized queue with a fixed number of slots
@@ -43,6 +46,8 @@ func (q *payloadQueue) put(id uint64, payload *eth.ExecutionPayload) {
 		id:      id,
 		payload: payload,
 	}
+	q.totalCached++
+	metrics.DriverPreconfEnvelopeCachedCounter.Inc()
 }
 
 // get retrieves a previously stored payload item or nil if it does not exist.
@@ -114,4 +119,24 @@ func (q *payloadQueue) has(id uint64, hash common.Hash) bool {
 		}
 	}
 	return false
+}
+
+// getLatestPayload retrieves the latest payload stored in the queue.
+func (q *payloadQueue) getLatestPayload() *eth.ExecutionPayload {
+	q.lock.RLock()
+	defer q.lock.RUnlock()
+
+	if q.payloads[0] == nil {
+		return nil
+	}
+
+	return q.payloads[0].payload
+}
+
+// getTotalCached retrieves the total number of cached payloads after the initialization of the queue.
+func (q *payloadQueue) getTotalCached() uint64 {
+	q.lock.RLock()
+	defer q.lock.RUnlock()
+
+	return q.totalCached
 }

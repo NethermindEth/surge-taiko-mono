@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 )
 
@@ -17,7 +16,6 @@ func TestComposeProducerRequestProof(t *testing.T) {
 		producer = &ComposeProofProducer{
 			Dummy:              true,
 			DummyProofProducer: DummyProofProducer{},
-			SgxGethProducer:    &SgxGethProofProducer{Dummy: true},
 		}
 		blockID = common.Big32
 	)
@@ -30,7 +28,6 @@ func TestComposeProducerRequestProof(t *testing.T) {
 	)
 	require.Nil(t, err)
 
-	require.Equal(t, res.BlockID, blockID)
-	require.Equal(t, res.Tier, encoding.TierDeprecated)
+	require.Equal(t, res.BatchID, blockID)
 	require.NotEmpty(t, res.Proof)
 }

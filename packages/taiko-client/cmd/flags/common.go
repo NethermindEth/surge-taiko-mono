@@ -68,29 +68,29 @@ var (
 		Category: commonCategory,
 		EnvVars:  []string{"JWT_SECRET"},
 	}
-	TaikoL1Address = &cli.StringFlag{
-		Name:     "taikoL1",
-		Usage:    "TaikoL1 contract `address`",
+	TaikoInboxAddress = &cli.StringFlag{
+		Name:     "taikoInbox",
+		Usage:    "TaikoInbox contract `address`",
 		Required: true,
 		Category: commonCategory,
-		EnvVars:  []string{"TAIKO_INBOX", "TAIKO_L1"},
+		EnvVars:  []string{"TAIKO_INBOX"},
 	}
-	TaikoL2Address = &cli.StringFlag{
-		Name:     "taikoL2",
-		Usage:    "TaikoL2 contract `address`",
+	TaikoAnchorAddress = &cli.StringFlag{
+		Name:     "taikoAnchor",
+		Usage:    "TaikoAnchor contract `address`",
 		Required: true,
 		Category: commonCategory,
-		EnvVars:  []string{"TAIKO_ANCHOR", "TAIKO_L2"},
-	}
-	TaikoTokenAddress = &cli.StringFlag{
-		Name:     "taikoToken",
-		Usage:    "TaikoToken contract `address`",
-		Required: true,
-		Category: commonCategory,
-		EnvVars:  []string{"TAIKO_TOKEN"},
+		EnvVars:  []string{"TAIKO_ANCHOR"},
 	}
 
 	// Optional flags used by all client software.
+	TaikoTokenAddress = &cli.StringFlag{
+		Name:     "taikoToken",
+		Usage:    "TaikoToken contract `address`",
+		Value:    rpc.ZeroAddress.Hex(),
+		Category: commonCategory,
+		EnvVars:  []string{"TAIKO_TOKEN"},
+	}
 	// Logging
 	Verbosity = &cli.IntFlag{
 		Name:     "verbosity",
@@ -155,14 +155,28 @@ var (
 		Category: commonCategory,
 		EnvVars:  []string{"PROVER_SET"},
 	}
+	InboxAddress = &cli.StringFlag{
+		Name:     "inbox",
+		Usage:    "Inbox contract `address`",
+		Value:    rpc.ZeroAddress.Hex(),
+		Category: commonCategory,
+		EnvVars:  []string{"INBOX"},
+	}
+	SurgeProposerWrapperAddress = &cli.StringFlag{
+		Name:     "surgeProposerWrapper",
+		Usage:    "SurgeProposerWrapper contract `address` - Wrapper for propose/prove operations to avoid nonce conflicts",
+		Value:    rpc.ZeroAddress.Hex(),
+		Category: commonCategory,
+		EnvVars:  []string{"SURGE_PROPOSER_WRAPPER"},
+	}
 )
 
 // CommonFlags All common flags.
 var CommonFlags = []cli.Flag{
 	// Required
 	L1WSEndpoint,
-	TaikoL1Address,
-	TaikoL2Address,
+	TaikoInboxAddress,
+	TaikoAnchorAddress,
 	// Optional
 	ProverSetAddress,
 	Verbosity,
@@ -174,6 +188,8 @@ var CommonFlags = []cli.Flag{
 	BackOffRetryInterval,
 	RPCTimeout,
 	L1PrivateEndpoint,
+	InboxAddress,
+	SurgeProposerWrapperAddress,
 }
 
 // MergeFlags merges the given flag slices.

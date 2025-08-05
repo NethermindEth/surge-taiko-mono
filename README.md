@@ -43,12 +43,11 @@ Get started with Surge:
 ## 🗂️ Repository Structure
 
 - **`packages/balance-monitor`**: 📊 Tracks and monitors balances across different accounts and contracts to ensure proper fund management.
-- **`packages/blobstorage`**: 🗄️ Manages blob data storage and retrieval, including APIs for interacting with blob hashes and metadata.
 - **`packages/bridge-ui`**: 🌉 Provides a user interface for bridging assets between layer-1 and layer-2 networks.
 - **`packages/docs-site`**: 📚 Hosts the documentation site for the Surge Rollup, including guides, FAQs, and protocol details.
 - **`packages/eventindexer`**: 🔍 Indexes blockchain events for querying and analysis, providing APIs for accessing event data.
 - **`packages/fork-diff`**: 🔄 A tool for comparing and visualizing differences between forks of the Taiko protocol.
-- **`packages/guardian-prover-health-check`**: 🛡️ Monitors the health and uptime of guardian provers, ensuring their availability and reliability.
+- **`packages/geth-rpc-gateway`**: 🛡️ RPC gateway for geth nodes.
 - **`packages/guardian-prover-health-check-ui`**: 🖥️ A Svelte-based UI for visualizing the health and status of guardian provers.
 - **`packages/monitors`**: 📈 Provides monitoring tools for tracking the health and performance of the rollup system.
 - **`packages/nfts`**: 🎨 Manages NFT-related contracts, scripts, and metadata for the Taiko ecosystem.

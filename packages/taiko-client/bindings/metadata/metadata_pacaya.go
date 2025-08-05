@@ -12,7 +12,7 @@ import (
 // Ensure TaikoDataBlockMetadataPacaya implements TaikoBlockMetaData.
 var _ TaikoProposalMetaData = (*TaikoDataBlockMetadataPacaya)(nil)
 
-// TaikoDataBlockMetadataPacaya is the metadata of an ontake Taiko block.
+// TaikoDataBlockMetadataPacaya is the metadata of an Pacaya Taiko blocks batch.
 type TaikoDataBlockMetadataPacaya struct {
 	pacayaBindings.ITaikoInboxBatchInfo
 	pacayaBindings.ITaikoInboxBatchMetadata
@@ -20,18 +20,13 @@ type TaikoDataBlockMetadataPacaya struct {
 }
 
 // NewTaikoDataBlockMetadataPacaya creates a new instance of TaikoDataBlockMetadataPacaya
-// from the TaikoL1.BlockProposedV2 event.
+// from the TaikoInbox.BatchProposed event.
 func NewTaikoDataBlockMetadataPacaya(e *pacayaBindings.TaikoInboxClientBatchProposed) *TaikoDataBlockMetadataPacaya {
 	return &TaikoDataBlockMetadataPacaya{
 		ITaikoInboxBatchInfo:     e.Info,
 		ITaikoInboxBatchMetadata: e.Meta,
 		Log:                      e.Raw,
 	}
-}
-
-// Ontake implements TaikoProposalMetaData interface.
-func (m *TaikoDataBlockMetadataPacaya) Ontake() TaikoBlockMetaDataOntake {
-	return nil
 }
 
 // Pacaya implements TaikoProposalMetaData interface.
@@ -166,4 +161,9 @@ func (m *TaikoDataBlockMetadataPacaya) IsOntakeBlock() bool {
 // InnerMetadata returns the inner metadata.
 func (m *TaikoDataBlockMetadataPacaya) InnerMetadata() *pacayaBindings.ITaikoInboxBatchMetadata {
 	return &m.ITaikoInboxBatchMetadata
+}
+
+// GetBaseFee returns the base fee of this batch.
+func (m *TaikoDataBlockMetadataPacaya) GetBaseFee() *big.Int {
+	return m.BaseFee
 }

@@ -3,8 +3,6 @@ package transaction
 import (
 	"bytes"
 	"errors"
-	"fmt"
-	"math/big"
 
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -13,7 +11,6 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
-	ontakeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/ontake"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	proofProducer "github.com/taikoxyz/taiko-mono/packages/taiko-client/prover/proof_producer"
@@ -26,186 +23,31 @@ var (
 // TxBuilder will build a transaction with the given nonce.
 type TxBuilder func(txOpts *bind.TransactOpts) (*txmgr.TxCandidate, error)
 
-// ProveBlockTxBuilder is responsible for building ProveBlock transactions.
-type ProveBlockTxBuilder struct {
-	rpc                           *rpc.Client
-	taikoL1Address                common.Address
-	proverSetAddress              common.Address
-	guardianProverMajorityAddress common.Address
-	guardianProverMinorityAddress common.Address
+// ProveBatchesTxBuilder is responsible for building ProveBatches transactions.
+type ProveBatchesTxBuilder struct {
+	rpc                         *rpc.Client
+	taikoInboxAddress           common.Address
+	proverSetAddress            common.Address
+	surgeProposerWrapperAddress common.Address
 }
 
-// NewProveBlockTxBuilder creates a new ProveBlockTxBuilder instance.
-func NewProveBlockTxBuilder(
+// NewProveBatchesTxBuilder creates a new ProveBatchesTxBuilder instance.
+func NewProveBatchesTxBuilder(
 	rpc *rpc.Client,
-	taikoL1Address common.Address,
+	taikoInboxAddress common.Address,
 	proverSetAddress common.Address,
-	guardianProverMajorityAddress common.Address,
-	guardianProverMinorityAddress common.Address,
-) *ProveBlockTxBuilder {
-	return &ProveBlockTxBuilder{
-		rpc,
-		taikoL1Address,
-		proverSetAddress,
-		guardianProverMajorityAddress,
-		guardianProverMinorityAddress,
-	}
-}
-
-// Build creates a new TaikoL1.ProveBlock transaction with the given nonce.
-func (a *ProveBlockTxBuilder) Build(
-	blockID *big.Int,
-	meta metadata.TaikoProposalMetaData,
-	transition *ontakeBindings.TaikoDataTransition,
-	tierProof *ontakeBindings.TaikoDataTierProof,
-	tier uint16,
-) TxBuilder {
-	return func(txOpts *bind.TransactOpts) (*txmgr.TxCandidate, error) {
-		var (
-			data     []byte
-			to       common.Address
-			err      error
-			guardian = tier >= encoding.TierGuardianMinorityID
-		)
-
-		log.Info(
-			"Build proof submission transaction",
-			"blockID", blockID,
-			"gasLimit", txOpts.GasLimit,
-			"guardian", guardian,
-		)
-
-		if !guardian {
-			input, err := encoding.EncodeProveBlockInput(meta, transition, tierProof)
-			if err != nil {
-				return nil, err
-			}
-
-			if a.proverSetAddress != rpc.ZeroAddress {
-				if data, err = encoding.ProverSetABI.Pack(
-					"proveBlocks",
-					[]uint64{blockID.Uint64()},
-					[][]byte{input},
-					[]byte{},
-				); err != nil {
-					return nil, err
-				}
-				to = a.proverSetAddress
-			} else {
-				if data, err = encoding.TaikoL1ABI.Pack(
-					"proveBlocks",
-					[]uint64{blockID.Uint64()},
-					[][]byte{input},
-					[]byte{},
-				); err != nil {
-					return nil, err
-				}
-				to = a.taikoL1Address
-			}
-		} else {
-			if tier > encoding.TierGuardianMinorityID {
-				to = a.guardianProverMajorityAddress
-			} else if tier == encoding.TierGuardianMinorityID && a.guardianProverMinorityAddress != rpc.ZeroAddress {
-				to = a.guardianProverMinorityAddress
-			} else {
-				return nil, fmt.Errorf("tier %d need set guardianProverMinorityAddress", tier)
-			}
-
-			if data, err = encoding.GuardianProverABI.Pack(
-				"approveV2",
-				meta.(*metadata.TaikoDataBlockMetadataOntake).InnerMetadata(),
-				*transition,
-				*tierProof,
-			); err != nil {
-				return nil, err
-			}
-		}
-
-		return &txmgr.TxCandidate{
-			TxData:   data,
-			To:       &to,
-			Blobs:    nil,
-			GasLimit: txOpts.GasLimit,
-			Value:    txOpts.Value,
-		}, nil
-	}
-}
-
-// BuildProveBlocks creates a new TaikoL1.ProveBlocks transaction.
-func (a *ProveBlockTxBuilder) BuildProveBlocks(
-	batchProof *proofProducer.BatchProofs,
-	graffiti [32]byte,
-) TxBuilder {
-	return func(txOpts *bind.TransactOpts) (*txmgr.TxCandidate, error) {
-		var (
-			data        []byte
-			to          common.Address
-			err         error
-			metas       = make([]metadata.TaikoProposalMetaData, len(batchProof.ProofResponses))
-			transitions = make([]ontakeBindings.TaikoDataTransition, len(batchProof.ProofResponses))
-			blockIDs    = make([]uint64, len(batchProof.ProofResponses))
-		)
-		for i, proof := range batchProof.ProofResponses {
-			metas[i] = proof.Meta
-			transitions[i] = ontakeBindings.TaikoDataTransition{
-				ParentHash: proof.Opts.OntakeOptions().ParentHash,
-				BlockHash:  proof.Opts.OntakeOptions().BlockHash,
-				StateRoot:  proof.Opts.OntakeOptions().StateRoot,
-				Graffiti:   graffiti,
-			}
-			blockIDs[i] = proof.BlockID.Uint64()
-		}
-		log.Info(
-			"Build batch proof submission transaction",
-			"blockIDs", blockIDs,
-			"gasLimit", txOpts.GasLimit,
-		)
-		input, err := encoding.EncodeProveBlocksInput(metas, transitions)
-		if err != nil {
-			return nil, err
-		}
-		tierProof, err := encoding.EncodeProveBlocksBatchProof(&ontakeBindings.TaikoDataTierProof{
-			Tier: batchProof.Tier,
-			Data: batchProof.BatchProof,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		if a.proverSetAddress != rpc.ZeroAddress {
-			if data, err = encoding.ProverSetABI.Pack(
-				"proveBlocks",
-				blockIDs,
-				input,
-				tierProof,
-			); err != nil {
-				return nil, err
-			}
-			to = a.proverSetAddress
-		} else {
-			if data, err = encoding.TaikoL1ABI.Pack(
-				"proveBlocks",
-				blockIDs,
-				input,
-				tierProof,
-			); err != nil {
-				return nil, err
-			}
-			to = a.taikoL1Address
-		}
-
-		return &txmgr.TxCandidate{
-			TxData:   data,
-			To:       &to,
-			Blobs:    nil,
-			GasLimit: txOpts.GasLimit,
-			Value:    txOpts.Value,
-		}, nil
+	surgeProposerWrapperAddress common.Address,
+) *ProveBatchesTxBuilder {
+	return &ProveBatchesTxBuilder{
+		rpc:                         rpc,
+		taikoInboxAddress:           taikoInboxAddress,
+		proverSetAddress:            proverSetAddress,
+		surgeProposerWrapperAddress: surgeProposerWrapperAddress,
 	}
 }
 
 // BuildProveBatchesPacaya creates a new TaikoInbox.ProveBatches transaction.
-func (a *ProveBlockTxBuilder) BuildProveBatchesPacaya(batchProof *proofProducer.BatchProofs) TxBuilder {
+func (a *ProveBatchesTxBuilder) BuildProveBatchesPacaya(batchProof *proofProducer.BatchProofs) TxBuilder {
 	return func(txOpts *bind.TransactOpts) (*txmgr.TxCandidate, error) {
 		var (
 			data        []byte
@@ -234,17 +76,38 @@ func (a *ProveBlockTxBuilder) BuildProveBatchesPacaya(batchProof *proofProducer.
 				"endBlockID", proof.Opts.PacayaOptions().Headers[len(proof.Opts.PacayaOptions().Headers)-1].Number,
 				"gasLimit", txOpts.GasLimit,
 				"verifier", batchProof.Verifier,
+				"sgxVerifier", batchProof.SgxProofVerifier,
 			)
 		}
-		if bytes.Compare(batchProof.Verifier.Bytes(), batchProof.SgxGethProofVerifier.Bytes()) < 0 {
-			subProofs[0] = encoding.SubProof{Verifier: batchProof.Verifier, Proof: batchProof.BatchProof}
-			subProofs[1] = encoding.SubProof{Verifier: batchProof.SgxGethProofVerifier, Proof: batchProof.SgxGethBatchProof}
+		if bytes.Compare(batchProof.Verifier.Bytes(), batchProof.SgxProofVerifier.Bytes()) < 0 {
+			subProofs[0] = encoding.SubProof{
+				ProofType: encoding.GetProofTypeFromString(string(batchProof.ProofType)),
+				Proof:     batchProof.BatchProof,
+			}
+			subProofs[1] = encoding.SubProof{
+				ProofType: encoding.ProofTypeSgxReth,
+				Proof:     batchProof.SgxBatchProof,
+			}
 		} else {
-			subProofs[0] = encoding.SubProof{Verifier: batchProof.SgxGethProofVerifier, Proof: batchProof.SgxGethBatchProof}
-			subProofs[1] = encoding.SubProof{Verifier: batchProof.Verifier, Proof: batchProof.BatchProof}
+			subProofs[0] = encoding.SubProof{
+				ProofType: encoding.ProofTypeSgxReth,
+				Proof:     batchProof.SgxBatchProof,
+			}
+			subProofs[1] = encoding.SubProof{
+				ProofType: encoding.GetProofTypeFromString(string(batchProof.ProofType)),
+				Proof:     batchProof.BatchProof,
+			}
 		}
 
-		input, err := encoding.EncodeProveBatchesInput(metas, transitions)
+		combinedProofType := subProofs[0].ProofType + subProofs[1].ProofType
+		log.Debug(
+			"Combined proof type details",
+			"subProof0Type", subProofs[0].ProofType,
+			"subProof1Type", subProofs[1].ProofType,
+			"combinedProofType", combinedProofType,
+		)
+
+		input, err := encoding.EncodeProveBatchesInput(combinedProofType, metas, transitions)
 		if err != nil {
 			return nil, err
 		}
@@ -253,17 +116,36 @@ func (a *ProveBlockTxBuilder) BuildProveBatchesPacaya(batchProof *proofProducer.
 			return nil, err
 		}
 
-		if a.proverSetAddress != rpc.ZeroAddress {
-			if data, err = encoding.ProverSetPacayaABI.Pack("proveBatches", input, encodedSubProofs); err != nil {
-				return nil, encoding.TryParsingCustomError(err)
-			}
-			to = a.proverSetAddress
-		} else {
-			if data, err = encoding.TaikoInboxABI.Pack("proveBatches", input, encodedSubProofs); err != nil {
-				return nil, encoding.TryParsingCustomError(err)
-			}
-			to = a.taikoL1Address
+		// Use SurgeProposerWrapper ABI (same interface as TaikoInbox)
+		if data, err = encoding.TaikoInboxABI.Pack("proveBatches", input, encodedSubProofs); err != nil {
+			return nil, encoding.TryParsingCustomError(err)
 		}
+
+		if a.surgeProposerWrapperAddress != rpc.ZeroAddress {
+			to = a.surgeProposerWrapperAddress
+			log.Info("Using SurgeProposerWrapper for proof submission at proveBatches",
+				"surgeProposerWrapper", a.surgeProposerWrapperAddress.Hex(),
+				"taikoInbox", a.taikoInboxAddress.Hex())
+		} else {
+			to = a.taikoInboxAddress
+		}
+
+		log.Debug("Transaction data being sent",
+			"to", to.Hex(),
+			"dataLength", len(data),
+			"dataHex", common.Bytes2Hex(data),
+			"gasLimit", txOpts.GasLimit,
+			"value", txOpts.Value,
+			"subProof0Type", subProofs[0].ProofType,
+			"subProof0Length", len(subProofs[0].Proof),
+			"subProof0Hex", common.Bytes2Hex(subProofs[0].Proof),
+			"subProof1Type", subProofs[1].ProofType,
+			"subProof1Length", len(subProofs[1].Proof),
+			"subProof1Hex", common.Bytes2Hex(subProofs[1].Proof),
+			"zkProofType", batchProof.ProofType,
+			"zkBatchProofLength", len(batchProof.BatchProof),
+			"sgxBatchProofLength", len(batchProof.SgxBatchProof),
+		)
 
 		return &txmgr.TxCandidate{
 			TxData:   data,

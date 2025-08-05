@@ -1,6 +1,7 @@
 package proposer
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
@@ -21,11 +22,11 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/bridge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
-	ontakeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/ontake"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/chain_syncer/beaconsync"
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/chain_syncer/blob"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/chain_syncer/event"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/state"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/jwt"
@@ -35,7 +36,7 @@ import (
 
 type ProposerTestSuite struct {
 	testutils.ClientTestSuite
-	s      *blob.Syncer
+	s      *event.Syncer
 	p      *Proposer
 	cancel context.CancelFunc
 }
@@ -46,12 +47,13 @@ func (s *ProposerTestSuite) SetupTest() {
 	state2, err := state.New(context.Background(), s.RPCClient)
 	s.Nil(err)
 
-	syncer, err := blob.NewSyncer(
+	syncer, err := event.NewSyncer(
 		context.Background(),
 		s.RPCClient,
 		state2,
 		beaconsync.NewSyncProgressTracker(s.RPCClient.L2, 1*time.Hour),
 		s.BlobServer.URL(),
+		nil,
 	)
 	s.Nil(err)
 	s.s = syncer
@@ -74,21 +76,22 @@ func (s *ProposerTestSuite) SetupTest() {
 			L2Endpoint:                  os.Getenv("L2_HTTP"),
 			L2EngineEndpoint:            os.Getenv("L2_AUTH"),
 			JwtSecret:                   string(jwtSecret),
-			TaikoL1Address:              common.HexToAddress(os.Getenv("TAIKO_INBOX")),
+			TaikoInboxAddress:           common.HexToAddress(os.Getenv("TAIKO_INBOX")),
 			ProverSetAddress:            common.HexToAddress(os.Getenv("PROVER_SET")),
 			TaikoWrapperAddress:         common.HexToAddress(os.Getenv("TAIKO_WRAPPER")),
 			ForcedInclusionStoreAddress: common.HexToAddress(os.Getenv("FORCED_INCLUSION_STORE")),
-			TaikoL2Address:              common.HexToAddress(os.Getenv("TAIKO_ANCHOR")),
+			TaikoAnchorAddress:          common.HexToAddress(os.Getenv("TAIKO_ANCHOR")),
 			TaikoTokenAddress:           common.HexToAddress(os.Getenv("TAIKO_TOKEN")),
+			BridgeAddress:               common.HexToAddress(os.Getenv("BRIDGE")),
 		},
-		L1ProposerPrivKey:          l1ProposerPrivKey,
-		L2SuggestedFeeRecipient:    common.HexToAddress(os.Getenv("L2_SUGGESTED_FEE_RECIPIENT")),
-		MinProposingInternal:       0,
-		ProposeInterval:            1024 * time.Hour,
-		MaxProposedTxListsPerEpoch: 1,
-		ProposeBlockTxGasLimit:     10_000_000,
-		BlobAllowed:                true,
-		FallbackToCalldata:         true,
+		L1ProposerPrivKey:       l1ProposerPrivKey,
+		L2SuggestedFeeRecipient: common.HexToAddress(os.Getenv("L2_SUGGESTED_FEE_RECIPIENT")),
+		MinProposingInternal:    0,
+		ProposeInterval:         1024 * time.Hour,
+		MaxTxListsPerEpoch:      1,
+		ProposeBatchTxGasLimit:  10_000_000,
+		BlobAllowed:             true,
+		FallbackToCalldata:      true,
 		TxmgrConfigs: &txmgr.CLIConfig{
 			L1RPCURL:                  os.Getenv("L1_WS"),
 			NumConfirmations:          0,
@@ -134,6 +137,7 @@ func (s *ProposerTestSuite) TestProposeWithRevertProtection() {
 		common.HexToAddress(os.Getenv("TAIKO_INBOX")),
 		common.HexToAddress(os.Getenv("TAIKO_WRAPPER")),
 		common.HexToAddress(os.Getenv("PROVER_SET")),
+		common.Address{}, // surgeProposerWrapperAddress
 		10_000_000,
 		s.p.chainConfig,
 		s.p.txmgrSelector,
@@ -148,36 +152,23 @@ func (s *ProposerTestSuite) TestProposeWithRevertProtection() {
 	head, err := s.p.rpc.L2.HeaderByNumber(context.Background(), nil)
 	s.Nil(err)
 
-	s.Less(head.Number.Uint64(), s.p.rpc.PacayaClients.ForkHeight)
-
 	s.SetIntervalMining(1)
-	for i := 0; i < int(s.p.rpc.PacayaClients.ForkHeight); i++ {
-		head, err = s.p.rpc.L2.HeaderByNumber(context.Background(), nil)
-		s.Nil(err)
-		metaHash, err := s.p.GetParentMetaHash(context.Background(), head.Number.Uint64())
-		s.Nil(err)
 
-		s.Nil(
-			s.p.ProposeTxLists(
-				context.Background(),
-				[]types.Transactions{{}},
-				head.Number.Uint64(),
-				metaHash,
-			),
-		)
-		s.Nil(s.s.ProcessL1Blocks(context.Background()))
-	}
-
-	head, err = s.p.rpc.L2.HeaderByNumber(context.Background(), nil)
+	metaHash, err := s.p.GetParentMetaHash(context.Background())
 	s.Nil(err)
-	s.GreaterOrEqual(head.Number.Uint64(), s.p.rpc.PacayaClients.ForkHeight)
+
+	l2BaseFee, err := s.p.rpc.L2.SuggestGasPrice(context.Background())
+	s.Nil(err)
+
+	s.Nil(s.p.ProposeTxLists(context.Background(), []types.Transactions{{}}, metaHash, l2BaseFee))
+	s.Nil(s.s.ProcessL1Blocks(context.Background()))
+
+	head2, err := s.p.rpc.L2.HeaderByNumber(context.Background(), nil)
+	s.Nil(err)
+	s.Equal(head2.Number.Uint64(), head.Number.Uint64()+1)
 }
 
 func (s *ProposerTestSuite) TestTxPoolContentWithMinTip() {
-	if os.Getenv("L2_NODE") == "l2_reth" {
-		s.T().Skip()
-	}
-
 	var (
 		txsCountForEachSender = 300
 		sendersCount          = 5
@@ -210,6 +201,9 @@ func (s *ProposerTestSuite) TestTxPoolContentWithMinTip() {
 		s.Nil(err)
 	}
 
+	l2BaseFee, err := s.p.rpc.L2.SuggestGasPrice(context.Background())
+	s.Nil(err)
+
 	// Empty mempool at first.
 	for {
 		poolContent, err := s.RPCClient.GetPoolContent(
@@ -217,11 +211,10 @@ func (s *ProposerTestSuite) TestTxPoolContentWithMinTip() {
 			s.p.proposerAddress,
 			s.p.protocolConfigs.BlockMaxGasLimit(),
 			rpc.BlockMaxTxListBytes,
-			s.p.LocalAddresses,
+			[]common.Address{},
 			10,
 			0,
-			s.p.chainConfig,
-			s.p.protocolConfigs.BaseFeeConfig(),
+			l2BaseFee,
 		)
 		s.Nil(err)
 
@@ -266,13 +259,13 @@ func (s *ProposerTestSuite) TestTxPoolContentWithMinTip() {
 		{
 			s.p.protocolConfigs.BlockMaxGasLimit(),
 			rpc.BlockMaxTxListBytes,
-			s.p.MaxProposedTxListsPerEpoch,
+			s.p.MaxTxListsPerEpoch,
 			[]int{txsCountForEachSender * len(privateKeys)},
 		},
 		{
 			s.p.protocolConfigs.BlockMaxGasLimit(),
 			rpc.BlockMaxTxListBytes,
-			s.p.MaxProposedTxListsPerEpoch * uint64(len(privateKeys)),
+			s.p.MaxTxListsPerEpoch * uint64(len(privateKeys)),
 			[]int{txsCountForEachSender * len(privateKeys)},
 		},
 		{
@@ -287,11 +280,10 @@ func (s *ProposerTestSuite) TestTxPoolContentWithMinTip() {
 			s.p.proposerAddress,
 			testCase.blockMaxGasLimit,
 			testCase.blockMaxTxListBytes,
-			s.p.LocalAddresses,
+			[]common.Address{},
 			testCase.maxTransactionsLists,
 			0,
-			s.p.chainConfig,
-			s.p.protocolConfigs.BaseFeeConfig(),
+			l2BaseFee,
 		)
 		s.Nil(err)
 
@@ -340,17 +332,19 @@ func (s *ProposerTestSuite) TestProposeOpNoEmptyBlock() {
 		s.Nil(err)
 	}
 
+	l2BaseFee, err := s.p.rpc.L2.SuggestGasPrice(context.Background())
+	s.Nil(err)
+
 	for i := 0; i < 3 && len(preBuiltTxList) == 0; i++ {
 		preBuiltTxList, err = s.RPCClient.GetPoolContent(
 			context.Background(),
 			p.proposerAddress,
 			p.protocolConfigs.BlockMaxGasLimit(),
 			rpc.BlockMaxTxListBytes,
-			p.LocalAddresses,
-			p.MaxProposedTxListsPerEpoch,
+			[]common.Address{},
+			p.MaxTxListsPerEpoch,
 			0,
-			p.chainConfig,
-			p.protocolConfigs.BaseFeeConfig(),
+			l2BaseFee,
 		)
 		time.Sleep(time.Second)
 	}
@@ -375,7 +369,6 @@ func (s *ProposerTestSuite) TestProposeOpNoEmptyBlock() {
 	}
 
 	// Start proposer
-	p.LocalAddressesOnly = false
 	p.ProposeInterval = time.Second
 	p.MinProposingInternal = time.Minute
 	s.Nil(p.ProposeOp(context.Background()))
@@ -388,17 +381,12 @@ func (s *ProposerTestSuite) TestName() {
 func (s *ProposerTestSuite) TestProposeOp() {
 	// Propose txs in L2 execution engine's mempool
 	sink1 := make(chan *pacayaBindings.TaikoInboxClientBatchProposed)
-	sink2 := make(chan *ontakeBindings.TaikoL1ClientBlockProposedV2)
 	sub1, err := s.RPCClient.PacayaClients.TaikoInbox.WatchBatchProposed(nil, sink1)
-	s.Nil(err)
-	sub2, err := s.RPCClient.OntakeClients.TaikoL1.WatchBlockProposedV2(nil, sink2, nil)
 	s.Nil(err)
 
 	defer func() {
 		sub1.Unsubscribe()
-		sub2.Unsubscribe()
 		close(sink1)
-		close(sink2)
 	}()
 
 	to := common.BytesToAddress(testutils.RandomBytes(32))
@@ -407,13 +395,8 @@ func (s *ProposerTestSuite) TestProposeOp() {
 
 	s.Nil(s.p.ProposeOp(context.Background()))
 
-	var meta metadata.TaikoProposalMetaData
-	select {
-	case event := <-sink1:
-		meta = metadata.NewTaikoDataBlockMetadataPacaya(event)
-	case event := <-sink2:
-		meta = metadata.NewTaikoDataBlockMetadataOntake(event)
-	}
+	event := <-sink1
+	meta := metadata.NewTaikoDataBlockMetadataPacaya(event)
 	s.Equal(meta.GetCoinbase(), s.p.L2SuggestedFeeRecipient)
 
 	_, isPending, err := s.p.rpc.L1.TransactionByHash(context.Background(), meta.GetTxHash())
@@ -440,12 +423,8 @@ func (s *ProposerTestSuite) TestUpdateProposingTicker() {
 }
 
 func (s *ProposerTestSuite) TestProposeMultiBlobsInOneBatch() {
-	// Propose valid L2 blocks to make the L2 fork into Pacaya fork.
-	s.ForkIntoPacaya(s.p, s.s)
-
 	l2Head1, err := s.RPCClient.L2.HeaderByNumber(context.Background(), nil)
 	s.Nil(err)
-	s.NotZero(l2Head1.Number.Uint64())
 
 	// Propose a batch which contains two blobs.
 	var (
@@ -473,7 +452,10 @@ func (s *ProposerTestSuite) TestProposeMultiBlobsInOneBatch() {
 		}
 	}
 
-	s.Nil(s.p.ProposeTxListPacaya(context.Background(), txsBatch, common.Hash{}))
+	l2BaseFee, err := s.p.rpc.L2.SuggestGasPrice(context.Background())
+	s.Nil(err)
+
+	s.Nil(s.p.ProposeTxListPacaya(context.Background(), txsBatch, common.Hash{}, l2BaseFee))
 	s.Nil(s.s.ProcessL1Blocks(context.Background()))
 
 	l2Head2, err := s.RPCClient.L2.BlockByNumber(context.Background(), nil)
@@ -491,6 +473,173 @@ func (s *ProposerTestSuite) TestStartClose() {
 	s.Nil(s.p.Start())
 	s.cancel()
 	s.NotPanics(func() { s.p.Close(s.p.ctx) })
+}
+
+func (s *ProposerTestSuite) TestBridgeMessageMonitoring() {
+	// Start the proposer first to ensure subscription is active
+	s.Nil(s.p.Start())
+	defer func() {
+		s.cancel()
+		s.NotPanics(func() { s.p.Close(s.p.ctx) })
+	}()
+
+	bridgeAddr := s.p.Config.ClientConfig.BridgeAddress
+	s.NotEqual(bridgeAddr, common.Address{}, "Bridge address should not be zero")
+	log.Info("Using Bridge address for test", "address", bridgeAddr.Hex())
+
+	// Get the Bridge contract ABI
+	bridgeABI, err := bridge.BridgeMetaData.GetAbi()
+	s.Nil(err)
+
+	// Get the sendMessage method
+	sendMessageMethod := bridgeABI.Methods["sendMessage"]
+	s.NotNil(sendMessageMethod.ID, "Failed to get sendMessage method ID")
+
+	// Helper function to create a Bridge message transaction
+	createBridgeMessageTx := func(nonce uint64) *types.Transaction {
+		testData := append(sendMessageMethod.ID, testutils.RandomBytes(100)...)
+
+		// Get current base fee
+		header, err := s.p.rpc.L1.HeaderByNumber(context.Background(), nil)
+		s.Nil(err)
+		baseFee := header.BaseFee
+
+		// Get chain ID
+		chainID := s.p.rpc.L1.ChainID
+
+		// Create a signed transaction with very low gas price to keep it pending
+		gasFeeCap := new(big.Int).Add(baseFee, big.NewInt(1)) // Set max fee per gas just slightly above base fee
+		gasTipCap := big.NewInt(1)                            // Set priority fee (tip) very low
+
+		signer := types.LatestSignerForChainID(chainID)
+		tx := types.NewTx(&types.DynamicFeeTx{
+			ChainID:   chainID,
+			Nonce:     nonce,
+			To:        &bridgeAddr,
+			Value:     common.Big1,
+			Gas:       100000,
+			GasFeeCap: gasFeeCap,
+			GasTipCap: gasTipCap,
+			Data:      testData,
+		})
+
+		signedTx, err := types.SignTx(tx, signer, s.TestAddrPrivKey)
+		s.Nil(err)
+
+		err = s.p.rpc.L1.SendTransaction(context.Background(), signedTx)
+		s.Nil(err)
+
+		log.Info(
+			"Sent Bridge message transaction",
+			"hash", signedTx.Hash().Hex(),
+			"from", s.TestAddr.Hex(),
+			"to", bridgeAddr.Hex(),
+			"nonce", nonce,
+			"value", signedTx.Value(),
+			"gasFeeCap", gasFeeCap,
+			"gasTipCap", gasTipCap,
+		)
+
+		return signedTx
+	}
+
+	// Helper function to wait for transaction processing
+	waitForProcessing := func() {
+		time.Sleep(2 * time.Second)
+	}
+
+	s.Run("Valid Bridge Message Transaction", func() {
+		testNonce, err := s.p.rpc.L1.NonceAt(context.Background(), s.TestAddr, nil)
+		s.Nil(err)
+
+		signedTx := createBridgeMessageTx(testNonce)
+		waitForProcessing()
+
+		// Verify the transaction was detected and stored
+		s.p.bridgeMsgMu.RLock()
+		detected := s.p.pendingBridgeMessages[signedTx.Hash()]
+		s.p.bridgeMsgMu.RUnlock()
+
+		s.NotNil(detected, "Bridge message transaction should be detected")
+		s.Equal(signedTx.Hash(), detected.Hash(), "Detected transaction hash should match sent transaction")
+		s.Equal(bridgeAddr, *detected.To(), "Detected transaction should be to Bridge contract")
+		s.True(bytes.HasPrefix(detected.Data(), sendMessageMethod.ID), "Transaction should have sendMessage selector")
+	})
+
+	s.Run("Non-Bridge Transaction", func() {
+		testNonce, err := s.p.rpc.L1.NonceAt(context.Background(), s.TestAddr, nil)
+		s.Nil(err)
+
+		randomAddr := common.BytesToAddress(testutils.RandomBytes(20))
+		nonBridgeTx, err := testutils.AssembleAndSendTestTx(
+			s.p.rpc.L1,
+			s.TestAddrPrivKey,
+			testNonce,
+			&randomAddr,
+			common.Big1,
+			testutils.RandomBytes(100),
+		)
+		s.Nil(err)
+		s.NotNil(nonBridgeTx, "Non-bridge transaction should not be nil")
+
+		waitForProcessing()
+
+		// Verify the non-Bridge transaction was not detected
+		s.p.bridgeMsgMu.RLock()
+		notDetected := s.p.pendingBridgeMessages[nonBridgeTx.Hash()]
+		s.p.bridgeMsgMu.RUnlock()
+
+		s.Nil(notDetected, "Non-Bridge transaction should not be detected")
+	})
+
+	s.Run("Invalid Bridge Transaction", func() {
+		testNonce, err := s.p.rpc.L1.NonceAt(context.Background(), s.TestAddr, nil)
+		s.Nil(err)
+
+		invalidSelectorTx, err := testutils.AssembleAndSendTestTx(
+			s.p.rpc.L1,
+			s.TestAddrPrivKey,
+			testNonce,
+			&bridgeAddr,
+			common.Big1,
+			testutils.RandomBytes(100),
+		)
+		s.Nil(err)
+		s.NotNil(invalidSelectorTx, "Invalid selector transaction should not be nil")
+
+		waitForProcessing()
+
+		// Verify the Bridge transaction without sendMessage selector was not detected
+		s.p.bridgeMsgMu.RLock()
+		notDetectedInvalid := s.p.pendingBridgeMessages[invalidSelectorTx.Hash()]
+		s.p.bridgeMsgMu.RUnlock()
+
+		s.Nil(notDetectedInvalid, "Bridge transaction without sendMessage selector should not be detected")
+	})
+
+	s.Run("Cleanup After Proposal", func() {
+		// First create a valid bridge message to ensure we have something to clean up
+		testNonce, err := s.p.rpc.L1.NonceAt(context.Background(), s.TestAddr, nil)
+		s.Nil(err)
+
+		createBridgeMessageTx(testNonce)
+		waitForProcessing()
+
+		// Verify we have a pending message
+		s.p.bridgeMsgMu.RLock()
+		initialMsgs := len(s.p.pendingBridgeMessages)
+		s.p.bridgeMsgMu.RUnlock()
+		s.Greater(initialMsgs, 0, "Should have pending messages before cleanup")
+
+		// Test that detected transactions are cleared after being proposed
+		s.Nil(s.p.ProposeOp(context.Background()))
+
+		s.p.bridgeMsgMu.RLock()
+		remainingMsgs := len(s.p.pendingBridgeMessages)
+		s.p.bridgeMsgMu.RUnlock()
+
+		s.Equal(0, remainingMsgs, "Pending messages should be cleared after proposing")
+	})
 }
 
 func TestProposerTestSuite(t *testing.T) {

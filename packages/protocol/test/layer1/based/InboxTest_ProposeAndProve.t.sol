@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import "./InboxTestBase.sol";
 
 contract InboxTest_ProposeAndProve is InboxTestBase {
+    using LibProofType for LibProofType.ProofType;
+
     function pacayaConfig() internal pure override returns (ITaikoInbox.Config memory) {
         ITaikoInbox.ForkHeights memory forkHeights;
 
@@ -28,7 +30,9 @@ contract InboxTest_ProposeAndProve is InboxTestBase {
             cooldownWindow: 0 hours,
             maxSignalsToReceive: 16,
             maxBlocksPerBatch: 768,
-            forkHeights: forkHeights
+            forkHeights: forkHeights,
+            // Surge: to prevent compilation errors
+            maxVerificationDelay: 0
         });
     }
 
@@ -231,17 +235,17 @@ contract InboxTest_ProposeAndProve is InboxTestBase {
         assertEq(ts.stateRoot, bytes32(uint256(0)));
 
         vm.expectRevert(ITaikoInbox.TransitionNotFound.selector);
-        ts = inbox.getTransitionById(9, uint24(0));
+        inbox.getTransitionsById(9, uint24(0));
 
-        ts = inbox.getTransitionById(9, uint24(1));
+        ts = inbox.getTransitionsById(9, uint24(1))[0];
         assertEq(ts.parentHash, correctBlockhash(8));
         assertEq(ts.blockHash, correctBlockhash(9));
         assertEq(ts.stateRoot, bytes32(uint256(0)));
 
         vm.expectRevert(ITaikoInbox.TransitionNotFound.selector);
-        ts = inbox.getTransitionByParentHash(9, correctBlockhash(9));
+        inbox.getTransitionsByParentHash(9, correctBlockhash(9));
 
-        ts = inbox.getTransitionByParentHash(9, correctBlockhash(8));
+        ts = inbox.getTransitionsByParentHash(9, correctBlockhash(8))[0];
         assertEq(ts.parentHash, correctBlockhash(8));
         assertEq(ts.blockHash, correctBlockhash(9));
         assertEq(ts.stateRoot, bytes32(uint256(0)));
@@ -463,93 +467,14 @@ contract InboxTest_ProposeAndProve is InboxTestBase {
         }
     }
 
-    function test_inbox_reprove_the_same_batch_with_same_transition_will_do_nothing()
-        external
-        transactBy(Alice)
-        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
-        WhenLogAllBatchesAndTransitions
-    {
-        ITaikoInbox.BatchMetadata[] memory metas = new ITaikoInbox.BatchMetadata[](1);
-        ITaikoInbox.Transition[] memory transitions = new ITaikoInbox.Transition[](1);
+    // Surge: remove test
+    // test_inbox_reprove_the_same_batch_with_same_transition_will_do_nothing
 
-        (metas[0],) = _loadMetadataAndInfo(1);
+    // Surge: remove test
+    // test_inbox_reprove_by_transition_with_same_parent_hash_but_different_block_hash_or_state_root_will_pause_inbox
 
-        transitions[0].parentHash = bytes32(uint256(0x100));
-        transitions[0].blockHash = bytes32(uint256(0x101));
-        transitions[0].stateRoot = bytes32(uint256(0x102));
-
-        inbox.proveBatches(abi.encode(metas, transitions), "proof");
-        _logAllBatchesAndTransitions();
-
-        inbox.proveBatches(abi.encode(metas, transitions), "proof");
-
-        assertTrue(!EssentialContract(address(inbox)).paused());
-    }
-
-    function test_inbox_reprove_by_transition_with_same_parent_hash_but_different_block_hash_or_state_root_will_pause_inbox(
-    )
-        external
-        transactBy(Alice)
-        WhenMultipleBatchesAreProposedWithDefaultParameters(1)
-        WhenLogAllBatchesAndTransitions
-    {
-        ITaikoInbox.BatchMetadata[] memory metas = new ITaikoInbox.BatchMetadata[](1);
-        ITaikoInbox.Transition[] memory transitions = new ITaikoInbox.Transition[](1);
-
-        (metas[0],) = _loadMetadataAndInfo(1);
-
-        transitions[0].parentHash = bytes32(uint256(0x100));
-        transitions[0].blockHash = bytes32(uint256(0x101));
-        transitions[0].stateRoot = bytes32(uint256(0x102));
-        inbox.proveBatches(abi.encode(metas, transitions), "proof");
-        _logAllBatchesAndTransitions();
-
-        transitions[0].blockHash = bytes32(uint256(0x103));
-        inbox.proveBatches(abi.encode(metas, transitions), "proof");
-        _logAllBatchesAndTransitions();
-
-        assertTrue(EssentialContract(address(inbox)).paused());
-    }
-
-    function test_inbox_reprove_by_transition_with_same_parent_hash_but_different_block_hash_will_pause_inbox(
-    )
-        external
-        transactBy(Alice)
-        WhenMultipleBatchesAreProposedWithDefaultParameters(9)
-        WhenMultipleBatchesAreProvedWithCorrectTransitions(1, 4)
-        WhenMultipleBatchesAreProvedWithCorrectTransitions(5, 6)
-        WhenLogAllBatchesAndTransitions
-    {
-        uint64 batchId = 5;
-
-        ITaikoInbox.BatchMetadata[] memory metas = new ITaikoInbox.BatchMetadata[](1);
-        ITaikoInbox.Transition[] memory transitions = new ITaikoInbox.Transition[](1);
-
-        (metas[0],) = _loadMetadataAndInfo(batchId);
-        transitions[0].parentHash = correctBlockhash(batchId - 1);
-        transitions[0].blockHash = bytes32(uint256(120));
-        transitions[0].stateRoot = correctStateRoot(batchId);
-
-        // Let the five transition is a conflict one.
-        inbox.proveBatches(abi.encode(metas, transitions), "proof");
-
-        // Verify the tagged conflict transition.
-        ITaikoInbox.TransitionState memory ts = inbox.getTransitionById(batchId, uint24(1));
-        assertEq(ts.blockHash, bytes32(uint256(0)));
-        // Verify the inbox is paused.
-        assertTrue(EssentialContract(address(inbox)).paused());
-
-        vm.startPrank(deployer);
-        EssentialContract(address(inbox)).unpause();
-        vm.stopPrank();
-
-        // Correct the blockhash.
-        transitions[0].blockHash = correctBlockhash(batchId);
-        inbox.proveBatches(abi.encode(metas, transitions), "proof");
-
-        // Verify the inbox is not paused.
-        assertFalse(EssentialContract(address(inbox)).paused());
-    }
+    // Surge: remove test
+    // test_inbox_reprove_by_transition_with_same_parent_hash_but_different_block_hash_will_pause_inbox
 
     function test_proposeBatch_reverts_for_invalid_proposer_and_operator()
         external
@@ -595,7 +520,11 @@ contract InboxTest_ProposeAndProve is InboxTestBase {
         }
 
         vm.startSnapshotGas("proveBatches");
-        inbox.proveBatches(abi.encode(metas, transitions), "proof");
+        // Surge: use happy case proof type
+        inbox.proveBatches(
+            abi.encode(LibProofType.sgxReth().combine(LibProofType.sp1Reth()), metas, transitions),
+            "proof"
+        );
         uint256 gasProveBatches = vm.stopSnapshotGas("proveBatches");
         console2.log("Gas per batch - proving:", gasProveBatches / count);
         console2.log("Gas per batch - total:", (gasProposeBatches + gasProveBatches) / count);

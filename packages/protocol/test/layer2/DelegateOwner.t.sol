@@ -31,11 +31,13 @@ contract TestDelegateOwner is Layer2Test {
         tDelegateOwner = deployDelegateOwner(eBridge, ethereumChainId, address(tBridge));
     }
 
+    // Surge: change the test to accomodate disabling of pause
     function test_delegate_owner_single_non_delegatecall() public onTaiko {
         vm.startPrank(deployer);
         EssentialContract_EmptyStub stub1 = _deployEssentialContract_EmptyStub(
             "stub1", address(new EssentialContract_EmptyStub(address(resolver)))
         );
+        address stub1Impl2 = address(new EssentialContract_EmptyStub(address(resolver)));
         vm.stopPrank();
 
         bytes memory data = abi.encode(
@@ -43,7 +45,7 @@ contract TestDelegateOwner is Layer2Test {
                 uint64(0),
                 address(stub1),
                 false, // CALL
-                abi.encodeCall(EssentialContract.pause, ())
+                abi.encodeCall(UUPSUpgradeable.upgradeTo, (stub1Impl2))
             )
         );
 
@@ -65,7 +67,7 @@ contract TestDelegateOwner is Layer2Test {
         assertTrue(tBridge.messageStatus(hash) == IBridge.Status.DONE);
 
         assertEq(tDelegateOwner.nextTxId(), 1);
-        assertTrue(stub1.paused());
+        assertEq(stub1.impl(), stub1Impl2);
     }
 
     function test_delegate_owner_single_non_delegatecall_self() public onTaiko {
@@ -101,6 +103,7 @@ contract TestDelegateOwner is Layer2Test {
         assertEq(tDelegateOwner.impl(), tDelegateOwnerImpl2);
     }
 
+    // Surge: change the test to accomodate disabling of pause
     function test_delegate_owner_delegate_tMulticall() public onTaiko {
         address tDelegateOwnerImpl2 = address(new DelegateOwner(address(tBridge)));
         address impl1 = address(new EssentialContract_EmptyStub(address(resolver)));
@@ -111,22 +114,19 @@ contract TestDelegateOwner is Layer2Test {
         EssentialContract_EmptyStub stub2 = _deployEssentialContract_EmptyStub("stub2", impl2);
         vm.stopPrank();
 
-        Multicall3.Call3[] memory calls = new Multicall3.Call3[](4);
-        calls[0].target = address(stub1);
-        calls[0].allowFailure = false;
-        calls[0].callData = abi.encodeCall(EssentialContract.pause, ());
+        Multicall3.Call3[] memory calls = new Multicall3.Call3[](3);
 
-        calls[1].target = address(stub2);
+        calls[0].target = address(stub2);
+        calls[0].allowFailure = false;
+        calls[0].callData = abi.encodeCall(UUPSUpgradeable.upgradeTo, (impl2));
+
+        calls[1].target = address(tDelegateOwner);
         calls[1].allowFailure = false;
-        calls[1].callData = abi.encodeCall(UUPSUpgradeable.upgradeTo, (impl2));
+        calls[1].callData = abi.encodeCall(UUPSUpgradeable.upgradeTo, (tDelegateOwnerImpl2));
 
         calls[2].target = address(tDelegateOwner);
         calls[2].allowFailure = false;
-        calls[2].callData = abi.encodeCall(UUPSUpgradeable.upgradeTo, (tDelegateOwnerImpl2));
-
-        calls[3].target = address(tDelegateOwner);
-        calls[3].allowFailure = false;
-        calls[3].callData = abi.encodeCall(DelegateOwner.setAdmin, (David));
+        calls[2].callData = abi.encodeCall(DelegateOwner.setAdmin, (David));
 
         bytes memory data = abi.encode(
             DelegateOwner.Call(
@@ -155,7 +155,6 @@ contract TestDelegateOwner is Layer2Test {
         assertTrue(tBridge.messageStatus(hash) == IBridge.Status.DONE);
 
         assertEq(tDelegateOwner.nextTxId(), 1);
-        assertTrue(stub1.paused());
         assertEq(stub2.impl(), impl2);
         assertEq(tDelegateOwner.impl(), tDelegateOwnerImpl2);
         assertEq(tDelegateOwner.admin(), David);
