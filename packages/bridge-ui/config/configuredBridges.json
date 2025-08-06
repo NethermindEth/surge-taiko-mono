@@ -1,21 +1,21 @@
 {
   "configuredBridges": [
     {
-      "source": "3151908",
+      "source": "560048",
       "destination": "763374",
       "addresses": {
-        "bridgeAddress": "0x75689954C665396167a6D372aC9154814FD30Fa4",
-        "erc20VaultAddress": "0x56e51543785bb41f8f6244aaF09a410d2C22D9A4",
-        "erc721VaultAddress": "0xB00AF8098B4d949AC0C8bfcf5eaCd4FF07d05D28",
-        "erc1155VaultAddress": "0x2dEf0967ccF7F1C5088Afe17ba0eF3D54409c503",
+        "bridgeAddress": "0x33068442AF3b5aE82f3aaE993c7ef45b0177c33F",
+        "erc20VaultAddress": "0xB3eFFBB8570774555F6F5202546e94c868224e99",
+        "erc721VaultAddress": "0x1269D1fBcF435dA0C16c5AEe63FCb108B0A15667",
+        "erc1155VaultAddress": "0xE678457217ee4d75593e38Fa18dE54A5CEE7cD88",
         "crossChainSyncAddress": "",
-        "signalServiceAddress": "0xefc92277E9166C27529CCD889143C6d4B6171595",
+        "signalServiceAddress": "0x41aAA51A42591259510113e00bBb849Eec599fC0",
         "quotaManagerAddress": ""
       }
     },
     {
       "source": "763374",
-      "destination": "3151908",
+      "destination": "560048",
       "addresses": {
         "bridgeAddress": "0x7633740000000000000000000000000000000001",
         "erc20VaultAddress": "0x7633740000000000000000000000000000000002",
