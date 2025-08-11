@@ -13,13 +13,11 @@ contract SurgeDevnetInbox is TaikoInbox {
         uint64 chainId;
         uint64 maxVerificationDelay;
         uint96 livenessBondBase;
-        uint96 livenessBondPerBlock;
     }
 
     uint64 public immutable chainId;
     uint64 public immutable maxVerificationDelay;
     uint96 public immutable livenessBondBase;
-    uint96 public immutable livenessBondPerBlock;
 
     constructor(
         ConfigParams memory _configParams,
@@ -34,7 +32,6 @@ contract SurgeDevnetInbox is TaikoInbox {
         chainId = _configParams.chainId;
         maxVerificationDelay = _configParams.maxVerificationDelay;
         livenessBondBase = _configParams.livenessBondBase;
-        livenessBondPerBlock = _configParams.livenessBondPerBlock;
     }
 
     function pacayaConfig() public view override returns (ITaikoInbox.Config memory) {
@@ -50,16 +47,16 @@ contract SurgeDevnetInbox is TaikoInbox {
             maxBatchesToVerify: 16,
             blockMaxGasLimit: 60_000_000,
             livenessBondBase: livenessBondBase,
-            livenessBondPerBlock: livenessBondPerBlock,
+            livenessBondPerBlock: 0,
             stateRootSyncInternal: 2,
             maxAnchorHeightOffset: 64,
-            // Surge: `baseFeeConfig` is no longer relevant
+            // Surge: Nothing except `sharingPctg` in `baseFeeConfig` is relevant
             baseFeeConfig: LibSharedData.BaseFeeConfig({
-                adjustmentQuotient: 8,
+                adjustmentQuotient: 0,
                 sharingPctg: 75,
-                gasIssuancePerSecond: 100_000_000,
-                minGasExcess: 31_136_000_000, // Resolves to ~0.0999 Gwei
-                maxGasIssuancePerBlock: 6_000_000_000
+                gasIssuancePerSecond: 0,
+                minGasExcess: 0,
+                maxGasIssuancePerBlock: 0
             }),
             provingWindow: 24 hours,
             cooldownWindow: 7 days,
