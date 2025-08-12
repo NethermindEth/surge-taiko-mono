@@ -10,13 +10,17 @@ check_command "cast"
 check_command "forge"
 check_command "docker"
 
+echo $'\n starting docker \n'
+
 # Start and stop docker-compose
 internal/docker/start.sh
 trap "internal/docker/stop.sh" EXIT INT KILL ERR
 
-# Deploy L1 contracts
-integration_test/deploy_l1_contract.sh
+echo $'\n starting surge deploy \n'
+# Deploy Surge L1 contracts
+integration_test/deploy_surge_l1.sh
 
+echo $'\n starting test_env \n'
 # Load environment variables for the upcoming integration tests
 source integration_test/test_env.sh
 
@@ -42,6 +46,8 @@ check_env "VERBOSITY"
 
 RUN_TESTS=${RUN_TESTS:-false}
 PACKAGE=${PACKAGE:-...}
+
+echo $'\n running tests \n'
 
 if [ "$RUN_TESTS" == "true" ]; then
     go test -v -p=1 ./"$PACKAGE" -coverprofile=coverage.out -covermode=atomic -timeout=700s
