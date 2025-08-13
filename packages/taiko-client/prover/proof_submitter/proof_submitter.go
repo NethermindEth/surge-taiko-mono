@@ -176,8 +176,8 @@ func (s *ProofSubmitterPacaya) RequestProof(ctx context.Context, meta metadata.T
 					// If zk proof is not drawn
 					log.Debug("ZK proof was not chosen for some reason, check raiko host", "batchID", opts.BatchID)
 				}
-				log.Debug("Failed to request SGX + ZK proofs, retrying", "batchID", opts.BatchID, "error", err)
-				return fmt.Errorf("failed to request sgx + zk proofs, error: %w", err)
+				log.Debug("Failed to request SGX + TDX + ZK proofs, retrying", "batchID", opts.BatchID, "error", err)
+				return fmt.Errorf("failed to request sgx + tdx + zk proofs, error: %w", err)
 			}
 
 			// Try to add the proof to the buffer.
@@ -195,7 +195,7 @@ func (s *ProofSubmitterPacaya) RequestProof(ctx context.Context, meta metadata.T
 				)
 			}
 			log.Info(
-				"Proof generated (SGX + ZK)",
+				"Proof generated (SGX + TDX + ZK)",
 				"batchID", meta.Pacaya().GetBatchID(),
 				"bufferSize", bufferSize,
 				"maxBufferSize", proofBuffer.MaxLength,
@@ -318,7 +318,7 @@ func (s *ProofSubmitterPacaya) AggregateProofsByType(ctx context.Context, proofT
 	// nolint:exhaustive
 	// We deliberately handle only known proof types and catch others in default case
 	switch proofType {
-	case proofProducer.ProofTypeSgx, proofProducer.ProofTypeZKR0, proofProducer.ProofTypeZKSP1:
+	case proofProducer.ProofTypeSgx, proofProducer.ProofTypeTdx, proofProducer.ProofTypeZKR0, proofProducer.ProofTypeZKSP1:
 		producer = s.proofProducer
 	default:
 		return fmt.Errorf("unknown proof type: %s", proofType)
@@ -339,7 +339,7 @@ func (s *ProofSubmitterPacaya) AggregateProofsByType(ctx context.Context, proofT
 			if err != nil {
 				if errors.Is(err, proofProducer.ErrProofInProgress) || errors.Is(err, proofProducer.ErrRetry) {
 					log.Debug(
-						"Aggregating proofs (SGX + ZK)",
+						"Aggregating proofs (SGX + TDX + ZK)",
 						"status", err,
 						"batchSize", len(buffer),
 						"firstID", buffer[0].BatchID,

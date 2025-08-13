@@ -77,8 +77,10 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesPacaya(batchProof *proofProduce
 				"gasLimit", txOpts.GasLimit,
 				"verifier", batchProof.Verifier,
 				"sgxVerifier", batchProof.SgxProofVerifier,
+				"tdxVerifier", batchProof.TdxProofVerifier,
 			)
 		}
+		// TODO: add TDX here
 		if bytes.Compare(batchProof.Verifier.Bytes(), batchProof.SgxProofVerifier.Bytes()) < 0 {
 			subProofs[0] = encoding.SubProof{
 				ProofType: encoding.GetProofTypeFromString(string(batchProof.ProofType)),
@@ -145,6 +147,7 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesPacaya(batchProof *proofProduce
 			"zkProofType", batchProof.ProofType,
 			"zkBatchProofLength", len(batchProof.BatchProof),
 			"sgxBatchProofLength", len(batchProof.SgxBatchProof),
+			"tdxBatchProofLength", len(batchProof.TdxBatchProof),
 		)
 
 		return &txmgr.TxCandidate{
