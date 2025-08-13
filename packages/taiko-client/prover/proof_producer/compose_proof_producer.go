@@ -34,6 +34,7 @@ type ComposeProofProducer struct {
 	Verifiers map[ProofType]common.Address
 
 	RaikoSGXHostEndpoint  string
+	RaikoTDXHostEndpoint  string
 	RaikoZKVMHostEndpoint string
 
 	RaikoRequestTimeout time.Duration
@@ -56,7 +57,7 @@ func (s *ComposeProofProducer) RequestProof(
 	}
 
 	log.Info(
-		"Request SGX + ZK proofs from raiko-host service",
+		"Request SGX + TDX + ZK proofs from raiko-host service",
 		"batchID", batchID,
 		"coinbase", meta.Pacaya().GetCoinbase(),
 		"time", time.Since(requestAt),
@@ -97,6 +98,34 @@ func (s *ComposeProofProducer) RequestProof(
 
 		// Note: we mark the `IsRethSGXProofGenerated` with true to record if it is first time generated
 		opts.PacayaOptions().IsRethSGXProofGenerated = true
+		return nil
+	})
+	g.Go(func() error {
+		// TDX proof request raiko-host service
+		if s.Dummy {
+			log.Debug("Dummy proof producer requested TDX proof", "batchID", batchID)
+
+			// The following line is a no-op; this is just to showcase the dummy proof producer
+			_, _ = s.DummyProofProducer.RequestProof(opts, batchID, meta, requestAt)
+			return nil
+		}
+
+		// By design we drop the TDX proof response in the following line because at this point we
+		// only need to record that it succeeded and we actually collect it during the next aggregation step
+		if _, err := s.requestBatchProof(
+			ctx,
+			batches,
+			opts.GetProverAddress(),
+			false,
+			ProofTypeTdx,
+			requestAt,
+			opts.PacayaOptions().IsNethermindTdxProofGenerated,
+		); err != nil {
+			return err
+		}
+
+		// Note: we mark the `IsNethermindTdxProofGenerated` with true to record if it is first time generated
+		opts.PacayaOptions().IsNethermindTdxProofGenerated = true
 		return nil
 	})
 	g.Go(func() error {
@@ -179,6 +208,7 @@ func (s *ComposeProofProducer) Aggregate(
 	)
 	var (
 		sgxBatchProofs []byte
+		tdxBatchProofs []byte
 		batchProofs    []byte
 		batches        = make([]*RaikoBatches, 0, len(items))
 		batchIDs       = make([]*big.Int, 0, len(items))
@@ -217,6 +247,35 @@ func (s *ComposeProofProducer) Aggregate(
 		// to record if it is first time generated
 		firstItem.Opts.PacayaOptions().IsRethSGXProofAggregationGenerated = true
 		sgxBatchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
+
+		return nil
+	})
+	g.Go(func() error {
+		if s.Dummy {
+			log.Debug("Dummy proof producer requested TDX batch proof aggregation", "batchSize", len(items))
+
+			resp, _ := s.DummyProofProducer.RequestBatchProofs(items, ProofTypeTdx)
+			tdxBatchProofs = resp.BatchProof
+			return nil
+		}
+
+		resp, err := s.requestBatchProof(
+			ctx,
+			batches,
+			firstItem.Opts.GetProverAddress(),
+			true,
+			ProofTypeTdx,
+			requestAt,
+			firstItem.Opts.PacayaOptions().IsNethermindTdxProofAggregationGenerated,
+		)
+		if err != nil {
+			return err
+		}
+
+		// Note: we mark the `IsNethermindTdxProofAggregationGenerated` in the first item with true
+		// to record if it is first time generated
+		firstItem.Opts.PacayaOptions().IsNethermindTdxProofAggregationGenerated = true
+		tdxBatchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
 
 		return nil
 	})
@@ -262,6 +321,8 @@ func (s *ComposeProofProducer) Aggregate(
 		Verifier:         verifier,
 		SgxBatchProof:    sgxBatchProofs,
 		SgxProofVerifier: s.Verifiers[ProofTypeSgx],
+		TdxBatchProof:    tdxBatchProofs,
+		TdxProofVerifier: s.Verifiers[ProofTypeTdx],
 	}, nil
 }
 
@@ -278,9 +339,16 @@ func (s *ComposeProofProducer) requestBatchProof(
 	ctx, cancel := rpc.CtxWithTimeoutOrDefault(ctx, s.RaikoRequestTimeout)
 	defer cancel()
 
-	endpoint := s.RaikoZKVMHostEndpoint
-	if proofType == ProofTypeSgx {
+	var endpoint string
+	switch proofType {
+	case ProofTypeSgx:
 		endpoint = s.RaikoSGXHostEndpoint
+	case ProofTypeTdx:
+		endpoint = s.RaikoZKVMHostEndpoint
+	case ProofTypeZKAny, ProofTypeZKR0, ProofTypeZKSP1:
+		endpoint = s.RaikoZKVMHostEndpoint
+	default:
+		return nil, fmt.Errorf("unexpected proof type: %s", proofType)
 	}
 
 	log.Debug(

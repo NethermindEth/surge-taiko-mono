@@ -93,6 +93,7 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 
 		// Proof verifiers addresses.
 		sgxVerifierAddress   common.Address
+		tdxVerifierAddress   common.Address
 		risc0VerifierAddress common.Address
 		sp1VerifierAddress   common.Address
 
@@ -112,6 +113,16 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 	}
 	proofTypes = append(proofTypes, producer.ProofTypeSgx)
 	verifiers[producer.ProofTypeSgx] = sgxVerifierAddress
+
+	// Get the required TDX verifier
+	if tdxVerifierAddress, err = p.rpc.GetTDXVerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
+		return fmt.Errorf("failed to get tdx verifier: %w", err)
+	}
+	if tdxVerifierAddress == rpc.ZeroAddress {
+		return fmt.Errorf("tdx verifier not found")
+	}
+	proofTypes = append(proofTypes, producer.ProofTypeTdx)
+	verifiers[producer.ProofTypeTdx] = tdxVerifierAddress
 
 	// Initialize the zk verifiers and zkvm proof producers.
 	if risc0VerifierAddress, err = p.rpc.GetRISC0VerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
@@ -138,6 +149,7 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 	proofProducer = &producer.ComposeProofProducer{
 		Verifiers:             verifiers,
 		RaikoSGXHostEndpoint:  p.cfg.RaikoSGXHostEndpoint,
+		RaikoTDXHostEndpoint:  p.cfg.RaikoTDXHostEndpoint,
 		RaikoZKVMHostEndpoint: p.cfg.RaikoZKVMHostEndpoint,
 		JWT:                   p.cfg.RaikoJWT,
 		RaikoRequestTimeout:   p.cfg.RaikoRequestTimeout,
@@ -153,6 +165,8 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 		switch proofType {
 		case producer.ProofTypeOp, producer.ProofTypeSgx:
 			proofBuffers[proofType] = producer.NewProofBuffer(p.cfg.SGXProofBufferSize)
+		case producer.ProofTypeTdx:
+			proofBuffers[proofType] = producer.NewProofBuffer(p.cfg.TDXProofBufferSize)
 		case producer.ProofTypeZKR0, producer.ProofTypeZKSP1:
 			proofBuffers[proofType] = producer.NewProofBuffer(p.cfg.ZKVMProofBufferSize)
 		default:

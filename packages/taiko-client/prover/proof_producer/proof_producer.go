@@ -43,6 +43,8 @@ type BatchProofs struct {
 	Verifier         common.Address
 	SgxBatchProof    []byte
 	SgxProofVerifier common.Address
+	TdxBatchProof    []byte
+	TdxProofVerifier common.Address
 }
 
 // ProofProducer is an interface that contains all methods to generate a proof.

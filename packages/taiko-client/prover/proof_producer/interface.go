@@ -15,6 +15,7 @@ const (
 	ProofTypeSgxGeth ProofType = "sgxgeth"
 	ProofTypeOp      ProofType = "op"
 	ProofTypeSgx     ProofType = "sgx"
+	ProofTypeTdx     ProofType = "tdx"
 	ProofTypeSgxCPU  ProofType = "native"
 	ProofTypeZKR0    ProofType = "risc0"
 	ProofTypeZKSP1   ProofType = "sp1"
@@ -42,6 +43,9 @@ type ProofRequestOptionsPacaya struct {
 
 	IsRethSGXProofGenerated            bool
 	IsRethSGXProofAggregationGenerated bool
+
+	IsNethermindTdxProofGenerated            bool
+	IsNethermindTdxProofAggregationGenerated bool
 
 	IsRethZKProofGenerated            bool
 	IsRethZKProofAggregationGenerated bool
