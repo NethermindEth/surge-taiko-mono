@@ -1,4 +1,4 @@
-name: "[Nethermind] Relayer Migrations - Docker build and push"
+name: "[Nethermind] Relayer and Migrations - Docker build and push"
 
 on:
   workflow_dispatch:
