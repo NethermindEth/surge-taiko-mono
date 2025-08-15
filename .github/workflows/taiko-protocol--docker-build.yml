@@ -26,10 +26,18 @@ permissions:
 
 jobs:
   build:
-    uses: NethermindEth/github-workflows/.github/workflows/docker-build-push-dockerhub.yaml@v1.3.4
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux/amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+    uses: NethermindEth/github-workflows/.github/workflows/docker-build-push-dockerhub.yaml@v1.5.1
     with:
       image_name: taiko-protocol
-      platforms: "linux/amd64,linux/arm64"
+      runner: ${{ matrix.runner }}
+      platforms: ${{ matrix.platform }}
       context: "packages/protocol"
       dockerfile_path: "packages/protocol/Dockerfile"
       push: ${{ github.event_name != 'pull_request' }}
