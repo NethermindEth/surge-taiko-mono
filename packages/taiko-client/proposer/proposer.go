@@ -91,6 +91,9 @@ func (p *Proposer) InitFromConfig(
 	p.Config = cfg
 	p.lastProposedAt = time.Now()
 	p.checkProfitability = cfg.CheckProfitability
+	if p.checkProfitability {
+		log.Info("Profitability checking enabled - blocks proposed only if fees exceed costs", "checkProfitability", true)
+	}
 
 	// RPC clients
 	if p.rpc, err = rpc.NewClient(p.ctx, cfg.ClientConfig); err != nil {
