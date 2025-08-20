@@ -26,18 +26,11 @@ permissions:
 
 jobs:
   build-migrations:
-    strategy:
-      matrix:
-        include:
-          - runner: ubuntu-latest
-            platform: linux/amd64
-          - runner: ubuntu-24.04-arm
-            platform: linux/arm64
     uses: NethermindEth/github-workflows/.github/workflows/docker-build-push-dockerhub.yaml@v1.5.1
     with:
       image_name: relayer-migrations
-      runner: ${{ matrix.runner }}
-      platforms: ${{ matrix.platform }}
+      runner: ubuntu-24.04-arm
+      setup-qemu: true
       push: ${{ github.event_name != 'pull_request' }}
       context: packages/relayer
       dockerfile_path: packages/relayer/Dockerfile.migrations
@@ -47,18 +40,10 @@ jobs:
       dockerhub_password: ${{ secrets.DOCKER_PASSWORD }}
 
   build-relayer:
-    strategy:
-      matrix:
-        include:
-          - runner: ubuntu-latest
-            platform: linux/amd64
-          - runner: ubuntu-24.04-arm
-            platform: linux/arm64
     uses: NethermindEth/github-workflows/.github/workflows/docker-build-push-dockerhub.yaml@v1.5.1
     with:
       image_name: relayer
-      runner: ${{ matrix.runner }}
-      platforms: ${{ matrix.platform }}
+      runner: ubuntu-24.04-arm
       context: "."
       dockerfile_path: "packages/relayer/Dockerfile"
       push: ${{ github.event_name != 'pull_request' }}
