@@ -10,10 +10,10 @@ library LibProofType {
     // [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, SGX_GETH, SP1_RETH, RISC0_RETH, TDX_RETH, SGX_RETH]
     type ProofType is uint16;
 
-    uint8 internal constant NUM_PROOF_TYPES = 4;
+    uint8 internal constant NUM_PROOF_TYPES = 5;
 
-    uint16 internal constant ZK_MASK = 0x0C; // 0b1100
-    uint16 internal constant TEE_MASK = 0x03; // 0b0011
+    uint16 internal constant ZK_MASK = 0x0C; // 0b01100
+    uint16 internal constant TEE_MASK = 0x13; // 0b10011
 
     // Invidual proof types
     // --------------------
