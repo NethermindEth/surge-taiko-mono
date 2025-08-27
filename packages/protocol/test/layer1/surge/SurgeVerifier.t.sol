@@ -48,7 +48,8 @@ contract SurgeVerifierTestBase is CommonTest {
                     address(sgxRethVerifier),
                     address(tdxRethVerifier),
                     address(risc0RethVerifier),
-                    address(sp1RethVerifier)
+                    address(sp1RethVerifier),
+                    address(0) // sgxGethVerifier not deployed in tests
                 )
             )
         });

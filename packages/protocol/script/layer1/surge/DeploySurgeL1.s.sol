@@ -296,7 +296,8 @@ contract DeploySurgeL1 is DeployCapability {
             verifiers.sgxRethVerifier,
             address(0), // TDX Reth verifier is not deployed yet
             verifiers.risc0RethVerifier,
-            verifiers.sp1RethVerifier
+            verifiers.sp1RethVerifier,
+            address(0) // SGX Geth verifier is not deployed yet
         );
         console2.log("** proofVerifier initialised and ownership transferred to:", l1Owner);
 
