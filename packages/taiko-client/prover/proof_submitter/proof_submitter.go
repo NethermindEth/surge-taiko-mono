@@ -185,6 +185,7 @@ func (s *ProofSubmitterPacaya) RequestProof(ctx context.Context, meta metadata.T
 			}
 
 			// Try to add the proof to the buffer.
+			// TODO(@jmadibekov): rename to zkProofBuffers
 			proofBuffer, exist := s.proofBuffers[proofResponse.ProofType]
 			if !exist {
 				return fmt.Errorf("get unexpected proof type from raiko %s", proofResponse.ProofType)
@@ -322,7 +323,7 @@ func (s *ProofSubmitterPacaya) AggregateProofsByType(ctx context.Context, proofT
 	// nolint:exhaustive
 	// We deliberately handle only known proof types and catch others in default case
 	switch proofType {
-	case proofProducer.ProofTypeSgx, proofProducer.ProofTypeZKR0, proofProducer.ProofTypeZKSP1:
+	case proofProducer.ProofTypeZKR0, proofProducer.ProofTypeZKSP1:
 		producer = s.proofProducer
 	default:
 		return fmt.Errorf("unknown proof type: %s", proofType)

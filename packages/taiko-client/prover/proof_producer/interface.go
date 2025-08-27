@@ -13,12 +13,13 @@ type ProofType string
 // ProofType constants.
 const (
 	ProofTypeSgxGeth ProofType = "sgxgeth"
-	ProofTypeOp      ProofType = "op"
-	ProofTypeSgx     ProofType = "sgx"
-	ProofTypeSgxCPU  ProofType = "native"
-	ProofTypeZKR0    ProofType = "risc0"
-	ProofTypeZKSP1   ProofType = "sp1"
-	ProofTypeZKAny   ProofType = "zk_any"
+	// TODO(@jmadibekov): rename to sgxreth
+	ProofTypeSgx    ProofType = "sgx"
+	ProofTypeSgxAny ProofType = "sgx_any"
+
+	ProofTypeZKR0  ProofType = "risc0"
+	ProofTypeZKSP1 ProofType = "sp1"
+	ProofTypeZKAny ProofType = "zk_any"
 )
 
 // ProofRequestOptions is an interface that contains all options that need to be passed to a backend proof producer

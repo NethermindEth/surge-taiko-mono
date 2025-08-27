@@ -27,11 +27,13 @@ type ProofRequestBody struct {
 
 // ProofResponse represents a response of a proof request.
 type ProofResponse struct {
-	BatchID   *big.Int
-	Meta      metadata.TaikoProposalMetaData
-	Proof     []byte
-	Opts      ProofRequestOptions
-	ProofType ProofType
+	BatchID *big.Int
+	Meta    metadata.TaikoProposalMetaData
+	Proof   []byte
+	Opts    ProofRequestOptions
+	// TODO(@jmadibekov): rename to ZKProofType
+	ProofType    ProofType
+	SGXProofType ProofType
 }
 
 // BatchProofs represents a response of a batch proof request.

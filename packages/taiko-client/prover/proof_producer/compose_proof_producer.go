@@ -38,8 +38,14 @@ type ComposeProofProducer struct {
 
 	RaikoRequestTimeout time.Duration
 	JWT                 string // JWT provided by Raiko
-	ProofType           ProofType
-	Dummy               bool
+
+	// TODO(@jmadibekov): rename to ZKProofType or completely remove it
+	ProofType ProofType
+
+	SgxProofTypeSelected ProofType
+	ZkProofTypeSelected  ProofType
+
+	Dummy bool
 	DummyProofProducer
 }
 
@@ -63,10 +69,12 @@ func (s *ComposeProofProducer) RequestProof(
 	)
 
 	var (
-		proof     []byte
-		proofType ProofType
-		batches   = []*RaikoBatches{{BatchID: batchID, L1InclusionBlockNumber: meta.GetRawBlockHeight()}}
-		g         = new(errgroup.Group)
+		proof []byte
+		// TODO(@jmadibekov): rename to zkProofType
+		proofType    ProofType
+		sgxProofType ProofType
+		batches      = []*RaikoBatches{{BatchID: batchID, L1InclusionBlockNumber: meta.GetRawBlockHeight()}}
+		g            = new(errgroup.Group)
 	)
 
 	g.Go(func() error {
@@ -81,19 +89,22 @@ func (s *ComposeProofProducer) RequestProof(
 			return nil
 		}
 
-		// By design we drop the SGX proof response in the following line because at this point we
+		// By design we drop the SGX proof response in the following lines because at this point we
 		// only need to record that it succeeded and we actually collect it during the next aggregation step
-		if _, err := s.requestBatchProof(
+		resp, err := s.requestBatchProof(
 			ctx,
 			batches,
 			opts.GetProverAddress(),
 			false,
-			ProofTypeSgx,
+			ProofTypeSgxAny,
 			requestAt,
 			opts.PacayaOptions().IsRethSGXProofGenerated,
-		); err != nil {
+		)
+		if err != nil {
 			return err
 		}
+
+		sgxProofType = resp.ProofType
 
 		// Note: we mark the `IsRethSGXProofGenerated` with true to record if it is first time generated
 		opts.PacayaOptions().IsRethSGXProofGenerated = true
@@ -101,7 +112,10 @@ func (s *ComposeProofProducer) RequestProof(
 	})
 	g.Go(func() error {
 		// ZK proof request raiko-host service
+		// TODO(@jmadibekov): make respective changes because of the following comment
 		// Note that s.ProofType here is always ProofTypeZKAny in Surge
+
+		// TODO(@jmadibekov): remove dummy support
 		if s.Dummy {
 			log.Debug("Dummy proof producer requested ZK proof", "batchID", batchID)
 
@@ -144,12 +158,16 @@ func (s *ComposeProofProducer) RequestProof(
 		return nil, fmt.Errorf("failed to get batches proofs: %w", err)
 	}
 
+	s.SgxProofTypeSelected = sgxProofType
+	s.ZkProofTypeSelected = proofType
+
 	return &ProofResponse{
-		BatchID:   batchID,
-		Meta:      meta,
-		Proof:     proof,
-		Opts:      opts,
-		ProofType: proofType,
+		BatchID:      batchID,
+		Meta:         meta,
+		Proof:        proof,
+		Opts:         opts,
+		ProofType:    proofType,
+		SGXProofType: sgxProofType,
 	}, nil
 }
 
@@ -162,9 +180,12 @@ func (s *ComposeProofProducer) Aggregate(
 	if len(items) == 0 {
 		return nil, ErrInvalidLength
 	}
-	// TODO(@jmadibekov): manually test the scenario when risc0 and sp1 proofs are mixed in the same group of batches.
+	// TODO(@jmadibekov): manually test the scenario when risc0 and sp1 proofs are mixed in the same group of batches (if that's even possible)
 	firstItem := items[0]
 	proofType := firstItem.ProofType
+
+	// TODO(@jmadibekov): proofType and ZkProofTypeSelected should be the same, hence make respective changes
+
 	verifier, exist := s.Verifiers[proofType]
 	if !exist {
 		return nil, fmt.Errorf("unknown proof type from raiko %s", proofType)
@@ -192,6 +213,7 @@ func (s *ComposeProofProducer) Aggregate(
 		batchIDs = append(batchIDs, item.Meta.Pacaya().GetBatchID())
 	}
 	g.Go(func() error {
+		// TODO(@jmadibekov): remove dummy support
 		if s.Dummy {
 			log.Debug("Dummy proof producer requested SGX batch proof aggregation", "batchSize", len(items))
 
@@ -205,7 +227,7 @@ func (s *ComposeProofProducer) Aggregate(
 			batches,
 			firstItem.Opts.GetProverAddress(),
 			true,
-			ProofTypeSgx,
+			s.SgxProofTypeSelected,
 			requestAt,
 			firstItem.Opts.PacayaOptions().IsRethSGXProofAggregationGenerated,
 		)
@@ -279,7 +301,7 @@ func (s *ComposeProofProducer) requestBatchProof(
 	defer cancel()
 
 	endpoint := s.RaikoZKVMHostEndpoint
-	if proofType == ProofTypeSgx {
+	if proofType == ProofTypeSgxAny {
 		endpoint = s.RaikoSGXHostEndpoint
 	}
 
