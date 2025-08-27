@@ -53,4 +53,5 @@ forge script ./script/layer2/surge/SetupSurgeL2.s.sol:SetupSurgeL2 \
     $LOG_LEVEL \
     --private-key $PRIVATE_KEY \
     --block-gas-limit $BLOCK_GAS_LIMIT \
+    --gas-estimate-multiplier 2 \
     $GAS_PRICE
