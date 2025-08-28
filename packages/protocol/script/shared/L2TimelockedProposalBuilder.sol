@@ -59,7 +59,9 @@ contract L2TimelockedProposalBuilder is Script {
         // --------------------------------------------------------------------------
         bytes memory proposalData = buildTimelockedProposal();
 
+        console2.log("Proposal Bytes: ");
         console2.logBytes(proposalData);
+        console2.log("----------------\n");
 
         // Write the proposal data to a JSON file
         // --------------------------------------------------------------------------
@@ -113,7 +115,13 @@ contract L2TimelockedProposalBuilder is Script {
             txdata: vm.envBytes("CALL_DATA")
         });
 
+        bytes memory encodedCall = abi.encode(call);
+
+        console2.log("Encoded Delegate Owner call: ");
+        console2.logBytes(encodedCall);
+        console2.log("----------------\n");
+
         // Encode the call data for onMessageInvocation
-        return abi.encodeWithSelector(DelegateOwner.onMessageInvocation.selector, abi.encode(call));
+        return abi.encodeWithSelector(DelegateOwner.onMessageInvocation.selector, encodedCall);
     }
 }
