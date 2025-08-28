@@ -2,15 +2,22 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "../automata-attestation/utils/BytesUtils.sol";
 import "src/shared/common/EssentialContract.sol";
 import "src/shared/libs/LibStrings.sol";
-import "../automata-attestation/interfaces/IAttestation.sol";
 import "../automata-attestation/lib/QuoteV3Auth/V3Struct.sol";
 import "../based/ITaikoInbox.sol";
 import "./LibPublicInput.sol";
 import "./IVerifier.sol";
 
-import {AzureTDX} from "azure-tdx-verifier/AzureTDX.sol";
+import { AzureTDX } from "azure-tdx-verifier/AzureTDX.sol";
+
+interface IAutomataDcapAttestation {
+    function verifyAndAttestOnChain(bytes calldata rawQuote)
+        external
+        payable
+        returns (bool, bytes memory);
+}
 
 /// @title AzureTdxVerifier
 /// @notice This contract is the implementation of verifying TDX signature proofs
@@ -23,6 +30,15 @@ contract AzureTdxVerifier is EssentialContract, IVerifier {
     struct Instance {
         address addr;
         uint64 validSince;
+    }
+
+    /// @dev Parameters for trusted TDX instances
+    struct TrustedParams {
+        bytes16 teeTcbSvn;
+        uint24 pcrBitmap;
+        bytes mrSeam;
+        bytes mrTd;
+        bytes32[] pcrs;
     }
 
     /// @notice The expiry time for the TDX instance.
@@ -59,9 +75,13 @@ contract AzureTdxVerifier is EssentialContract, IVerifier {
 
     /// @dev Indicates whether a quote nonce hash has been used or not.
     /// Slot 4.
-    mapping(bytes nonceHash => bool isUsed) public nonceUsed;
+    mapping(bytes32 nonceHash => bool isUsed) public nonceUsed;
 
-    uint256[46] private __gap;
+    /// @dev The trusted parameters for trusted TDX instances
+    /// Slot 5.
+    mapping(uint256 index => TrustedParams trustedParams) public trustedParams;
+
+    uint256[45] private __gap;
 
     /// @notice Emitted when a new TDX instance is added to the registry, or replaced.
     /// @param id The ID of the TDX instance.
@@ -78,10 +98,21 @@ contract AzureTdxVerifier is EssentialContract, IVerifier {
     /// @param instance The address of the TDX instance.
     event InstanceDeleted(uint256 indexed id, address indexed instance);
 
+    /// @notice Emitted when trusted params are updated
+    /// @param index The index of the trusted params
+    /// @param params The trusted params
+    event TrustedParamsUpdated(uint256 indexed index, TrustedParams params);
+
     error TDX_ALREADY_ATTESTED();
     error TDX_INVALID_ATTESTATION();
     error TDX_INVALID_INSTANCE();
     error TDX_INVALID_PROOF();
+    error TDX_INVALID_TRUSTED_PARAMS();
+    error TDX_INVALID_VERSION_TYPE();
+    error TDX_INVALID_TCB_SVN();
+    error TDX_INVALID_MR_SEAM();
+    error TDX_INVALID_MR_TD();
+    error TDX_INVALID_PCR();
 
     constructor(
         uint64 _taikoChainId,
@@ -129,15 +160,33 @@ contract AzureTdxVerifier is EssentialContract, IVerifier {
         }
     }
 
+    /// @notice Sets the trusted parameters for quote verification to a specific index
+    /// @param index The index of the trusted parameters
+    /// @param _params The trusted parameters
+    function setTrustedParams(uint256 index, TrustedParams calldata _params) external onlyOwner {
+        trustedParams[index] = _params;
+        emit TrustedParamsUpdated(index, _params);
+    }
+
     /// @notice Adds an TDX instance after the attestation is verified
+    /// @param _trustedParamsIdx The index of the trusted parameters.
     /// @param _attestation The attestation verification parameters.
     /// @return The respective instanceId
-    function registerInstance(AzureTDX.VerifyParams memory _attestation)
+    function registerInstance(
+        uint256 _trustedParamsIdx,
+        AzureTDX.VerifyParams memory _attestation
+    )
         external
         returns (uint256)
     {
-        bool verified = IAttestation(automataDcapAttestation).verifyAttestation(AzureTDX.verify(_attestation));
+        (bool verified, bytes memory output) = IAutomataDcapAttestation(automataDcapAttestation)
+            .verifyAndAttestOnChain(AzureTDX.verify(_attestation));
         require(verified, TDX_INVALID_ATTESTATION());
+
+        TrustedParams memory params = trustedParams[_trustedParamsIdx];
+        require(params.pcrBitmap != 0, TDX_INVALID_TRUSTED_PARAMS());
+
+        _validateAttestationOutput(output, _attestation, params);
 
         bytes32 nonceHash = keccak256(_attestation.nonce);
         require(!nonceUsed[nonceHash], TDX_INVALID_ATTESTATION());
@@ -236,5 +285,44 @@ contract AzureTdxVerifier is EssentialContract, IVerifier {
         require(instance == instances[id].addr, TDX_INVALID_INSTANCE());
         return instances[id].validSince <= block.timestamp
             && block.timestamp <= instances[id].validSince + INSTANCE_EXPIRY;
+    }
+
+    function _validateAttestationOutput(
+        bytes memory _attestationOutput,
+        AzureTDX.VerifyParams memory _attestation,
+        TrustedParams memory _params
+    )
+        private
+        view
+    {
+        bytes6 teeVersionType = bytes6(BytesUtils.substring(_attestationOutput, 0, 6));
+
+        // TEE Version (0x04) || TEE Type (0x81000000)
+        require(teeVersionType == 0x000481000000, TDX_INVALID_VERSION_TYPE());
+
+        bytes16 teeTcbSvn = bytes16(BytesUtils.substring(_attestationOutput, 13, 16));
+
+        require(teeTcbSvn == _params.teeTcbSvn, TDX_INVALID_TCB_SVN());
+
+        bytes memory mrSeam = BytesUtils.substring(_attestationOutput, 29, 48);
+        require(mrSeam.length == _params.mrSeam.length, TDX_INVALID_MR_SEAM());
+        require(keccak256(mrSeam) == keccak256(_params.mrSeam), TDX_INVALID_MR_SEAM());
+
+        bytes memory mrTd = BytesUtils.substring(_attestationOutput, 149, 48);
+        require(mrTd.length == _params.mrTd.length, TDX_INVALID_MR_TD());
+        require(keccak256(mrTd) == keccak256(_params.mrTd), TDX_INVALID_MR_TD());
+
+        bytes32[] memory pcrs = new bytes32[](24);
+        for (uint256 i; i < _attestation.pcrs.length; ++i) {
+            pcrs[_attestation.pcrs[i].index] = _attestation.pcrs[i].digest;
+        }
+
+        uint256 pcrIdx;
+        for (uint256 i; i < 24; ++i) {
+            if (_params.pcrBitmap & (1 << i) != 0) {
+                require(pcrs[i] == _params.pcrs[pcrIdx], TDX_INVALID_PCR());
+                ++pcrIdx;
+            }
+        }
     }
 }
