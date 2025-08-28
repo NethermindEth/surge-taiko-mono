@@ -28,11 +28,6 @@ library LibProofType {
         return ProofType.wrap(0x01);
     }
 
-    /// @dev TDX Reth proof type (0b0010)
-    function tdxReth() internal pure returns (ProofType) {
-        return ProofType.wrap(0x02);
-    }
-
     /// @dev RISC-0 Reth proof type (0b0100)
     function risc0Reth() internal pure returns (ProofType) {
         return ProofType.wrap(0x04);
