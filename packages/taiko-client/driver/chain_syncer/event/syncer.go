@@ -13,6 +13,7 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
+	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/chain_syncer/beaconsync"
 	blocksInserter "github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/chain_syncer/event/blocks_inserter"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/state"
@@ -37,8 +38,9 @@ type Syncer struct {
 	// Blocks inserters
 	blocksInserterPacaya blocksInserter.Inserter // Pacaya blocks inserter
 
-	lastInsertedBatchID *big.Int
-	reorgDetectedFlag   bool
+	lastInsertedBatchID     *big.Int
+	reorgDetectedFlag       bool
+	batchesRollbackedRanges BatchesRollbackedRanges
 }
 
 // NewSyncer creates a new syncer instance.
@@ -90,6 +92,7 @@ func NewSyncer(
 			txListFetcherBlob,
 			latestSeenProposalCh,
 		),
+		batchesRollbackedRanges: nil,
 	}, nil
 }
 
@@ -139,6 +142,22 @@ func (s *Syncer) processL1Blocks(ctx context.Context) error {
 		s.lastInsertedBatchID = nil
 	}
 
+	// Fetch all the rollbacked batches before processing the new batches.
+	rollbackedIterator, err := eventIterator.NewBatchesRollbackedIterator(ctx, &eventIterator.BatchesRollbackedIteratorConfig{
+		Client:                   s.rpc.L1,
+		TaikoInbox:               s.rpc.PacayaClients.TaikoInbox,
+		StartHeight:              s.state.GetL1Current().Number,
+		EndHeight:                l1End.Number,
+		OnBatchesRollbackedEvent: s.onBatchesRollbacked,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := rollbackedIterator.Iter(); err != nil {
+		return err
+	}
+
 	iter, err := eventIterator.NewBatchProposedIterator(ctx, &eventIterator.BatchProposedIteratorConfig{
 		Client:               s.rpc.L1,
 		TaikoInbox:           s.rpc.PacayaClients.TaikoInbox,
@@ -160,6 +179,27 @@ func (s *Syncer) processL1Blocks(ctx context.Context) error {
 		metrics.DriverL1CurrentHeightGauge.Set(float64(s.state.GetL1Current().Number.Uint64()))
 	}
 
+	return nil
+}
+
+// onBatchesRollbacked is a `BatchesRollbacked` event callback which is responsible for
+// updating the batches rollbacked ranges.
+func (s *Syncer) onBatchesRollbacked(
+	ctx context.Context,
+	event *pacayaBindings.TaikoInboxClientBatchesRollbacked,
+	endIter eventIterator.EndBatchesRollbackedEventIterFunc,
+) error {
+	log.Info("BatchesRollbacked event received",
+		"startBatchID", event.StartId,
+		"endBatchID", event.EndId,
+		"l1BlockHeight", event.Raw.BlockNumber,
+		"totalBatchesToSkip", event.EndId-event.StartId+1)
+
+	s.batchesRollbackedRanges = append(s.batchesRollbackedRanges, BatchesRollbacked{
+		StartBatchID: event.StartId,
+		EndBatchID:   event.EndId,
+	})
+	endIter()
 	return nil
 }
 
@@ -225,6 +265,15 @@ func (s *Syncer) onBatchProposed(
 			"now", time.Now().Unix(),
 		)
 		time.Sleep(time.Until(time.Unix(int64(timestamp), 0)))
+	}
+
+	// If the batch ID is in the rollbacked ranges, we skip the batch insertion.
+	if s.batchesRollbackedRanges != nil && s.batchesRollbackedRanges.Contains(meta.Pacaya().GetBatchID().Uint64()) {
+		log.Info(
+			"Skip batch due to batch present in rollbacked range",
+			"batchID", meta.Pacaya().GetBatchID(),
+		)
+		return nil
 	}
 
 	// Insert new blocks to L2 EE's chain.
