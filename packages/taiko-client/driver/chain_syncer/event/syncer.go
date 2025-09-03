@@ -19,6 +19,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/state"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/types"
 
 	anchorTxConstructor "github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/anchor_tx_constructor"
 	txListDecompressor "github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/txlist_decompressor"
@@ -40,7 +41,7 @@ type Syncer struct {
 
 	lastInsertedBatchID     *big.Int
 	reorgDetectedFlag       bool
-	batchesRollbackedRanges BatchesRollbackedRanges
+	batchesRollbackedRanges types.BatchesRollbackedRanges
 }
 
 // NewSyncer creates a new syncer instance.
@@ -193,9 +194,9 @@ func (s *Syncer) onBatchesRollbacked(
 		"startBatchID", event.StartId,
 		"endBatchID", event.EndId,
 		"l1BlockHeight", event.Raw.BlockNumber,
-		"totalBatchesToSkip", event.EndId-event.StartId+1)
+		"totalBatchesRollBacked", event.EndId-event.StartId+1)
 
-	s.batchesRollbackedRanges = append(s.batchesRollbackedRanges, BatchesRollbacked{
+	s.batchesRollbackedRanges = append(s.batchesRollbackedRanges, types.BatchesRollbacked{
 		StartBatchID: event.StartId,
 		EndBatchID:   event.EndId,
 	})
@@ -270,8 +271,9 @@ func (s *Syncer) onBatchProposed(
 	// If the batch ID is in the rollbacked ranges, we skip the batch insertion.
 	if s.batchesRollbackedRanges != nil && s.batchesRollbackedRanges.Contains(meta.Pacaya().GetBatchID().Uint64()) {
 		log.Info(
-			"Skip batch due to batch present in rollbacked range",
+			"Skip batch since it is present in the rollbacked range",
 			"batchID", meta.Pacaya().GetBatchID(),
+			"lastInsertedBatchID", s.lastInsertedBatchID,
 		)
 		return nil
 	}

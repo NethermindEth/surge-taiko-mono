@@ -14,7 +14,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 )
 
-// EndBatchesRolledBackEventIterFunc ends the current iteration.
+// EndBatchesRollBackedEventIterFunc ends the current iteration.
 type EndBatchesRollbackedEventIterFunc func()
 
 // OnBatchesRollbackedEvent represents the callback function which will be called when a TaikoInbox.BatchesRollbacked event is
@@ -25,7 +25,7 @@ type OnBatchesRollbackedEvent func(
 	EndBatchesRollbackedEventIterFunc,
 ) error
 
-// BatchesRolledBackIterator iterates the emitted TaikoInbox.BatchesRolledBack events in the chain,
+// BatchesRollbackedIterator iterates the emitted TaikoInbox.BatchesRollbacked events in the chain,
 // with the awareness of reorganization.
 type BatchesRollbackedIterator struct {
 	ctx                context.Context
@@ -34,7 +34,7 @@ type BatchesRollbackedIterator struct {
 	isEnd              bool
 }
 
-// BatchesRolledBackIteratorConfig represents the configs of a BatchesRolledBack event iterator.
+// BatchesRollbackedIteratorConfig represents the configs of a BatchesRollbacked event iterator.
 type BatchesRollbackedIteratorConfig struct {
 	Client                   *rpc.EthClient
 	TaikoInbox               *pacayaBindings.TaikoInboxClient
