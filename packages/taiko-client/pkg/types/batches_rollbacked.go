@@ -1,4 +1,4 @@
-package event
+package types
 
 type BatchesRollbacked struct {
 	StartBatchID uint64
