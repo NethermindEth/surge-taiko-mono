@@ -4,12 +4,12 @@
       "source": "560048",
       "destination": "763374",
       "addresses": {
-        "bridgeAddress": "0x5757915bF011d5fEd9F6F5C5B9a831D46e696F45",
-        "erc20VaultAddress": "0xe7bd5b31F404D6E4d4984a417C29CF615ca95539",
-        "erc721VaultAddress": "0x610654492ef659cb67726c09016D21CC509268B9",
-        "erc1155VaultAddress": "0x195E28cE7A8B9C120F4cad6BCD502e71aed3863A",
+        "bridgeAddress": "0x144B7C956a04dBE673d290c33580B6e108B9CCe3",
+        "erc20VaultAddress": "0x090b1De27C6d845eC685C5121230fa8c60217B4E",
+        "erc721VaultAddress": "0xa3C7748be9708E07Cf08630360d8618B17530e2F",
+        "erc1155VaultAddress": "0x28cb39BF85CCfDeB910Ee60551B9fae298D19fc4",
         "crossChainSyncAddress": "",
-        "signalServiceAddress": "0x61a775d58071EF632678e0af49256749e48BC55B",
+        "signalServiceAddress": "0x97872E58F1732dC74ceC58b3bC34a1aB09AF79F2",
         "quotaManagerAddress": ""
       }
     },
