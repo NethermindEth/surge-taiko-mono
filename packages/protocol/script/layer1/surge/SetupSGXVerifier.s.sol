@@ -98,6 +98,16 @@ contract SetupSGXVerifier is Script, DeployCapability {
             // Parse bytes input
             V3Struct.ParsedV3QuoteStruct memory v3quote =
                 AttestationLib.parseV3QuoteBytes(pemCertChainLibAddr, v3QuoteBytes);
+            
+            // Log the instance id to Json
+            vm.writeJson(
+                vm.serializeUint(
+                    "sgx_instance_ids",
+                    "sgx_instance_id",
+                    SgxVerifier(sgxVerifierAddress).nextInstanceId()
+                ),
+                string.concat(vm.projectRoot(), "/deployments/sgx_instances.json")
+            );
 
             // Log the instance id to Json
             uint256 instanceId = sgxVerifier.nextInstanceId();
