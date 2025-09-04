@@ -928,8 +928,8 @@ func (c *Client) GetForcedInclusionPacaya(ctx context.Context) (
 	return &forcedInclusion, new(big.Int).SetUint64(uint64(minTxsPerForcedInclusion)), nil
 }
 
-// GetSGXVerifierPacaya resolves the Pacaya sgx verifier address.
-func (c *Client) GetSGXVerifierPacaya(opts *bind.CallOpts) (common.Address, error) {
+// GetSGXRethVerifierPacaya resolves the Pacaya sgx reth verifier address.
+func (c *Client) GetSGXRethVerifierPacaya(opts *bind.CallOpts) (common.Address, error) {
 	if c.PacayaClients.SurgeVerifier == nil {
 		return common.Address{}, errors.New("surgeVerifier contract is not set")
 	}
@@ -955,15 +955,13 @@ func (c *Client) GetSP1VerifierPacaya(opts *bind.CallOpts) (common.Address, erro
 	return getImmutableAddressFromStructPacaya(c, opts, c.PacayaClients.SurgeVerifier.Sp1RethVerifier)
 }
 
-// GetSgxGethVerifierPacaya resolves the Pacaya sgx geth verifier address.
-func (c *Client) GetSgxGethVerifierPacaya(opts *bind.CallOpts) (common.Address, error) {
+// GetSGXGethVerifierPacaya resolves the Pacaya sgx geth verifier address.
+func (c *Client) GetSGXGethVerifierPacaya(opts *bind.CallOpts) (common.Address, error) {
 	if c.PacayaClients.SurgeVerifier == nil {
 		return common.Address{}, errors.New("surgeVerifier contract is not set")
 	}
 
-	// TODO(@jmadibekov)
-	return getImmutableAddressFromStructPacaya(c, opts, c.PacayaClients.SurgeVerifier.SgxRethVerifier)
-	// return getImmutableAddressFromStructPacaya(c, opts, c.PacayaClients.SurgeVerifier.SgxGethVerifer)
+	return getImmutableAddressFromStructPacaya(c, opts, c.PacayaClients.SurgeVerifier.SgxGethVerifier)
 }
 
 // GetPreconfRouterPacaya resolves the preconfirmation router address.

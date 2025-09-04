@@ -94,7 +94,7 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 
 		// Proof verifiers addresses.
 		sgxGethVerifierAddress common.Address
-		sgxVerifierAddress     common.Address
+		sgxRethVerifierAddress common.Address
 		risc0VerifierAddress   common.Address
 		sp1VerifierAddress     common.Address
 
@@ -105,23 +105,21 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 		err error
 	)
 
-	// Get the required sgx geth verifier address from the protocol
-	if sgxGethVerifierAddress, err = p.rpc.GetSgxGethVerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
+	// Get the sgx geth verifier address from the protocol
+	if sgxGethVerifierAddress, err = p.rpc.GetSGXGethVerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
 		return fmt.Errorf("failed to get sgx geth verifier: %w", err)
 	}
-	if sgxGethVerifierAddress == rpc.ZeroAddress {
-		return fmt.Errorf("sgx geth verifier not found")
+	if sgxGethVerifierAddress != rpc.ZeroAddress {
+		verifiers[producer.ProofTypeSgxGeth] = sgxGethVerifierAddress
 	}
-	verifiers[producer.ProofTypeSgxGeth] = sgxGethVerifierAddress
 
-	// Get the required sgx reth verifier address from the protocol
-	if sgxVerifierAddress, err = p.rpc.GetSGXVerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
+	// Get the sgx reth verifier address from the protocol
+	if sgxRethVerifierAddress, err = p.rpc.GetSGXRethVerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
 		return fmt.Errorf("failed to get sgx verifier: %w", err)
 	}
-	if sgxVerifierAddress == rpc.ZeroAddress {
-		return fmt.Errorf("sgx verifier not found")
+	if sgxRethVerifierAddress != rpc.ZeroAddress {
+		verifiers[producer.ProofTypeSgx] = sgxRethVerifierAddress
 	}
-	verifiers[producer.ProofTypeSgx] = sgxVerifierAddress
 
 	if len(verifiers) == 0 {
 		return fmt.Errorf("at least one of the sgx verifiers (sgx geth, sgx reth) must be set")
@@ -147,17 +145,16 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 		return fmt.Errorf("at least one of the zk verifiers (risc0, sp1) must be set")
 	}
 
-	log.Info("Initialize prover", "type", producer.ProofTypeZKAny, "verifiers", verifiers)
-
 	proofProducer = &producer.ComposeProofProducer{
 		Verifiers:             verifiers,
 		RaikoSGXHostEndpoint:  p.cfg.RaikoSGXHostEndpoint,  // used for sgx geth + sgx reth
 		RaikoZKVMHostEndpoint: p.cfg.RaikoZKVMHostEndpoint, // used for risc0 + sp1
 		JWT:                   p.cfg.RaikoJWT,
 		RaikoRequestTimeout:   p.cfg.RaikoRequestTimeout,
-		ProofType:             producer.ProofTypeZKAny,
 		Dummy:                 p.cfg.Dummy,
 	}
+
+	log.Info("Initialize prover", "proofProducer", proofProducer)
 
 	// Init proof buffers.
 	var proofBuffers = make(map[producer.ProofType]*producer.ProofBuffer, proofSubmitter.MaxNumSupportedProofTypes)
@@ -165,7 +162,7 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 	// We deliberately handle only known proof types and catch others in default case
 	for _, proofType := range proofTypes {
 		switch proofType {
-		case producer.ProofTypeZKR0, producer.ProofTypeZKSP1: // we need buffers only for risc0 + sp1, by design
+		case producer.ProofTypeZKR0, producer.ProofTypeZKSP1: // only for risc0 + sp1 by design
 			proofBuffers[proofType] = producer.NewProofBuffer(p.cfg.ZKVMProofBufferSize)
 		default:
 			return fmt.Errorf("unexpected proof type: %s", proofType)

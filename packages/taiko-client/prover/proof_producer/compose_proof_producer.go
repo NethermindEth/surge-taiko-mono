@@ -39,12 +39,6 @@ type ComposeProofProducer struct {
 	RaikoRequestTimeout time.Duration
 	JWT                 string // JWT provided by Raiko
 
-	// TODO(@jmadibekov): rename to ZKProofType or completely remove it
-	ProofType ProofType
-
-	SgxProofTypeSelected ProofType
-	ZkProofTypeSelected  ProofType
-
 	Dummy bool
 	DummyProofProducer
 }
@@ -69,28 +63,15 @@ func (s *ComposeProofProducer) RequestProof(
 	)
 
 	var (
-		proof []byte
-		// TODO(@jmadibekov): rename to zkProofType
-		proofType    ProofType
+		proof        []byte
+		zkProofType  ProofType
 		sgxProofType ProofType
 		batches      = []*RaikoBatches{{BatchID: batchID, L1InclusionBlockNumber: meta.GetRawBlockHeight()}}
 		g            = new(errgroup.Group)
 	)
 
 	g.Go(func() error {
-		// SGX proof request raiko-host service
-		// Note that - unlike `taiko-mono` upstream - we don't request the SGXGeth in Surge,
-		// instead we request the normal SGX proof
-		if s.Dummy {
-			log.Debug("Dummy proof producer requested SGX proof", "batchID", batchID)
-
-			// The following line is a no-op; this is just to showcase the dummy proof producer
-			_, _ = s.DummyProofProducer.RequestProof(opts, batchID, meta, requestAt)
-			return nil
-		}
-
-		// By design we drop the SGX proof response in the following lines because at this point we
-		// only need to record that it succeeded and we actually collect it during the next aggregation step
+		// => SGX proof request raiko-host service
 		resp, err := s.requestBatchProof(
 			ctx,
 			batches,
@@ -98,7 +79,7 @@ func (s *ComposeProofProducer) RequestProof(
 			false,
 			ProofTypeSgxAny,
 			requestAt,
-			opts.PacayaOptions().IsRethSGXProofGenerated,
+			opts.PacayaOptions().IsSGXProofGenerated,
 		)
 		if err != nil {
 			return err
@@ -106,48 +87,30 @@ func (s *ComposeProofProducer) RequestProof(
 
 		sgxProofType = resp.ProofType
 
-		// Note: we mark the `IsRethSGXProofGenerated` with true to record if it is first time generated
-		opts.PacayaOptions().IsRethSGXProofGenerated = true
+		// Note: we mark the `IsSGXProofGenerated` with true to record if it is first time generated
+		opts.PacayaOptions().IsSGXProofGenerated = true
 		return nil
 	})
 	g.Go(func() error {
-		// ZK proof request raiko-host service
-		// TODO(@jmadibekov): make respective changes because of the following comment
-		// Note that s.ProofType here is always ProofTypeZKAny in Surge
-
-		// TODO(@jmadibekov): remove dummy support
-		if s.Dummy {
-			log.Debug("Dummy proof producer requested ZK proof", "batchID", batchID)
-
-			// For the dummy proof producer, we just use the sp1 proof type (as zk_any would break the logic down the line)
-			proofType = ProofTypeZKSP1
-			if resp, err := s.DummyProofProducer.RequestProof(opts, batchID, meta, requestAt); err != nil {
-				return err
-			} else {
-				proof = resp.Proof
-			}
-
-			return nil
-		}
-
+		// => ZK proof request raiko-host service
 		resp, err := s.requestBatchProof(
 			ctx,
 			batches,
 			opts.GetProverAddress(),
 			false,
-			s.ProofType,
+			ProofTypeZKAny,
 			requestAt,
-			opts.PacayaOptions().IsRethZKProofGenerated,
+			opts.PacayaOptions().IsZKProofGenerated,
 		)
 		if err != nil {
 			return err
 		}
 
-		proofType = resp.ProofType
-		// Note: we mark the `IsRethZKProofGenerated` with true to record if it is first time generated
-		opts.PacayaOptions().IsRethZKProofGenerated = true
+		zkProofType = resp.ProofType
+		// Note: we mark the `IsZKProofGenerated` with true to record if it is first time generated
+		opts.PacayaOptions().IsZKProofGenerated = true
 		// Note: Since the single sp1 proof from raiko is null, we need to ignore the case.
-		if ProofTypeZKSP1 != proofType {
+		if ProofTypeZKSP1 != zkProofType {
 			proof = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
 		}
 
@@ -158,15 +121,12 @@ func (s *ComposeProofProducer) RequestProof(
 		return nil, fmt.Errorf("failed to get batches proofs: %w", err)
 	}
 
-	s.SgxProofTypeSelected = sgxProofType
-	s.ZkProofTypeSelected = proofType
-
 	return &ProofResponse{
 		BatchID:      batchID,
 		Meta:         meta,
 		Proof:        proof,
 		Opts:         opts,
-		ProofType:    proofType,
+		ZKProofType:  zkProofType,
 		SGXProofType: sgxProofType,
 	}, nil
 }
@@ -180,19 +140,20 @@ func (s *ComposeProofProducer) Aggregate(
 	if len(items) == 0 {
 		return nil, ErrInvalidLength
 	}
-	// TODO(@jmadibekov): manually test the scenario when risc0 and sp1 proofs are mixed in the same group of batches (if that's even possible)
+	// TODO(@jmadibekov): manually test the scenario when risc0 and sp1 proofs are mixed
+	// in the same group of batches (if that's even possible)
 	firstItem := items[0]
-	proofType := firstItem.ProofType
+	zkProofType := firstItem.ZKProofType
+	sgxProofType := firstItem.SGXProofType
 
-	// TODO(@jmadibekov): proofType and ZkProofTypeSelected should be the same, hence make respective changes
-
-	verifier, exist := s.Verifiers[proofType]
+	verifier, exist := s.Verifiers[zkProofType]
 	if !exist {
-		return nil, fmt.Errorf("unknown proof type from raiko %s", proofType)
+		return nil, fmt.Errorf("unknown proof type from raiko %s", zkProofType)
 	}
 	log.Info(
 		"Aggregate batch proofs from raiko-host service",
-		"proofType", proofType,
+		"zkProofType", zkProofType,
+		"sgxProofType", sgxProofType,
 		"batchSize", len(items),
 		"firstID", firstItem.BatchID,
 		"lastID", items[len(items)-1].BatchID,
@@ -213,61 +174,43 @@ func (s *ComposeProofProducer) Aggregate(
 		batchIDs = append(batchIDs, item.Meta.Pacaya().GetBatchID())
 	}
 	g.Go(func() error {
-		// TODO(@jmadibekov): remove dummy support
-		if s.Dummy {
-			log.Debug("Dummy proof producer requested SGX batch proof aggregation", "batchSize", len(items))
-
-			resp, _ := s.DummyProofProducer.RequestBatchProofs(items, ProofTypeSgx)
-			sgxBatchProofs = resp.BatchProof
-			return nil
-		}
-
 		resp, err := s.requestBatchProof(
 			ctx,
 			batches,
 			firstItem.Opts.GetProverAddress(),
 			true,
-			s.SgxProofTypeSelected,
+			sgxProofType,
 			requestAt,
-			firstItem.Opts.PacayaOptions().IsRethSGXProofAggregationGenerated,
+			firstItem.Opts.PacayaOptions().IsSGXProofAggregationGenerated,
 		)
 		if err != nil {
 			return err
 		}
 
-		// Note: we mark the `IsRethSGXProofAggregationGenerated` in the first item with true
+		// Note: we mark the `IsSGXProofAggregationGenerated` in the first item with true
 		// to record if it is first time generated
-		firstItem.Opts.PacayaOptions().IsRethSGXProofAggregationGenerated = true
+		firstItem.Opts.PacayaOptions().IsSGXProofAggregationGenerated = true
 		sgxBatchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
 
 		return nil
 	})
 	g.Go(func() error {
-		if s.Dummy {
-			log.Debug("Dummy proof producer requested ZK batch proof aggregation", "batchSize", len(items))
-
-			proofType = s.ProofType
-			resp, _ := s.DummyProofProducer.RequestBatchProofs(items, s.ProofType)
-			batchProofs = resp.BatchProof
-			return nil
-		}
-
 		resp, err := s.requestBatchProof(
 			ctx,
 			batches,
 			firstItem.Opts.GetProverAddress(),
 			true,
-			proofType,
+			zkProofType,
 			requestAt,
-			firstItem.Opts.PacayaOptions().IsRethZKProofAggregationGenerated,
+			firstItem.Opts.PacayaOptions().IsZKProofAggregationGenerated,
 		)
 		if err != nil {
 			return err
 		}
 
-		// Note: we mark the `IsRethZKProofAggregationGenerated` in the first item with true
+		// Note: we mark the `IsZKProofAggregationGenerated` in the first item with true
 		// to record if it is first time generated
-		firstItem.Opts.PacayaOptions().IsRethZKProofAggregationGenerated = true
+		firstItem.Opts.PacayaOptions().IsZKProofAggregationGenerated = true
 		batchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
 
 		return nil
@@ -277,13 +220,15 @@ func (s *ComposeProofProducer) Aggregate(
 	}
 
 	return &BatchProofs{
-		ProofResponses:   items,
-		BatchProof:       batchProofs,
-		BatchIDs:         batchIDs,
-		ProofType:        proofType,
-		Verifier:         verifier,
+		ProofResponses: items,
+		BatchProof:     batchProofs,
+		BatchIDs:       batchIDs,
+		ProofType:      zkProofType,
+		Verifier:       verifier,
+
+		SgxProofType:     sgxProofType,
 		SgxBatchProof:    sgxBatchProofs,
-		SgxProofVerifier: s.Verifiers[ProofTypeSgx],
+		SgxProofVerifier: s.Verifiers[sgxProofType],
 	}, nil
 }
 
