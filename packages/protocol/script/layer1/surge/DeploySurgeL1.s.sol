@@ -5,6 +5,10 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
+// Solady for JSON parsing
+import "solady/src/utils/JSONParserLib.sol";
+import "solady/src/utils/LibString.sol";
+
 // Third-party verifiers
 import "@risc0/contracts/groth16/RiscZeroGroth16Verifier.sol";
 import { SP1Verifier as SuccinctVerifier } from
@@ -33,6 +37,7 @@ import "src/layer1/preconf/impl/PreconfRouter.sol";
 import "src/layer1/verifiers/Risc0Verifier.sol";
 import "src/layer1/verifiers/SP1Verifier.sol";
 import "src/layer1/verifiers/SgxVerifier.sol";
+import "src/layer1/verifiers/AzureTdxVerifier.sol";
 
 // Surge contracts
 import "src/layer1/surge/SurgeDevnetInbox.sol";
@@ -53,9 +58,46 @@ import "test/shared/DeployCapability.sol";
 // Named imports to prevent conflicts
 import { SurgeTimelockController } from "src/layer1/surge/common/SurgeTimelockController.sol";
 
+// TDX Automata interfaces (based on the provided snippet)
+interface IPcsDao {
+    function upsertPcsCertificates(uint8 ca, bytes calldata cert) external returns (bytes32 attestationId);
+}
+
+interface IFmspcTcbDao {
+    function upsertFmspcTcb(TcbInfoJsonObj memory tcbInfoJson) external;
+}
+
+interface IAutomataEnclaveIdentityDao {
+    function upsertEnclaveIdentity(uint256 id, uint256 isvsvn, EnclaveIdentityJsonObj memory identityJson) external;
+}
+
+interface IEnclaveIdentityHelper {
+    function parseIdentityString(string memory identityStr) 
+        external pure returns (IdentityObj memory identity, bool success);
+}
+
+// TDX data structures (based on the provided snippet)
+struct TcbInfoJsonObj {
+    string tcbInfoStr;
+    bytes signature;
+}
+
+struct EnclaveIdentityJsonObj {
+    string identityStr;
+    bytes signature;
+}
+
+struct IdentityObj {
+    uint256 id;
+    // Additional fields as needed
+}
+
 /// @title DeploySurgeL1
 /// @notice This script deploys the core Taiko protocol modified for Nethermind's Surge.
 contract DeploySurgeL1 is DeployCapability {
+    using JSONParserLib for JSONParserLib.Item;
+    using LibString for string;
+    
     uint256 internal constant ADDRESS_LENGTH = 40;
 
     // Deployment configuration
@@ -112,6 +154,16 @@ contract DeploySurgeL1 is DeployCapability {
     bytes32 internal immutable mrEnclave = vm.envBytes32("MR_ENCLAVE");
     bytes32 internal immutable mrSigner = vm.envBytes32("MR_SIGNER");
 
+    // TDX verifier configuration
+    bytes internal tdxTrustedParamsBytes = vm.envBytes("TDX_TRUSTED_PARAMS_BYTES");
+    bytes internal tdxQuoteBytes = vm.envBytes("TDX_QUOTE_BYTES");
+
+    // TDX Automata contract addresses
+    address internal immutable tdxPcsDao = vm.envOr("TDX_PCS_DAO_ADDRESS", address(0));
+    address internal immutable tdxFmspcTcbDao = vm.envOr("TDX_FMSPC_TCB_DAO_ADDRESS", address(0));
+    address internal immutable tdxEnclaveIdentityDao = vm.envOr("TDX_ENCLAVE_IDENTITY_DAO_ADDRESS", address(0));
+    address internal immutable tdxEnclaveIdentityHelper = vm.envOr("TDX_ENCLAVE_IDENTITY_HELPER_ADDRESS", address(0));
+
     struct SharedContracts {
         address sharedResolver;
         address signalService;
@@ -127,6 +179,7 @@ contract DeploySurgeL1 is DeployCapability {
     }
 
     struct VerifierContracts {
+        address azureTdxVerifier;
         address sgxRethVerifier;
         address risc0RethVerifier;
         address sp1RethVerifier;
@@ -274,6 +327,9 @@ contract DeploySurgeL1 is DeployCapability {
         SgxVerifier(verifiers.sgxRethVerifier).transferOwnership(l1Owner);
         console2.log("** sgxRethVerifier ownership transferred to:", l1Owner);
 
+        AzureTdxVerifier(verifiers.azureTdxVerifier).transferOwnership(l1Owner);
+        console2.log("** azureTdxVerifier ownership transferred to:", l1Owner);
+
         Risc0Verifier(verifiers.risc0RethVerifier).transferOwnership(l1Owner);
         console2.log("** risc0RethVerifier ownership transferred to:", l1Owner);
 
@@ -289,7 +345,7 @@ contract DeploySurgeL1 is DeployCapability {
         SurgeVerifier(rollupContracts.proofVerifier).init(
             l1Owner,
             verifiers.sgxRethVerifier,
-            address(0), // TDX Reth verifier is not deployed yet
+            verifiers.azureTdxVerifier,
             verifiers.risc0RethVerifier,
             verifiers.sp1RethVerifier
         );
@@ -461,6 +517,14 @@ contract DeploySurgeL1 is DeployCapability {
             data: abi.encodeCall(SgxVerifier.init, address(0))
         });
 
+        verifiers.azureTdxVerifier = deployProxy({
+            name: "azure_tdx_verifier",
+            impl: address(new AzureTdxVerifier(l2ChainId, _taikoInbox, _proofVerifier, verifiers.automataProxy)),
+            // Owner is initially the deployer contract because we need to set the
+            // instance
+            data: abi.encodeCall(AzureTdxVerifier.init, address(0))
+        });
+
         (verifiers.risc0RethVerifier, verifiers.sp1RethVerifier) = deployZKVerifiers();
     }
 
@@ -579,6 +643,10 @@ contract DeploySurgeL1 is DeployCapability {
         // Setup SGX Verifier
         // ---------------------------------------------------------------
         setupSGXVerifier(_verifiers);
+        
+        // Setup Azure TDX Verifier
+        // ---------------------------------------------------------------
+        setupAzureTDXVerifier(_verifiers);
     }
 
     function setupSGXVerifier(VerifierContracts memory _verifiers) internal {
@@ -652,6 +720,105 @@ contract DeploySurgeL1 is DeployCapability {
         // Toggle quote validity check
         automataAttestation.toggleLocalReportCheck();
         console2.log("** Quote validity check toggled");
+    }
+
+    function setupAzureTDXVerifier(VerifierContracts memory _verifiers) internal {
+        // Setup Automata DCAP Attestation
+        AzureTdxVerifier azureTdxVerifier =
+            AzureTdxVerifier(_verifiers.azureTdxVerifier);
+
+        if (tdxTrustedParamsBytes.length > 0) {
+            AzureTdxVerifier.TrustedParams memory params = abi.decode(tdxTrustedParamsBytes, (AzureTdxVerifier.TrustedParams));
+            azureTdxVerifier.setTrustedParams(0, params);
+            console2.log("** TDX trusted params configured");
+        }
+
+        setupTDXCollaterals();
+
+        if (tdxQuoteBytes.length > 0) {
+            vm.writeJson(
+                vm.serializeUint(
+                    "tdx_instance_ids",
+                    "tdx_instance_id",
+                    AzureTdxVerifier(_verifiers.azureTdxVerifier).nextInstanceId()
+                ),
+                string.concat(vm.projectRoot(), "/deployments/tdx_instances.json")
+            );
+
+            azureTdxVerifier.registerInstance(0, abi.decode(tdxQuoteBytes, (AzureTDX.VerifyParams)));
+            console2.log("** TDX instance registered with quote");
+        }
+    }
+
+    /// @dev Setup TDX collaterals similar to the provided snippet
+    function setupTDXCollaterals() internal {
+        // Configure PCS certificates if path provided (hex file)
+        string memory pcsCertPath = vm.envOr("TDX_PCS_CERT_PATH", string(""));
+        if (tdxPcsDao != address(0) && bytes(pcsCertPath).length > 0) {
+            bytes memory certBytes = vm.parseBytes(vm.readFile(string.concat(vm.projectRoot(), pcsCertPath)));
+            
+            // Use CA.SIGNING (0) as default - adjust based on your needs
+            IPcsDao(tdxPcsDao).upsertPcsCertificates(0, certBytes);
+            console2.log("** TDX PCS certificates configured");
+        }
+
+        // Configure enclave identity if path provided
+        string memory enclaveIdentityPath = vm.envOr("TDX_QE_IDENTITY_PATH", string(""));
+        if (bytes(enclaveIdentityPath).length > 0 && tdxEnclaveIdentityDao != address(0) 
+            && tdxEnclaveIdentityHelper != address(0)) {
+            string memory enclaveIdentityJson = vm.readFile(string.concat(vm.projectRoot(), enclaveIdentityPath));
+            EnclaveIdentityJsonObj memory identityJsonObj = parseEnclaveIdentityJson(enclaveIdentityJson);
+            
+            (IdentityObj memory identity, bool success) = IEnclaveIdentityHelper(tdxEnclaveIdentityHelper)
+                .parseIdentityString(identityJsonObj.identityStr);
+            require(success, "setupTDXCollaterals: failed to parse enclave identity");
+
+            IAutomataEnclaveIdentityDao(tdxEnclaveIdentityDao).upsertEnclaveIdentity(
+                identity.id, 4, identityJsonObj
+            );
+            console2.log("** TDX enclave identity configured");
+        }
+
+        // Configure TCB info if path provided  
+        string memory tcbInfoPath = vm.envOr("TDX_TCB_INFO_PATH", string(""));
+        if (bytes(tcbInfoPath).length > 0 && tdxFmspcTcbDao != address(0)) {
+            string memory tcbInfoJson = vm.readFile(string.concat(vm.projectRoot(), tcbInfoPath));
+            TcbInfoJsonObj memory tcbInfoJsonObj = parseTcbInfoJson(tcbInfoJson);
+            
+            IFmspcTcbDao(tdxFmspcTcbDao).upsertFmspcTcb(tcbInfoJsonObj);
+            console2.log("** TDX TCB info configured");
+        }
+    }
+
+    /// @dev Parse enclave identity JSON to extract identity string and signature
+    function parseEnclaveIdentityJson(string memory jsonStr) 
+        internal pure returns (EnclaveIdentityJsonObj memory result) {
+        JSONParserLib.Item memory root = JSONParserLib.parse(jsonStr);
+        JSONParserLib.Item[] memory children = root.children();
+        
+        for (uint256 i = 0; i < root.size(); i++) {
+            string memory key = children[i].key();
+            if (LibString.eq(key, "\"enclaveIdentity\"")) {
+                result.identityStr = children[i].value();
+            } else if (LibString.eq(key, "\"signature\"")) {
+                result.signature = vm.parseBytes(JSONParserLib.decodeString(children[i].value()));
+            }
+        }
+    }
+
+    /// @dev Parse TCB info JSON to extract TCB info string and signature  
+    function parseTcbInfoJson(string memory jsonStr) internal pure returns (TcbInfoJsonObj memory result) {
+        JSONParserLib.Item memory root = JSONParserLib.parse(jsonStr);
+        JSONParserLib.Item[] memory children = root.children();
+        
+        for (uint256 i = 0; i < root.size(); i++) {
+            string memory key = children[i].key();
+            if (LibString.eq(key, "\"tcbInfo\"")) {
+                result.tcbInfoStr = children[i].value();
+            } else if (LibString.eq(key, "\"signature\"")) {
+                result.signature = vm.parseBytes(JSONParserLib.decodeString(children[i].value()));
+            }
+        }
     }
 
     /// @dev Deploy the inbox contract based on the L2 network
@@ -738,7 +905,7 @@ contract DeploySurgeL1 is DeployCapability {
 
         // Build L1 contracts list
         // ---------------------------------------------------------------
-        address[] memory l1Contracts = new address[](15);
+        address[] memory l1Contracts = new address[](16);
         l1Contracts[0] = _sharedContracts.signalService;
         l1Contracts[1] = _sharedContracts.bridge;
         l1Contracts[2] = _sharedContracts.erc20Vault;
@@ -754,6 +921,7 @@ contract DeploySurgeL1 is DeployCapability {
         l1Contracts[12] = _verifiers.risc0RethVerifier;
         l1Contracts[13] = _verifiers.sp1RethVerifier;
         l1Contracts[14] = _verifiers.sgxRethVerifier;
+        l1Contracts[15] = _verifiers.azureTdxVerifier;
 
         // Verify ownership
         // ---------------------------------------------------------------
