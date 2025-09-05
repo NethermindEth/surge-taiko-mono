@@ -29,6 +29,7 @@ contract L2TimelockedProposalBuilder is Script {
     // --------------------------------------------------------------------------
     uint64 internal immutable l2ChainId = uint64(vm.envUint("L2_CHAINID"));
     address internal immutable l2DelegateOwner = vm.envAddress("L2_DELEGATE_OWNER");
+    address internal immutable destOwner = vm.envAddress("DEST_OWNER");
 
     // Message configuration
     // --------------------------------------------------------------------------
@@ -80,7 +81,7 @@ contract L2TimelockedProposalBuilder is Script {
             srcChainId: 0, // Will be set by the bridge
             destChainId: l2ChainId,
             srcOwner: l1TimelockController,
-            destOwner: l2DelegateOwner,
+            destOwner: destOwner,
             to: l2DelegateOwner,
             value: value,
             data: delegateOwnerCall,
@@ -92,11 +93,14 @@ contract L2TimelockedProposalBuilder is Script {
         bytes memory bridgeCallData =
             abi.encodeWithSelector(Bridge.sendMessage.selector, bridgeMessage);
 
-        // Step 4: Encode the TimelockController.schedule call
+        console2.log("Bridge call: ");
+        console2.logBytes(bridgeCallData);
+        console2.log("----------------\n");
+
         bytes memory timelockScheduleData = abi.encodeWithSelector(
             TimelockController.schedule.selector,
             l1Bridge, // target
-            value, // value
+            value + fee, // value + fee
             bridgeCallData, // payload
             bytes32(0), // predecessor (no dependency)
             bytes32(0), // salt (no specific salt)
