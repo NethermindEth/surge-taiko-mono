@@ -307,13 +307,14 @@ func (p *Prover) fetchRollbackedBatches() error {
 		return err
 	}
 
-	rollbackedIterator, err := eventIterator.NewBatchesRollbackedIterator(p.ctx, &eventIterator.BatchesRollbackedIteratorConfig{
-		Client:                   p.rpc.L1,
-		TaikoInbox:               p.rpc.PacayaClients.TaikoInbox,
-		StartHeight:              p.sharedState.GetL1Current().Number,
-		EndHeight:                l1head.Number,
-		OnBatchesRollbackedEvent: p.eventHandlers.batchesRollbackedHandler.Handle,
-	})
+	rollbackedIterator, err := eventIterator.NewBatchesRollbackedIterator(
+		p.ctx, &eventIterator.BatchesRollbackedIteratorConfig{
+			Client:                   p.rpc.L1,
+			TaikoInbox:               p.rpc.PacayaClients.TaikoInbox,
+			StartHeight:              p.sharedState.GetL1Current().Number,
+			EndHeight:                l1head.Number,
+			OnBatchesRollbackedEvent: p.eventHandlers.batchesRollbackedHandler.Handle,
+		})
 	if err != nil {
 		return err
 	}

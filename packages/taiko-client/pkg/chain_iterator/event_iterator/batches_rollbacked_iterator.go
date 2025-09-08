@@ -17,8 +17,8 @@ import (
 // EndBatchesRollBackedEventIterFunc ends the current iteration.
 type EndBatchesRollbackedEventIterFunc func()
 
-// OnBatchesRollbackedEvent represents the callback function which will be called when a TaikoInbox.BatchesRollbacked event is
-// iterated.
+// OnBatchesRollbackedEvent represents the callback function which will be called when a TaikoInbox.BatchesRollbacked
+// event is iterated.
 type OnBatchesRollbackedEvent func(
 	context.Context,
 	*pacayaBindings.TaikoInboxClientBatchesRollbacked,
@@ -46,7 +46,10 @@ type BatchesRollbackedIteratorConfig struct {
 }
 
 // NewBatchesRollbackedIterator creates a new instance of BatchesRollbacked event iterator.
-func NewBatchesRollbackedIterator(ctx context.Context, cfg *BatchesRollbackedIteratorConfig) (*BatchesRollbackedIterator, error) {
+func NewBatchesRollbackedIterator(
+	ctx context.Context,
+	cfg *BatchesRollbackedIteratorConfig,
+) (*BatchesRollbackedIterator, error) {
 	if cfg.OnBatchesRollbackedEvent == nil {
 		return nil, errors.New("invalid callback")
 	}
