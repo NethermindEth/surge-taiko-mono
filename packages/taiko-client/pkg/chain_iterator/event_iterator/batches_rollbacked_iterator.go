@@ -106,15 +106,22 @@ func assembleBatchesRollbackedIteratorCallback(
 		)
 
 		// Iterate the BatchesRollbacked events.
+		log.Debug("Filtering BatchesRollbacked events",
+			"startBlock", start.Number.Uint64(),
+			"endBlock", endHeight)
+
 		iterPacaya, err := taikoInbox.FilterBatchesRollbacked(
 			&bind.FilterOpts{Start: start.Number.Uint64(), End: &endHeight, Context: ctx},
 		)
 		if err != nil {
+			log.Error("Failed to filter BatchesRollbacked events", "error", err)
 			return err
 		}
 		defer iterPacaya.Close()
 
+		eventCount := 0
 		for iterPacaya.Next() {
+			eventCount++
 			event := iterPacaya.Event
 			log.Debug("Processing BatchesRollbacked event",
 				"start batch id", event.StartId,
@@ -147,6 +154,11 @@ func assembleBatchesRollbackedIteratorCallback(
 		if iterPacaya.Error() != nil {
 			return iterPacaya.Error()
 		}
+
+		log.Debug("BatchesRollbacked iterator completed",
+			"startBlock", start.Number.Uint64(),
+			"endBlock", endHeight,
+			"eventsFound", eventCount)
 
 		return nil
 	}

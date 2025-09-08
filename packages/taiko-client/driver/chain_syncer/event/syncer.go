@@ -144,6 +144,10 @@ func (s *Syncer) processL1Blocks(ctx context.Context) error {
 	}
 
 	// Fetch all the rollbacked batches before processing the new batches.
+	log.Debug("Creating BatchesRollbacked iterator",
+		"startHeight", s.state.GetL1Current().Number,
+		"endHeight", l1End.Number)
+
 	rollbackedIterator, err := eventIterator.NewBatchesRollbackedIterator(ctx, &eventIterator.BatchesRollbackedIteratorConfig{
 		Client:                   s.rpc.L1,
 		TaikoInbox:               s.rpc.PacayaClients.TaikoInbox,
@@ -152,12 +156,16 @@ func (s *Syncer) processL1Blocks(ctx context.Context) error {
 		OnBatchesRollbackedEvent: s.onBatchesRollbacked,
 	})
 	if err != nil {
+		log.Error("Failed to create BatchesRollbacked iterator", "error", err)
 		return err
 	}
 
+	log.Debug("Starting BatchesRollbacked iterator")
 	if err := rollbackedIterator.Iter(); err != nil {
+		log.Error("BatchesRollbacked iterator failed", "error", err)
 		return err
 	}
+	log.Debug("BatchesRollbacked iterator completed successfully")
 
 	iter, err := eventIterator.NewBatchProposedIterator(ctx, &eventIterator.BatchProposedIteratorConfig{
 		Client:               s.rpc.L1,
