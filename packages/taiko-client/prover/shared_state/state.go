@@ -1,6 +1,7 @@
 package state
 
 import (
+	"sync"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/core/types"
@@ -12,7 +13,8 @@ import (
 type SharedState struct {
 	lastHandledBatchID      atomic.Uint64
 	l1Current               atomic.Value
-	batchesRollbackedRanges atomic.Value
+	m                       sync.RWMutex
+	batchesRollbackedRanges taikoTypes.BatchesRollbackedRanges
 }
 
 // New creates a new prover shared state instance.
@@ -45,13 +47,14 @@ func (s *SharedState) SetL1Current(header *types.Header) {
 
 // GetBatchesRollbackedRanges returns the batches rollbacked ranges.
 func (s *SharedState) GetBatchesRollbackedRanges() taikoTypes.BatchesRollbackedRanges {
-	if val := s.batchesRollbackedRanges.Load(); val != nil {
-		return val.(taikoTypes.BatchesRollbackedRanges)
-	}
-	return nil
+	s.m.RLock()
+	defer s.m.RUnlock()
+	return s.batchesRollbackedRanges
 }
 
-// SetBatchesRollbackedRanges sets the batches rollbacked ranges.
-func (s *SharedState) SetBatchesRollbackedRanges(ranges taikoTypes.BatchesRollbackedRanges) {
-	s.batchesRollbackedRanges.Store(ranges)
+// AddBatchesRollbackedRange adds a new batches rollbacked range to the shared state.
+func (s *SharedState) AddBatchesRollbackedRange(rollbackedRange taikoTypes.BatchesRollbacked) {
+	s.m.Lock()
+	defer s.m.Unlock()
+	s.batchesRollbackedRanges = append(s.batchesRollbackedRanges, rollbackedRange)
 }

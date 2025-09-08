@@ -43,13 +43,12 @@ func (h *BatchesRollbackedEventHandler) Handle(
 	)
 
 	// Add the new batches rollbacked range to the shared state.
-	h.sharedState.SetBatchesRollbackedRanges(
-		append(h.sharedState.GetBatchesRollbackedRanges(),
-			types.BatchesRollbacked{
-				StartBatchID: e.StartId,
-				EndBatchID:   e.EndId,
-			},
-		))
+	h.sharedState.AddBatchesRollbackedRange(
+		types.BatchesRollbacked{
+			StartBatchID: e.StartId,
+			EndBatchID:   e.EndId,
+		},
+	)
 
 	return nil
 }
