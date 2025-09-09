@@ -506,21 +506,24 @@ contract DeploySurgeL1 is DeployCapability {
         private
         returns (WrapperContracts memory wrapperContracts)
     {
-        wrapperContracts.forcedInclusionStore =
-            deployProxy({ name: "forced_inclusion_store", impl: _emptyImpl, data: "" });
-
-        wrapperContracts.taikoWrapper =
-            deployProxy({ name: "taiko_wrapper", impl: _emptyImpl, data: "" });
-
-        UUPSUpgradeable(wrapperContracts.forcedInclusionStore).upgradeTo(
-            address(
-                new ForcedInclusionStore(
-                    inclusionWindow, inclusionFeeInGwei, _taikoInbox, wrapperContracts.taikoWrapper
-                )
-            )
-        );
-
         if (usePreconf) {
+            wrapperContracts.forcedInclusionStore =
+                deployProxy({ name: "forced_inclusion_store", impl: _emptyImpl, data: "" });
+
+            wrapperContracts.taikoWrapper =
+                deployProxy({ name: "taiko_wrapper", impl: _emptyImpl, data: "" });
+
+            UUPSUpgradeable(wrapperContracts.forcedInclusionStore).upgradeTo(
+                address(
+                    new ForcedInclusionStore(
+                        inclusionWindow,
+                        inclusionFeeInGwei,
+                        _taikoInbox,
+                        wrapperContracts.taikoWrapper
+                    )
+                )
+            );
+
             wrapperContracts.preconfWhitelist = deployProxy({
                 name: "preconf_whitelist",
                 impl: address(new PreconfWhitelist()),
@@ -538,15 +541,17 @@ contract DeploySurgeL1 is DeployCapability {
                 ),
                 data: abi.encodeCall(PreconfRouter.init, (_owner))
             });
-        }
 
-        UUPSUpgradeable(wrapperContracts.taikoWrapper).upgradeTo({
-            newImplementation: address(
-                new TaikoWrapper(
-                    _taikoInbox, wrapperContracts.forcedInclusionStore, wrapperContracts.preconfRouter
+            UUPSUpgradeable(wrapperContracts.taikoWrapper).upgradeTo({
+                newImplementation: address(
+                    new TaikoWrapper(
+                        _taikoInbox,
+                        wrapperContracts.forcedInclusionStore,
+                        wrapperContracts.preconfRouter
+                    )
                 )
-            )
-        });
+            });
+        }
     }
 
     function deployForkRouter(
