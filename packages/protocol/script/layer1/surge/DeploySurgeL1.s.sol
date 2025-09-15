@@ -124,6 +124,7 @@ contract DeploySurgeL1 is DeployCapability {
     uint64 internal immutable maxVerificationDelay = uint64(vm.envUint("MAX_VERIFICATION_DELAY"));
     uint64 internal immutable minVerificationStreak = uint64(vm.envUint("MIN_VERIFICATION_STREAK"));
     uint96 internal immutable livenessBondBase = uint96(vm.envUint("LIVENESS_BOND_BASE"));
+    uint24 internal immutable cooldownWindow = uint24(vm.envUint("COOLDOWN_WINDOW"));
 
     // Preconf configuration
     // ---------------------------------------------------------------
@@ -207,7 +208,11 @@ contract DeploySurgeL1 is DeployCapability {
         require(maxVerificationDelay != 0, "config: MAX_VERIFICATION_DELAY");
         require(minVerificationStreak != 0, "config: MIN_LIVENESS_STREAK");
         require(livenessBondBase != 0, "config: LIVENESS_BOND_BASE");
-
+        require(cooldownWindow != 0, "config: COOLDOWN_WINDOW");
+        require(
+            cooldownWindow < maxVerificationDelay,
+            "config: COOLDOWN_WINDOW < MAX_VERIFICATION_DELAY"
+        );
         address l1Owner = msg.sender;
 
         // Timelock variables
@@ -837,6 +842,7 @@ contract DeploySurgeL1 is DeployCapability {
                 new SurgeDevnetInbox(
                     SurgeDevnetInbox.ConfigParams({
                         chainId: l2ChainId,
+                        cooldownWindow: cooldownWindow,
                         maxVerificationDelay: maxVerificationDelay,
                         livenessBondBase: livenessBondBase
                     }),
@@ -853,6 +859,7 @@ contract DeploySurgeL1 is DeployCapability {
                 new SurgeHoodiInbox(
                     SurgeHoodiInbox.ConfigParams({
                         chainId: l2ChainId,
+                        cooldownWindow: cooldownWindow,
                         maxVerificationDelay: maxVerificationDelay,
                         livenessBondBase: livenessBondBase
                     }),
@@ -869,6 +876,7 @@ contract DeploySurgeL1 is DeployCapability {
                 new SurgeMainnetInbox(
                     SurgeMainnetInbox.ConfigParams({
                         chainId: l2ChainId,
+                        cooldownWindow: cooldownWindow,
                         maxVerificationDelay: maxVerificationDelay,
                         livenessBondBase: livenessBondBase
                     }),

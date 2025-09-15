@@ -280,6 +280,12 @@ func (p *Prover) initEventHandlers() error {
 		p.rpc,
 		p.proofSubmissionCh,
 	)
+	// ------- BatchesRollbacked -------
+	p.eventHandlers.batchesRollbackedHandler = handler.NewBatchesRollbackedEventHandler(
+		&handler.NewBatchesRollbackedEventHandlerOps{
+			SharedState: p.sharedState,
+		},
+	)
 	// ------- AssignmentExpired -------
 	p.eventHandlers.assignmentExpiredHandler = handler.NewAssignmentExpiredEventHandler(
 		p.rpc,
