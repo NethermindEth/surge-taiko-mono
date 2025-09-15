@@ -30,6 +30,9 @@ export FOUNDRY_PROFILE=${FOUNDRY_PROFILE:-"layer1"}
 # Broadcast transactions
 export BROADCAST=${BROADCAST:-true}
 
+# Verify smart contracts
+export VERIFY=${VERIFY:-false}
+
 # Required environment variable validation
 if [ -z "$SGX_VERIFIER_ADDRESS" ]; then
     echo "Error: SGX_VERIFIER_ADDRESS not set"
@@ -59,7 +62,7 @@ fi
 
 # Parameterize verification
 export VERIFY_ARG=""
-if [ "$BROADCAST" = "true" ]; then
+if [ "$VERIFY" = "true" ]; then
     VERIFY_ARG="--verify"
 fi
 
