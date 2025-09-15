@@ -197,11 +197,14 @@ func (s *Syncer) onBatchesRollbacked(
 		"startBatchID", event.StartId,
 		"endBatchID", event.EndId,
 		"l1BlockHeight", event.Raw.BlockNumber,
+		"l1LogIndex", event.Raw.Index,
 		"totalBatchesRollBacked", event.EndId-event.StartId+1)
 
 	s.batchesRollbackedRanges = append(s.batchesRollbackedRanges, types.BatchesRollbacked{
 		StartBatchID: event.StartId,
 		EndBatchID:   event.EndId,
+		L1Height:     event.Raw.BlockNumber,
+		L1LogIndex:   event.Raw.Index,
 	})
 	endIter()
 	return nil
@@ -272,7 +275,11 @@ func (s *Syncer) onBatchProposed(
 	}
 
 	// If the batch ID is in the rollbacked ranges, we skip the batch insertion.
-	if s.batchesRollbackedRanges != nil && s.batchesRollbackedRanges.Contains(meta.Pacaya().GetBatchID().Uint64()) {
+	if s.batchesRollbackedRanges != nil && s.batchesRollbackedRanges.Contains(
+		meta.Pacaya().GetBatchID().Uint64(),
+		meta.GetRawBlockHeight().Uint64(),
+		meta.GetLogIndex(),
+	) {
 		log.Info(
 			"Skip batch since it is present in the rollbacked range (BatchesRollbacked)",
 			"batchID", meta.Pacaya().GetBatchID(),
