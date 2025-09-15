@@ -7,7 +7,7 @@
         "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
           "default": {
-            "http": ["https://l1-rpc-internal.staging.surge.wtf"]
+            "http": ["https://l1-rpc-internal.hoodi.surge.wtf"]
           }
         },
         "nativeCurrency": {
@@ -30,7 +30,7 @@
         "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
           "default": {
-            "http": ["https://l2-rpc.staging.surge.wtf"]
+            "http": ["https://l2-rpc.hoodi.surge.wtf"]
           }
         },
         "nativeCurrency": {
@@ -41,7 +41,7 @@
         "blockExplorers": {
           "default": {
             "name": "Surge Explorer",
-            "url": "https://explorer.staging.surge.wtf"
+            "url": "https://explorer.hoodi.surge.wtf"
           }
         }
       }
