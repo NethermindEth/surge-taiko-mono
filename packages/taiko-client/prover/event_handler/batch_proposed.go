@@ -89,6 +89,8 @@ func (h *BatchProposedEventHandler) Handle(
 		log.Info(
 			"Skip batch since it is present in the rollbacked range (BatchesRollbacked)",
 			"batchID", meta.Pacaya().GetBatchID(),
+			"l1Height", meta.GetRawBlockHeight(),
+			"l1LogIndex", meta.GetLogIndex(),
 			"lastHandledBatchID", h.sharedState.GetLastHandledBatchID(),
 		)
 		return nil
