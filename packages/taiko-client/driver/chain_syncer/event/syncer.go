@@ -162,12 +162,14 @@ func (s *Syncer) processL1Blocks(ctx context.Context) error {
 		return err
 	}
 
+	rollbacksDetected := len(s.batchesRollbackedRanges) > 0
 	iter, err := eventIterator.NewBatchProposedIterator(ctx, &eventIterator.BatchProposedIteratorConfig{
 		Client:               s.rpc.L1,
 		TaikoInbox:           s.rpc.PacayaClients.TaikoInbox,
 		StartHeight:          s.state.GetL1Current().Number,
 		EndHeight:            l1End.Number,
 		OnBatchProposedEvent: s.onBatchProposed,
+		RollbacksDetected:    rollbacksDetected,
 	})
 	if err != nil {
 		return err
@@ -226,6 +228,22 @@ func (s *Syncer) onBatchProposed(
 		return nil
 	}
 
+	// If the batch ID is in the rollbacked ranges, we skip the batch insertion.
+	if s.batchesRollbackedRanges != nil && s.batchesRollbackedRanges.Contains(
+		meta.Pacaya().GetBatchID().Uint64(),
+		meta.GetRawBlockHeight().Uint64(),
+		meta.GetLogIndex(),
+	) {
+		log.Info(
+			"Skip batch since it is present in the rollbacked range (BatchesRollbacked)",
+			"batchID", meta.Pacaya().GetBatchID(),
+			"l1Height", meta.GetRawBlockHeight(),
+			"l1LogIndex", meta.GetLogIndex(),
+			"lastInsertedBatchID", s.lastInsertedBatchID,
+		)
+		return nil
+	}
+
 	// If we are not inserting a block whose parent block is the latest verified block in protocol,
 	// and the node hasn't just finished the P2P sync, we check if the L1 chain has been reorged.
 	if !s.progressTracker.Triggered() {
@@ -272,22 +290,6 @@ func (s *Syncer) onBatchProposed(
 			"now", time.Now().Unix(),
 		)
 		time.Sleep(time.Until(time.Unix(int64(timestamp), 0)))
-	}
-
-	// If the batch ID is in the rollbacked ranges, we skip the batch insertion.
-	if s.batchesRollbackedRanges != nil && s.batchesRollbackedRanges.Contains(
-		meta.Pacaya().GetBatchID().Uint64(),
-		meta.GetRawBlockHeight().Uint64(),
-		meta.GetLogIndex(),
-	) {
-		log.Info(
-			"Skip batch since it is present in the rollbacked range (BatchesRollbacked)",
-			"batchID", meta.Pacaya().GetBatchID(),
-			"l1Height", meta.GetRawBlockHeight(),
-			"l1LogIndex", meta.GetLogIndex(),
-			"lastInsertedBatchID", s.lastInsertedBatchID,
-		)
-		return nil
 	}
 
 	// Insert new blocks to L2 EE's chain.
