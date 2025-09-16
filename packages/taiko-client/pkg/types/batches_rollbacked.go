@@ -14,16 +14,15 @@ type BatchesRollbackedRanges []BatchesRollbacked
 // from an older L1 block/log index.
 func (r BatchesRollbackedRanges) Contains(batchID uint64, l1Height uint64, l1LogIndex uint) bool {
 	for _, interval := range r {
-		if batchID >= interval.StartBatchID && batchID <= interval.EndBatchID &&
-			l1Height <= interval.L1Height {
+		if batchID >= interval.StartBatchID && batchID <= interval.EndBatchID {
 			if l1Height < interval.L1Height {
 				return true
+			} else if l1Height == interval.L1Height {
+				// Equal L1 height, use the log index to determine the order.
+				if l1LogIndex < interval.L1LogIndex {
+					return true
+				}
 			}
-			// Equal L1 height, use the log index to determine the order.
-			if l1LogIndex < interval.L1LogIndex {
-				return true
-			}
-			return false
 		}
 	}
 	return false
