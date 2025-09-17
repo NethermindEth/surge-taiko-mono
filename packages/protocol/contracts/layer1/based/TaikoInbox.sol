@@ -119,8 +119,6 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
         nonReentrant
         returns (BatchInfo memory info_, BatchMetadata memory meta_)
     {
-        require(state.stats2.proposeWithProofMode, ProposeWithProofModeDisabled());
-
         // Decode propose params
         BatchParams memory proposeParams = abi.decode(_proposeParams, (BatchParams));
 
