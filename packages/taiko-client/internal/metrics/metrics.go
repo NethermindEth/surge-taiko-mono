@@ -110,6 +110,18 @@ var (
 	ProverSgxGethProofAggregationGeneratedCounter = factory.NewCounter(prometheus.CounterOpts{
 		Name: "prover_proof_sgx_geth_aggregation_generated",
 	})
+	ProverTdxAggregationGenerationTime = factory.NewGauge(prometheus.GaugeOpts{
+		Name: "prover_proof_tdx_aggregation_generation_time",
+	})
+	ProverTdxProofGeneratedCounter = factory.NewCounter(prometheus.CounterOpts{
+		Name: "prover_proof_tdx_generated",
+	})
+	ProverTdxProofGenerationTime = factory.NewGauge(prometheus.GaugeOpts{
+		Name: "prover_proof_tdx_generation_time",
+	})
+	ProverTdxProofAggregationGeneratedCounter = factory.NewCounter(prometheus.CounterOpts{
+		Name: "prover_proof_tdx_aggregation_generated",
+	})
 	ProverR0AggregationGenerationTime = factory.NewGauge(prometheus.GaugeOpts{
 		Name: "prover_proof_r0_aggregation_generation_time",
 	})

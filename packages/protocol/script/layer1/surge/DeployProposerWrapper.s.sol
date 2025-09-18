@@ -35,11 +35,7 @@ contract DeployProposerWrapper is Script {
 
         // Log the proposer wrapper address to Json
         vm.writeJson(
-            vm.serializeAddress(
-                "proposer_wrappers",
-                "proposer_wrapper",
-                address(proposerWrapper)
-            ),
+            vm.serializeAddress("proposer_wrappers", "proposer_wrapper", address(proposerWrapper)),
             string.concat(vm.projectRoot(), "/deployments/proposer_wrappers.json")
         );
         console2.log("Surge proposer wrapper deployed at: ", address(proposerWrapper));

@@ -143,6 +143,9 @@ func updateProvingMetrics(proofType ProofType, requestAt time.Time, isAggregatio
 		case ProofTypeSgx:
 			metrics.ProverSGXAggregationGenerationTime.Set(float64(time.Since(requestAt).Seconds()))
 			metrics.ProverSgxProofAggregationGeneratedCounter.Add(1)
+		case ProofTypeTdx:
+			metrics.ProverTdxAggregationGenerationTime.Set(float64(time.Since(requestAt).Seconds()))
+			metrics.ProverTdxProofAggregationGeneratedCounter.Add(1)
 		case ProofTypeZKR0:
 			metrics.ProverR0AggregationGenerationTime.Set(float64(time.Since(requestAt).Seconds()))
 			metrics.ProverR0ProofAggregationGeneratedCounter.Add(1)
@@ -162,6 +165,9 @@ func updateProvingMetrics(proofType ProofType, requestAt time.Time, isAggregatio
 		case ProofTypeSgx:
 			metrics.ProverSgxProofGenerationTime.Set(float64(time.Since(requestAt).Seconds()))
 			metrics.ProverSgxProofGeneratedCounter.Add(1)
+		case ProofTypeTdx:
+			metrics.ProverTdxProofGenerationTime.Set(float64(time.Since(requestAt).Seconds()))
+			metrics.ProverTdxProofGeneratedCounter.Add(1)
 		case ProofTypeZKR0:
 			metrics.ProverR0ProofGenerationTime.Set(float64(time.Since(requestAt).Seconds()))
 			metrics.ProverR0ProofGeneratedCounter.Add(1)
