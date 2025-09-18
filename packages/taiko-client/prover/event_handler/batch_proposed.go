@@ -79,6 +79,23 @@ func (h *BatchProposedEventHandler) Handle(
 	meta metadata.TaikoProposalMetaData,
 	end eventIterator.EndBatchProposedEventIterFunc,
 ) error {
+	// If the batch ID is in the rollbacked ranges, we skip the batch handling.
+	if h.sharedState.GetBatchesRollbackedRanges() != nil &&
+		h.sharedState.GetBatchesRollbackedRanges().Contains(
+			meta.Pacaya().GetBatchID().Uint64(),
+			meta.GetRawBlockHeight().Uint64(),
+			meta.GetLogIndex(),
+		) {
+		log.Info(
+			"Skip batch since it is present in the rollbacked range (BatchesRollbacked)",
+			"batchID", meta.Pacaya().GetBatchID(),
+			"l1Height", meta.GetRawBlockHeight(),
+			"l1LogIndex", meta.GetLogIndex(),
+			"lastHandledBatchID", h.sharedState.GetLastHandledBatchID(),
+		)
+		return nil
+	}
+
 	// Wait for the corresponding L2 block being mined in node.
 	if _, err := h.rpc.WaitL2Header(ctx, new(big.Int).SetUint64(meta.Pacaya().GetLastBlockID())); err != nil {
 		return fmt.Errorf("failed to wait L2 header (eventID %d): %w", meta.Pacaya().GetLastBlockID(), err)
