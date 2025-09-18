@@ -344,7 +344,7 @@ func (s *ComposeProofProducer) requestBatchProof(
 	case ProofTypeSgx:
 		endpoint = s.RaikoSGXHostEndpoint
 	case ProofTypeTdx:
-		endpoint = s.RaikoZKVMHostEndpoint
+		endpoint = s.RaikoTDXHostEndpoint
 	case ProofTypeZKAny, ProofTypeZKR0, ProofTypeZKSP1:
 		endpoint = s.RaikoZKVMHostEndpoint
 	default:
