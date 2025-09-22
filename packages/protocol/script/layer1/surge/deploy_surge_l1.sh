@@ -50,6 +50,9 @@ export DEPLOY_SP1_RETH_VERIFIER=${DEPLOY_SP1_RETH_VERIFIER:-true}
 # Deploy Surge protocol
 export FOUNDRY_PROFILE=${FOUNDRY_PROFILE:-"layer1"}
 
+# Verify smart contracts
+export VERIFY=${VERIFY:-false}
+
 # Broadcast transactions
 export BROADCAST=${BROADCAST:-false}
 
@@ -57,6 +60,12 @@ export BROADCAST=${BROADCAST:-false}
 export BROADCAST_ARG=""
 if [ "$BROADCAST" = "true" ]; then
     BROADCAST_ARG="--broadcast"
+fi
+
+# Parameterize verification
+export VERIFY_ARG=""
+if [ "$VERIFY" = "true" ]; then
+    VERIFY_ARG="--verify"
 fi
 
 # Parameterize log level
@@ -68,6 +77,7 @@ export BLOCK_GAS_LIMIT=${BLOCK_GAS_LIMIT:-200000000}
 forge script ./script/layer1/surge/DeploySurgeL1.s.sol:DeploySurgeL1 \
     --fork-url $FORK_URL \
     $BROADCAST_ARG \
+    $VERIFY_ARG \
     --ffi \
     $LOG_LEVEL \
     --private-key $PRIVATE_KEY \
