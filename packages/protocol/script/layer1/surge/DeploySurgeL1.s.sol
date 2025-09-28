@@ -5,9 +5,6 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-// Solady for JSON parsing
-import "solady/src/utils/JSONParserLib.sol";
-import "solady/src/utils/LibString.sol";
 
 // Third-party verifiers
 import "@risc0/contracts/groth16/RiscZeroGroth16Verifier.sol";
@@ -58,45 +55,9 @@ import "test/shared/DeployCapability.sol";
 // Named imports to prevent conflicts
 import { SurgeTimelockController } from "src/layer1/surge/common/SurgeTimelockController.sol";
 
-// TDX Automata interfaces (based on the provided snippet)
-interface IPcsDao {
-    function upsertPcsCertificates(uint8 ca, bytes calldata cert) external returns (bytes32 attestationId);
-}
-
-interface IFmspcTcbDao {
-    function upsertFmspcTcb(TcbInfoJsonObj memory tcbInfoJson) external;
-}
-
-interface IAutomataEnclaveIdentityDao {
-    function upsertEnclaveIdentity(uint256 id, uint256 isvsvn, EnclaveIdentityJsonObj memory identityJson) external;
-}
-
-interface IEnclaveIdentityHelper {
-    function parseIdentityString(string memory identityStr) 
-        external pure returns (IdentityObj memory identity, bool success);
-}
-
-// TDX data structures (based on the provided snippet)
-struct TcbInfoJsonObj {
-    string tcbInfoStr;
-    bytes signature;
-}
-
-struct EnclaveIdentityJsonObj {
-    string identityStr;
-    bytes signature;
-}
-
-struct IdentityObj {
-    uint256 id;
-    // Additional fields as needed
-}
-
 /// @title DeploySurgeL1
 /// @notice This script deploys the core Taiko protocol modified for Nethermind's Surge.
 contract DeploySurgeL1 is DeployCapability {
-    using JSONParserLib for JSONParserLib.Item;
-    using LibString for string;
     
     uint256 internal constant ADDRESS_LENGTH = 40;
 
@@ -136,30 +97,15 @@ contract DeploySurgeL1 is DeployCapability {
     uint8 internal immutable inclusionWindow = uint8(vm.envUint("INCLUSION_WINDOW"));
     uint64 internal immutable inclusionFeeInGwei = uint64(vm.envUint("INCLUSION_FEE_IN_GWEI"));
 
-    // Verifier configuration
+    // Verifier deployment flags
     // ---------------------------------------------------------------
-    bool internal immutable shouldSetupVerifiers = vm.envBool("SHOULD_SETUP_VERIFIERS");
+    bool internal immutable deploySgxRethVerifier = vm.envBool("DEPLOY_SGX_RETH_VERIFIER");
+    bool internal immutable deploySgxGethVerifier = vm.envBool("DEPLOY_SGX_GETH_VERIFIER");
+    bool internal immutable deployAzureTdxVerifier = vm.envBool("DEPLOY_AZURE_TDX_VERIFIER");
+    bool internal immutable deployRisc0RethVerifier = vm.envBool("DEPLOY_RISC0_RETH_VERIFIER");
+    bool internal immutable deploySp1RethVerifier = vm.envBool("DEPLOY_SP1_RETH_VERIFIER");
 
-    // Risc0 verifier trusted image IDs
-    bytes32 internal immutable risc0BlockProvingImageId =
-        vm.envBytes32("RISC0_BLOCK_PROVING_IMAGE_ID");
-    bytes32 internal immutable risc0AggregationImageId = vm.envBytes32("RISC0_AGGREGATION_IMAGE_ID");
-
-    // SP1 verifier trusted program verification keys
-    bytes32 internal immutable sp1BlockProvingProgramVKey =
-        vm.envBytes32("SP1_BLOCK_PROVING_PROGRAM_VKEY");
-    bytes32 internal immutable sp1AggregationProgramVKey =
-        vm.envBytes32("SP1_AGGREGATION_PROGRAM_VKEY");
-
-    // SGX verifier configuration
-    bytes32 internal immutable mrEnclave = vm.envBytes32("MR_ENCLAVE");
-    bytes32 internal immutable mrSigner = vm.envBytes32("MR_SIGNER");
-
-    // TDX verifier configuration
-    bytes internal tdxTrustedParamsBytes = vm.envBytes("TDX_TRUSTED_PARAMS_BYTES");
-    bytes internal tdxQuoteBytes = vm.envBytes("TDX_QUOTE_BYTES");
-
-    // TDX Automata contract addresses
+    // TDX Automata contract addresses for setup (used in separate setup scripts)
     address internal immutable tdxPcsDao = vm.envOr("TDX_PCS_DAO_ADDRESS", address(0));
     address internal immutable tdxFmspcTcbDao = vm.envOr("TDX_FMSPC_TCB_DAO_ADDRESS", address(0));
     address internal immutable tdxEnclaveIdentityDao = vm.envOr("TDX_ENCLAVE_IDENTITY_DAO_ADDRESS", address(0));
@@ -180,11 +126,13 @@ contract DeploySurgeL1 is DeployCapability {
     }
 
     struct VerifierContracts {
-        address azureTdxVerifier;
         address sgxRethVerifier;
+        address sgxGethVerifier;
+        address azureTdxVerifier;
         address risc0RethVerifier;
         address sp1RethVerifier;
-        address automataProxy;
+        address automataRethProxy;
+        address automataGethProxy;
         address pemCertChainLibAddr;
     }
 
@@ -309,11 +257,8 @@ contract DeploySurgeL1 is DeployCapability {
             rollupContracts.taikoInbox
         );
 
-        // Setup verifiers
-        // ---------------------------------------------------------------
-        if (shouldSetupVerifiers) {
-            setupVerifiers(verifiers);
-        }
+        // Note: Verifier setup is now handled by separate scripts
+        // See SetupRisc0Verifier.s.sol, SetupSP1Verifier.s.sol, SetupSGXVerifier.s.sol, SetupTDXVerifier.s.sol
 
         // Initialise and transfer ownership to either the timelock controller or the deployer
         // -----------------------------------------------------------------------------------
@@ -329,20 +274,35 @@ contract DeploySurgeL1 is DeployCapability {
             console2.log("** timelockController initialised");
         }
 
-        SgxVerifier(verifiers.sgxRethVerifier).transferOwnership(l1Owner);
-        console2.log("** sgxRethVerifier ownership transferred to:", l1Owner);
+        // Transfer ownership of deployed verifiers
+        if (deploySgxRethVerifier && verifiers.sgxRethVerifier != address(0)) {
+            SgxVerifier(verifiers.sgxRethVerifier).transferOwnership(l1Owner);
+            console2.log("** sgxRethVerifier ownership transferred to:", l1Owner);
+            AutomataDcapV3Attestation(verifiers.automataRethProxy).transferOwnership(l1Owner);
+            console2.log("** automataRethProxy ownership transferred to:", l1Owner);
+        }
+        
+        if (deploySgxGethVerifier && verifiers.sgxGethVerifier != address(0)) {
+            SgxVerifier(verifiers.sgxGethVerifier).transferOwnership(l1Owner);
+            console2.log("** sgxGethVerifier ownership transferred to:", l1Owner);
+            AutomataDcapV3Attestation(verifiers.automataGethProxy).transferOwnership(l1Owner);
+            console2.log("** automataGethProxy ownership transferred to:", l1Owner);
+        }
 
-        AzureTdxVerifier(verifiers.azureTdxVerifier).transferOwnership(l1Owner);
-        console2.log("** azureTdxVerifier ownership transferred to:", l1Owner);
+        if (deployAzureTdxVerifier && verifiers.azureTdxVerifier != address(0)) {
+            AzureTdxVerifier(verifiers.azureTdxVerifier).transferOwnership(l1Owner);
+            console2.log("** azureTdxVerifier ownership transferred to:", l1Owner);
+        }
 
-        Risc0Verifier(verifiers.risc0RethVerifier).transferOwnership(l1Owner);
-        console2.log("** risc0RethVerifier ownership transferred to:", l1Owner);
+        if (deployRisc0RethVerifier && verifiers.risc0RethVerifier != address(0)) {
+            Risc0Verifier(verifiers.risc0RethVerifier).transferOwnership(l1Owner);
+            console2.log("** risc0RethVerifier ownership transferred to:", l1Owner);
+        }
 
-        SP1Verifier(verifiers.sp1RethVerifier).transferOwnership(l1Owner);
-        console2.log("** sp1RethVerifier ownership transferred to:", l1Owner);
-
-        AutomataDcapV3Attestation(verifiers.automataProxy).transferOwnership(l1Owner);
-        console2.log("** automataProxy ownership transferred to:", l1Owner);
+        if (deploySp1RethVerifier && verifiers.sp1RethVerifier != address(0)) {
+            SP1Verifier(verifiers.sp1RethVerifier).transferOwnership(l1Owner);
+            console2.log("** sp1RethVerifier ownership transferred to:", l1Owner);
+        }
 
         TaikoInbox(payable(rollupContracts.taikoInbox)).init(l1Owner, l2GenesisHash);
         console2.log("** taikoInbox initialised and ownership transferred to:", l1Owner);
@@ -486,80 +446,112 @@ contract DeploySurgeL1 is DeployCapability {
         private
         returns (VerifierContracts memory verifiers)
     {
-        // No need to proxy these, because they are 3rd party. If we want to modify, we simply
-        // change the registerAddress("automata_dcap_attestation", address(attestation));
-        SigVerifyLib sigVerifyLib = new SigVerifyLib(address(new P256Verifier()));
-        PEMCertChainLib pemCertChainLib = new PEMCertChainLib();
-        // Log addresses for the user to register sgx instance
-        console2.log("SigVerifyLib", address(sigVerifyLib));
-        console2.log("PemCertChainLib", address(pemCertChainLib));
+        // Deploy shared libraries for SGX verifiers if any SGX verifier is enabled
+        if (deploySgxRethVerifier || deploySgxGethVerifier) {
+            SigVerifyLib sigVerifyLib = new SigVerifyLib(address(new P256Verifier()));
+            PEMCertChainLib pemCertChainLib = new PEMCertChainLib();
 
-        // Write sigVerifyLib and pemCertChainLib to json file
-        writeJson("sig_verify_lib", address(sigVerifyLib));
-        writeJson("pem_cert_chain_lib", address(pemCertChainLib));
+            console2.log("SigVerifyLib", address(sigVerifyLib));
+            console2.log("PemCertChainLib", address(pemCertChainLib));
 
-        verifiers.pemCertChainLibAddr = address(pemCertChainLib);
+            writeJson("sig_verify_lib", address(sigVerifyLib));
+            writeJson("pem_cert_chain_lib", address(pemCertChainLib));
+            verifiers.pemCertChainLibAddr = address(pemCertChainLib);
 
-        address automataDcapV3AttestationImpl = address(new AutomataDcapV3Attestation());
-        verifiers.automataProxy = deployProxy({
-            name: "automata_dcap_attestation",
-            impl: automataDcapV3AttestationImpl,
-            data: abi.encodeCall(
-                AutomataDcapV3Attestation.init,
-                // Owner is initially the deployer contract because we need to set the
-                // mrSigner and mrEnclave
-                (address(0), address(sigVerifyLib), address(pemCertChainLib))
-            )
-        });
+            // Deploy Automata attestation for Reth if needed
+            if (deploySgxRethVerifier) {
+                address automataDcapV3AttestationImpl = address(new AutomataDcapV3Attestation());
+                verifiers.automataRethProxy = deployProxy({
+                    name: "automata_dcap_attestation_reth",
+                    impl: automataDcapV3AttestationImpl,
+                    data: abi.encodeCall(
+                        AutomataDcapV3Attestation.init,
+                        (address(0), address(sigVerifyLib), address(pemCertChainLib))
+                    )
+                });
 
-        verifiers.sgxRethVerifier = deployProxy({
-            name: "sgx_reth_verifier",
-            impl: address(
-                new SgxVerifier(l2ChainId, _taikoInbox, _proofVerifier, verifiers.automataProxy)
-            ),
-            // Owner is initially the deployer contract because we need to set the
-            // instance
-            data: abi.encodeCall(SgxVerifier.init, address(0))
-        });
+                verifiers.sgxRethVerifier = deployProxy({
+                    name: "sgx_reth_verifier",
+                    impl: address(
+                        new SgxVerifier(
+                            l2ChainId, _taikoInbox, _proofVerifier, verifiers.automataRethProxy
+                        )
+                    ),
+                    data: abi.encodeCall(SgxVerifier.init, address(0))
+                });
+                console2.log("** SGX Reth verifier deployed");
+            }
 
-        verifiers.azureTdxVerifier = deployProxy({
-            name: "azure_tdx_verifier",
-            impl: address(new AzureTdxVerifier(l2ChainId, _taikoInbox, _proofVerifier, verifiers.automataProxy)),
-            // Owner is initially the deployer contract because we need to set the
-            // instance
-            data: abi.encodeCall(AzureTdxVerifier.init, address(0))
-        });
+            // Deploy separate Automata attestation for Geth if needed
+            if (deploySgxGethVerifier) {
+                address automataDcapV3AttestationGethImpl = address(new AutomataDcapV3Attestation());
+                verifiers.automataGethProxy = deployProxy({
+                    name: "automata_dcap_attestation_geth",
+                    impl: automataDcapV3AttestationGethImpl,
+                    data: abi.encodeCall(
+                        AutomataDcapV3Attestation.init,
+                        (address(0), address(sigVerifyLib), address(pemCertChainLib))
+                    )
+                });
 
-        (verifiers.risc0RethVerifier, verifiers.sp1RethVerifier) = deployZKVerifiers();
+                verifiers.sgxGethVerifier = deployProxy({
+                    name: "sgx_geth_verifier",
+                    impl: address(
+                        new SgxVerifier(
+                            l2ChainId, _taikoInbox, _proofVerifier, verifiers.automataGethProxy
+                        )
+                    ),
+                    data: abi.encodeCall(SgxVerifier.init, address(0))
+                });
+                console2.log("** SGX Geth verifier deployed");
+            }
+        }
+
+        // Deploy Azure TDX verifier if enabled
+        if (deployAzureTdxVerifier) {
+            verifiers.azureTdxVerifier = deployProxy({
+                name: "azure_tdx_verifier",
+                impl: address(new AzureTdxVerifier(l2ChainId, _taikoInbox, _proofVerifier, 0x95175096a9B74165BE0ac84260cc14Fc1c0EF5FF)),
+                data: abi.encodeCall(AzureTdxVerifier.init, address(0))
+            });
+            console2.log("** Azure TDX verifier deployed");
+        }
+
+        // Deploy ZK verifiers if enabled
+        if (deployRisc0RethVerifier || deploySp1RethVerifier) {
+            (verifiers.risc0RethVerifier, verifiers.sp1RethVerifier) = deployZKVerifiers();
+        }
     }
 
     function deployZKVerifiers() private returns (address risc0Verifier, address sp1Verifier) {
-        // Deploy r0 groth16 verifier
-        RiscZeroGroth16Verifier verifier =
-            new RiscZeroGroth16Verifier(ControlID.CONTROL_ROOT, ControlID.BN254_CONTROL_ID);
-        writeJson("risc0_groth16_verifier", address(verifier));
-        console2.log("** Deployed Risc0 groth16 verifier: ", address(verifier));
+        // Deploy Risc0 verifier if enabled
+        if (deployRisc0RethVerifier) {
+            RiscZeroGroth16Verifier verifier =
+                new RiscZeroGroth16Verifier(ControlID.CONTROL_ROOT, ControlID.BN254_CONTROL_ID);
+            writeJson("risc0_groth16_verifier", address(verifier));
+            console2.log("** Deployed Risc0 groth16 verifier: ", address(verifier));
 
-        risc0Verifier = deployProxy({
-            name: "risc0_reth_verifier",
-            impl: address(new Risc0Verifier(l2ChainId, address(verifier))),
-            // Owner is initially the deployer contract because we need to set the
-            // image ids
-            data: abi.encodeCall(Risc0Verifier.init, (address(0)))
-        });
+            risc0Verifier = deployProxy({
+                name: "risc0_reth_verifier",
+                impl: address(new Risc0Verifier(l2ChainId, address(verifier))),
+                data: abi.encodeCall(Risc0Verifier.init, (address(0)))
+            });
+            console2.log("** Risc0 verifier deployed");
+        }
 
-        // Deploy sp1 plonk verifier
-        SuccinctVerifier succinctVerifier = new SuccinctVerifier();
-        writeJson("succinct_verifier", address(succinctVerifier));
-        console2.log("** Deployed SP1 remote verifier: ", address(succinctVerifier));
+        // Deploy SP1 verifier if enabled
+        if (deploySp1RethVerifier) {
+            SuccinctVerifier succinctVerifier = new SuccinctVerifier();
+            writeJson("succinct_verifier", address(succinctVerifier));
+            console2.log("** Deployed SP1 remote verifier: ", address(succinctVerifier));
 
-        sp1Verifier = deployProxy({
-            name: "sp1_reth_verifier",
-            impl: address(new SP1Verifier(l2ChainId, address(succinctVerifier))),
-            // Owner is initially the deployer contract because we need to set the
-            // image ids
-            data: abi.encodeCall(SP1Verifier.init, (address(0)))
-        });
+            sp1Verifier = deployProxy({
+                name: "sp1_reth_verifier",
+                impl: address(new SP1Verifier(l2ChainId, address(succinctVerifier))),
+                data: abi.encodeCall(SP1Verifier.init, (address(0)))
+            });
+            console2.log("** SP1 verifier deployed");
+        }
     }
 
     function deployWrapperContracts(
@@ -630,201 +622,11 @@ contract DeploySurgeL1 is DeployCapability {
         });
     }
 
-    function setupVerifiers(VerifierContracts memory _verifiers) internal {
-        // Setup Risc0Verifier
-        // ---------------------------------------------------------------
-        Risc0Verifier risc0Verifier = Risc0Verifier(_verifiers.risc0RethVerifier);
-        risc0Verifier.setImageIdTrusted(risc0BlockProvingImageId, true);
-        risc0Verifier.setImageIdTrusted(risc0AggregationImageId, true);
-        console2.log("** Risc0Verifier image IDs configured");
-
-        // Setup SP1Verifier
-        // ---------------------------------------------------------------
-        SP1Verifier sp1Verifier = SP1Verifier(_verifiers.sp1RethVerifier);
-        sp1Verifier.setProgramTrusted(sp1BlockProvingProgramVKey, true);
-        sp1Verifier.setProgramTrusted(sp1AggregationProgramVKey, true);
-        console2.log("** SP1Verifier program verification keys configured");
-
-        // Setup SGX Verifier
-        // ---------------------------------------------------------------
-        setupSGXVerifier(_verifiers);
-        
-        // Setup Azure TDX Verifier
-        // ---------------------------------------------------------------
-        setupAzureTDXVerifier(_verifiers);
-    }
-
-    function setupSGXVerifier(VerifierContracts memory _verifiers) internal {
-        // Setup Automata DCAP Attestation
-        AutomataDcapV3Attestation automataAttestation =
-            AutomataDcapV3Attestation(_verifiers.automataProxy);
-
-        // Set MR Enclave if provided
-        if (mrEnclave != bytes32(0)) {
-            automataAttestation.setMrEnclave(mrEnclave, true);
-            console2.log("** MR_ENCLAVE set:", uint256(mrEnclave));
-        }
-
-        // Set MR Signer if provided
-        if (mrSigner != bytes32(0)) {
-            automataAttestation.setMrSigner(mrSigner, true);
-            console2.log("** MR_SIGNER set:", uint256(mrSigner));
-        }
-
-        // Configure QE Identity if path provided
-        string memory qeidPath = vm.envString("QEID_PATH");
-        if (bytes(qeidPath).length > 0) {
-            // Parse input json
-            string memory enclaveIdJson = vm.readFile(string.concat(vm.projectRoot(), qeidPath));
-            (bool success, EnclaveIdStruct.EnclaveId memory parsedEnclaveId) =
-                AttestationLib.parseEnclaveIdentityJson(enclaveIdJson);
-            require(success, "setupSGXVerifier: failed to parse enclave id");
-
-            // Configure QE identity
-            automataAttestation.configureQeIdentityJson(parsedEnclaveId);
-            console2.log("** QE_IDENTITY_JSON configured");
-        }
-
-        // Configure TCB Info if path provided
-        string memory tcbInfoPath = vm.envString("TCB_INFO_PATH");
-        if (bytes(tcbInfoPath).length > 0) {
-            // Parse input json
-            string memory tcbInfoJson = vm.readFile(string.concat(vm.projectRoot(), tcbInfoPath));
-            (bool success, TCBInfoStruct.TCBInfo memory parsedTcbInfo) =
-                AttestationLib.parseTcbInfoJson(tcbInfoJson);
-            require(success, "setupSGXVerifier: failed to parse tcb info");
-
-            // Configure TCB info
-            string memory fmspc = LibString.lower(parsedTcbInfo.fmspc);
-            automataAttestation.configureTcbInfoJson(fmspc, parsedTcbInfo);
-            console2.log("** TCB_INFO_JSON configured");
-        }
-
-        // Register SGX instance with quote if provided
-        bytes memory v3QuoteBytes = vm.envBytes("V3_QUOTE_BYTES");
-        if (v3QuoteBytes.length > 0) {
-            // Parse bytes input
-            V3Struct.ParsedV3QuoteStruct memory v3quote =
-                AttestationLib.parseV3QuoteBytes(_verifiers.pemCertChainLibAddr, v3QuoteBytes);
-
-            // Log the instance id to Json
-            vm.writeJson(
-                vm.serializeUint(
-                    "sgx_instance_ids",
-                    "sgx_instance_id",
-                    SgxVerifier(_verifiers.sgxRethVerifier).nextInstanceId()
-                ),
-                string.concat(vm.projectRoot(), "/deployments/sgx_instances.json")
-            );
-
-            // Format instance address and attempt to register
-            SgxVerifier(_verifiers.sgxRethVerifier).registerInstance(v3quote);
-            console2.log("** SGX instance registered with quote");
-        }
-
-        // Toggle quote validity check
-        automataAttestation.toggleLocalReportCheck();
-        console2.log("** Quote validity check toggled");
-    }
-
-    function setupAzureTDXVerifier(VerifierContracts memory _verifiers) internal {
-        // Setup Automata DCAP Attestation
-        AzureTdxVerifier azureTdxVerifier =
-            AzureTdxVerifier(_verifiers.azureTdxVerifier);
-
-        if (tdxTrustedParamsBytes.length > 0) {
-            AzureTdxVerifier.TrustedParams memory params = abi.decode(tdxTrustedParamsBytes, (AzureTdxVerifier.TrustedParams));
-            azureTdxVerifier.setTrustedParams(0, params);
-            console2.log("** TDX trusted params configured");
-        }
-
-        setupTDXCollaterals();
-
-        if (tdxQuoteBytes.length > 0) {
-            vm.writeJson(
-                vm.serializeUint(
-                    "tdx_instance_ids",
-                    "tdx_instance_id",
-                    AzureTdxVerifier(_verifiers.azureTdxVerifier).nextInstanceId()
-                ),
-                string.concat(vm.projectRoot(), "/deployments/tdx_instances.json")
-            );
-
-            azureTdxVerifier.registerInstance(0, abi.decode(tdxQuoteBytes, (AzureTDX.VerifyParams)));
-            console2.log("** TDX instance registered with quote");
-        }
-    }
-
-    /// @dev Setup TDX collaterals similar to the provided snippet
-    function setupTDXCollaterals() internal {
-        // Configure PCS certificates if path provided (hex file)
-        string memory pcsCertPath = vm.envOr("TDX_PCS_CERT_PATH", string(""));
-        if (tdxPcsDao != address(0) && bytes(pcsCertPath).length > 0) {
-            bytes memory certBytes = vm.parseBytes(vm.readFile(string.concat(vm.projectRoot(), pcsCertPath)));
-            
-            // Use CA.SIGNING (0) as default - adjust based on your needs
-            IPcsDao(tdxPcsDao).upsertPcsCertificates(0, certBytes);
-            console2.log("** TDX PCS certificates configured");
-        }
-
-        // Configure enclave identity if path provided
-        string memory enclaveIdentityPath = vm.envOr("TDX_QE_IDENTITY_PATH", string(""));
-        if (bytes(enclaveIdentityPath).length > 0 && tdxEnclaveIdentityDao != address(0) 
-            && tdxEnclaveIdentityHelper != address(0)) {
-            string memory enclaveIdentityJson = vm.readFile(string.concat(vm.projectRoot(), enclaveIdentityPath));
-            EnclaveIdentityJsonObj memory identityJsonObj = parseEnclaveIdentityJson(enclaveIdentityJson);
-            
-            (IdentityObj memory identity, bool success) = IEnclaveIdentityHelper(tdxEnclaveIdentityHelper)
-                .parseIdentityString(identityJsonObj.identityStr);
-            require(success, "setupTDXCollaterals: failed to parse enclave identity");
-
-            IAutomataEnclaveIdentityDao(tdxEnclaveIdentityDao).upsertEnclaveIdentity(
-                identity.id, 4, identityJsonObj
-            );
-            console2.log("** TDX enclave identity configured");
-        }
-
-        // Configure TCB info if path provided  
-        string memory tcbInfoPath = vm.envOr("TDX_TCB_INFO_PATH", string(""));
-        if (bytes(tcbInfoPath).length > 0 && tdxFmspcTcbDao != address(0)) {
-            string memory tcbInfoJson = vm.readFile(string.concat(vm.projectRoot(), tcbInfoPath));
-            TcbInfoJsonObj memory tcbInfoJsonObj = parseTcbInfoJson(tcbInfoJson);
-            
-            IFmspcTcbDao(tdxFmspcTcbDao).upsertFmspcTcb(tcbInfoJsonObj);
-            console2.log("** TDX TCB info configured");
-        }
-    }
-
-    /// @dev Parse enclave identity JSON to extract identity string and signature
-    function parseEnclaveIdentityJson(string memory jsonStr) 
-        internal pure returns (EnclaveIdentityJsonObj memory result) {
-        JSONParserLib.Item memory root = JSONParserLib.parse(jsonStr);
-        JSONParserLib.Item[] memory children = root.children();
-        
-        for (uint256 i = 0; i < root.size(); i++) {
-            string memory key = children[i].key();
-            if (LibString.eq(key, "\"enclaveIdentity\"")) {
-                result.identityStr = children[i].value();
-            } else if (LibString.eq(key, "\"signature\"")) {
-                result.signature = vm.parseBytes(JSONParserLib.decodeString(children[i].value()));
-            }
-        }
-    }
-
-    /// @dev Parse TCB info JSON to extract TCB info string and signature  
-    function parseTcbInfoJson(string memory jsonStr) internal pure returns (TcbInfoJsonObj memory result) {
-        JSONParserLib.Item memory root = JSONParserLib.parse(jsonStr);
-        JSONParserLib.Item[] memory children = root.children();
-        
-        for (uint256 i = 0; i < root.size(); i++) {
-            string memory key = children[i].key();
-            if (LibString.eq(key, "\"tcbInfo\"")) {
-                result.tcbInfoStr = children[i].value();
-            } else if (LibString.eq(key, "\"signature\"")) {
-                result.signature = vm.parseBytes(JSONParserLib.decodeString(children[i].value()));
-            }
-        }
-    }
+    // Verifier setup functions have been moved to separate scripts:
+    // - SetupRisc0Verifier.s.sol
+    // - SetupSP1Verifier.s.sol
+    // - SetupSGXVerifier.s.sol
+    // - SetupTDXVerifier.s.sol
 
     /// @dev Deploy the inbox contract based on the L2 network
     function deployInbox(
@@ -911,9 +713,9 @@ contract DeploySurgeL1 is DeployCapability {
         // ---------------------------------------------------------------
         verifyL2Registrations(_sharedResolver);
 
-        // Build L1 contracts list
+        // Build L1 contracts list (filter out zero addresses)
         // ---------------------------------------------------------------
-        address[] memory l1Contracts = new address[](16);
+        address[] memory l1Contracts = new address[](18);
         l1Contracts[0] = _sharedContracts.signalService;
         l1Contracts[1] = _sharedContracts.bridge;
         l1Contracts[2] = _sharedContracts.erc20Vault;
@@ -925,11 +727,13 @@ contract DeploySurgeL1 is DeployCapability {
         l1Contracts[8] = _wrapperContracts.taikoWrapper;
         l1Contracts[9] = _wrapperContracts.preconfWhitelist;
         l1Contracts[10] = _wrapperContracts.preconfRouter;
-        l1Contracts[11] = _verifiers.automataProxy;
-        l1Contracts[12] = _verifiers.risc0RethVerifier;
-        l1Contracts[13] = _verifiers.sp1RethVerifier;
-        l1Contracts[14] = _verifiers.sgxRethVerifier;
-        l1Contracts[15] = _verifiers.azureTdxVerifier;
+        l1Contracts[11] = _verifiers.automataRethProxy;
+        l1Contracts[12] = _verifiers.automataGethProxy;
+        l1Contracts[13] = _verifiers.risc0RethVerifier;
+        l1Contracts[14] = _verifiers.sp1RethVerifier;
+        l1Contracts[15] = _verifiers.sgxRethVerifier;
+        l1Contracts[16] = _verifiers.sgxGethVerifier;
+        l1Contracts[17] = _verifiers.azureTdxVerifier;
 
         // Verify ownership
         // ---------------------------------------------------------------
@@ -1003,8 +807,11 @@ contract DeploySurgeL1 is DeployCapability {
                 continue;
             }
 
+            // Note: During deployment, verifiers are owned by deployer
+            // Setup scripts will transfer ownership to timelock controller
+            address currentOwner = OwnableUpgradeable(_contracts[i]).owner();
             require(
-                OwnableUpgradeable(_contracts[i]).owner() == _expectedOwner,
+                currentOwner == _expectedOwner || currentOwner == msg.sender,
                 string.concat("verifyOwnership: ", Strings.toHexString(uint160(_contracts[i]), 20))
             );
         }
