@@ -246,7 +246,7 @@ func (s *ComposeProofProducer) requestBatchProof(
 	defer cancel()
 
 	endpoint := s.RaikoZKVMHostEndpoint
-	if proofType == ProofTypeSgxAny {
+	if proofType == ProofTypeSgxGeth || proofType == ProofTypeSgx || proofType == ProofTypeSgxAny {
 		endpoint = s.RaikoSGXHostEndpoint
 	}
 

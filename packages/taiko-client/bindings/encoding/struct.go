@@ -34,7 +34,7 @@ func GetProofTypeFromString(proofType string) uint16 {
 		return ProofTypeRisc0Reth
 	case "sp1":
 		return ProofTypeSp1Reth
-	case "sgx_geth":
+	case "sgxgeth":
 		return ProofTypeSgxGeth
 	default:
 		return ProofTypeEmpty
