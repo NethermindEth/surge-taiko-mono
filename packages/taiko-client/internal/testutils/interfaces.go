@@ -22,7 +22,7 @@ type Proposer interface {
 		txLists []types.Transactions,
 		parentMetaHash common.Hash,
 		l2BaseFee *big.Int,
-		wasSignalForcePropose bool,
+		isSignalForcePropose bool,
 	) error
 	RegisterTxMgrSelectorToBlobServer(blobServer *MemoryBlobServer)
 }

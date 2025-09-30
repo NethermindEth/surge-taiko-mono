@@ -276,12 +276,17 @@ func (p *Proposer) shouldForcePropose() (bool, string) {
 		timeSinceSignal, p.Config.ForceProposingDelay-timeSinceSignal)
 }
 
-// markSignalForceProposeDone marks the current signal-based force propose as completed
-func (p *Proposer) markSignalForceProposeDone() {
+// resetSignalForcePropose resets the pending signal force propose state and logs if it was actually a force propose
+func (p *Proposer) resetSignalForcePropose(isSignalForcePropose bool) {
 	p.signalMu.Lock()
+	hadPendingSignal := p.pendingSignalForcePropose
 	p.pendingSignalForcePropose = false
 	p.signalMu.Unlock()
-	log.Info("Completed signal-based force propose")
+
+	// Only log completion message if this was actually a force propose due to signal
+	if isSignalForcePropose && hadPendingSignal {
+		log.Info("Completed signal-based force propose")
+	}
 }
 
 // Start starts the proposer's main loop.
@@ -561,9 +566,9 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 	// Propose the transactions lists.
 	err = p.ProposeTxLists(ctx, txLists, parentMetaHash, l2BaseFee, shouldForcePropose)
 
-	// If proposal was successful and we were force proposing due to signal, mark it as done
-	if err == nil && shouldForcePropose {
-		p.markSignalForceProposeDone()
+	// If proposal was successful, reset any pending signal force propose state
+	if err == nil {
+		p.resetSignalForcePropose(shouldForcePropose)
 	}
 
 	return err
@@ -575,9 +580,9 @@ func (p *Proposer) ProposeTxLists(
 	txLists []types.Transactions,
 	parentMetaHash common.Hash,
 	l2BaseFee *big.Int,
-	wasSignalForcePropose bool,
+	isSignalForcePropose bool,
 ) error {
-	if err := p.ProposeTxListPacaya(ctx, txLists, parentMetaHash, l2BaseFee, wasSignalForcePropose); err != nil {
+	if err := p.ProposeTxListPacaya(ctx, txLists, parentMetaHash, l2BaseFee, isSignalForcePropose); err != nil {
 		return err
 	}
 	p.lastProposedAt = time.Now()
@@ -590,7 +595,7 @@ func (p *Proposer) ProposeTxListPacaya(
 	txBatch []types.Transactions,
 	parentMetaHash common.Hash,
 	l2BaseFee *big.Int,
-	wasSignalForcePropose bool,
+	isSignalForcePropose bool,
 ) error {
 	var (
 		proposerAddress = p.proposerAddress
@@ -669,8 +674,8 @@ func (p *Proposer) ProposeTxListPacaya(
 		return err
 	}
 
-	// Check profitability if enabled
-	if p.checkProfitability {
+	// Check profitability if enabled, but bypass check when force proposing due to signal
+	if p.checkProfitability && !isSignalForcePropose {
 		profitable, err := p.isProfitable(ctx, txBatch, l2BaseFee, txCandidate, txs)
 		if err != nil {
 			return err
@@ -683,6 +688,8 @@ func (p *Proposer) ProposeTxListPacaya(
 			)
 			return nil
 		}
+	} else if isSignalForcePropose {
+		log.Info("Bypassing profitability check for signal-based force propose")
 	}
 
 	err = retryOnError(
@@ -699,7 +706,7 @@ func (p *Proposer) ProposeTxListPacaya(
 	log.Info("📝 Propose blocks batch succeeded",
 		"blocksInBatch", len(txBatch),
 		"txs", txs,
-		"wasSignalForcePropose", wasSignalForcePropose,
+		"isSignalForcePropose", isSignalForcePropose,
 	)
 
 	metrics.ProposerProposedTxListsCounter.Add(float64(len(txBatch)))
