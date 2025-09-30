@@ -461,13 +461,14 @@ func (p *Proposer) fetchPoolContent(allowEmptyPoolContent bool, l2BaseFee *big.I
 	for _, txs := range preBuiltTxList {
 		txLists = append(txLists, txs.TxList)
 	}
-	// If the pool content is empty and the `--epoch.minProposingInterval` flag is set, we check
-	// whether the proposer should propose an empty block.
+	// If the pool content is empty and we should propose empty blocks (either due to
+	// `--epoch.minProposingInterval` timeout or signal-based force proposing), create an empty block.
 	if allowEmptyPoolContent && len(txLists) == 0 {
 		log.Info(
 			"Pool content is empty, proposing an empty block",
 			"lastProposedAt", p.lastProposedAt,
 			"minProposingInterval", p.MinProposingInterval,
+			"forceProposingDelay", p.ForceProposingDelay,
 		)
 		txLists = append(txLists, types.Transactions{})
 	}
