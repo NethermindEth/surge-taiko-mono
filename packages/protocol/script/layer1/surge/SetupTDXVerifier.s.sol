@@ -175,14 +175,24 @@ contract SetupTDXVerifier is Script, DeployCapability {
     /// @dev Setup TDX collaterals (PCS certificates, enclave identity, TCB info)
     function setupTDXCollaterals() internal {
         // Configure PCS certificates if path provided
+        string memory rootPcsCertPath = vm.envOr("TDX_ROOT_PCS_CERT_PATH", string(""));
+        if (bytes(rootPcsCertPath).length > 0) {
+            bytes memory certBytes = vm.parseBytes(
+                vm.readFile(string.concat(vm.projectRoot(), rootPcsCertPath))
+            );
+            
+            // Use CA.ROOT (0)
+            IPcsDao(tdxPcsDao).upsertPcsCertificates(0, certBytes);
+            console2.log("** TDX_ROOT_PCS_CERTIFICATES configured");
+        }
         string memory pcsCertPath = vm.envOr("TDX_PCS_CERT_PATH", string(""));
         if (bytes(pcsCertPath).length > 0) {
             bytes memory certBytes = vm.parseBytes(
                 vm.readFile(string.concat(vm.projectRoot(), pcsCertPath))
             );
             
-            // Use CA.SIGNING (3) as default - adjust based on your needs
-            // IPcsDao(tdxPcsDao).upsertPcsCertificates(3, certBytes);
+            // Use CA.SIGNING (3)
+            IPcsDao(tdxPcsDao).upsertPcsCertificates(3, certBytes);
             console2.log("** TDX_PCS_CERTIFICATES configured");
         }
 
@@ -196,12 +206,11 @@ contract SetupTDXVerifier is Script, DeployCapability {
             
             (IdentityObj memory identity,) = IEnclaveIdentityHelper(tdxEnclaveIdentityHelper)
                 .parseIdentityString(identityJsonObj.identityStr);
-            // require(success, "SetupTDXVerifier: failed to parse enclave identity");
 
             // Use isvsvn = 4 for TDX QE
-            // IAutomataEnclaveIdentityDao(tdxEnclaveIdentityDao).upsertEnclaveIdentity(
-            //     uint256(identity.id), 4, identityJsonObj
-            // );
+            IAutomataEnclaveIdentityDao(tdxEnclaveIdentityDao).upsertEnclaveIdentity(
+                uint256(identity.id), 4, identityJsonObj
+            );
             console2.log("** TDX_QE_IDENTITY configured");
         }
 
@@ -212,8 +221,8 @@ contract SetupTDXVerifier is Script, DeployCapability {
                 string.concat(vm.projectRoot(), tcbInfoPath)
             );
             TcbInfoJsonObj memory tcbInfoJsonObj = parseTcbInfoJson(tcbInfoJson);
-            
-            // IFmspcTcbDao(tdxFmspcTcbDao).upsertFmspcTcb(tcbInfoJsonObj);
+
+            IFmspcTcbDao(tdxFmspcTcbDao).upsertFmspcTcb(tcbInfoJsonObj);
             console2.log("** TDX_TCB_INFO configured");
         }
     }
