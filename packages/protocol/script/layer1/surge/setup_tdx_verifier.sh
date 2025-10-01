@@ -18,7 +18,7 @@ export TDX_ENCLAVE_IDENTITY_HELPER_ADDRESS=${TDX_ENCLAVE_IDENTITY_HELPER_ADDRESS
 
 # TDX collateral paths
 export TDX_QE_IDENTITY_PATH=${TDX_QE_IDENTITY_PATH:-"/test/layer1/automata-attestation/assets/0923/tdx_identity.json"}
-export TDX_TCB_INFO_PATH=${TDX_TCB_INFO_PATH:-"/test/layer1/automata-attestation/assets/0923/tdx_tcb_00806F050000.json"}
+export TDX_TCB_INFO_PATH=${TDX_TCB_INFO_PATH:-"/test/layer1/automata-attestation/assets/0923/tdx_tcb_90c06f000000.json"}
 export TDX_PCS_CERT_PATH=${TDX_PCS_CERT_PATH:-"/test/layer1/automata-attestation/assets/0923/tdx_pcs_cert.hex"}
 export TDX_ROOT_PCS_CERT_PATH=${TDX_ROOT_PCS_CERT_PATH:-"/test/layer1/automata-attestation/assets/0923/tdx_root_pcs_cert.hex"}
 

@@ -23,7 +23,7 @@ export TDX_TRUSTED_PARAMS_BYTES=${TDX_TRUSTED_PARAMS_BYTES:-"0x"}
 
 # Attestation configuration
 export TDX_QE_IDENTITY_PATH=${TDX_QE_IDENTITY_PATH:-"/test/layer1/automata-attestation/assets/0923/tdx_identity.json"}
-export TDX_TCB_INFO_PATH=${TDX_TCB_INFO_PATH:-"/test/layer1/automata-attestation/assets/0923/tdx_tcb_00806F050000.json"}
+export TDX_TCB_INFO_PATH=${TDX_TCB_INFO_PATH:-"/test/layer1/automata-attestation/assets/0923/tdx_tcb_90c06f000000.json"}
 export TDX_PCS_CERT_PATH=${TDX_PCS_CERT_PATH:-"/test/layer1/automata-attestation/assets/0923/tdx_pcs_cert.hex"}
 export TDX_QUOTE_BYTES=${TDX_QUOTE_BYTES:-"0x"}
 

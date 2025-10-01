@@ -2,9 +2,9 @@
   "tcbInfo": {
     "id": "TDX",
     "version": 3,
-    "issueDate": "2025-09-30T14:26:16Z",
-    "nextUpdate": "2025-10-30T14:26:16Z",
-    "fmspc": "00806F050000",
+    "issueDate": "2025-10-01T18:13:07Z",
+    "nextUpdate": "2025-10-31T18:13:07Z",
+    "fmspc": "90c06f000000",
     "pceId": "0000",
     "tcbType": 0,
     "tcbEvaluationDataNumber": 17,
@@ -50,9 +50,9 @@
       {
         "tcb": {
           "sgxtcbcomponents": [
-            { "svn": 7, "category": "BIOS", "type": "Early Microcode Update" },
+            { "svn": 2, "category": "BIOS", "type": "Early Microcode Update" },
             {
-              "svn": 7,
+              "svn": 2,
               "category": "OS/VMM",
               "type": "SGX Late Microcode Update"
             },
@@ -61,7 +61,7 @@
             { "svn": 3, "category": "BIOS" },
             { "svn": 1, "category": "BIOS" },
             { "svn": 0 },
-            { "svn": 3, "category": "OS/VMM", "type": "SEAMLDR ACM" },
+            { "svn": 5, "category": "OS/VMM", "type": "SEAMLDR ACM" },
             { "svn": 0 },
             { "svn": 0 },
             { "svn": 0 },
@@ -71,12 +71,12 @@
             { "svn": 0 },
             { "svn": 0 }
           ],
-          "pcesvn": 11,
+          "pcesvn": 13,
           "tdxtcbcomponents": [
             { "svn": 5, "category": "OS/VMM", "type": "TDX Module" },
             { "svn": 0, "category": "OS/VMM", "type": "TDX Module" },
             {
-              "svn": 7,
+              "svn": 2,
               "category": "OS/VMM",
               "type": "TDX Late Microcode Update"
             },
@@ -101,9 +101,9 @@
       {
         "tcb": {
           "sgxtcbcomponents": [
-            { "svn": 6, "category": "BIOS", "type": "Early Microcode Update" },
+            { "svn": 2, "category": "BIOS", "type": "Early Microcode Update" },
             {
-              "svn": 6,
+              "svn": 2,
               "category": "OS/VMM",
               "type": "SGX Late Microcode Update"
             },
@@ -112,116 +112,7 @@
             { "svn": 3, "category": "BIOS" },
             { "svn": 1, "category": "BIOS" },
             { "svn": 0 },
-            { "svn": 3, "category": "OS/VMM", "type": "SEAMLDR ACM" },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 }
-          ],
-          "pcesvn": 11,
-          "tdxtcbcomponents": [
-            { "svn": 3, "category": "OS/VMM", "type": "TDX Module" },
-            { "svn": 0, "category": "OS/VMM", "type": "TDX Module" },
-            {
-              "svn": 6,
-              "category": "OS/VMM",
-              "type": "TDX Late Microcode Update"
-            },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 }
-          ]
-        },
-        "tcbDate": "2023-08-09T00:00:00Z",
-        "tcbStatus": "OutOfDate",
-        "advisoryIDs": ["INTEL-SA-00960", "INTEL-SA-00982", "INTEL-SA-00986"]
-      },
-      {
-        "tcb": {
-          "sgxtcbcomponents": [
-            { "svn": 5, "category": "BIOS", "type": "Early Microcode Update" },
-            {
-              "svn": 5,
-              "category": "OS/VMM",
-              "type": "SGX Late Microcode Update"
-            },
-            { "svn": 2, "category": "OS/VMM", "type": "TXT SINIT" },
-            { "svn": 2, "category": "BIOS" },
-            { "svn": 3, "category": "BIOS" },
-            { "svn": 1, "category": "BIOS" },
-            { "svn": 0 },
-            { "svn": 3, "category": "OS/VMM", "type": "SEAMLDR ACM" },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 }
-          ],
-          "pcesvn": 11,
-          "tdxtcbcomponents": [
-            { "svn": 3, "category": "OS/VMM", "type": "TDX Module" },
-            { "svn": 0, "category": "OS/VMM", "type": "TDX Module" },
-            {
-              "svn": 5,
-              "category": "OS/VMM",
-              "type": "TDX Late Microcode Update"
-            },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 },
-            { "svn": 0 }
-          ]
-        },
-        "tcbDate": "2023-02-15T00:00:00Z",
-        "tcbStatus": "OutOfDate",
-        "advisoryIDs": [
-          "INTEL-SA-00837",
-          "INTEL-SA-00960",
-          "INTEL-SA-00982",
-          "INTEL-SA-00986"
-        ]
-      },
-      {
-        "tcb": {
-          "sgxtcbcomponents": [
-            { "svn": 5, "category": "BIOS", "type": "Early Microcode Update" },
-            {
-              "svn": 5,
-              "category": "OS/VMM",
-              "type": "SGX Late Microcode Update"
-            },
-            { "svn": 2, "category": "OS/VMM", "type": "TXT SINIT" },
-            { "svn": 2, "category": "BIOS" },
-            { "svn": 3, "category": "BIOS" },
-            { "svn": 1, "category": "BIOS" },
-            { "svn": 0 },
-            { "svn": 3, "category": "OS/VMM", "type": "SEAMLDR ACM" },
+            { "svn": 5, "category": "OS/VMM", "type": "SEAMLDR ACM" },
             { "svn": 0 },
             { "svn": 0 },
             { "svn": 0 },
@@ -233,10 +124,10 @@
           ],
           "pcesvn": 5,
           "tdxtcbcomponents": [
-            { "svn": 3, "category": "OS/VMM", "type": "TDX Module" },
+            { "svn": 5, "category": "OS/VMM", "type": "TDX Module" },
             { "svn": 0, "category": "OS/VMM", "type": "TDX Module" },
             {
-              "svn": 5,
+              "svn": 2,
               "category": "OS/VMM",
               "type": "TDX Late Microcode Update"
             },
@@ -271,13 +162,10 @@
           "INTEL-SA-00381",
           "INTEL-SA-00389",
           "INTEL-SA-00477",
-          "INTEL-SA-00837",
-          "INTEL-SA-00960",
-          "INTEL-SA-00982",
-          "INTEL-SA-00986"
+          "INTEL-SA-00837"
         ]
       }
     ]
   },
-  "signature": "b81b2321a09a110305b3958daac0d39625ea2f087725e57b7037a3df18d7fd667ac43d6f971a2ebdab4309ab07ce5042fb95e91e50d0866bc61582e1ca767566"
+  "signature": "91e14420654ba0d209843e85c5a987e97f5686b502dd34d303473b9e31cf1293f785e785c62848d8b55a309ed8d78780fda67c3c22a9011b126f0a2fb6957f23"
 }
