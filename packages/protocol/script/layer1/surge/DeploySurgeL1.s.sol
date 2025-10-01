@@ -511,7 +511,7 @@ contract DeploySurgeL1 is DeployCapability {
         if (deployAzureTdxVerifier) {
             verifiers.azureTdxVerifier = deployProxy({
                 name: "azure_tdx_verifier",
-                impl: address(new AzureTdxVerifier(l2ChainId, _taikoInbox, _proofVerifier, 0x95175096a9B74165BE0ac84260cc14Fc1c0EF5FF)),
+                impl: address(new AzureTdxVerifier(l2ChainId, _taikoInbox, _proofVerifier, 0x9af1b030450C74518Ab572547f5BE10E9caAe7Ba)),
                 data: abi.encodeCall(AzureTdxVerifier.init, address(0))
             });
             console2.log("** Azure TDX verifier deployed");
