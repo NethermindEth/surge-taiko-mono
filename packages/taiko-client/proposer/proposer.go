@@ -238,14 +238,23 @@ func (p *Proposer) handleSignalSentEvent(vLog types.Log) {
 	)
 
 	p.signalMu.Lock()
-	p.lastSignalSentEventAt = time.Now()
-	p.pendingSignalForcePropose = true
-	p.signalMu.Unlock()
+	defer p.signalMu.Unlock()
 
-	log.Debug("Scheduled force propose after SignalSent event",
-		"delay", p.Config.ForceProposingDelay,
-		"scheduledFor", time.Now().Add(p.Config.ForceProposingDelay),
-	)
+	// Only process the first signal event if no pending force propose
+	if !p.pendingSignalForcePropose {
+		p.lastSignalSentEventAt = time.Now()
+		p.pendingSignalForcePropose = true
+
+		log.Debug("Scheduled force propose after SignalSent event",
+			"delay", p.Config.ForceProposingDelay,
+			"scheduledFor", time.Now().Add(p.Config.ForceProposingDelay),
+		)
+	} else {
+		log.Debug("Ignoring subsequent SignalSent event - force propose already pending",
+			"txHash", vLog.TxHash.Hex(),
+			"blockNumber", vLog.BlockNumber,
+		)
+	}
 }
 
 // shouldForcePropose checks if we should force propose based on SignalSent events
