@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
@@ -191,13 +192,18 @@ func (p *Proposer) initSignalServiceSubscription() error {
 
 // subscribeToSignalSentEvent subscribes to SignalSent event on SignalService contract
 func (p *Proposer) subscribeToSignalSentEvent() error {
-	logChan := make(chan types.Log)
-	sub, err := p.rpc.L1.SubscribeFilterLogs(p.ctx, ethereum.FilterQuery{
-		Addresses: []common.Address{p.signalServiceAddress},
-		Topics: [][]common.Hash{{
-			crypto.Keccak256Hash([]byte("SignalSent(address,bytes32,bytes32,bytes32)")),
-		}}, // SignalSent event topic
-	}, logChan)
+	createSubscription := func() (chan types.Log, ethereum.Subscription, error) {
+		logChan := make(chan types.Log)
+		sub, err := p.rpc.L1.SubscribeFilterLogs(p.ctx, ethereum.FilterQuery{
+			Addresses: []common.Address{p.signalServiceAddress},
+			Topics: [][]common.Hash{{
+				crypto.Keccak256Hash([]byte("SignalSent(address,bytes32,bytes32,bytes32)")),
+			}},
+		}, logChan)
+		return logChan, sub, err
+	}
+
+	logChan, sub, err := createSubscription()
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to SignalSent events on SignalService %s: %w",
 			p.signalServiceAddress.Hex(), err)
@@ -219,8 +225,21 @@ func (p *Proposer) subscribeToSignalSentEvent() error {
 				log.Info("SignalSent event subscription stopped due to context cancellation")
 				return
 			case err := <-sub.Err():
-				log.Error("SignalSent event subscription error", "err", err)
-				return
+				log.Error("SignalSent event subscription error, attempting to reconnect", "err", err)
+
+				// Attempt to reconnect with exponential backoff, retrying indefinitely
+				_ = backoff.Retry(func() error {
+					newLogChan, newSub, err := createSubscription()
+					if err != nil {
+						log.Warn("Failed to reconnect to SignalSent events, retrying", "err", err)
+						return err
+					}
+
+					log.Info("Successfully reconnected to SignalSent events")
+					sub = newSub
+					logChan = newLogChan
+					return nil
+				}, backoff.WithContext(backoff.NewExponentialBackOff(), p.ctx))
 			case vLog := <-logChan:
 				p.handleSignalSentEvent(vLog)
 			}
@@ -288,9 +307,10 @@ func (p *Proposer) shouldForcePropose() (bool, string) {
 // resetSignalForcePropose resets the pending signal force propose state and logs if it was actually a force propose
 func (p *Proposer) resetSignalForcePropose(isSignalForcePropose bool) {
 	p.signalMu.Lock()
+	defer p.signalMu.Unlock()
+	
 	hadPendingSignal := p.pendingSignalForcePropose
 	p.pendingSignalForcePropose = false
-	p.signalMu.Unlock()
 
 	// Only log completion message if this was actually a force propose due to signal
 	if isSignalForcePropose && hadPendingSignal {
