@@ -11,15 +11,15 @@ import "src/layer1/mainnet/libs/LibFasterReentryLock.sol";
 contract SurgeHoodiInbox is TaikoInbox {
     struct ConfigParams {
         uint64 chainId;
+        uint24 cooldownWindow;
         uint64 maxVerificationDelay;
         uint96 livenessBondBase;
-        uint96 livenessBondPerBlock;
     }
 
     uint64 public immutable chainId;
+    uint24 public immutable cooldownWindow;
     uint64 public immutable maxVerificationDelay;
     uint96 public immutable livenessBondBase;
-    uint96 public immutable livenessBondPerBlock;
 
     constructor(
         ConfigParams memory _configParams,
@@ -32,9 +32,9 @@ contract SurgeHoodiInbox is TaikoInbox {
         TaikoInbox(_wrapper, _dao, _verifier, _bondToken, _signalService)
     {
         chainId = _configParams.chainId;
+        cooldownWindow = _configParams.cooldownWindow;
         maxVerificationDelay = _configParams.maxVerificationDelay;
         livenessBondBase = _configParams.livenessBondBase;
-        livenessBondPerBlock = _configParams.livenessBondPerBlock;
     }
 
     function pacayaConfig() public view override returns (ITaikoInbox.Config memory) {
@@ -48,22 +48,23 @@ contract SurgeHoodiInbox is TaikoInbox {
             maxUnverifiedBatches: 324_000, // DO NOT CHANGE!!!
             batchRingBufferSize: 360_000, // DO NOT CHANGE!!!
             maxBatchesToVerify: 16,
-            blockMaxGasLimit: 200_000_000,
+            blockMaxGasLimit: 60_000_000,
             livenessBondBase: livenessBondBase,
-            livenessBondPerBlock: livenessBondPerBlock,
+            livenessBondPerBlock: 0,
             stateRootSyncInternal: 2,
             maxAnchorHeightOffset: 64,
+            // Surge: Nothing except `sharingPctg` in `baseFeeConfig` is relevant
             baseFeeConfig: LibSharedData.BaseFeeConfig({
-                adjustmentQuotient: 8,
+                adjustmentQuotient: 0,
                 sharingPctg: 75,
-                gasIssuancePerSecond: 50_000_000,
-                minGasExcess: 15_291_000_000, // Resolves to ~0.0999 Gwei
-                maxGasIssuancePerBlock: 6_000_000_000
+                gasIssuancePerSecond: 0,
+                minGasExcess: 0,
+                maxGasIssuancePerBlock: 0
             }),
             provingWindow: 24 hours,
-            cooldownWindow: 7 days,
+            cooldownWindow: cooldownWindow,
             maxSignalsToReceive: 16,
-            maxBlocksPerBatch: 768,
+            maxBlocksPerBatch: 6,
             forkHeights: ITaikoInbox.ForkHeights({ ontake: 0, pacaya: 0, shasta: 0, unzen: 0 }),
             maxVerificationDelay: maxVerificationDelay
         });

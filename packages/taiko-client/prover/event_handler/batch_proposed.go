@@ -28,30 +28,32 @@ var (
 
 // BatchProposedEventHandler is responsible for handling the BatchProposed event as a prover.
 type BatchProposedEventHandler struct {
-	sharedState            *state.SharedState
-	proverAddress          common.Address
-	proverSetAddress       common.Address
-	rpc                    *rpc.Client
-	localProposerAddresses []common.Address
-	assignmentExpiredCh    chan<- metadata.TaikoProposalMetaData
-	proofSubmissionCh      chan<- *proofProducer.ProofRequestBody
-	backOffRetryInterval   time.Duration
-	backOffMaxRetrys       uint64
-	proveUnassignedBlocks  bool
+	sharedState                 *state.SharedState
+	proverAddress               common.Address
+	proverSetAddress            common.Address
+	surgeProposerWrapperAddress common.Address
+	rpc                         *rpc.Client
+	localProposerAddresses      []common.Address
+	assignmentExpiredCh         chan<- metadata.TaikoProposalMetaData
+	proofSubmissionCh           chan<- *proofProducer.ProofRequestBody
+	backOffRetryInterval        time.Duration
+	backOffMaxRetrys            uint64
+	proveUnassignedBlocks       bool
 }
 
 // NewBatchProposedEventHandlerOps is the options for creating a new BatchProposedEventHandler.
 type NewBatchProposedEventHandlerOps struct {
-	SharedState            *state.SharedState
-	ProverAddress          common.Address
-	ProverSetAddress       common.Address
-	RPC                    *rpc.Client
-	LocalProposerAddresses []common.Address
-	AssignmentExpiredCh    chan metadata.TaikoProposalMetaData
-	ProofSubmissionCh      chan *proofProducer.ProofRequestBody
-	BackOffRetryInterval   time.Duration
-	BackOffMaxRetrys       uint64
-	ProveUnassignedBlocks  bool
+	SharedState                 *state.SharedState
+	ProverAddress               common.Address
+	ProverSetAddress            common.Address
+	SurgeProposerWrapperAddress common.Address
+	RPC                         *rpc.Client
+	LocalProposerAddresses      []common.Address
+	AssignmentExpiredCh         chan metadata.TaikoProposalMetaData
+	ProofSubmissionCh           chan *proofProducer.ProofRequestBody
+	BackOffRetryInterval        time.Duration
+	BackOffMaxRetrys            uint64
+	ProveUnassignedBlocks       bool
 }
 
 // NewBatchProposedEventHandler creates a new BatchProposedEventHandler instance.
@@ -60,6 +62,7 @@ func NewBatchProposedEventHandler(opts *NewBatchProposedEventHandlerOps) *BatchP
 		opts.SharedState,
 		opts.ProverAddress,
 		opts.ProverSetAddress,
+		opts.SurgeProposerWrapperAddress,
 		opts.RPC,
 		opts.LocalProposerAddresses,
 		opts.AssignmentExpiredCh,
@@ -76,6 +79,23 @@ func (h *BatchProposedEventHandler) Handle(
 	meta metadata.TaikoProposalMetaData,
 	end eventIterator.EndBatchProposedEventIterFunc,
 ) error {
+	// If the batch ID is in the rollbacked ranges, we skip the batch handling.
+	if h.sharedState.GetBatchesRollbackedRanges() != nil &&
+		h.sharedState.GetBatchesRollbackedRanges().Contains(
+			meta.Pacaya().GetBatchID().Uint64(),
+			meta.GetRawBlockHeight().Uint64(),
+			meta.GetLogIndex(),
+		) {
+		log.Info(
+			"Skip batch since it is present in the rollbacked range (BatchesRollbacked)",
+			"batchID", meta.Pacaya().GetBatchID(),
+			"l1Height", meta.GetRawBlockHeight(),
+			"l1LogIndex", meta.GetLogIndex(),
+			"lastHandledBatchID", h.sharedState.GetLastHandledBatchID(),
+		)
+		return nil
+	}
+
 	// Wait for the corresponding L2 block being mined in node.
 	if _, err := h.rpc.WaitL2Header(ctx, new(big.Int).SetUint64(meta.Pacaya().GetLastBlockID())); err != nil {
 		return fmt.Errorf("failed to wait L2 header (eventID %d): %w", meta.Pacaya().GetLastBlockID(), err)
@@ -201,11 +221,15 @@ func (h *BatchProposedEventHandler) checkExpirationAndSubmitProofPacaya(
 	if !windowExpired &&
 		meta.GetProposer() != h.proverAddress &&
 		meta.GetProposer() != h.proverSetAddress &&
+		meta.GetProposer() != h.surgeProposerWrapperAddress &&
 		!slices.Contains(h.localProposerAddresses, meta.GetProposer()) {
 		log.Info(
 			"Proposed batch is not provable by current prover at the moment",
 			"batchID", meta.Pacaya().GetBatchID(),
-			"prover", meta.GetProposer(),
+			"currentProver", h.proverAddress,
+			"currentProverSet", h.proverSetAddress,
+			"surgeProposerWrapper", h.surgeProposerWrapperAddress,
+			"assignProver", meta.GetProposer(),
 			"timeToExpire", timeToExpire,
 			"localProposerAddresses", h.localProposerAddresses,
 		)
@@ -214,6 +238,9 @@ func (h *BatchProposedEventHandler) checkExpirationAndSubmitProofPacaya(
 			log.Info(
 				"Add proposed block to wait for proof window expiration",
 				"batchID", meta.Pacaya().GetBatchID(),
+				"currentProver", h.proverAddress,
+				"currentProverSet", h.proverSetAddress,
+				"surgeProposerWrapper", h.surgeProposerWrapperAddress,
 				"assignProver", meta.GetProposer(),
 				"timeToExpire", timeToExpire,
 				"localProposerAddresses", h.localProposerAddresses,
@@ -233,12 +260,14 @@ func (h *BatchProposedEventHandler) checkExpirationAndSubmitProofPacaya(
 	if !h.proveUnassignedBlocks &&
 		meta.GetProposer() != h.proverAddress &&
 		meta.GetProposer() != h.proverSetAddress &&
+		meta.GetProposer() != h.surgeProposerWrapperAddress &&
 		!slices.Contains(h.localProposerAddresses, meta.GetProposer()) {
 		log.Info(
 			"Expired batch is not provable by current prover",
 			"batchID", meta.Pacaya().GetBatchID(),
 			"currentProver", h.proverAddress,
 			"currentProverSet", h.proverSetAddress,
+			"surgeProposerWrapper", h.surgeProposerWrapperAddress,
 			"assignProver", meta.GetProposer(),
 			"localProposerAddresses", h.localProposerAddresses,
 		)
@@ -248,6 +277,9 @@ func (h *BatchProposedEventHandler) checkExpirationAndSubmitProofPacaya(
 	log.Info(
 		"Proposed batch is provable",
 		"batchID", meta.Pacaya().GetBatchID(),
+		"currentProver", h.proverAddress,
+		"currentProverSet", h.proverSetAddress,
+		"surgeProposerWrapper", h.surgeProposerWrapperAddress,
 		"assignProver", meta.GetProposer(),
 		"localProposerAddresses", h.localProposerAddresses,
 	)
