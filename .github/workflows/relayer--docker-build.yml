@@ -108,7 +108,7 @@ jobs:
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_MIGRATIONS }}:temp-ubuntu-latest \
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_MIGRATIONS }}:temp-ubuntu-24.04-arm
-
+ 
       - uses: oras-project/setup-oras@v1
       - run: oras version
       - name: Login to registry with oras
@@ -116,6 +116,7 @@ jobs:
           oras login ${{ env.DOCKER_REGISTRY }} \
             -u ${{ env.DOCKER_USERNAME }} \
             -p ${{ env.DOCKER_PASSWORD }}
+
 
       - name: Summary
         run: |
@@ -202,7 +203,7 @@ jobs:
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_RELAYER }}:temp-ubuntu-latest \
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY_RELAYER }}:temp-ubuntu-24.04-arm
-
+ 
       - uses: oras-project/setup-oras@v1
       - run: oras version
       - name: Login to registry with oras
@@ -210,6 +211,7 @@ jobs:
           oras login ${{ env.DOCKER_REGISTRY }} \
             -u ${{ env.DOCKER_USERNAME }} \
             -p ${{ env.DOCKER_PASSWORD }}
+
 
       - name: Summary
         run: |
