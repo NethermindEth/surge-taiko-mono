@@ -95,7 +95,6 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
             bondToken: bondToken,
             signalService: signalService,
             inboxWrapper: inboxWrapper
-            // params.celestiaBlobParams
         });
 
         (info_, meta_, stats2) = LibProposing.proposeBatches(state, proposeBatchParams, _txList);
