@@ -49,6 +49,13 @@ interface ITaikoInbox {
         uint64 createdIn;
     }
 
+    struct CelestiaBlobParams {
+	    // The block height at which the submitted blobs were included.
+        uint64 height;
+        // The namespace (channel) that the blobs were submitted to.
+	    bytes namespace;
+    }
+
     struct BatchParams {
         address proposer;
         address coinbase;
@@ -60,6 +67,8 @@ interface ITaikoInbox {
         bool revertIfNotFirstProposal;
         // Specifies the number of blocks to be generated from this batch.
         BlobParams blobParams;
+        // Surge: Provided when Celestia is being used as an alternative DA layer
+        CelestiaBlobParams celestiaBlobParams;
         BlockParams[] blocks;
     }
 
@@ -79,6 +88,8 @@ interface ITaikoInbox {
         uint32 gasLimit;
         // Surge: Custom L2 base fee set by the proposer
         uint96 baseFee;
+        // Surge: Provided when Celestia is being used as an alternative DA layer
+        CelestiaBlobParams celestiaBlobParams;
         uint64 lastBlockId;
         uint64 lastBlockTimestamp;
         // Data for the L2 anchor transaction, shared by all blocks in the batch
@@ -310,6 +321,7 @@ interface ITaikoInbox {
     error InsufficientBond();
     error InvalidBlobCreatedIn();
     error InvalidBlobParams();
+    error InvalidCelestiaBlobParams();
     error InvalidGenesisBlockHash();
     error InvalidParams();
     error InvalidProofType();

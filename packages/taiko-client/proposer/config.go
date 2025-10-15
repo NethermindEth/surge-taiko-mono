@@ -84,6 +84,11 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 	batchPostingGasWithBlobs := uint64(160_000)
 	proofPostingGas := uint64(750_000)
 
+	celestiaConfigs, err := pkgFlags.InitProposerCelestiaConfigsFromCli(c)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		ClientConfig: &rpc.ClientConfig{
 			L1Endpoint:                  c.String(flags.L1WSEndpoint.Name),
@@ -99,6 +104,7 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			ProverSetAddress:            common.HexToAddress(c.String(flags.ProverSetAddress.Name)),
 			BridgeAddress:               common.HexToAddress(c.String(flags.BridgeAddress.Name)),
 			SurgeProposerWrapperAddress: common.HexToAddress(c.String(flags.SurgeProposerWrapperAddress.Name)),
+			CelestiaConfigs:             celestiaConfigs,
 		},
 		L1ProposerPrivKey:       l1ProposerPrivKey,
 		L2SuggestedFeeRecipient: common.HexToAddress(l2SuggestedFeeRecipient),

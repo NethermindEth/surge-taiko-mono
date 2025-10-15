@@ -172,3 +172,13 @@ func (m *TaikoDataBlockMetadataPacaya) InnerMetadata() *pacayaBindings.ITaikoInb
 func (m *TaikoDataBlockMetadataPacaya) GetBaseFee() *big.Int {
 	return m.BaseFee
 }
+
+// GetCelestiaBlobsHeight returns the height in which the blobs were included in Celestia.
+func (m *TaikoDataBlockMetadataPacaya) GetCelestiaBlobsHeight() uint64 {
+	return m.CelestiaBlobParams.Height
+}
+
+// GetCelestiaBlobsNamespace returns the namespace in which the blobs were included in Celestia.
+func (m *TaikoDataBlockMetadataPacaya) GetCelestiaBlobsNamespace() []byte {
+	return m.CelestiaBlobParams.Namespace
+}

@@ -45,6 +45,8 @@ type Client struct {
 	L1Beacon *BeaconClient
 	// Protocol contracts clients
 	PacayaClients *PacayaClients
+	// DA layer clients
+	CelestiaDA *CelestiaClient
 }
 
 // ClientConfig contains all configs which will be used to initializing an
@@ -67,16 +69,18 @@ type ClientConfig struct {
 	L2EngineEndpoint            string
 	JwtSecret                   string
 	Timeout                     time.Duration
+	CelestiaConfigs             *CelestiaConfig
 }
 
 // NewClient initializes all RPC clients used by Taiko client software.
 func NewClient(ctx context.Context, cfg *ClientConfig) (*Client, error) {
 	var (
-		l1Client       *EthClient
-		l2Client       *EthClient
-		l1BeaconClient *BeaconClient
-		l2CheckPoint   *EthClient
-		err            error
+		l1Client         *EthClient
+		l2Client         *EthClient
+		l1BeaconClient   *BeaconClient
+		l2CheckPoint     *EthClient
+		celestiaDAClient *CelestiaClient
+		err              error
 	)
 
 	// Keep retrying to connect to the RPC endpoints until success or context is cancelled.
@@ -110,6 +114,14 @@ func NewClient(ctx context.Context, cfg *ClientConfig) (*Client, error) {
 			}
 		}
 
+		if cfg.CelestiaConfigs.Enabled {
+			celestiaDAClient, err = NewCelestiaClient(ctxWithTimeout, cfg.CelestiaConfigs, cfg.Timeout)
+			if err != nil {
+				log.Error("Failed to connect to Celestia node, retrying", "endpoint", cfg.CelestiaConfigs.Endpoint, "err", err)
+				return err
+			}
+		}
+
 		return nil
 	}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx)); err != nil {
 		return nil, err
@@ -131,6 +143,7 @@ func NewClient(ctx context.Context, cfg *ClientConfig) (*Client, error) {
 		L2:           l2Client,
 		L2CheckPoint: l2CheckPoint,
 		L2Engine:     l2AuthClient,
+		CelestiaDA:   celestiaDAClient,
 	}
 
 	// Initialize all smart contract clients.

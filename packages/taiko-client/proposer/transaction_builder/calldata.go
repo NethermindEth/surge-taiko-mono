@@ -124,6 +124,9 @@ func (b *CalldataTransactionBuilder) BuildPacaya(
 		},
 		Blocks:  blockParams,
 		BaseFee: baseFee,
+		CelestiaBlobParams: encoding.CelestiaBlobParams{
+			Height: 0,
+		},
 	}
 
 	if b.revertProtectionEnabled {

@@ -1,0 +1,124 @@
+package celestia
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	"github.com/celestiaorg/go-square/merkle"
+	"github.com/celestiaorg/go-square/v2/inclusion"
+	"github.com/celestiaorg/go-square/v2/share"
+)
+
+const (
+	// https://github.com/celestiaorg/celestia-app/blob/main/pkg/appconsts/v4/app_consts.go#L17
+	CelestiaBlobNamespace         = "blob"
+	SubtreeRootThreshold  int     = 64
+	DefaultGasPrice       float64 = -1.0
+	DefaultMinGasPrice            = 0.002
+	DefaultMaxGasPrice            = DefaultMinGasPrice * 100
+)
+
+type Commitment []byte
+
+type Blob struct {
+	*share.Blob `json:"blob"`
+
+	Commitment Commitment `json:"commitment"`
+
+	index int
+}
+
+type SubmitOptions struct {
+	SignerAddress     string  `json:"signer_address,omitempty"`
+	KeyName           string  `json:"key_name,omitempty"`
+	GasPrice          float64 `json:"gas_price,omitempty"`
+	IsGasPriceSet     bool    `json:"is_gas_price_set,omitempty"`
+	MaxGasPrice       float64 `json:"max_gas_price"`
+	Gas               uint64  `json:"gas,omitempty"`
+	Priority          int     `json:"tx_priority,omitempty"`
+	FeeGranterAddress string  `json:"fee_granter_address,omitempty"`
+}
+
+type CelestiaBlobHandler struct {
+	Submit func(context.Context, []*Blob, *SubmitOptions) (uint64, error)
+	GetAll func(context.Context, uint64, []share.Namespace) ([]*Blob, error)
+}
+
+// NewBlobV0 constructs a new blob from the provided Namespace and data.
+// The blob will be formatted as v0 shares.
+func NewBlobV0(namespace share.Namespace, data []byte) (*Blob, error) {
+	return NewBlob(share.ShareVersionZero, namespace, data, nil)
+}
+
+// NewBlob constructs a new blob from the provided Namespace, data, signer, and share version.
+// There are two possible share versions at this time (v0 and v1) and we only use one, the other is skipped.
+// The implementation fallows https://github.com/celestiaorg/celestia-node/blob/main/blob/blob.go
+func NewBlob(shareVersion uint8, namespace share.Namespace, data, signer []byte) (*Blob, error) {
+	if err := namespace.ValidateForBlob(); err != nil {
+		return nil, fmt.Errorf("invalid user namespace: %w", err)
+	}
+
+	shareBlob, err := share.NewBlob(namespace, data, shareVersion, signer)
+	if err != nil {
+		return nil, err
+	}
+
+	commitment, err := inclusion.CreateCommitment(shareBlob, merkle.HashFromByteSlices, SubtreeRootThreshold)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Blob{Blob: shareBlob, Commitment: commitment, index: -1}, nil
+}
+
+type jsonBlob struct {
+	Namespace    []byte     `json:"namespace"`
+	Data         []byte     `json:"data"`
+	ShareVersion uint8      `json:"share_version"`
+	Commitment   Commitment `json:"commitment"`
+	Signer       []byte     `json:"signer,omitempty"`
+	Index        int        `json:"index"`
+}
+
+func (b *Blob) MarshalJSON() ([]byte, error) {
+	blob := &jsonBlob{
+		Namespace:    b.Namespace().Bytes(),
+		Data:         b.Data(),
+		ShareVersion: b.ShareVersion(),
+		Commitment:   b.Commitment,
+		Signer:       b.Signer(),
+		Index:        b.index,
+	}
+	return json.Marshal(blob)
+}
+
+func (b *Blob) UnmarshalJSON(data []byte) error {
+	var jsonBlob jsonBlob
+	err := json.Unmarshal(data, &jsonBlob)
+	if err != nil {
+		return err
+	}
+
+	ns, err := share.NewNamespaceFromBytes(jsonBlob.Namespace)
+	if err != nil {
+		return err
+	}
+
+	blob, err := NewBlob(jsonBlob.ShareVersion, ns, jsonBlob.Data, jsonBlob.Signer)
+	if err != nil {
+		return err
+	}
+
+	blob.Commitment = jsonBlob.Commitment
+	blob.index = jsonBlob.Index
+	*b = *blob
+	return nil
+}
+
+func NewSubmitOptions() *SubmitOptions {
+	return &SubmitOptions{
+		GasPrice:    DefaultGasPrice,
+		MaxGasPrice: DefaultMaxGasPrice,
+	}
+}

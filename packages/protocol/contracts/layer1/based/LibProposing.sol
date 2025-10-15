@@ -102,9 +102,36 @@ library LibProposing {
 
             {
                 bool calldataUsed = _txList.length != 0;
+                bool celestiaUsed = _proposeBatchParams.params.celestiaBlobParams.height > 0;
 
                 if (calldataUsed) {
                     // calldata is used for data availability
+                    require(
+                        _proposeBatchParams.params.blobParams.firstBlobIndex == 0,
+                        ITaikoInbox.InvalidBlobParams()
+                    );
+                    require(
+                        _proposeBatchParams.params.blobParams.numBlobs == 0,
+                        ITaikoInbox.InvalidBlobParams()
+                    );
+                    require(
+                        _proposeBatchParams.params.blobParams.createdIn == 0,
+                        ITaikoInbox.InvalidBlobCreatedIn()
+                    );
+                    require(
+                        _proposeBatchParams.params.blobParams.blobHashes.length == 0,
+                        ITaikoInbox.InvalidBlobParams()
+                    );
+                    require(
+                        _proposeBatchParams.params.celestiaBlobParams.height == 0,
+                        ITaikoInbox.InvalidCelestiaBlobParams()
+                    );
+                    require(
+                        _proposeBatchParams.params.celestiaBlobParams.namespace.length == 0,
+                        ITaikoInbox.InvalidCelestiaBlobParams()
+                    );
+                } else if (celestiaUsed) {
+                    // Celestia is used for data availability
                     require(
                         _proposeBatchParams.params.blobParams.firstBlobIndex == 0,
                         ITaikoInbox.InvalidBlobParams()
@@ -190,6 +217,8 @@ library LibProposing {
                 gasLimit: _proposeBatchParams.config.blockMaxGasLimit,
                 // Surge: custom L2 basefee set by the proposer
                 baseFee: _proposeBatchParams.params.baseFee,
+                // Surge: Provided when Celestia is being used as an alternative DA layer
+                celestiaBlobParams: _proposeBatchParams.params.celestiaBlobParams,
                 lastBlockId: 0, // to be initialised later
                 lastBlockTimestamp: lastBlockTimestamp,
                 //

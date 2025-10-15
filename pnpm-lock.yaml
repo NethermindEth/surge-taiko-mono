@@ -69,6 +69,9 @@ importers:
       '@sveltejs/adapter-auto':
         specifier: ^3.2.0
         version: 3.2.0(@sveltejs/kit@2.5.22(@sveltejs/vite-plugin-svelte@3.1.0(svelte@4.2.15)(vite@5.2.11(@types/node@22.7.5)(terser@5.31.0)))(svelte@4.2.15)(vite@5.2.11(@types/node@22.7.5)(terser@5.31.0)))
+      '@sveltejs/adapter-node':
+        specifier: ^5.2.12
+        version: 5.3.3(@sveltejs/kit@2.5.22(@sveltejs/vite-plugin-svelte@3.1.0(svelte@4.2.15)(vite@5.2.11(@types/node@22.7.5)(terser@5.31.0)))(svelte@4.2.15)(vite@5.2.11(@types/node@22.7.5)(terser@5.31.0)))
       '@sveltejs/kit':
         specifier: ^2.5.21
         version: 2.5.22(@sveltejs/vite-plugin-svelte@3.1.0(svelte@4.2.15)(vite@5.2.11(@types/node@22.7.5)(terser@5.31.0)))(svelte@4.2.15)(vite@5.2.11(@types/node@22.7.5)(terser@5.31.0))
@@ -339,14 +342,14 @@ importers:
         specifier: github:taikoxyz/p256-verifier#v0.1.0
         version: p256-verifier#v0.1.0@https://codeload.github.com/taikoxyz/p256-verifier/tar.gz/6ef45b117642786b08a37b4c37c6a6ce151166da
       risc0-ethereum:
-        specifier: github:risc0/risc0-ethereum#v2.2.0
-        version: risc0-ethereum#v2.2.0@https://codeload.github.com/risc0/risc0-ethereum/tar.gz/382d76a8040068243a5d13e3de50fcca4224b0d6
+        specifier: github:risc0/risc0-ethereum#v3.0.1
+        version: risc0-ethereum#v3.0.1@https://codeload.github.com/risc0/risc0-ethereum/tar.gz/365e7b2db4f620fa256580c27558d2623362b9ae
       solady:
         specifier: github:Vectorized/solady#v0.0.231
         version: https://codeload.github.com/Vectorized/solady/tar.gz/a12a2575c899a328c1bafdada632dabbff27cf6b
       sp1-contracts:
-        specifier: github:succinctlabs/sp1-contracts#v4.0.0
-        version: sp1-contracts#v4.0.0@https://codeload.github.com/succinctlabs/sp1-contracts/tar.gz/26651fdb1c1d6513443560d42888dedc3f68bde6
+        specifier: github:succinctlabs/sp1-contracts#v5.0.0
+        version: sp1-contracts#v5.0.0@https://codeload.github.com/succinctlabs/sp1-contracts/tar.gz/512b5e029abc27f6e46a3c7eba220dac83ecc306
     devDependencies:
       '@types/node':
         specifier: ^20.11.30
@@ -3666,6 +3669,42 @@ packages:
     resolution: {integrity: sha512-lzD84av1ZQhYUS+jsGqJiCMaJO2dn9u+RTT9n9q6D3SaKVwWqv+7AoRKqBu19bkwyE+iFRl1ymr40QS90jVFYg==}
     engines: {node: '>=14.15'}
 
+  '@rollup/plugin-commonjs@28.0.6':
+    resolution: {integrity: sha512-XSQB1K7FUU5QP+3lOQmVCE3I0FcbbNvmNT4VJSj93iUjayaARrTQeoRdiYQoftAJBLrR9t2agwAd3ekaTgHNlw==}
+    engines: {node: '>=16.0.0 || 14 >= 14.17'}
+    peerDependencies:
+      rollup: ^2.68.0||^3.0.0||^4.0.0
+    peerDependenciesMeta:
+      rollup:
+        optional: true
+
+  '@rollup/plugin-json@6.1.0':
+    resolution: {integrity: sha512-EGI2te5ENk1coGeADSIwZ7G2Q8CJS2sF120T7jLw4xFw9n7wIOXHo+kIYRAoVpJAN+kmqZSoO3Fp4JtoNF4ReA==}
+    engines: {node: '>=14.0.0'}
+    peerDependencies:
+      rollup: ^1.20.0||^2.0.0||^3.0.0||^4.0.0
+    peerDependenciesMeta:
+      rollup:
+        optional: true
+
+  '@rollup/plugin-node-resolve@16.0.3':
+    resolution: {integrity: sha512-lUYM3UBGuM93CnMPG1YocWu7X802BrNF3jW2zny5gQyLQgRFJhV1Sq0Zi74+dh/6NBx1DxFC4b4GXg9wUCG5Qg==}
+    engines: {node: '>=14.0.0'}
+    peerDependencies:
+      rollup: ^2.78.0||^3.0.0||^4.0.0
+    peerDependenciesMeta:
+      rollup:
+        optional: true
+
+  '@rollup/pluginutils@5.3.0':
+    resolution: {integrity: sha512-5EdhGZtnu3V88ces7s53hhfK5KSASnJZv8Lulpc04cWO3REESroJXg73DFsOmgbU2BhwV0E20bu2IDZb3VKW4Q==}
+    engines: {node: '>=14.0.0'}
+    peerDependencies:
+      rollup: ^1.20.0||^2.0.0||^3.0.0||^4.0.0
+    peerDependenciesMeta:
+      rollup:
+        optional: true
+
   '@rollup/rollup-android-arm-eabi@4.17.2':
     resolution: {integrity: sha512-NM0jFxY8bB8QLkoKxIQeObCaDlJKewVlIEkuyYKm5An1tdVZ966w2+MPQ2l8LBZLjR+SgyV+nRkTIunzOYBMLQ==}
     cpu: [arm]
@@ -4269,6 +4308,11 @@ packages:
     peerDependencies:
       '@sveltejs/kit': ^2.0.0
 
+  '@sveltejs/adapter-node@5.3.3':
+    resolution: {integrity: sha512-SRDVuFBkmpKGsA9b0wYaCrrSChq2Yv5Dv8g7WiZcs8E69vdQNRamN0DzQV9/rEixvuRkojATLADNeQ+6FeyVNQ==}
+    peerDependencies:
+      '@sveltejs/kit': ^2.4.0
+
   '@sveltejs/kit@2.5.22':
     resolution: {integrity: sha512-PQ98baF2WzvG5yiO4cZKJZJG60XjHTZD1jyho3u9Kmthx2ytdGYyVPPvKXgKXpKSq4wwctD9dl0d2blSbJMcOg==}
     engines: {node: '>=18.13'}
@@ -4509,6 +4553,9 @@ packages:
 
   '@types/react@18.3.3':
     resolution: {integrity: sha512-hti/R0pS0q1/xx+TsI73XIqk26eBsISZ2R0wUijXIngRK9R/e7Xw/cXVxQK7R5JjW+SV4zGcn5hXjudkN/pLIw==}
+
+  '@types/resolve@1.20.2':
+    resolution: {integrity: sha512-60BCwRFOZCQhDncwQdxxeOEEkbc5dIMccYLwbxsS4TUNeVECQ/pBJ0j09mrHOl/JJvpRPGwO9SvE4nR2Nb/a4Q==}
 
   '@types/responselike@1.0.3':
     resolution: {integrity: sha512-H/+L+UkTV33uf49PH5pCAUBVPNj2nDBXTN+qS1dOwyyg24l3CcicicCA7ca+HMvJBZcFgl5r8e+RR6elsb4Lyw==}
@@ -7728,6 +7775,9 @@ packages:
     resolution: {integrity: sha512-qP1vozQRI+BMOPcjFzrjXuQvdak2pHNUMZoeG2eRbiSqyvbEf/wQtEOTOX1guk6E3t36RkaqiSt8A/6YElNxLQ==}
     engines: {node: '>=12'}
 
+  is-module@1.0.0:
+    resolution: {integrity: sha512-51ypPSPCoTEIN9dy5Oy+h4pShgJmPCygKfyRCISBI+JoWT/2oJvK8QPxmwv7b/p239jXrm9M1mlQbyKJ5A152g==}
+
   is-negative-zero@2.0.3:
     resolution: {integrity: sha512-5KoIu2Ngpyek75jXodFvnafB6DJgr3u8uuK0LEZJjrU19DrMD3EVERaR8sjz8CCGgpZvxPl9SuE1GMVPFHx1mw==}
     engines: {node: '>= 0.4'}
@@ -7761,6 +7811,9 @@ packages:
 
   is-promise@2.2.2:
     resolution: {integrity: sha512-+lP4/6lKUBfQjZ2pdxThZvLUAafmZb8OAxFb8XXtiQmS35INgr85hdOGoEs124ez1FCnZJt6jau/T+alh58QFQ==}
+
+  is-reference@1.2.1:
+    resolution: {integrity: sha512-U82MsXXiFIrjCK4otLT+o2NA2Cd2g5MLoOVXUZjIOhLurrRxpEXzI8O0KZHr3IjLvlAH1kTPYSuqer5T9ZVBKQ==}
 
   is-reference@3.0.2:
     resolution: {integrity: sha512-v3rht/LgVcsdZa3O2Nqs+NMowLOxeOm7Ay9+/ARQ2F+qEoANRcqrjAZKGN0v8ymUetZGgkp26LTnGT7H0Qo9Pg==}
@@ -9382,6 +9435,10 @@ packages:
     resolution: {integrity: sha512-I3EurrIQMlRc9IaAZnqRR044Phh2DXY+55o7uJ0V+hYZAcQYSuFWsc9q5PvyDHUSCe1Qxn/iBz+78s86zWnGag==}
     engines: {node: '>=10'}
 
+  picomatch@4.0.3:
+    resolution: {integrity: sha512-5gTmgEY/sqK6gFXLIsQNH19lWb4ebPDLA4SdLP7dsWkIXHWlG66oPuVvXSGFPppYZz8ZDZq0dYYrbHfBCVUb1Q==}
+    engines: {node: '>=12'}
+
   pify@2.3.0:
     resolution: {integrity: sha512-udgsAY+fTnvv7kI7aaxbqwWNb0AHiB0qBO89PZKPkoTmGOgdbrHDKD+0B2X4uTfJ/FT1R09r9gTsjUjNJotuog==}
     engines: {node: '>=0.10.0'}
@@ -10032,8 +10089,8 @@ packages:
   ripemd160@2.0.2:
     resolution: {integrity: sha512-ii4iagi25WusVoiC4B4lq7pbXfAp3D9v5CwfkY33vffw2+pkDjY1D8GaN7spsxvCSx8dkPqOZCEZyfxcmJG2IA==}
 
-  risc0-ethereum#v2.2.0@https://codeload.github.com/risc0/risc0-ethereum/tar.gz/382d76a8040068243a5d13e3de50fcca4224b0d6:
-    resolution: {tarball: https://codeload.github.com/risc0/risc0-ethereum/tar.gz/382d76a8040068243a5d13e3de50fcca4224b0d6}
+  risc0-ethereum#v3.0.1@https://codeload.github.com/risc0/risc0-ethereum/tar.gz/365e7b2db4f620fa256580c27558d2623362b9ae:
+    resolution: {tarball: https://codeload.github.com/risc0/risc0-ethereum/tar.gz/365e7b2db4f620fa256580c27558d2623362b9ae}
     version: 0.0.0
 
   rlp@2.2.7:
@@ -10342,8 +10399,8 @@ packages:
     resolution: {integrity: sha512-l3BikUxvPOcn5E74dZiq5BGsTb5yEwhaTSzccU6t4sDOH8NWJCstKO5QT2CvtFoK6F0saL7p9xHAqHOlCPJygA==}
     engines: {node: '>= 8'}
 
-  sp1-contracts#v4.0.0@https://codeload.github.com/succinctlabs/sp1-contracts/tar.gz/26651fdb1c1d6513443560d42888dedc3f68bde6:
-    resolution: {tarball: https://codeload.github.com/succinctlabs/sp1-contracts/tar.gz/26651fdb1c1d6513443560d42888dedc3f68bde6}
+  sp1-contracts#v5.0.0@https://codeload.github.com/succinctlabs/sp1-contracts/tar.gz/512b5e029abc27f6e46a3c7eba220dac83ecc306:
+    resolution: {tarball: https://codeload.github.com/succinctlabs/sp1-contracts/tar.gz/512b5e029abc27f6e46a3c7eba220dac83ecc306}
     version: 0.0.0
 
   space-separated-tokens@2.0.2:
@@ -16580,6 +16637,42 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@rollup/plugin-commonjs@28.0.6(rollup@4.17.2)':
+    dependencies:
+      '@rollup/pluginutils': 5.3.0(rollup@4.17.2)
+      commondir: 1.0.1
+      estree-walker: 2.0.2
+      fdir: 6.2.0(picomatch@4.0.3)
+      is-reference: 1.2.1
+      magic-string: 0.30.11
+      picomatch: 4.0.3
+    optionalDependencies:
+      rollup: 4.17.2
+
+  '@rollup/plugin-json@6.1.0(rollup@4.17.2)':
+    dependencies:
+      '@rollup/pluginutils': 5.3.0(rollup@4.17.2)
+    optionalDependencies:
+      rollup: 4.17.2
+
+  '@rollup/plugin-node-resolve@16.0.3(rollup@4.17.2)':
+    dependencies:
+      '@rollup/pluginutils': 5.3.0(rollup@4.17.2)
+      '@types/resolve': 1.20.2
+      deepmerge: 4.3.1
+      is-module: 1.0.0
+      resolve: 1.22.8
+    optionalDependencies:
+      rollup: 4.17.2
+
+  '@rollup/pluginutils@5.3.0(rollup@4.17.2)':
+    dependencies:
+      '@types/estree': 1.0.5
+      estree-walker: 2.0.2
+      picomatch: 4.0.3
+    optionalDependencies:
+      rollup: 4.17.2
+
   '@rollup/rollup-android-arm-eabi@4.17.2':
     optional: true
 
@@ -17500,6 +17593,14 @@ snapshots:
       '@sveltejs/kit': 2.5.22(@sveltejs/vite-plugin-svelte@3.1.0(svelte@4.2.15)(vite@5.2.11(@types/node@22.7.5)(terser@5.31.0)))(svelte@4.2.15)(vite@5.2.11(@types/node@22.7.5)(terser@5.31.0))
       import-meta-resolve: 4.1.0
 
+  '@sveltejs/adapter-node@5.3.3(@sveltejs/kit@2.5.22(@sveltejs/vite-plugin-svelte@3.1.0(svelte@4.2.15)(vite@5.2.11(@types/node@22.7.5)(terser@5.31.0)))(svelte@4.2.15)(vite@5.2.11(@types/node@22.7.5)(terser@5.31.0)))':
+    dependencies:
+      '@rollup/plugin-commonjs': 28.0.6(rollup@4.17.2)
+      '@rollup/plugin-json': 6.1.0(rollup@4.17.2)
+      '@rollup/plugin-node-resolve': 16.0.3(rollup@4.17.2)
+      '@sveltejs/kit': 2.5.22(@sveltejs/vite-plugin-svelte@3.1.0(svelte@4.2.15)(vite@5.2.11(@types/node@22.7.5)(terser@5.31.0)))(svelte@4.2.15)(vite@5.2.11(@types/node@22.7.5)(terser@5.31.0))
+      rollup: 4.17.2
+
   '@sveltejs/kit@2.5.22(@sveltejs/vite-plugin-svelte@3.1.0(svelte@4.2.15)(vite@5.2.11(@types/node@20.12.8)(terser@5.31.0)))(svelte@4.2.15)(vite@5.2.11(@types/node@20.12.8)(terser@5.31.0))':
     dependencies:
       '@sveltejs/vite-plugin-svelte': 3.1.0(svelte@4.2.15)(vite@5.2.11(@types/node@20.12.8)(terser@5.31.0))
@@ -17824,6 +17925,8 @@ snapshots:
     dependencies:
       '@types/prop-types': 15.7.12
       csstype: 3.1.3
+
+  '@types/resolve@1.20.2': {}
 
   '@types/responselike@1.0.3':
     dependencies:
@@ -22004,6 +22107,10 @@ snapshots:
     optionalDependencies:
       picomatch: 3.0.1
 
+  fdir@6.2.0(picomatch@4.0.3):
+    optionalDependencies:
+      picomatch: 4.0.3
+
   file-entry-cache@6.0.1:
     dependencies:
       flat-cache: 3.2.0
@@ -23039,6 +23146,8 @@ snapshots:
 
   is-interactive@2.0.0: {}
 
+  is-module@1.0.0: {}
+
   is-negative-zero@2.0.3: {}
 
   is-number-object@1.0.7:
@@ -23060,6 +23169,10 @@ snapshots:
   is-potential-custom-element-name@1.0.1: {}
 
   is-promise@2.2.2: {}
+
+  is-reference@1.2.1:
+    dependencies:
+      '@types/estree': 1.0.5
 
   is-reference@3.0.2:
     dependencies:
@@ -25167,6 +25280,8 @@ snapshots:
 
   picomatch@3.0.1: {}
 
+  picomatch@4.0.3: {}
+
   pify@2.3.0: {}
 
   pify@3.0.0: {}
@@ -25996,7 +26111,7 @@ snapshots:
       hash-base: 3.1.0
       inherits: 2.0.4
 
-  risc0-ethereum#v2.2.0@https://codeload.github.com/risc0/risc0-ethereum/tar.gz/382d76a8040068243a5d13e3de50fcca4224b0d6: {}
+  risc0-ethereum#v3.0.1@https://codeload.github.com/risc0/risc0-ethereum/tar.gz/365e7b2db4f620fa256580c27558d2623362b9ae: {}
 
   rlp@2.2.7:
     dependencies:
@@ -26430,7 +26545,7 @@ snapshots:
 
   source-map@0.7.4: {}
 
-  sp1-contracts#v4.0.0@https://codeload.github.com/succinctlabs/sp1-contracts/tar.gz/26651fdb1c1d6513443560d42888dedc3f68bde6: {}
+  sp1-contracts#v5.0.0@https://codeload.github.com/succinctlabs/sp1-contracts/tar.gz/512b5e029abc27f6e46a3c7eba220dac83ecc306: {}
 
   space-separated-tokens@2.0.2: {}
 

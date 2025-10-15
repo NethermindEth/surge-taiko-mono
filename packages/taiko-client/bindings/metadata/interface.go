@@ -48,4 +48,6 @@ type TaikoBatchMetaDataPacaya interface {
 	GetLogIndex() uint
 	InnerMetadata() *pacayaBindings.ITaikoInboxBatchMetadata
 	GetBaseFee() *big.Int
+	GetCelestiaBlobsHeight() uint64
+	GetCelestiaBlobsNamespace() []byte
 }

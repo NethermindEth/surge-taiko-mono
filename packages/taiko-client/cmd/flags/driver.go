@@ -89,4 +89,4 @@ var DriverFlags = MergeFlags(CommonFlags, []cli.Flag{
 	PreconfBlockServerCORSOrigins,
 	PreconfWhitelistAddress,
 	PreconfHandoverSkipSlots,
-}, p2pFlags.P2PFlags("PRECONFIRMATION"))
+}, p2pFlags.P2PFlags("PRECONFIRMATION"), CelestiaDriverFlags)

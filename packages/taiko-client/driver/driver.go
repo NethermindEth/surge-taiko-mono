@@ -88,6 +88,10 @@ func (d *Driver) InitFromConfig(ctx context.Context, cfg *Config) (err error) {
 		log.Warn("P2P syncing enabled, but no connected peer found in L2 execution engine")
 	}
 
+	if cfg.CelestiaConfigs.Enabled && !cfg.P2PSync {
+		log.Warn("Celestia enabled, P2P syncing disabled - Celestia RPC endpoint should point to archival node")
+	}
+
 	latestSeenProposalCh := make(chan *encoding.LastSeenProposal, 1024)
 	if d.l2ChainSyncer, err = chainSyncer.New(
 		d.ctx,

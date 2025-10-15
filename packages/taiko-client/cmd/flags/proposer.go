@@ -141,4 +141,4 @@ var ProposerFlags = MergeFlags(CommonFlags, []cli.Flag{
 	RevertProtectionEnabled,
 	CheckProfitability,
 	ForceProposingDelay,
-}, TxmgrFlags)
+}, TxmgrFlags, CelestiaProposerFlags)
