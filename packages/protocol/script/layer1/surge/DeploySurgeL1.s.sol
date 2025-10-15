@@ -34,6 +34,7 @@ import "src/layer1/preconf/impl/PreconfRouter.sol";
 import "src/layer1/verifiers/Risc0Verifier.sol";
 import "src/layer1/verifiers/SP1Verifier.sol";
 import "src/layer1/verifiers/SgxVerifier.sol";
+import "src/layer1/verifiers/TdxVerifier.sol";
 import "src/layer1/verifiers/AzureTdxVerifier.sol";
 
 // Surge contracts
@@ -101,6 +102,7 @@ contract DeploySurgeL1 is DeployCapability {
     // ---------------------------------------------------------------
     bool internal immutable deploySgxRethVerifier = vm.envBool("DEPLOY_SGX_RETH_VERIFIER");
     bool internal immutable deploySgxGethVerifier = vm.envBool("DEPLOY_SGX_GETH_VERIFIER");
+    bool internal immutable deployTdxVerifier = vm.envBool("DEPLOY_TDX_VERIFIER");
     bool internal immutable deployAzureTdxVerifier = vm.envBool("DEPLOY_AZURE_TDX_VERIFIER");
     bool internal immutable deployRisc0RethVerifier = vm.envBool("DEPLOY_RISC0_RETH_VERIFIER");
     bool internal immutable deploySp1RethVerifier = vm.envBool("DEPLOY_SP1_RETH_VERIFIER");
@@ -110,6 +112,7 @@ contract DeploySurgeL1 is DeployCapability {
     address internal immutable tdxFmspcTcbDao = vm.envOr("TDX_FMSPC_TCB_DAO_ADDRESS", address(0));
     address internal immutable tdxEnclaveIdentityDao = vm.envOr("TDX_ENCLAVE_IDENTITY_DAO_ADDRESS", address(0));
     address internal immutable tdxEnclaveIdentityHelper = vm.envOr("TDX_ENCLAVE_IDENTITY_HELPER_ADDRESS", address(0));
+    address internal immutable tdxAutomataDcapAttestation = vm.envOr("TDX_AUTOMATA_DCAP_ATTESTATION_ADDRESS", address(0));
 
     struct SharedContracts {
         address sharedResolver;
@@ -511,10 +514,20 @@ contract DeploySurgeL1 is DeployCapability {
         if (deployAzureTdxVerifier) {
             verifiers.azureTdxVerifier = deployProxy({
                 name: "azure_tdx_verifier",
-                impl: address(new AzureTdxVerifier(l2ChainId, _taikoInbox, _proofVerifier, 0x9af1b030450C74518Ab572547f5BE10E9caAe7Ba)),
+                impl: address(new AzureTdxVerifier(l2ChainId, _taikoInbox, _proofVerifier, tdxAutomataDcapAttestation)),
                 data: abi.encodeCall(AzureTdxVerifier.init, address(0))
             });
             console2.log("** Azure TDX verifier deployed");
+        }
+
+        // Deploy TDX verifier if enabled
+        if (deployTdxVerifier) {
+            verifiers.tdxVerifier = deployProxy({
+                name: "tdx_verifier",
+                impl: address(new TdxVerifier(l2ChainId, _taikoInbox, _proofVerifier, tdxAutomataDcapAttestation)),
+                data: abi.encodeCall(TdxVerifier.init, address(0))
+            });
+            console2.log("** TDX verifier deployed");
         }
 
         // Deploy ZK verifiers if enabled

@@ -9,7 +9,8 @@ import "solady/src/utils/JSONParserLib.sol";
 import "solady/src/utils/LibString.sol";
 
 // Layer 1 contracts
-import "src/layer1/verifiers/TdxVerifier.sol";
+import "src/layer1/verifiers/AzureTdxVerifier.sol";
+import { AzureTDX } from "azure-tdx-verifier/AzureTDX.sol";
 import "src/shared/libs/LibStrings.sol";
 import "test/shared/DeployCapability.sol";
 
@@ -86,9 +87,9 @@ struct Tcb {
     EnclaveIdTcbStatus status;
 }
 
-/// @title SetupTDXVerifier
+/// @title SetupAzureTDXVerifier
 /// @notice Script to setup TDX verifier with attestation configuration and transfer ownership
-contract SetupTDXVerifier is Script, DeployCapability {
+contract SetupAzureTDXVerifier is Script, DeployCapability {
     using JSONParserLib for JSONParserLib.Item;
     using LibString for string;
 
@@ -96,7 +97,7 @@ contract SetupTDXVerifier is Script, DeployCapability {
     uint256 internal immutable privateKey = vm.envUint("PRIVATE_KEY");
 
     // TDX verifier configuration
-    address internal immutable tdxVerifierAddress = vm.envAddress("TDX_VERIFIER_ADDRESS");
+    address internal immutable tdxVerifierAddress = vm.envAddress("AZURE_TDX_VERIFIER_ADDRESS");
     
     // TDX Automata contract addresses (required)
     address internal immutable tdxPcsDao = vm.envAddress("TDX_PCS_DAO_ADDRESS");
@@ -105,8 +106,8 @@ contract SetupTDXVerifier is Script, DeployCapability {
     address internal immutable tdxEnclaveIdentityHelper = vm.envAddress("TDX_ENCLAVE_IDENTITY_HELPER_ADDRESS");
 
     // TDX attestation configuration
-    bytes internal tdxTrustedParamsBytes = vm.envOr("TDX_TRUSTED_PARAMS_BYTES", bytes(""));
-    bytes internal tdxQuoteBytes = vm.envOr("TDX_QUOTE_BYTES", bytes(""));
+    bytes internal tdxTrustedParamsBytes = vm.envOr("AZURE_TDX_TRUSTED_PARAMS_BYTES", bytes(""));
+    bytes internal tdxQuoteBytes = vm.envOr("AZURE_TDX_QUOTE_BYTES", bytes(""));
 
     // Ownership transfer
     address internal immutable newOwner = vm.envAddress("NEW_OWNER");
@@ -119,22 +120,22 @@ contract SetupTDXVerifier is Script, DeployCapability {
     }
 
     function run() external broadcast {
-        require(tdxVerifierAddress != address(0), "config: TDX_VERIFIER_ADDRESS");
+        require(tdxVerifierAddress != address(0), "config: AZURE_TDX_VERIFIER_ADDRESS");
         require(tdxPcsDao != address(0), "config: TDX_PCS_DAO_ADDRESS");
         require(tdxFmspcTcbDao != address(0), "config: TDX_FMSPC_TCB_DAO_ADDRESS");
         require(tdxEnclaveIdentityDao != address(0), "config: TDX_ENCLAVE_IDENTITY_DAO_ADDRESS");
         require(tdxEnclaveIdentityHelper != address(0), "config: TDX_ENCLAVE_IDENTITY_HELPER_ADDRESS");
         require(newOwner != address(0), "config: NEW_OWNER");
 
-        TdxVerifier tdxVerifier = TdxVerifier(tdxVerifierAddress);
+        AzureTdxVerifier tdxVerifier = AzureTdxVerifier(tdxVerifierAddress);
 
         // Verify current ownership
-        require(tdxVerifier.owner() == msg.sender, "SetupTDXVerifier: tdx verifier not owner");
+        require(tdxVerifier.owner() == msg.sender, "SetupAzureTDXVerifier: tdx verifier not owner");
 
         // Setup TDX trusted parameters if provided
         if (tdxTrustedParamsBytes.length > 0) {
-            TdxVerifier.TrustedParams memory params = 
-                abi.decode(tdxTrustedParamsBytes, (TdxVerifier.TrustedParams));
+            AzureTdxVerifier.TrustedParams memory params = 
+                abi.decode(tdxTrustedParamsBytes, (AzureTdxVerifier.TrustedParams));
             tdxVerifier.setTrustedParams(0, params);
             console2.log("** TDX_TRUSTED_PARAMS configured");
         }
@@ -158,15 +159,15 @@ contract SetupTDXVerifier is Script, DeployCapability {
             uint256 instanceId = tdxVerifier.nextInstanceId();
 
             // Register instance
-            TdxVerifier.VerifyParams memory verifyParams = 
-                abi.decode(tdxQuoteBytes, (TdxVerifier.VerifyParams));
+            AzureTDX.VerifyParams memory verifyParams = 
+                abi.decode(tdxQuoteBytes, (AzureTDX.VerifyParams));
             tdxVerifier.registerInstance(instanceId, verifyParams);
             console2.log("** TDX instance registered with ID:", instanceId);
         }
 
         // Transfer ownership
         tdxVerifier.transferOwnership(newOwner);
-        console2.log("** TdxVerifier ownership transferred to:", newOwner);
+        console2.log("** AzureTdxVerifier ownership transferred to:", newOwner);
 
         console2.log("** TDX verifier setup complete **");
     }
@@ -174,7 +175,7 @@ contract SetupTDXVerifier is Script, DeployCapability {
     /// @dev Setup TDX collaterals (PCS certificates, enclave identity, TCB info)
     function setupTDXCollaterals() internal {
         // Configure PCS certificates if path provided
-        string memory rootPcsCertPath = vm.envOr("TDX_ROOT_PCS_CERT_PATH", string(""));
+        string memory rootPcsCertPath = vm.envOr("AZURE_TDX_ROOT_PCS_CERT_PATH", string(""));
         if (bytes(rootPcsCertPath).length > 0) {
             bytes memory certBytes = vm.parseBytes(
                 vm.readFile(string.concat(vm.projectRoot(), rootPcsCertPath))
@@ -184,7 +185,7 @@ contract SetupTDXVerifier is Script, DeployCapability {
             IPcsDao(tdxPcsDao).upsertPcsCertificates(0, certBytes);
             console2.log("** TDX_ROOT_PCS_CERTIFICATES configured");
         }
-        string memory pcsCertPath = vm.envOr("TDX_PCS_CERT_PATH", string(""));
+        string memory pcsCertPath = vm.envOr("AZURE_TDX_PCS_CERT_PATH", string(""));
         if (bytes(pcsCertPath).length > 0) {
             bytes memory certBytes = vm.parseBytes(
                 vm.readFile(string.concat(vm.projectRoot(), pcsCertPath))
@@ -196,7 +197,7 @@ contract SetupTDXVerifier is Script, DeployCapability {
         }
 
         // Configure enclave identity if path provided
-        string memory enclaveIdentityPath = vm.envOr("TDX_QE_IDENTITY_PATH", string(""));
+        string memory enclaveIdentityPath = vm.envOr("AZURE_TDX_QE_IDENTITY_PATH", string(""));
         if (bytes(enclaveIdentityPath).length > 0) {
             string memory enclaveIdentityJson = vm.readFile(
                 string.concat(vm.projectRoot(), enclaveIdentityPath)
@@ -214,7 +215,7 @@ contract SetupTDXVerifier is Script, DeployCapability {
         }
 
         // Configure TCB info if path provided  
-        string memory tcbInfoPath = vm.envOr("TDX_TCB_INFO_PATH", string(""));
+        string memory tcbInfoPath = vm.envOr("AZURE_TDX_TCB_INFO_PATH", string(""));
         if (bytes(tcbInfoPath).length > 0) {
             string memory tcbInfoJson = vm.readFile(
                 string.concat(vm.projectRoot(), tcbInfoPath)

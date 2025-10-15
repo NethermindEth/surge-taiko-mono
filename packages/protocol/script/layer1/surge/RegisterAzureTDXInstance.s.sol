@@ -9,7 +9,8 @@ import "solady/src/utils/JSONParserLib.sol";
 import "solady/src/utils/LibString.sol";
 
 // Layer 1 contracts
-import "contracts/layer1/verifiers/TdxVerifier.sol";
+import "contracts/layer1/verifiers/AzureTdxVerifier.sol";
+import { AzureTDX } from "azure-tdx-verifier/AzureTDX.sol";
 
 // TDX Automata interfaces
 interface IPcsDao {
@@ -44,7 +45,7 @@ struct IdentityObj {
     uint256 id;
 }
 
-contract RegisterTDXInstance is Script {
+contract RegisterAzureTDXInstance is Script {
     using JSONParserLib for JSONParserLib.Item;
     using LibString for string;
 
@@ -54,7 +55,7 @@ contract RegisterTDXInstance is Script {
 
     // TDX configuration
     // ---------------------------------------------------------------------------------------------
-    address public tdxVerifier = vm.envAddress("TDX_VERIFIER");
+    address public azureTdxVerifier = vm.envAddress("AZURE_TDX_VERIFIER");
     
     // TDX Automata contract addresses
     address internal immutable tdxPcsDao = vm.envAddress("TDX_PCS_DAO_ADDRESS");
@@ -63,8 +64,8 @@ contract RegisterTDXInstance is Script {
     address internal immutable tdxEnclaveIdentityHelper = vm.envAddress("TDX_ENCLAVE_IDENTITY_HELPER_ADDRESS");
 
     // TDX trusted parameters and quote
-    bytes internal tdxTrustedParamsBytes = vm.envBytes("TDX_TRUSTED_PARAMS_BYTES");
-    bytes internal tdxQuoteBytes = vm.envBytes("TDX_QUOTE_BYTES");
+    bytes internal tdxTrustedParamsBytes = vm.envBytes("AZURE_TDX_TRUSTED_PARAMS_BYTES");
+    bytes internal tdxQuoteBytes = vm.envBytes("AZURE_TDX_QUOTE_BYTES");
 
     modifier broadcast() {
         require(privateKey != 0, "invalid private key");
@@ -74,11 +75,11 @@ contract RegisterTDXInstance is Script {
     }
 
     function run() external broadcast {
-        TdxVerifier tdxVerifier = TdxVerifier(tdxVerifier);
+        AzureTdxVerifier tdxVerifier = AzureTdxVerifier(azureTdxVerifier);
 
         if (tdxTrustedParamsBytes.length > 0) {
-            TdxVerifier.TrustedParams memory params = 
-                abi.decode(tdxTrustedParamsBytes, (TdxVerifier.TrustedParams));
+            AzureTdxVerifier.TrustedParams memory params = 
+                abi.decode(tdxTrustedParamsBytes, (AzureTdxVerifier.TrustedParams));
             tdxVerifier.setTrustedParams(0, params);
             console2.log("** TDX trusted params configured");
         }
@@ -95,15 +96,15 @@ contract RegisterTDXInstance is Script {
                 string.concat(vm.projectRoot(), "/deployments/tdx_instances.json")
             );
 
-            TdxVerifier.VerifyParams memory verifyParams = 
-                abi.decode(tdxQuoteBytes, (TdxVerifier.VerifyParams));
+            AzureTDX.VerifyParams memory verifyParams = 
+                abi.decode(tdxQuoteBytes, (AzureTDX.VerifyParams));
             tdxVerifier.registerInstance(0, verifyParams);
             console2.log("** TDX instance registered with quote");
         }
     }
 
     function setupTDXCollaterals() internal {
-        string memory pcsCertPath = vm.envOr("TDX_PCS_CERT_PATH", string(""));
+        string memory pcsCertPath = vm.envOr("AZURE_TDX_PCS_CERT_PATH", string(""));
         if (tdxPcsDao != address(0) && bytes(pcsCertPath).length > 0) {
             bytes memory certBytes = vm.parseBytes(vm.readFile(string.concat(vm.projectRoot(), pcsCertPath)));
             
@@ -112,7 +113,7 @@ contract RegisterTDXInstance is Script {
             console2.log("** TDX PCS certificates configured");
         }
 
-        string memory enclaveIdentityPath = vm.envOr("TDX_QE_IDENTITY_PATH", string(""));
+        string memory enclaveIdentityPath = vm.envOr("AZURE_TDX_QE_IDENTITY_PATH", string(""));
         if (bytes(enclaveIdentityPath).length > 0 && tdxEnclaveIdentityDao != address(0) 
             && tdxEnclaveIdentityHelper != address(0)) {
             string memory enclaveIdentityJson = vm.readFile(string.concat(vm.projectRoot(), enclaveIdentityPath));
@@ -129,7 +130,7 @@ contract RegisterTDXInstance is Script {
             console2.log("** TDX enclave identity configured");
         }
 
-        string memory tcbInfoPath = vm.envOr("TDX_TCB_INFO_PATH", string(""));
+        string memory tcbInfoPath = vm.envOr("AZURE_TDX_TCB_INFO_PATH", string(""));
         if (bytes(tcbInfoPath).length > 0 && tdxFmspcTcbDao != address(0)) {
             string memory tcbInfoJson = vm.readFile(string.concat(vm.projectRoot(), tcbInfoPath));
             TcbInfoJsonObj memory tcbInfoJsonObj = parseTcbInfoJson(tcbInfoJson);

@@ -15,17 +15,17 @@ export TDX_FMSPC_TCB_DAO_ADDRESS=${TDX_FMSPC_TCB_DAO_ADDRESS:-"0x000000000000000
 export TDX_ENCLAVE_IDENTITY_DAO_ADDRESS=${TDX_ENCLAVE_IDENTITY_DAO_ADDRESS:-"0x0000000000000000000000000000000000000000"}
 export TDX_ENCLAVE_IDENTITY_HELPER_ADDRESS=${TDX_ENCLAVE_IDENTITY_HELPER_ADDRESS:-"0x0000000000000000000000000000000000000000"}
 ### export AUTOMATA_DCAP_ATTESTATION=${AUTOMATA_DCAP_ATTESTATION:-"0x0000000000000000000000000000000000000000"}
-export TDX_VERIFIER=${TDX_VERIFIER:-"0x0000000000000000000000000000000000000000"}
+export AZURE_TDX_VERIFIER=${AZURE_TDX_VERIFIER:-"0x0000000000000000000000000000000000000000"}
 ### export PEM_CERT_CHAIN_LIB=${PEM_CERT_CHAIN_LIB:-"0x0000000000000000000000000000000000000000"}
 
 # Trusted parameters configuration
-export TDX_TRUSTED_PARAMS_BYTES=${TDX_TRUSTED_PARAMS_BYTES:-"0x"}
+export AZURE_TDX_TRUSTED_PARAMS_BYTES=${AZURE_TDX_TRUSTED_PARAMS_BYTES:-"0x"}
 
 # Attestation configuration
-export TDX_QE_IDENTITY_PATH=${TDX_QE_IDENTITY_PATH:-"/test/layer1/automata-attestation/assets/0923/tdx_identity.json"}
-export TDX_TCB_INFO_PATH=${TDX_TCB_INFO_PATH:-"/test/layer1/automata-attestation/assets/0923/tdx_tcb_90c06f000000.json"}
-export TDX_PCS_CERT_PATH=${TDX_PCS_CERT_PATH:-"/test/layer1/automata-attestation/assets/0923/tdx_pcs_cert.hex"}
-export TDX_QUOTE_BYTES=${TDX_QUOTE_BYTES:-"0x"}
+export AZURE_TDX_QE_IDENTITY_PATH=${AZURE_TDX_QE_IDENTITY_PATH:-"/test/layer1/automata-attestation/assets/0923/tdx_identity.json"}
+export AZURE_TDX_TCB_INFO_PATH=${AZURE_TDX_TCB_INFO_PATH:-"/test/layer1/automata-attestation/assets/0923/tdx_tcb_90c06f000000.json"}
+export AZURE_TDX_PCS_CERT_PATH=${AZURE_TDX_PCS_CERT_PATH:-"/test/layer1/automata-attestation/assets/0923/tdx_pcs_cert.hex"}
+export AZURE_TDX_QUOTE_BYTES=${AZURE_TDX_QUOTE_BYTES:-"0x"}
 
 # Foundry configuration
 export FOUNDRY_PROFILE=${FOUNDRY_PROFILE:-"layer1"}
@@ -45,7 +45,7 @@ export LOG_LEVEL=${LOG_LEVEL:-"-vvvv"}
 # Parameterize block gas limit
 export BLOCK_GAS_LIMIT=${BLOCK_GAS_LIMIT:-200000000}
 
-forge script ./script/layer1/surge/RegisterTDXInstance.s.sol:RegisterTDXInstance \
+forge script ./script/layer1/surge/RegisterAzureTDXInstance.s.sol:RegisterAzureTDXInstance \
     --fork-url $FORK_URL \
     $BROADCAST_ARG \
     --ffi \
