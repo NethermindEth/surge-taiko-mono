@@ -181,8 +181,12 @@ contract SetupTDXVerifier is Script, DeployCapability {
             );
             
             // Use CA.ROOT (0)
-            IPcsDao(tdxPcsDao).upsertPcsCertificates(0, certBytes);
-            console2.log("** TDX_ROOT_PCS_CERTIFICATES configured");
+            try IPcsDao(tdxPcsDao).upsertPcsCertificates(0, certBytes) returns (bytes32 attestationId) {
+                console2.log("** TDX_ROOT_PCS_CERTIFICATES configured");
+            } catch (bytes memory reason) {
+                console2.log("** [FAIL] TDX_ROOT_PCS_CERTIFICATES not configured");
+                console2.logBytes(reason);
+            }
         }
         string memory pcsCertPath = vm.envOr("TDX_PCS_CERT_PATH", string(""));
         if (bytes(pcsCertPath).length > 0) {
@@ -191,8 +195,12 @@ contract SetupTDXVerifier is Script, DeployCapability {
             );
             
             // Use CA.SIGNING (3)
-            IPcsDao(tdxPcsDao).upsertPcsCertificates(3, certBytes);
-            console2.log("** TDX_PCS_CERTIFICATES configured");
+            try IPcsDao(tdxPcsDao).upsertPcsCertificates(3, certBytes) returns (bytes32 attestationId) {
+                console2.log("** TDX_PCS_CERTIFICATES configured");
+            } catch (bytes memory reason) {
+                console2.log("** [FAIL] TDX_PCS_CERTIFICATES not configured");
+                console2.logBytes(reason);
+            }
         }
 
         // Configure enclave identity if path provided
@@ -207,10 +215,14 @@ contract SetupTDXVerifier is Script, DeployCapability {
                 .parseIdentityString(identityJsonObj.identityStr);
 
             // Use isvsvn = 4 for TDX QE
-            IAutomataEnclaveIdentityDao(tdxEnclaveIdentityDao).upsertEnclaveIdentity(
+            try IAutomataEnclaveIdentityDao(tdxEnclaveIdentityDao).upsertEnclaveIdentity(
                 uint256(identity.id), 4, identityJsonObj
-            );
-            console2.log("** TDX_QE_IDENTITY configured");
+            ) returns (bytes32 attestationId) {
+                console2.log("** TDX_QE_IDENTITY configured");
+            } catch (bytes memory reason) {
+                console2.log("** [FAIL] TDX_QE_IDENTITY not configured");
+                console2.logBytes(reason);
+            }
         }
 
         // Configure TCB info if path provided  
@@ -221,8 +233,12 @@ contract SetupTDXVerifier is Script, DeployCapability {
             );
             TcbInfoJsonObj memory tcbInfoJsonObj = parseTcbInfoJson(tcbInfoJson);
 
-            IFmspcTcbDao(tdxFmspcTcbDao).upsertFmspcTcb(tcbInfoJsonObj);
-            console2.log("** TDX_TCB_INFO configured");
+            try IFmspcTcbDao(tdxFmspcTcbDao).upsertFmspcTcb(tcbInfoJsonObj) returns (bytes32 attestationId) {
+                console2.log("** TDX_TCB_INFO configured");
+            } catch (bytes memory reason) {
+                console2.log("** [FAIL] TDX_TCB_INFO not configured");
+                console2.logBytes(reason);
+            }
         }
     }
 
