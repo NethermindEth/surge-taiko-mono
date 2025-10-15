@@ -218,7 +218,7 @@ contract SetupAzureTDXVerifier is Script, DeployCapability {
             // Use isvsvn = 4 for TDX QE
             try IAutomataEnclaveIdentityDao(tdxEnclaveIdentityDao).upsertEnclaveIdentity(
                 uint256(identity.id), 4, identityJsonObj
-            ) returns (bytes32 attestationId) {
+            ) {
                 console2.log("** TDX_QE_IDENTITY configured");
             } catch (bytes memory reason) {
                 console2.log("** [FAIL] TDX_QE_IDENTITY not configured");
@@ -234,7 +234,7 @@ contract SetupAzureTDXVerifier is Script, DeployCapability {
             );
             TcbInfoJsonObj memory tcbInfoJsonObj = parseTcbInfoJson(tcbInfoJson);
 
-            try IFmspcTcbDao(tdxFmspcTcbDao).upsertFmspcTcb(tcbInfoJsonObj) returns (bytes32 attestationId) {
+            try IFmspcTcbDao(tdxFmspcTcbDao).upsertFmspcTcb(tcbInfoJsonObj) {
                 console2.log("** TDX_TCB_INFO configured");
             } catch (bytes memory reason) {
                 console2.log("** [FAIL] TDX_TCB_INFO not configured");
