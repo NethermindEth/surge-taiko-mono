@@ -10,21 +10,24 @@ contract ProofTypeFixtures {
     // ---------------------------
 
     LibProofType.ProofType[] internal zkTeeProofTypes = [
+        LibProofType.tdxNethermind().combine(LibProofType.sp1Reth()),
+        LibProofType.tdxNethermind().combine(LibProofType.risc0Reth()),
         LibProofType.sgxReth().combine(LibProofType.sp1Reth()),
-        LibProofType.tdxReth().combine(LibProofType.sp1Reth()),
         LibProofType.sgxReth().combine(LibProofType.risc0Reth()),
-        LibProofType.tdxReth().combine(LibProofType.risc0Reth())
+        LibProofType.azureTdxNethermind().combine(LibProofType.sp1Reth()),
+        LibProofType.azureTdxNethermind().combine(LibProofType.risc0Reth())
     ];
 
     LibProofType.ProofType[] internal zkProofTypes =
         [LibProofType.sp1Reth(), LibProofType.risc0Reth()];
 
     LibProofType.ProofType[] internal teeProofTypes =
-        [LibProofType.sgxReth(), LibProofType.tdxReth()];
+        [LibProofType.sgxReth(), LibProofType.tdxNethermind(), LibProofType.azureTdxNethermind()];
 
     LibProofType.ProofType[] internal allProofTypes = [
         LibProofType.sgxReth(),
-        LibProofType.tdxReth(),
+        LibProofType.tdxNethermind(),
+        LibProofType.azureTdxNethermind(),
         LibProofType.sp1Reth(),
         LibProofType.risc0Reth()
     ];

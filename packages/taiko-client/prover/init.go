@@ -92,10 +92,11 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 		proofProducer producer.ProofProducer
 
 		// Proof verifiers addresses.
-		sgxVerifierAddress   common.Address
-		tdxVerifierAddress   common.Address
-		risc0VerifierAddress common.Address
-		sp1VerifierAddress   common.Address
+		sgxVerifierAddress      common.Address
+		tdxVerifierAddress      common.Address
+		azureTdxVerifierAddress common.Address
+		risc0VerifierAddress    common.Address
+		sp1VerifierAddress      common.Address
 
 		// All activated proof types in protocol.
 		proofTypes = make([]producer.ProofType, 0, proofSubmitter.MaxNumSupportedProofTypes)
@@ -124,6 +125,15 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 	proofTypes = append(proofTypes, producer.ProofTypeTdx)
 	verifiers[producer.ProofTypeTdx] = tdxVerifierAddress
 
+	if azureTdxVerifierAddress, err = p.rpc.GetAzureTDXVerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
+		return fmt.Errorf("failed to get azure tdx verifier: %w", err)
+	}
+	if azureTdxVerifierAddress == rpc.ZeroAddress {
+		return fmt.Errorf("azure tdx verifier not found")
+	}
+	proofTypes = append(proofTypes, producer.ProofTypeAzureTdx)
+	verifiers[producer.ProofTypeAzureTdx] = azureTdxVerifierAddress
+
 	// Initialize the zk verifiers and zkvm proof producers.
 	if risc0VerifierAddress, err = p.rpc.GetRISC0VerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
 		return fmt.Errorf("failed to get risc0 verifier: %w", err)
@@ -147,14 +157,15 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 	log.Info("Initialize prover", "type", producer.ProofTypeZKAny, "verifiers", verifiers)
 
 	proofProducer = &producer.ComposeProofProducer{
-		Verifiers:             verifiers,
-		RaikoSGXHostEndpoint:  p.cfg.RaikoSGXHostEndpoint,
-		RaikoTDXHostEndpoint:  p.cfg.RaikoTDXHostEndpoint,
-		RaikoZKVMHostEndpoint: p.cfg.RaikoZKVMHostEndpoint,
-		JWT:                   p.cfg.RaikoJWT,
-		RaikoRequestTimeout:   p.cfg.RaikoRequestTimeout,
-		ProofType:             producer.ProofTypeZKAny,
-		Dummy:                 p.cfg.Dummy,
+		Verifiers:                 verifiers,
+		RaikoSGXHostEndpoint:      p.cfg.RaikoSGXHostEndpoint,
+		RaikoTDXHostEndpoint:      p.cfg.RaikoTDXHostEndpoint,
+		RaikoAzureTDXHostEndpoint: p.cfg.RaikoAzureTDXHostEndpoint,
+		RaikoZKVMHostEndpoint:     p.cfg.RaikoZKVMHostEndpoint,
+		JWT:                       p.cfg.RaikoJWT,
+		RaikoRequestTimeout:       p.cfg.RaikoRequestTimeout,
+		ProofType:                 producer.ProofTypeZKAny,
+		Dummy:                     p.cfg.Dummy,
 	}
 
 	// Init proof buffers.
@@ -167,6 +178,8 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 			proofBuffers[proofType] = producer.NewProofBuffer(p.cfg.SGXProofBufferSize)
 		case producer.ProofTypeTdx:
 			proofBuffers[proofType] = producer.NewProofBuffer(p.cfg.TDXProofBufferSize)
+		case producer.ProofTypeAzureTdx:
+			proofBuffers[proofType] = producer.NewProofBuffer(p.cfg.AzureTDXProofBufferSize)
 		case producer.ProofTypeZKR0, producer.ProofTypeZKSP1:
 			proofBuffers[proofType] = producer.NewProofBuffer(p.cfg.ZKVMProofBufferSize)
 		default:

@@ -347,8 +347,9 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
                     LibProofType.ProofType _proofType = transitions[mti].proofType;
 
                     // Take action depending upon existing proof type
+                    // TODO: check if this makes sense
                     if (
-                        _proofType.isZkTeeProof()
+                        _proofType.isFinalizingProof()
                             || (_proofType.isZkProof() && proofType.isZkProof())
                             || (_proofType.isTeeProof() && proofType.isTeeProof())
                     ) {
@@ -373,7 +374,7 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
 
                     // If the conflicting transition is finalising, the sender of the proof becomes
                     // the bond receiver
-                    if (proofType.isZkTeeProof()) {
+                    if (proofType.isFinalizingProof()) {
                         _ts.bondReceiver = msg.sender;
                     }
 
@@ -411,7 +412,7 @@ abstract contract TaikoInbox is EssentialContract, ITaikoInbox, IProposeBatch, I
             }
 
             // Surge: Set the bond receiver based on the proving window and received proof type
-            if (proofType.isZkTeeProof()) {
+            if (proofType.isFinalizingProof()) {
                 __ts.bondReceiver = inProvingWindow ? meta.proposer : msg.sender;
             }
 

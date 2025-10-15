@@ -34,8 +34,8 @@ import "src/layer1/preconf/impl/PreconfRouter.sol";
 import "src/layer1/verifiers/Risc0Verifier.sol";
 import "src/layer1/verifiers/SP1Verifier.sol";
 import "src/layer1/verifiers/SgxVerifier.sol";
-import "src/layer1/verifiers/TdxVerifier.sol";
-import "src/layer1/verifiers/AzureTdxVerifier.sol";
+import {TdxVerifier} from "src/layer1/verifiers/TdxVerifier.sol";
+import {AzureTdxVerifier} from "src/layer1/verifiers/AzureTdxVerifier.sol";
 
 // Surge contracts
 import "src/layer1/surge/SurgeDevnetInbox.sol";
@@ -131,7 +131,8 @@ contract DeploySurgeL1 is DeployCapability {
     struct VerifierContracts {
         address sgxRethVerifier;
         address sgxGethVerifier;
-        address azureTdxVerifier;
+        address azureTdxNethermindVerifier;
+        address tdxNethermindVerifier;
         address risc0RethVerifier;
         address sp1RethVerifier;
         address automataRethProxy;
@@ -292,9 +293,14 @@ contract DeploySurgeL1 is DeployCapability {
             console2.log("** automataGethProxy ownership transferred to:", l1Owner);
         }
 
-        if (deployAzureTdxVerifier && verifiers.azureTdxVerifier != address(0)) {
-            AzureTdxVerifier(verifiers.azureTdxVerifier).transferOwnership(l1Owner);
-            console2.log("** azureTdxVerifier ownership transferred to:", l1Owner);
+        if (deployTdxVerifier && verifiers.tdxNethermindVerifier != address(0)) {
+            TdxVerifier(verifiers.tdxNethermindVerifier).transferOwnership(l1Owner);
+            console2.log("** tdxNethermindVerifier ownership transferred to:", l1Owner);
+        }
+
+        if (deployAzureTdxVerifier && verifiers.azureTdxNethermindVerifier != address(0)) {
+            AzureTdxVerifier(verifiers.azureTdxNethermindVerifier).transferOwnership(l1Owner);
+            console2.log("** azureTdxNethermindVerifier ownership transferred to:", l1Owner);
         }
 
         if (deployRisc0RethVerifier && verifiers.risc0RethVerifier != address(0)) {
@@ -313,7 +319,8 @@ contract DeploySurgeL1 is DeployCapability {
         SurgeVerifier(rollupContracts.proofVerifier).init(
             l1Owner,
             verifiers.sgxRethVerifier,
-            verifiers.azureTdxVerifier,
+            verifiers.tdxNethermindVerifier,
+            verifiers.azureTdxNethermindVerifier,
             verifiers.risc0RethVerifier,
             verifiers.sp1RethVerifier
         );
@@ -512,22 +519,22 @@ contract DeploySurgeL1 is DeployCapability {
 
         // Deploy Azure TDX verifier if enabled
         if (deployAzureTdxVerifier) {
-            verifiers.azureTdxVerifier = deployProxy({
-                name: "azure_tdx_verifier",
+            verifiers.azureTdxNethermindVerifier = deployProxy({
+                name: "azure_tdx_nethermind_verifier",
                 impl: address(new AzureTdxVerifier(l2ChainId, _taikoInbox, _proofVerifier, tdxAutomataDcapAttestation)),
                 data: abi.encodeCall(AzureTdxVerifier.init, address(0))
             });
-            console2.log("** Azure TDX verifier deployed");
+            console2.log("** Azure TDX Nethermind verifier deployed");
         }
 
         // Deploy TDX verifier if enabled
         if (deployTdxVerifier) {
-            verifiers.tdxVerifier = deployProxy({
-                name: "tdx_verifier",
+            verifiers.tdxNethermindVerifier = deployProxy({
+                name: "tdx_nethermind_verifier",
                 impl: address(new TdxVerifier(l2ChainId, _taikoInbox, _proofVerifier, tdxAutomataDcapAttestation)),
                 data: abi.encodeCall(TdxVerifier.init, address(0))
             });
-            console2.log("** TDX verifier deployed");
+            console2.log("** TDX Nethermind verifier deployed");
         }
 
         // Deploy ZK verifiers if enabled
@@ -728,7 +735,7 @@ contract DeploySurgeL1 is DeployCapability {
 
         // Build L1 contracts list (filter out zero addresses)
         // ---------------------------------------------------------------
-        address[] memory l1Contracts = new address[](18);
+        address[] memory l1Contracts = new address[](19);
         l1Contracts[0] = _sharedContracts.signalService;
         l1Contracts[1] = _sharedContracts.bridge;
         l1Contracts[2] = _sharedContracts.erc20Vault;
@@ -746,7 +753,8 @@ contract DeploySurgeL1 is DeployCapability {
         l1Contracts[14] = _verifiers.sp1RethVerifier;
         l1Contracts[15] = _verifiers.sgxRethVerifier;
         l1Contracts[16] = _verifiers.sgxGethVerifier;
-        l1Contracts[17] = _verifiers.azureTdxVerifier;
+        l1Contracts[17] = _verifiers.tdxNethermindVerifier;
+        l1Contracts[18] = _verifiers.azureTdxNethermindVerifier;
 
         // Verify ownership
         // ---------------------------------------------------------------

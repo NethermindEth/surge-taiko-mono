@@ -31,6 +31,7 @@ func (s *ProverTestSuite) SetupApp() *cli.App {
 		&cli.StringFlag{Name: flags.Allowance.Name},
 		&cli.StringFlag{Name: flags.RaikoSGXHostEndpoint.Name},
 		&cli.StringFlag{Name: flags.RaikoTDXHostEndpoint.Name},
+		&cli.StringFlag{Name: flags.RaikoAzureTDXHostEndpoint.Name},
 	}
 	app.Flags = append(app.Flags, flags.TxmgrFlags...)
 	app.Action = func(ctx *cli.Context) error {

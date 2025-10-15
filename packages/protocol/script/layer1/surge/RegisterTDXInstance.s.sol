@@ -74,12 +74,10 @@ contract RegisterTDXInstance is Script {
     }
 
     function run() external broadcast {
-        TdxVerifier tdxVerifier = TdxVerifier(tdxVerifier);
-
         if (tdxTrustedParamsBytes.length > 0) {
             TdxVerifier.TrustedParams memory params = 
                 abi.decode(tdxTrustedParamsBytes, (TdxVerifier.TrustedParams));
-            tdxVerifier.setTrustedParams(0, params);
+            TdxVerifier(tdxVerifier).setTrustedParams(0, params);
             console2.log("** TDX trusted params configured");
         }
 
@@ -90,14 +88,14 @@ contract RegisterTDXInstance is Script {
                 vm.serializeUint(
                     "tdx_instance_ids",
                     "tdx_instance_id",
-                    tdxVerifier.nextInstanceId()
+                    TdxVerifier(tdxVerifier).nextInstanceId()
                 ),
                 string.concat(vm.projectRoot(), "/deployments/tdx_instances.json")
             );
 
             TdxVerifier.VerifyParams memory verifyParams = 
                 abi.decode(tdxQuoteBytes, (TdxVerifier.VerifyParams));
-            tdxVerifier.registerInstance(0, verifyParams);
+            TdxVerifier(tdxVerifier).registerInstance(0, verifyParams);
             console2.log("** TDX instance registered with quote");
         }
     }

@@ -36,15 +36,17 @@ type ProofResponse struct {
 
 // BatchProofs represents a response of a batch proof request.
 type BatchProofs struct {
-	ProofResponses   []*ProofResponse
-	BatchProof       []byte
-	BatchIDs         []*big.Int
-	ProofType        ProofType
-	Verifier         common.Address
-	SgxBatchProof    []byte
-	SgxProofVerifier common.Address
-	TdxBatchProof    []byte
-	TdxProofVerifier common.Address
+	ProofResponses        []*ProofResponse
+	BatchProof            []byte
+	BatchIDs              []*big.Int
+	ProofType             ProofType
+	Verifier              common.Address
+	SgxBatchProof         []byte
+	SgxProofVerifier      common.Address
+	TdxBatchProof         []byte
+	TdxProofVerifier      common.Address
+	AzureTdxBatchProof    []byte
+	AzureTdxProofVerifier common.Address
 }
 
 // ProofProducer is an interface that contains all methods to generate a proof.

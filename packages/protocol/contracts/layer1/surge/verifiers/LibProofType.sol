@@ -11,8 +11,8 @@ library LibProofType {
 
     uint8 internal constant NUM_PROOF_TYPES = 4;
 
-    uint16 internal constant ZK_MASK = 0x0C; // 0b1100
-    uint16 internal constant TEE_MASK = 0x03; // 0b0011
+    uint16 internal constant ZK_MASK = 0x18; // 0b11000
+    uint16 internal constant TEE_MASK = 0x07; // 0b00111
 
     // Invidual proof types
     // --------------------
@@ -22,24 +22,29 @@ library LibProofType {
         return ProofType.wrap(0x00);
     }
 
-    /// @dev SGX Reth proof type (0b0001)
+    /// @dev SGX Reth proof type (0b00001)
     function sgxReth() internal pure returns (ProofType) {
         return ProofType.wrap(0x01);
     }
 
-    /// @dev TDX Reth proof type (0b0010)
-    function tdxReth() internal pure returns (ProofType) {
+    /// @dev TDX Nethermind proof type (0b00010)
+    function tdxNethermind() internal pure returns (ProofType) {
         return ProofType.wrap(0x02);
     }
 
-    /// @dev RISC-0 Reth proof type (0b0100)
-    function risc0Reth() internal pure returns (ProofType) {
+    /// @dev Azure TDX Nethermind proof type (0b00100)
+    function azureTdxNethermind() internal pure returns (ProofType) {
         return ProofType.wrap(0x04);
     }
 
-    /// @dev SP1 Reth proof type (0b1000)
-    function sp1Reth() internal pure returns (ProofType) {
+    /// @dev RISC-0 Reth proof type (0b01000)
+    function risc0Reth() internal pure returns (ProofType) {
         return ProofType.wrap(0x08);
+    }
+
+    /// @dev SP1 Reth proof type (0b10000)
+    function sp1Reth() internal pure returns (ProofType) {
+        return ProofType.wrap(0x10);
     }
 
     // ZK / TEE type detectors
@@ -58,6 +63,11 @@ library LibProofType {
     function isZkTeeProof(ProofType _proofType) internal pure returns (bool) {
         uint16 pt = ProofType.unwrap(_proofType);
         return (pt & ZK_MASK) != 0 && (pt & TEE_MASK) != 0;
+    }
+
+    // TODO: set some other rule after TDX testing
+    function isFinalizingProof(ProofType _proofType) internal pure returns (bool) {
+        return equals(_proofType, tdxNethermind()) || equals(_proofType, azureTdxNethermind());
     }
 
     // Misc helpers

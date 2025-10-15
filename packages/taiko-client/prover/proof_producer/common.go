@@ -146,6 +146,9 @@ func updateProvingMetrics(proofType ProofType, requestAt time.Time, isAggregatio
 		case ProofTypeTdx:
 			metrics.ProverTdxAggregationGenerationTime.Set(float64(time.Since(requestAt).Seconds()))
 			metrics.ProverTdxProofAggregationGeneratedCounter.Add(1)
+		case ProofTypeAzureTdx:
+			metrics.ProverAzureTdxAggregationGenerationTime.Set(float64(time.Since(requestAt).Seconds()))
+			metrics.ProverAzureTdxProofAggregationGeneratedCounter.Add(1)
 		case ProofTypeZKR0:
 			metrics.ProverR0AggregationGenerationTime.Set(float64(time.Since(requestAt).Seconds()))
 			metrics.ProverR0ProofAggregationGeneratedCounter.Add(1)
@@ -168,6 +171,9 @@ func updateProvingMetrics(proofType ProofType, requestAt time.Time, isAggregatio
 		case ProofTypeTdx:
 			metrics.ProverTdxProofGenerationTime.Set(float64(time.Since(requestAt).Seconds()))
 			metrics.ProverTdxProofGeneratedCounter.Add(1)
+		case ProofTypeAzureTdx:
+			metrics.ProverAzureTdxProofGenerationTime.Set(float64(time.Since(requestAt).Seconds()))
+			metrics.ProverAzureTdxProofGeneratedCounter.Add(1)
 		case ProofTypeZKR0:
 			metrics.ProverR0ProofGenerationTime.Set(float64(time.Since(requestAt).Seconds()))
 			metrics.ProverR0ProofGeneratedCounter.Add(1)

@@ -322,7 +322,7 @@ func (s *ProofSubmitterPacaya) AggregateProofsByType(ctx context.Context, proofT
 	// nolint:exhaustive
 	// We deliberately handle only known proof types and catch others in default case
 	switch proofType {
-	case proofProducer.ProofTypeSgx, proofProducer.ProofTypeTdx, proofProducer.ProofTypeZKR0, proofProducer.ProofTypeZKSP1:
+	case proofProducer.ProofTypeSgx, proofProducer.ProofTypeTdx, proofProducer.ProofTypeAzureTdx, proofProducer.ProofTypeZKR0, proofProducer.ProofTypeZKSP1:
 		producer = s.proofProducer
 	default:
 		return fmt.Errorf("unknown proof type: %s", proofType)

@@ -33,9 +33,10 @@ type RaikoRequestProofBodyV3Pacaya struct {
 type ComposeProofProducer struct {
 	Verifiers map[ProofType]common.Address
 
-	RaikoSGXHostEndpoint  string
-	RaikoTDXHostEndpoint  string
-	RaikoZKVMHostEndpoint string
+	RaikoSGXHostEndpoint      string
+	RaikoTDXHostEndpoint      string
+	RaikoAzureTDXHostEndpoint string
+	RaikoZKVMHostEndpoint     string
 
 	RaikoRequestTimeout time.Duration
 	JWT                 string // JWT provided by Raiko
@@ -70,36 +71,36 @@ func (s *ComposeProofProducer) RequestProof(
 		g         = new(errgroup.Group)
 	)
 
-	g.Go(func() error {
-		// SGX proof request raiko-host service
-		// Note that - unlike `taiko-mono` upstream - we don't request the SGXGeth in Surge,
-		// instead we request the normal SGX proof
-		if s.Dummy {
-			log.Debug("Dummy proof producer requested SGX proof", "batchID", batchID)
+	// g.Go(func() error {
+	// SGX proof request raiko-host service
+	// Note that - unlike `taiko-mono` upstream - we don't request the SGXGeth in Surge,
+	// instead we request the normal SGX proof
+	// if s.Dummy {
+	// 	log.Debug("Dummy proof producer requested SGX proof", "batchID", batchID)
 
-			// The following line is a no-op; this is just to showcase the dummy proof producer
-			_, _ = s.DummyProofProducer.RequestProof(opts, batchID, meta, requestAt)
-			return nil
-		}
+	// 	// The following line is a no-op; this is just to showcase the dummy proof producer
+	// 	_, _ = s.DummyProofProducer.RequestProof(opts, batchID, meta, requestAt)
+	// 	return nil
+	// }
 
-		// By design we drop the SGX proof response in the following line because at this point we
-		// only need to record that it succeeded and we actually collect it during the next aggregation step
-		if _, err := s.requestBatchProof(
-			ctx,
-			batches,
-			opts.GetProverAddress(),
-			false,
-			ProofTypeSgx,
-			requestAt,
-			opts.PacayaOptions().IsRethSGXProofGenerated,
-		); err != nil {
-			return err
-		}
+	// // By design we drop the SGX proof response in the following line because at this point we
+	// // only need to record that it succeeded and we actually collect it during the next aggregation step
+	// if _, err := s.requestBatchProof(
+	// 	ctx,
+	// 	batches,
+	// 	opts.GetProverAddress(),
+	// 	false,
+	// 	ProofTypeSgx,
+	// 	requestAt,
+	// 	opts.PacayaOptions().IsRethSGXProofGenerated,
+	// ); err != nil {
+	// 	return err
+	// }
 
-		// Note: we mark the `IsRethSGXProofGenerated` with true to record if it is first time generated
-		opts.PacayaOptions().IsRethSGXProofGenerated = true
-		return nil
-	})
+	// // Note: we mark the `IsRethSGXProofGenerated` with true to record if it is first time generated
+	// opts.PacayaOptions().IsRethSGXProofGenerated = true
+	// return nil
+	// })
 	g.Go(func() error {
 		// TDX proof request raiko-host service
 		if s.Dummy {
@@ -129,45 +130,73 @@ func (s *ComposeProofProducer) RequestProof(
 		return nil
 	})
 	g.Go(func() error {
-		// ZK proof request raiko-host service
-		// Note that s.ProofType here is always ProofTypeZKAny in Surge
+		// Azure TDX proof request raiko-host service
 		if s.Dummy {
-			log.Debug("Dummy proof producer requested ZK proof", "batchID", batchID)
+			log.Debug("Dummy proof producer requested Azure TDX proof", "batchID", batchID)
 
-			// For the dummy proof producer, we just use the sp1 proof type (as zk_any would break the logic down the line)
-			proofType = ProofTypeZKSP1
-			if resp, err := s.DummyProofProducer.RequestProof(opts, batchID, meta, requestAt); err != nil {
-				return err
-			} else {
-				proof = resp.Proof
-			}
-
+			// The following line is a no-op; this is just to showcase the dummy proof producer
+			_, _ = s.DummyProofProducer.RequestProof(opts, batchID, meta, requestAt)
 			return nil
 		}
 
-		resp, err := s.requestBatchProof(
+		// By design we drop the Azure TDX proof response in the following line because at this point we
+		// only need to record that it succeeded and we actually collect it during the next aggregation step
+		if _, err := s.requestBatchProof(
 			ctx,
 			batches,
 			opts.GetProverAddress(),
 			false,
-			s.ProofType,
+			ProofTypeAzureTdx,
 			requestAt,
-			opts.PacayaOptions().IsRethZKProofGenerated,
-		)
-		if err != nil {
+			opts.PacayaOptions().IsNethermindAzureTdxProofGenerated,
+		); err != nil {
 			return err
 		}
 
-		proofType = resp.ProofType
-		// Note: we mark the `IsRethZKProofGenerated` with true to record if it is first time generated
-		opts.PacayaOptions().IsRethZKProofGenerated = true
-		// Note: Since the single sp1 proof from raiko is null, we need to ignore the case.
-		if ProofTypeZKSP1 != proofType {
-			proof = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
-		}
-
+		// Note: we mark the `IsNethermindAzureTdxProofGenerated` with true to record if it is first time generated
+		opts.PacayaOptions().IsNethermindAzureTdxProofGenerated = true
 		return nil
 	})
+	// g.Go(func() error {
+	// 	// ZK proof request raiko-host service
+	// 	// Note that s.ProofType here is always ProofTypeZKAny in Surge
+	// 	if s.Dummy {
+	// 		log.Debug("Dummy proof producer requested ZK proof", "batchID", batchID)
+
+	// 		// For the dummy proof producer, we just use the sp1 proof type (as zk_any would break the logic down the line)
+	// 		proofType = ProofTypeZKSP1
+	// 		if resp, err := s.DummyProofProducer.RequestProof(opts, batchID, meta, requestAt); err != nil {
+	// 			return err
+	// 		} else {
+	// 			proof = resp.Proof
+	// 		}
+
+	// 		return nil
+	// 	}
+
+	// 	resp, err := s.requestBatchProof(
+	// 		ctx,
+	// 		batches,
+	// 		opts.GetProverAddress(),
+	// 		false,
+	// 		s.ProofType,
+	// 		requestAt,
+	// 		opts.PacayaOptions().IsRethZKProofGenerated,
+	// 	)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	proofType = resp.ProofType
+	// 	// Note: we mark the `IsRethZKProofGenerated` with true to record if it is first time generated
+	// 	opts.PacayaOptions().IsRethZKProofGenerated = true
+	// 	// Note: Since the single sp1 proof from raiko is null, we need to ignore the case.
+	// 	if ProofTypeZKSP1 != proofType {
+	// 		proof = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
+	// 	}
+
+	// 	return nil
+	// })
 
 	if err := g.Wait(); err != nil {
 		return nil, fmt.Errorf("failed to get batches proofs: %w", err)
@@ -207,12 +236,13 @@ func (s *ComposeProofProducer) Aggregate(
 		"time", time.Since(requestAt),
 	)
 	var (
-		sgxBatchProofs []byte
-		tdxBatchProofs []byte
-		batchProofs    []byte
-		batches        = make([]*RaikoBatches, 0, len(items))
-		batchIDs       = make([]*big.Int, 0, len(items))
-		g              = new(errgroup.Group)
+		sgxBatchProofs      []byte
+		tdxBatchProofs      []byte
+		azureTdxBatchProofs []byte
+		batchProofs         []byte
+		batches             = make([]*RaikoBatches, 0, len(items))
+		batchIDs            = make([]*big.Int, 0, len(items))
+		g                   = new(errgroup.Group)
 	)
 	for _, item := range items {
 		batches = append(batches, &RaikoBatches{
@@ -221,35 +251,35 @@ func (s *ComposeProofProducer) Aggregate(
 		})
 		batchIDs = append(batchIDs, item.Meta.Pacaya().GetBatchID())
 	}
-	g.Go(func() error {
-		if s.Dummy {
-			log.Debug("Dummy proof producer requested SGX batch proof aggregation", "batchSize", len(items))
+	// g.Go(func() error {
+	// 	if s.Dummy {
+	// 		log.Debug("Dummy proof producer requested SGX batch proof aggregation", "batchSize", len(items))
 
-			resp, _ := s.DummyProofProducer.RequestBatchProofs(items, ProofTypeSgx)
-			sgxBatchProofs = resp.BatchProof
-			return nil
-		}
+	// 		resp, _ := s.DummyProofProducer.RequestBatchProofs(items, ProofTypeSgx)
+	// 		sgxBatchProofs = resp.BatchProof
+	// 		return nil
+	// 	}
 
-		resp, err := s.requestBatchProof(
-			ctx,
-			batches,
-			firstItem.Opts.GetProverAddress(),
-			true,
-			ProofTypeSgx,
-			requestAt,
-			firstItem.Opts.PacayaOptions().IsRethSGXProofAggregationGenerated,
-		)
-		if err != nil {
-			return err
-		}
+	// 	resp, err := s.requestBatchProof(
+	// 		ctx,
+	// 		batches,
+	// 		firstItem.Opts.GetProverAddress(),
+	// 		true,
+	// 		ProofTypeSgx,
+	// 		requestAt,
+	// 		firstItem.Opts.PacayaOptions().IsRethSGXProofAggregationGenerated,
+	// 	)
+	// 	if err != nil {
+	// 		return err
+	// 	}
 
-		// Note: we mark the `IsRethSGXProofAggregationGenerated` in the first item with true
-		// to record if it is first time generated
-		firstItem.Opts.PacayaOptions().IsRethSGXProofAggregationGenerated = true
-		sgxBatchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
+	// 	// Note: we mark the `IsRethSGXProofAggregationGenerated` in the first item with true
+	// 	// to record if it is first time generated
+	// 	firstItem.Opts.PacayaOptions().IsRethSGXProofAggregationGenerated = true
+	// 	sgxBatchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
 
-		return nil
-	})
+	// 	return nil
+	// })
 	g.Go(func() error {
 		if s.Dummy {
 			log.Debug("Dummy proof producer requested TDX batch proof aggregation", "batchSize", len(items))
@@ -281,11 +311,10 @@ func (s *ComposeProofProducer) Aggregate(
 	})
 	g.Go(func() error {
 		if s.Dummy {
-			log.Debug("Dummy proof producer requested ZK batch proof aggregation", "batchSize", len(items))
+			log.Debug("Dummy proof producer requested Azure TDX batch proof aggregation", "batchSize", len(items))
 
-			proofType = s.ProofType
-			resp, _ := s.DummyProofProducer.RequestBatchProofs(items, s.ProofType)
-			batchProofs = resp.BatchProof
+			resp, _ := s.DummyProofProducer.RequestBatchProofs(items, ProofTypeAzureTdx)
+			azureTdxBatchProofs = resp.BatchProof
 			return nil
 		}
 
@@ -294,35 +323,67 @@ func (s *ComposeProofProducer) Aggregate(
 			batches,
 			firstItem.Opts.GetProverAddress(),
 			true,
-			proofType,
+			ProofTypeAzureTdx,
 			requestAt,
-			firstItem.Opts.PacayaOptions().IsRethZKProofAggregationGenerated,
+			firstItem.Opts.PacayaOptions().IsNethermindAzureTdxProofAggregationGenerated,
 		)
 		if err != nil {
 			return err
 		}
 
-		// Note: we mark the `IsRethZKProofAggregationGenerated` in the first item with true
+		// Note: we mark the `IsNethermindAzureTdxProofAggregationGenerated` in the first item with true
 		// to record if it is first time generated
-		firstItem.Opts.PacayaOptions().IsRethZKProofAggregationGenerated = true
-		batchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
+		firstItem.Opts.PacayaOptions().IsNethermindAzureTdxProofAggregationGenerated = true
+		azureTdxBatchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
 
 		return nil
 	})
+	// g.Go(func() error {
+	// 	if s.Dummy {
+	// 		log.Debug("Dummy proof producer requested ZK batch proof aggregation", "batchSize", len(items))
+
+	// 		proofType = s.ProofType
+	// 		resp, _ := s.DummyProofProducer.RequestBatchProofs(items, s.ProofType)
+	// 		batchProofs = resp.BatchProof
+	// 		return nil
+	// 	}
+
+	// 	resp, err := s.requestBatchProof(
+	// 		ctx,
+	// 		batches,
+	// 		firstItem.Opts.GetProverAddress(),
+	// 		true,
+	// 		proofType,
+	// 		requestAt,
+	// 		firstItem.Opts.PacayaOptions().IsRethZKProofAggregationGenerated,
+	// 	)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	// Note: we mark the `IsRethZKProofAggregationGenerated` in the first item with true
+	// 	// to record if it is first time generated
+	// 	firstItem.Opts.PacayaOptions().IsRethZKProofAggregationGenerated = true
+	// 	batchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
+
+	// 	return nil
+	// })
 	if err := g.Wait(); err != nil {
 		return nil, fmt.Errorf("failed to get batches proofs: %w", err)
 	}
 
 	return &BatchProofs{
-		ProofResponses:   items,
-		BatchProof:       batchProofs,
-		BatchIDs:         batchIDs,
-		ProofType:        proofType,
-		Verifier:         verifier,
-		SgxBatchProof:    sgxBatchProofs,
-		SgxProofVerifier: s.Verifiers[ProofTypeSgx],
-		TdxBatchProof:    tdxBatchProofs,
-		TdxProofVerifier: s.Verifiers[ProofTypeTdx],
+		ProofResponses:        items,
+		BatchProof:            batchProofs,
+		BatchIDs:              batchIDs,
+		ProofType:             proofType,
+		Verifier:              verifier,
+		SgxBatchProof:         sgxBatchProofs,
+		SgxProofVerifier:      s.Verifiers[ProofTypeSgx],
+		TdxBatchProof:         tdxBatchProofs,
+		TdxProofVerifier:      s.Verifiers[ProofTypeTdx],
+		AzureTdxBatchProof:    azureTdxBatchProofs,
+		AzureTdxProofVerifier: s.Verifiers[ProofTypeAzureTdx],
 	}, nil
 }
 
@@ -345,6 +406,8 @@ func (s *ComposeProofProducer) requestBatchProof(
 		endpoint = s.RaikoSGXHostEndpoint
 	case ProofTypeTdx:
 		endpoint = s.RaikoTDXHostEndpoint
+	case ProofTypeAzureTdx:
+		endpoint = s.RaikoAzureTDXHostEndpoint
 	case ProofTypeZKAny, ProofTypeZKR0, ProofTypeZKSP1:
 		endpoint = s.RaikoZKVMHostEndpoint
 	default:

@@ -78,6 +78,7 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesPacaya(batchProof *proofProduce
 				"verifier", batchProof.Verifier,
 				"sgxVerifier", batchProof.SgxProofVerifier,
 				"tdxVerifier", batchProof.TdxProofVerifier,
+				"azureTdxVerifier", batchProof.AzureTdxProofVerifier,
 			)
 		}
 		// TODO: add TDX here
@@ -148,6 +149,7 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesPacaya(batchProof *proofProduce
 			"zkBatchProofLength", len(batchProof.BatchProof),
 			"sgxBatchProofLength", len(batchProof.SgxBatchProof),
 			"tdxBatchProofLength", len(batchProof.TdxBatchProof),
+			"azureTdxBatchProofLength", len(batchProof.AzureTdxBatchProof),
 		)
 
 		return &txmgr.TxCandidate{
