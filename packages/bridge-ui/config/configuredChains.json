@@ -2,12 +2,12 @@
   "configuredChains": [
     {
       "560048": {
-        "name": "L1 Devnet",
+        "name": "Hoodi",
         "type": "L1",
         "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
           "default": {
-            "http": ["https://l1-rpc-internal.staging.surge.wtf"]
+            "http": ["https://l1-rpc.hoodi.surge.wtf"]
           }
         },
         "nativeCurrency": {
@@ -17,20 +17,20 @@
         },
         "blockExplorers": {
           "default": {
-            "name": "L1 Devnet Explorer",
-            "url": "https://hoodi.etherscan.io"
+            "name": "Hoodi Block Explorer",
+            "url": "https://hoodi.etherscan.io/"
           }
         }
       }
     },
     {
-      "763374": {
-        "name": "Surge Devnet",
+      "763375": {
+        "name": "Surge Testnet",
         "type": "L2",
         "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
           "default": {
-            "http": ["https://l2-rpc.staging.surge.wtf"]
+            "http": ["https://l2-rpc.hoodi.surge.wtf"]
           }
         },
         "nativeCurrency": {
@@ -40,8 +40,8 @@
         },
         "blockExplorers": {
           "default": {
-            "name": "Surge Explorer",
-            "url": "https://explorer.staging.surge.wtf"
+            "name": "Surge Testnet Block Explorer",
+            "url": "https://explorer.hoodi.surge.wtf"
           }
         }
       }
