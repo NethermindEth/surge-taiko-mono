@@ -1,12 +1,12 @@
 {
   "configuredEventIndexer": [
     {
-      "chainIds": [3151908, 763374],
-      "url": "https://devnet-two.surge.wtf/l1-relayer"
+      "chainIds": [560048, 763375],
+      "url": "https://relayer-api-l1.hoodi.surge.wtf"
     },
     {
-      "chainIds": [763374, 3151908],
-      "url": "https://devnet-two.surge.wtf/l2-relayer"
+      "chainIds": [763375, 560048],
+      "url": "https://relayer-api-l2.hoodi.surge.wtf"
     }
   ]
 }
