@@ -60,13 +60,17 @@ func (p *Proposer) isProfitable(
 		filteredTxBatch := p.filterTxsByBaseFee(*txBatch, optimalBaseFee)
 		filteredTxCount := countTxsInBatch(filteredTxBatch)
 
+		// Calculate improvement percentage
+		improvementPct := float64(optimalCollectedFees.Int64()-originalCollectedFees.Int64()) * 100 /
+			float64(originalCollectedFees.Int64())
+
 		log.Info("Found better base fee threshold using optimized algorithm",
 			"optimalBaseFee", utils.WeiToEther(optimalBaseFee),
 			"optimalCollectedFees", utils.WeiToEther(optimalCollectedFees),
 			"originalCollectedFees", utils.WeiToEther(originalCollectedFees),
 			"filteredTxCount", filteredTxCount,
 			"originalTxCount", *txs,
-			"improvement", fmt.Sprintf("%.2f%%", float64(optimalCollectedFees.Int64()-originalCollectedFees.Int64())*100/float64(originalCollectedFees.Int64())),
+			"improvement", fmt.Sprintf("%.2f%%", improvementPct),
 		)
 
 		bestCollectedFees.Set(optimalCollectedFees)
@@ -244,10 +248,9 @@ func (p *Proposer) getPercentageFromBaseFeeToTheProposer(num *big.Int) *big.Int 
 
 // txWithBaseFee is a helper struct to sort transactions by their base fee
 type txWithBaseFee struct {
-	tx          *types.Transaction
-	baseFee     *big.Int
-	gas         uint64
-	priorityFee *big.Int // Tip per gas (for better revenue calculation)
+	tx      *types.Transaction
+	baseFee *big.Int
+	gas     uint64
 }
 
 // sortTxsByBaseFeeDesc sorts transactions by base fee in descending order using quicksort.
