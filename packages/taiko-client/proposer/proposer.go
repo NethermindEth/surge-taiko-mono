@@ -62,6 +62,9 @@ type Proposer struct {
 
 	checkProfitability bool
 
+	// Cost estimator for profitability checks (can be mocked in tests)
+	costEstimator CostEstimator
+
 	// Signal-based force proposing
 	signalServiceAddress      common.Address
 	lastSignalSentEventAt     time.Time
@@ -115,6 +118,11 @@ func (p *Proposer) InitFromConfig(
 		return fmt.Errorf("failed to get protocol configs: %w", err)
 	}
 	config.ReportProtocolConfigs(p.protocolConfigs)
+
+	// Initialize cost estimator with default implementation (can be overridden in tests)
+	if p.costEstimator == nil {
+		p.costEstimator = p
+	}
 
 	if txMgr == nil {
 		if txMgr, err = txmgr.NewSimpleTxManager(

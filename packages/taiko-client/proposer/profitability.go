@@ -13,6 +13,11 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
 
+// CostEstimator is an interface for estimating the L1 cost of proposing a batch.
+type CostEstimator interface {
+	estimateL1Cost(ctx context.Context, candidate *txmgr.TxCandidate) (*big.Int, error)
+}
+
 // isProfitable checks if proposing the given transaction batch is profitable.
 // It performs profitability checks and can adjust the base fee and filter transactions if needed.
 // Returns (isProfitable bool, baseFeeAdjusted bool, error)
@@ -23,7 +28,7 @@ func (p *Proposer) isProfitable(
 	candidate *txmgr.TxCandidate,
 	txs *uint64,
 ) (bool, bool, error) {
-	estimatedCost, err := p.estimateL2Cost(ctx, candidate)
+	estimatedCost, err := p.costEstimator.estimateL1Cost(ctx, candidate)
 	if err != nil {
 		return false, false, fmt.Errorf("failed to estimate L2 cost: %w", err)
 	}
@@ -113,9 +118,9 @@ func (p *Proposer) isProfitable(
 	return isProfitable, bestAdjusted, nil
 }
 
-// estimateL2Cost estimates the cost of proposing the L2 batch to L1.
+// estimateL1Cost estimates the cost of proposing the L2 batch to L1.
 // It considers both blob-based and calldata-based posting, along with proving costs.
-func (p *Proposer) estimateL2Cost(
+func (p *Proposer) estimateL1Cost(
 	ctx context.Context,
 	candidate *txmgr.TxCandidate,
 ) (*big.Int, error) {
@@ -174,7 +179,7 @@ func (p *Proposer) estimateL2Cost(
 	)
 	totalCost = new(big.Int).Add(totalCost, proofPostingCost)
 
-	log.Info("L2 cost estimation",
+	log.Info("L1 cost estimation",
 		"l1BaseFee", utils.WeiToEther(l1BaseFee),
 		"costWithCalldata", utils.WeiToEther(costWithCalldata),
 		"costWithBlobs", utils.WeiToEther(costWithBlobs),
