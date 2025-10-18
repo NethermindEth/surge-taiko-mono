@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 )
 
@@ -113,7 +114,11 @@ func TestIsProfitableReferenceModification(t *testing.T) {
 
 			// Verify the filtered transaction is tx2
 			if filtered[0][0].GasFeeCap().Cmp(big.NewInt(100_000_000_000)) != 0 {
-				t.Errorf("percentage %d: Expected filtered transaction to have 100 gwei gas fee cap, got %v", pct, filtered[0][0].GasFeeCap())
+				t.Errorf(
+					"percentage %d: Expected filtered transaction to have 100 gwei gas fee cap, got %v",
+					pct,
+					filtered[0][0].GasFeeCap(),
+				)
 			}
 
 			// Test: count transactions
@@ -122,7 +127,14 @@ func TestIsProfitableReferenceModification(t *testing.T) {
 				t.Errorf("percentage %d: Expected count to be 1, got %d", pct, count)
 			}
 
-			t.Logf("✓ percentage %d threshold: %v gwei (original base fee: %v gwei)", pct, new(big.Int).Div(threshold, big.NewInt(1_000_000_000)), new(big.Int).Div(originalBaseFee, big.NewInt(1_000_000_000)))
+			thresholdGwei := new(big.Int).Div(threshold, big.NewInt(1_000_000_000))
+			originalBaseGwei := new(big.Int).Div(originalBaseFee, big.NewInt(1_000_000_000))
+			t.Logf(
+				"✓ percentage %d threshold: %v gwei (original base fee: %v gwei)",
+				pct,
+				thresholdGwei,
+				originalBaseGwei,
+			)
 			t.Logf("✓ Original transaction count: %d", originalTxCount)
 			t.Logf("✓ Filtered transaction count (pct %d): %d", pct, count)
 		}
@@ -194,10 +206,42 @@ func TestFilterThresholdsTableDriven(t *testing.T) {
 	chainID := big.NewInt(1)
 
 	// Create txs with fees: 10 gwei, 50 gwei, 100 gwei, 200 gwei
-	tx10 := types.NewTx(&types.DynamicFeeTx{ChainID: chainID, Nonce: 0, GasFeeCap: big.NewInt(10_000_000_000), GasTipCap: big.NewInt(1_000_000_000), Gas: 21000, To: &testAddr, Value: common.Big0})
-	tx50 := types.NewTx(&types.DynamicFeeTx{ChainID: chainID, Nonce: 1, GasFeeCap: big.NewInt(50_000_000_000), GasTipCap: big.NewInt(1_000_000_000), Gas: 21000, To: &testAddr, Value: common.Big0})
-	tx100 := types.NewTx(&types.DynamicFeeTx{ChainID: chainID, Nonce: 2, GasFeeCap: big.NewInt(100_000_000_000), GasTipCap: big.NewInt(1_000_000_000), Gas: 21000, To: &testAddr, Value: common.Big0})
-	tx200 := types.NewTx(&types.DynamicFeeTx{ChainID: chainID, Nonce: 3, GasFeeCap: big.NewInt(200_000_000_000), GasTipCap: big.NewInt(1_000_000_000), Gas: 21000, To: &testAddr, Value: common.Big0})
+	tx10 := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   chainID,
+		Nonce:     0,
+		GasFeeCap: big.NewInt(10_000_000_000),
+		GasTipCap: big.NewInt(1_000_000_000),
+		Gas:       21000,
+		To:        &testAddr,
+		Value:     common.Big0,
+	})
+	tx50 := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   chainID,
+		Nonce:     1,
+		GasFeeCap: big.NewInt(50_000_000_000),
+		GasTipCap: big.NewInt(1_000_000_000),
+		Gas:       21000,
+		To:        &testAddr,
+		Value:     common.Big0,
+	})
+	tx100 := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   chainID,
+		Nonce:     2,
+		GasFeeCap: big.NewInt(100_000_000_000),
+		GasTipCap: big.NewInt(1_000_000_000),
+		Gas:       21000,
+		To:        &testAddr,
+		Value:     common.Big0,
+	})
+	tx200 := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   chainID,
+		Nonce:     3,
+		GasFeeCap: big.NewInt(200_000_000_000),
+		GasTipCap: big.NewInt(1_000_000_000),
+		Gas:       21000,
+		To:        &testAddr,
+		Value:     common.Big0,
+	})
 
 	batch := []types.Transactions{{tx10, tx50, tx100, tx200}}
 
@@ -225,7 +269,14 @@ func TestFilterThresholdsTableDriven(t *testing.T) {
 		count := countTxsInBatch(filtered)
 
 		if int(count) != tc.expect {
-			t.Errorf("pct %d: expected %d txs after filtering, got %d (threshold %v gwei)", tc.pct, tc.expect, count, new(big.Int).Div(threshold, big.NewInt(1_000_000_000)))
+			thresholdGwei := new(big.Int).Div(threshold, big.NewInt(1_000_000_000))
+			t.Errorf(
+				"pct %d: expected %d txs after filtering, got %d (threshold %v gwei)",
+				tc.pct,
+				tc.expect,
+				count,
+				thresholdGwei,
+			)
 		}
 	}
 }
