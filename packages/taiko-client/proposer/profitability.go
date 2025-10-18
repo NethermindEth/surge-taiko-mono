@@ -28,34 +28,28 @@ func (p *Proposer) isProfitable(
 		return false, false, fmt.Errorf("failed to estimate L2 cost: %w", err)
 	}
 
-	// First, check profitability with the standard L2 base fee
-	collectedFees := p.computeL2Fees(*txBatch, *l2BaseFee)
-	isProfitable := collectedFees.Cmp(estimatedCost) >= 0
+	// Compute collected fees for the original batch/base fee
+	originalCollectedFees := p.computeL2Fees(*txBatch, *l2BaseFee)
 
 	log.Info("Profitability check (standard base fee)",
 		"estimatedCost", utils.WeiToEther(estimatedCost),
-		"collectedFees", utils.WeiToEther(collectedFees),
-		"isProfitable", isProfitable,
+		"collectedFees", utils.WeiToEther(originalCollectedFees),
 		"l2BaseFee", utils.WeiToEther(*l2BaseFee),
 		"numBatches", len(*txBatch),
 		"numTransactions", *txs,
 	)
 
-	// If profitable with standard base fee, return early
-	if isProfitable {
-		return true, false, nil
-	}
+	// We'll keep track of the best option found (highest collected fees)
+	bestCollectedFees := new(big.Int).Set(originalCollectedFees)
+	bestTxBatch := *txBatch
+	bestL2BaseFee := new(big.Int).Set(*l2BaseFee)
+	bestTxs := *txs
+	bestAdjusted := false
 
-	// If not profitable with standard base fee, try with adjusted percentages of highest transaction base fee
 	highestTxBaseFee := p.findHighestBaseFeeInBatch(*txBatch)
 
-	if highestTxBaseFee == nil || highestTxBaseFee.Cmp(*l2BaseFee) <= 0 {
-		// No higher base fee transactions found, return not profitable
-		return false, false, nil
-	}
-
-	// Try different percentage thresholds: 50%, then 75%
-	percentages := []int64{50, 75}
+	// Try different percentage thresholds: 25%, 50%, 75%, 90%
+	percentages := []int64{25, 50, 75, 90}
 
 	for _, percentage := range percentages {
 		// Calculate the adjusted base fee
@@ -75,12 +69,10 @@ func (p *Proposer) isProfitable(
 
 		// Recalculate collected fees with filtered transactions and adjusted base fee
 		collectedFeesAdjusted := p.computeL2Fees(filteredTxBatch, adjustedBaseFee)
-		isProfitableAdjusted := collectedFeesAdjusted.Cmp(estimatedCost) >= 0
 
 		log.Info("Profitability check (adjusted with highest tx base fee)",
 			"estimatedCost", utils.WeiToEther(estimatedCost),
 			"collectedFeesAdjusted", utils.WeiToEther(collectedFeesAdjusted),
-			"isProfitableAdjusted", isProfitableAdjusted,
 			"highestTxBaseFee", utils.WeiToEther(highestTxBaseFee),
 			"percentage", percentage,
 			"adjustedBaseFee", utils.WeiToEther(adjustedBaseFee),
@@ -88,19 +80,37 @@ func (p *Proposer) isProfitable(
 			"filteredTxCount", countTxsInBatch(filteredTxBatch),
 		)
 
-		if isProfitableAdjusted {
-			log.Info("Proposing with adjusted base fee due to high-paying transactions",
-				"percentage", percentage,
-			)
-			// Modify the references in-place
-			*txBatch = filteredTxBatch
-			*l2BaseFee = adjustedBaseFee
-			*txs = countTxsInBatch(filteredTxBatch)
-			return true, true, nil
+		// If this adjusted collected fees are higher than the best we've seen, pick it
+		if collectedFeesAdjusted.Cmp(bestCollectedFees) > 0 {
+			bestCollectedFees.Set(collectedFeesAdjusted)
+			bestTxBatch = filteredTxBatch
+			bestL2BaseFee.Set(adjustedBaseFee)
+			bestTxs = countTxsInBatch(filteredTxBatch)
+			bestAdjusted = true
 		}
 	}
 
-	return false, false, nil
+	// Apply the best found batch/base fee
+	if bestAdjusted {
+		log.Info("Selecting adjusted batch/baseFee as it yields higher collected fees",
+			"bestCollectedFees", utils.WeiToEther(bestCollectedFees),
+			"estimatedCost", utils.WeiToEther(estimatedCost),
+			"bestL2BaseFee", utils.WeiToEther(bestL2BaseFee),
+			"originalCollectedFees", utils.WeiToEther(originalCollectedFees),
+			"originalL2BaseFee", utils.WeiToEther(*l2BaseFee),
+			"originalTxCount", *txs,
+			"bestTxCount", bestTxs,
+		)
+
+		// Modify the references in-place to the best option
+		*txBatch = bestTxBatch
+		*l2BaseFee = bestL2BaseFee
+		*txs = bestTxs
+	}
+
+	// Final profitability decision based on the bestCollectedFees
+	isProfitable := bestCollectedFees.Cmp(estimatedCost) >= 0
+	return isProfitable, bestAdjusted, nil
 }
 
 // estimateL2Cost estimates the cost of proposing the L2 batch to L1.

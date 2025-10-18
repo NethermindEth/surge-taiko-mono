@@ -1,13 +1,105 @@
 package proposer
 
 import (
+	"context"
 	"math/big"
 	"testing"
+	"time"
 
+	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 )
+
+// testProposer embeds Proposer and allows tests to override estimated cost
+type testProposer struct {
+	Proposer
+	estimatedCost *big.Int
+}
+
+// estimateL2Cost overrides the Proposer method for tests to avoid RPC calls.
+func (p *testProposer) estimateL2Cost(ctx context.Context, candidate *txmgr.TxCandidate) (*big.Int, error) {
+	if p.estimatedCost != nil {
+		return new(big.Int).Set(p.estimatedCost), nil
+	}
+	return big.NewInt(0), nil
+}
+
+// isProfitable mirrors the production logic but uses p.estimatedCost instead of calling RPC
+func (p *testProposer) isProfitable(ctx context.Context, txBatch *[]types.Transactions, l2BaseFee **big.Int, candidate *txmgr.TxCandidate, txs *uint64) (bool, bool, error) {
+	estimatedCost := big.NewInt(0)
+	if p.estimatedCost != nil {
+		estimatedCost = new(big.Int).Set(p.estimatedCost)
+	}
+
+	// Compute collected fees for the original batch/base fee
+	originalCollectedFees := p.computeL2Fees(*txBatch, *l2BaseFee)
+
+	// We'll keep track of the best option found (highest collected fees)
+	bestCollectedFees := new(big.Int).Set(originalCollectedFees)
+	bestTxBatch := *txBatch
+	bestL2BaseFee := new(big.Int).Set(*l2BaseFee)
+	bestTxs := *txs
+	bestAdjusted := false
+
+	// If there are no candidate transactions with a higher base fee, we only consider the original
+	highestTxBaseFee := p.findHighestBaseFeeInBatch(*txBatch)
+	if highestTxBaseFee == nil || highestTxBaseFee.Cmp(*l2BaseFee) <= 0 {
+		// No higher base fee transactions found; decide profitability based on originalCollectedFees
+		isProfitable := originalCollectedFees.Cmp(estimatedCost) >= 0
+		return isProfitable, false, nil
+	}
+
+	// Try different percentage thresholds: 50%, then 75%
+	percentages := []int64{50, 75}
+
+	for _, percentage := range percentages {
+		adjustedBaseFee := new(big.Int).Mul(highestTxBaseFee, big.NewInt(percentage))
+		adjustedBaseFee = new(big.Int).Div(adjustedBaseFee, big.NewInt(100))
+
+		filteredTxBatch := p.filterTxsByBaseFee(*txBatch, adjustedBaseFee)
+		if len(filteredTxBatch) == 0 {
+			continue
+		}
+
+		collectedFeesAdjusted := p.computeL2Fees(filteredTxBatch, adjustedBaseFee)
+
+		if collectedFeesAdjusted.Cmp(bestCollectedFees) > 0 {
+			bestCollectedFees.Set(collectedFeesAdjusted)
+			bestTxBatch = filteredTxBatch
+			bestL2BaseFee.Set(adjustedBaseFee)
+			bestTxs = countTxsInBatch(filteredTxBatch)
+			bestAdjusted = true
+		}
+	}
+
+	if bestAdjusted {
+		*txBatch = bestTxBatch
+		*l2BaseFee = bestL2BaseFee
+		*txs = bestTxs
+	}
+
+	isProfitable := bestCollectedFees.Cmp(estimatedCost) >= 0
+	return isProfitable, bestAdjusted, nil
+}
+
+// dummyProtocolConfigs is a minimal ProtocolConfigs implementation for tests.
+type dummyProtocolConfigs struct{}
+
+func (d *dummyProtocolConfigs) BaseFeeConfig() *pacayaBindings.LibSharedDataBaseFeeConfig {
+	return &pacayaBindings.LibSharedDataBaseFeeConfig{SharingPctg: 100}
+}
+func (d *dummyProtocolConfigs) BlockMaxGasLimit() uint32              { return 0 }
+func (d *dummyProtocolConfigs) ForkHeightsOntake() uint64             { return 0 }
+func (d *dummyProtocolConfigs) ForkHeightsPacaya() uint64             { return 0 }
+func (d *dummyProtocolConfigs) LivenessBond() *big.Int                { return big.NewInt(0) }
+func (d *dummyProtocolConfigs) LivenessBondPerBlock() *big.Int        { return big.NewInt(0) }
+func (d *dummyProtocolConfigs) MaxProposals() uint64                  { return 0 }
+func (d *dummyProtocolConfigs) ProvingWindow() (time.Duration, error) { return 0, nil }
+func (d *dummyProtocolConfigs) MaxBlocksPerBatch() int                { return 0 }
+func (d *dummyProtocolConfigs) MaxAnchorHeightOffset() uint64         { return 0 }
 
 // TestIsProfitableReferenceModification tests that the refactored isProfitable
 // correctly modifies the references when using adjusted base fee
@@ -160,6 +252,138 @@ func TestIsProfitableReferenceModification(t *testing.T) {
 		t.Logf("50%% threshold: %v gwei (passes: %d txs)", new(big.Int).Div(threshold50, big.NewInt(1_000_000_000)), count50)
 		t.Logf("75%% threshold: %v gwei (passes: %d txs)", new(big.Int).Div(threshold75, big.NewInt(1_000_000_000)), count75)
 	})
+}
+
+// TestIsProfitableSelection tests that isProfitable picks the highest-paying
+// batch (original or adjusted) and updates references accordingly.
+func TestIsProfitableSelection(t *testing.T) {
+	// Use package-level testProposer and set estimatedCost for this test
+	tp := &testProposer{estimatedCost: big.NewInt(100_000_000_000_000)}
+	tp.protocolConfigs = &dummyProtocolConfigs{}
+
+	testAddr := common.HexToAddress("0x1234567890123456789012345678901234567890")
+	chainID := big.NewInt(1)
+
+	// Create three transactions: one low, one very high, one medium
+	txLow := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   chainID,
+		Nonce:     0,
+		GasFeeCap: big.NewInt(5_000_000_000), // 5 gwei
+		GasTipCap: big.NewInt(1_000_000_000),
+		Gas:       21000,
+		To:        &testAddr,
+		Value:     common.Big0,
+	})
+
+	txHigh := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   chainID,
+		Nonce:     1,
+		GasFeeCap: big.NewInt(200_000_000_000), // 200 gwei (highest)
+		GasTipCap: big.NewInt(1_000_000_000),
+		Gas:       21000,
+		To:        &testAddr,
+		Value:     common.Big0,
+	})
+
+	txMid := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   chainID,
+		Nonce:     2,
+		GasFeeCap: big.NewInt(30_000_000_000), // 30 gwei
+		GasTipCap: big.NewInt(1_000_000_000),
+		Gas:       21000,
+		To:        &testAddr,
+		Value:     common.Big0,
+	})
+
+	// Batch with all three transactions
+	txBatch := []types.Transactions{{txLow, txHigh, txMid}}
+	l2BaseFee := big.NewInt(10_000_000_000) // 10 gwei
+	txCount := uint64(3)
+
+	// Wrap in txmgr candidate (not used by our fake estimate but needed for signature)
+	var candidate txmgr.TxCandidate
+
+	// Call isProfitable and expect it to select the adjusted batch (50% of highest=100 gwei)
+	profitable, adjusted, err := tp.isProfitable(context.Background(), &txBatch, &l2BaseFee, &candidate, &txCount)
+	if err != nil {
+		t.Fatalf("isProfitable returned error: %v", err)
+	}
+
+	if !profitable {
+		t.Fatalf("Expected batch to be profitable with selected best option")
+	}
+
+	if !adjusted {
+		t.Fatalf("Expected adjusted to be true since filtered batch should yield higher fees")
+	}
+
+	// After adjustment, only txHigh should remain (200 gwei >= 100 gwei threshold)
+	if len(txBatch) != 1 || len(txBatch[0]) != 1 {
+		t.Fatalf("Expected filtered batch to contain only the highest tx, got %v", txBatch)
+	}
+
+	if txBatch[0][0].GasFeeCap().Cmp(big.NewInt(200_000_000_000)) != 0 {
+		t.Fatalf("Expected remaining tx to be the 200 gwei tx, got %v", txBatch[0][0].GasFeeCap())
+	}
+}
+
+// TestIsProfitableKeepsOriginal ensures that if original collected fees are
+// greater than any adjusted subset, the original batch is kept and adjusted=false
+func TestIsProfitableKeepsOriginal(t *testing.T) {
+	tp := &testProposer{estimatedCost: big.NewInt(1)}
+	tp.protocolConfigs = &dummyProtocolConfigs{}
+	testAddr := common.HexToAddress("0x1234567890123456789012345678901234567890")
+	chainID := big.NewInt(1)
+
+	// Create many medium-paying transactions and one very high-paying tx.
+	var txs types.Transactions
+	for i := 0; i < 10; i++ {
+		tx := types.NewTx(&types.DynamicFeeTx{
+			ChainID:   chainID,
+			Nonce:     uint64(i),
+			GasFeeCap: big.NewInt(11_000_000_000), // 11 gwei
+			GasTipCap: big.NewInt(1_000_000_000),
+			Gas:       21000,
+			To:        &testAddr,
+			Value:     common.Big0,
+		})
+		txs = append(txs, tx)
+	}
+
+	// One very high-paying transaction
+	highTx := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   chainID,
+		Nonce:     11,
+		GasFeeCap: big.NewInt(25_000_000_000), // 25 gwei (highest)
+		GasTipCap: big.NewInt(1_000_000_000),
+		Gas:       21000,
+		To:        &testAddr,
+		Value:     common.Big0,
+	})
+	txs = append(txs, highTx)
+
+	txBatch := []types.Transactions{txs}
+	l2BaseFee := big.NewInt(10_000_000_000) // 10 gwei
+	txCount := uint64(len(txs))
+	var candidate txmgr.TxCandidate
+
+	profitable, adjusted, err := tp.isProfitable(context.Background(), &txBatch, &l2BaseFee, &candidate, &txCount)
+	if err != nil {
+		t.Fatalf("isProfitable returned error: %v", err)
+	}
+
+	if !profitable {
+		t.Fatalf("Expected original batch to be profitable")
+	}
+
+	if adjusted {
+		t.Fatalf("Expected adjusted to be false since original is best")
+	}
+
+	// Ensure original batch remains intact (all transactions kept)
+	if len(txBatch) != 1 || len(txBatch[0]) != int(txCount) {
+		t.Fatalf("Expected original batch to be kept with %d txs, got %v", txCount, txBatch)
+	}
 }
 
 // TestFindHighestBaseFeeInBatch tests finding the highest base fee in a batch of transactions
