@@ -101,34 +101,34 @@ func (s *ComposeProofProducer) RequestProof(
 	// opts.PacayaOptions().IsRethSGXProofGenerated = true
 	// return nil
 	// })
-	g.Go(func() error {
-		// TDX proof request raiko-host service
-		if s.Dummy {
-			log.Debug("Dummy proof producer requested TDX proof", "batchID", batchID)
+	// g.Go(func() error {
+	// 	// TDX proof request raiko-host service
+	// 	if s.Dummy {
+	// 		log.Debug("Dummy proof producer requested TDX proof", "batchID", batchID)
 
-			// The following line is a no-op; this is just to showcase the dummy proof producer
-			_, _ = s.DummyProofProducer.RequestProof(opts, batchID, meta, requestAt)
-			return nil
-		}
+	// 		// The following line is a no-op; this is just to showcase the dummy proof producer
+	// 		_, _ = s.DummyProofProducer.RequestProof(opts, batchID, meta, requestAt)
+	// 		return nil
+	// 	}
 
-		// By design we drop the TDX proof response in the following line because at this point we
-		// only need to record that it succeeded and we actually collect it during the next aggregation step
-		if _, err := s.requestBatchProof(
-			ctx,
-			batches,
-			opts.GetProverAddress(),
-			false,
-			ProofTypeTdx,
-			requestAt,
-			opts.PacayaOptions().IsNethermindTdxProofGenerated,
-		); err != nil {
-			return err
-		}
+	// 	// By design we drop the TDX proof response in the following line because at this point we
+	// 	// only need to record that it succeeded and we actually collect it during the next aggregation step
+	// 	if _, err := s.requestBatchProof(
+	// 		ctx,
+	// 		batches,
+	// 		opts.GetProverAddress(),
+	// 		false,
+	// 		ProofTypeTdx,
+	// 		requestAt,
+	// 		opts.PacayaOptions().IsNethermindTdxProofGenerated,
+	// 	); err != nil {
+	// 		return err
+	// 	}
 
-		// Note: we mark the `IsNethermindTdxProofGenerated` with true to record if it is first time generated
-		opts.PacayaOptions().IsNethermindTdxProofGenerated = true
-		return nil
-	})
+	// 	// Note: we mark the `IsNethermindTdxProofGenerated` with true to record if it is first time generated
+	// 	opts.PacayaOptions().IsNethermindTdxProofGenerated = true
+	// 	return nil
+	// })
 	g.Go(func() error {
 		// Azure TDX proof request raiko-host service
 		if s.Dummy {
