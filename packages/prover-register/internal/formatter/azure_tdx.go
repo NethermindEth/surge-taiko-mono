@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/google/go-tdx-guest/abi"
@@ -14,6 +15,8 @@ import (
 	"github.com/google/go-tpm/legacy/tpm2"
 	"github.com/taikoxyz/taiko-mono/packages/prover-register/internal/logger"
 )
+
+var VERIFIABLE_PCRS = []uint32{4, 9, 11, 12, 13, 15}
 
 type AzureTDXFormatter struct {
 	log *logger.Logger
@@ -296,47 +299,60 @@ func (f *AzureTDXFormatter) ExtractTrustedParams(data *AzureTDXProcessedData) (*
 	var mrSeam []byte
 	var mrTd []byte
 
-	if quoteV4.TdQuoteBody != nil {
-		// TEE TCB SVN is in the TD quote body (16 bytes)
-		if len(quoteV4.TdQuoteBody.TeeTcbSvn) == 16 {
-			copy(teeTcbSvn[:], quoteV4.TdQuoteBody.TeeTcbSvn)
-		}
-
-		// MR_SEAM is in the TD quote body (48 bytes)
-		if len(quoteV4.TdQuoteBody.MrSeam) == 48 {
-			mrSeam = make([]byte, 48)
-			copy(mrSeam, quoteV4.TdQuoteBody.MrSeam)
-		}
-
-		// MR_TD is in the TD quote body (48 bytes)
-		if len(quoteV4.TdQuoteBody.MrTd) == 48 {
-			mrTd = make([]byte, 48)
-			copy(mrTd, quoteV4.TdQuoteBody.MrTd)
-		}
-	} else {
+	if quoteV4.TdQuoteBody == nil {
 		return nil, fmt.Errorf("TDQuoteBody is nil")
 	}
+	if len(quoteV4.TdQuoteBody.TeeTcbSvn) != 16 {
+		return nil, fmt.Errorf("TeeTcbSvn is not 16 bytes")
+	}
+	if len(quoteV4.TdQuoteBody.MrSeam) != 48 {
+		return nil, fmt.Errorf("MrSeam is not 48 bytes")
+	}
+	if len(quoteV4.TdQuoteBody.MrTd) != 48 {
+		return nil, fmt.Errorf("MrTd is not 48 bytes")
+	}
 
-	// Convert PCR values from our processed data to byte arrays
-	var pcrs [][]byte
+	copy(teeTcbSvn[:], quoteV4.TdQuoteBody.TeeTcbSvn)
+	copy(mrSeam, quoteV4.TdQuoteBody.MrSeam)
+	copy(mrTd, quoteV4.TdQuoteBody.MrTd)
+
+	var pcrs = make([][]byte, 24)
 	for _, pcr := range data.Pcrs {
 		pcrBytes := make([]byte, 32)
 		copy(pcrBytes, pcr.Value[:])
-		pcrs = append(pcrs, pcrBytes)
+		pcrs[pcr.Index] = pcrBytes
 	}
+
+	collectedPcrs, bitmap := f.collectPCRValues(pcrs, VERIFIABLE_PCRS)
 
 	params := &AzureTDXTrustedParams{
 		TeeTcbSvn: teeTcbSvn,
-		PcrBitmap: 0xffffff, // All 24 PCRs
+		PcrBitmap: bitmap,
 		MrSeam:    mrSeam,
 		MrTd:      mrTd,
-		Pcrs:      pcrs,
+		Pcrs:      collectedPcrs,
 	}
 
 	f.log.Info("extracted trusted params successfully",
 		"teeTcbSvn", hex.EncodeToString(teeTcbSvn[:]),
+		"pcrBitmap", fmt.Sprintf("0x%x", bitmap),
 		"mrSeam", hex.EncodeToString(mrSeam),
 		"mrTd", hex.EncodeToString(mrTd),
-		"pcrCount", len(pcrs))
+		"pcrCount", len(collectedPcrs))
 	return params, nil
+}
+
+func (f *AzureTDXFormatter) collectPCRValues(pcrs [][]byte, ids []uint32) (collectedPcrs [][]byte, bitmap uint32) {
+	sort.Slice(ids, func(i, j int) bool {
+		return ids[i] < ids[j]
+	})
+
+	collectedPcrs = make([][]byte, len(ids))
+	bitmap = uint32(0)
+	for i, id := range ids {
+		collectedPcrs[i] = pcrs[id]
+		bitmap = bitmap | (1 << uint32(id))
+	}
+
+	return collectedPcrs, bitmap
 }
