@@ -48,6 +48,7 @@ require (
 	github.com/swaggo/swag v1.16.4
 	github.com/testcontainers/testcontainers-go v0.35.0
 	github.com/urfave/cli/v2 v2.27.5
+	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa
 	golang.org/x/sync v0.16.0
 	gopkg.in/go-playground/assert.v1 v1.2.1
@@ -303,7 +304,6 @@ require (
 	go.uber.org/fx v1.23.0 // indirect
 	go.uber.org/mock v0.5.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/mod v0.26.0 // indirect
