@@ -9,18 +9,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/taikoxyz/taiko-mono/packages/prover-register/internal/logger"
+	"go.uber.org/zap"
 )
 
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
-	log        *logger.Logger
+	log        *zap.SugaredLogger
 }
 
 type GuestData map[string]interface{}
 
-func NewClient(baseURL string, log *logger.Logger) *Client {
+func NewClient(baseURL string, log *zap.SugaredLogger) *Client {
 	// Ensure baseURL has http:// prefix
 	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
 		baseURL = "http://" + baseURL
@@ -37,7 +37,7 @@ func NewClient(baseURL string, log *logger.Logger) *Client {
 
 func (c *Client) GetGuestData(ctx context.Context) (GuestData, error) {
 	url := fmt.Sprintf("%s/guest_data", c.baseURL)
-	c.log.Debug("fetching guest data", "url", url)
+	c.log.Debugw("fetching guest data", "url", url)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -75,7 +75,7 @@ func (c *Client) GetGuestData(ctx context.Context) (GuestData, error) {
 		data = dataArray[0]
 	}
 
-	c.log.Debug("successfully fetched guest data", "keys", getKeys(data))
+	c.log.Debugw("successfully fetched guest data", "keys", getKeys(data))
 	return data, nil
 }
 

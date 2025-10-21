@@ -7,14 +7,14 @@ import (
 
 	"github.com/google/go-tdx-guest/abi"
 	"github.com/google/go-tdx-guest/proto/tdx"
-	"github.com/taikoxyz/taiko-mono/packages/prover-register/internal/logger"
+	"go.uber.org/zap"
 )
 
 type TDXFormatter struct {
-	log *logger.Logger
+	log *zap.SugaredLogger
 }
 
-func NewTDXFormatter(log *logger.Logger) *TDXFormatter {
+func NewTDXFormatter(log *zap.SugaredLogger) *TDXFormatter {
 	return &TDXFormatter{log: log}
 }
 
@@ -124,7 +124,7 @@ func (f *TDXFormatter) ExtractTrustedParams(data *TDXProcessedData) (*TDXTrusted
 		RtMr3:     rtMr3[:],
 	}
 
-	f.log.Info("extracted trusted params successfully",
+	f.log.Infow("extracted trusted params successfully",
 		"teeTcbSvn", hex.EncodeToString(teeTcbSvn[:]),
 		"mrSeam", hex.EncodeToString(params.MrSeam),
 		"mrTd", hex.EncodeToString(params.MrTd),

@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/taikoxyz/taiko-mono/packages/prover-register/internal/logger"
+	"go.uber.org/zap"
 )
 
 type RISC0Formatter struct {
-	log *logger.Logger
+	log *zap.SugaredLogger
 }
 
-func NewRISC0Formatter(log *logger.Logger) *RISC0Formatter {
+func NewRISC0Formatter(log *zap.SugaredLogger) *RISC0Formatter {
 	return &RISC0Formatter{log: log}
 }
 

@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/taikoxyz/taiko-mono/packages/prover-register/internal/logger"
+	"go.uber.org/zap"
 )
 
 type SGXFormatter struct {
-	log *logger.Logger
+	log *zap.SugaredLogger
 }
 
-func NewSGXFormatter(log *logger.Logger) *SGXFormatter {
+func NewSGXFormatter(log *zap.SugaredLogger) *SGXFormatter {
 	return &SGXFormatter{log: log}
 }
 

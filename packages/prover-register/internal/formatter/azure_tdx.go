@@ -13,16 +13,16 @@ import (
 	"github.com/google/go-tdx-guest/proto/tdx"
 	tpmproto "github.com/google/go-tpm-tools/proto/tpm"
 	"github.com/google/go-tpm/legacy/tpm2"
-	"github.com/taikoxyz/taiko-mono/packages/prover-register/internal/logger"
+	"go.uber.org/zap"
 )
 
 var VERIFIABLE_PCRS = []uint32{4, 9, 11, 12, 13, 15}
 
 type AzureTDXFormatter struct {
-	log *logger.Logger
+	log *zap.SugaredLogger
 }
 
-func NewAzureTDXFormatter(log *logger.Logger) *AzureTDXFormatter {
+func NewAzureTDXFormatter(log *zap.SugaredLogger) *AzureTDXFormatter {
 	return &AzureTDXFormatter{log: log}
 }
 
@@ -124,7 +124,7 @@ func (f *AzureTDXFormatter) processAttestationData(doc *AttestationDocument, ins
 	// Decode HCL attestation key
 	hclAkPub, err := tpm2.DecodePublic(doc.Attestation.AkPub)
 	if err != nil {
-		f.log.Error("failed to decode HCL attestation key", "error", err)
+		f.log.Errorw("failed to decode HCL attestation key", "error", err)
 		return nil, fmt.Errorf("decode HCL attestation key: %w", err)
 	}
 
@@ -139,29 +139,29 @@ func (f *AzureTDXFormatter) processAttestationData(doc *AttestationDocument, ins
 	// Decode attestation report
 	decodedAttestationReport, err := instanceInfo.DecodeAttestationReport()
 	if err != nil {
-		f.log.Error("failed to decode attestation report", "error", err)
+		f.log.Errorw("failed to decode attestation report", "error", err)
 		return nil, fmt.Errorf("decode attestation report: %w", err)
 	}
 
 	// Convert quote to proto
 	quoteProto, err := abi.QuoteToProto(decodedAttestationReport)
 	if err != nil {
-		f.log.Error("failed to convert quote to proto", "error", err)
+		f.log.Errorw("failed to convert quote to proto", "error", err)
 		return nil, fmt.Errorf("convert quote to proto: %w", err)
 	}
-	f.log.Debug("converted quote to proto", "quote", quoteProto)
+	f.log.Debugw("converted quote to proto", "quote", quoteProto)
 
 	// Extract PCRs
 	pcrs, err := f.extractPCRs(sha256Quote)
 	if err != nil {
 		return nil, err
 	}
-	f.log.Debug("extracted PCR values", "count", TPMPCRCount)
+	f.log.Debugw("extracted PCR values", "count", TPMPCRCount)
 
 	// Decode TPM signature
 	decodedSig, err := tpm2.DecodeSignature(bytes.NewBuffer(sha256Quote.RawSig))
 	if err != nil {
-		f.log.Error("failed to decode TPM signature", "error", err)
+		f.log.Errorw("failed to decode TPM signature", "error", err)
 		return nil, fmt.Errorf("decode TPM signature: %w", err)
 	}
 
@@ -207,22 +207,22 @@ func (f *AzureTDXFormatter) decodeAdditionalData(inputData *AzureTDXInputData, d
 	if err != nil {
 		return nil, err
 	}
-	f.log.Debug("decoded attestation report", "size", len(attestationReport))
+	f.log.Debugw("decoded attestation report", "size", len(attestationReport))
 
 	runtimeData, err := instanceInfo.DecodeRuntimeData()
 	if err != nil {
 		return nil, err
 	}
-	f.log.Debug("decoded runtime data", "size", len(runtimeData))
+	f.log.Debugw("decoded runtime data", "size", len(runtimeData))
 
 	userData, err := doc.DecodeUserData()
 	if err != nil {
 		return nil, err
 	}
-	f.log.Debug("decoded user data", "size", len(userData))
+	f.log.Debugw("decoded user data", "size", len(userData))
 
 	runtimeDataHash := sha256.Sum256(runtimeData)
-	f.log.Debug("computed runtime data hash", "hash", hex.EncodeToString(runtimeDataHash[:]))
+	f.log.Debugw("computed runtime data hash", "hash", hex.EncodeToString(runtimeDataHash[:]))
 
 	return &decodedAdditionalData{
 		attestationReport: attestationReport,
@@ -333,7 +333,7 @@ func (f *AzureTDXFormatter) ExtractTrustedParams(data *AzureTDXProcessedData) (*
 		Pcrs:      collectedPcrs,
 	}
 
-	f.log.Info("extracted trusted params successfully",
+	f.log.Infow("extracted trusted params successfully",
 		"teeTcbSvn", hex.EncodeToString(teeTcbSvn[:]),
 		"pcrBitmap", fmt.Sprintf("0x%x", bitmap),
 		"mrSeam", hex.EncodeToString(mrSeam[:]),

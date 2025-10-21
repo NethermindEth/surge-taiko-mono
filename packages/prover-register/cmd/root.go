@@ -31,6 +31,8 @@ var (
 	envFile          string
 	dryRun           bool
 	dryRunAsOwner    bool
+	logJSON          bool
+	logDebug         bool
 )
 
 var rootCmd = &cobra.Command{
@@ -57,6 +59,8 @@ func init() {
 	rootCmd.Flags().StringVar(&envFile, "env", ".env", "Environment file path")
 	rootCmd.Flags().BoolVar(&dryRun, "dry", false, "Dry run mode - simulate transactions without sending")
 	rootCmd.Flags().BoolVar(&dryRunAsOwner, "dry-as-owner", false, "Dry run mode simulating as contract owner")
+	rootCmd.Flags().BoolVar(&logJSON, "log.json", false, "Output logs in JSON format")
+	rootCmd.Flags().BoolVar(&logDebug, "log.debug", false, "Enable debug logging")
 
 	rootCmd.MarkFlagRequired("verifier")
 	rootCmd.MarkFlagRequired("type")
@@ -80,7 +84,11 @@ func initConfig() {
 }
 
 func runRegister(cmd *cobra.Command, args []string) error {
-	log := logger.NewJSONLogger()
+	log, err := logger.NewLogger(logJSON, logDebug)
+	if err != nil {
+		return fmt.Errorf("failed to initialize logger: %w", err)
+	}
+	defer log.Sync()
 	ctx := context.Background()
 
 	// If --dry-as-owner is set, automatically enable dry run
@@ -88,7 +96,7 @@ func runRegister(cmd *cobra.Command, args []string) error {
 		dryRun = true
 	}
 
-	log.Info("starting registration process",
+	log.Infow("starting registration process",
 		"verifier", verifierAddress,
 		"type", verifierType,
 		"prover", proverAddress,
@@ -131,7 +139,7 @@ func runRegister(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get guest data: %w", err)
 	}
 
-	log.Debug("received guest data", "data", guestData)
+	log.Debugw("received guest data", "data", guestData)
 
 	// Process guest data based on verifier type
 	var processedData interface{}

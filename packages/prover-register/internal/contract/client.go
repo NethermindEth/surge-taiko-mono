@@ -15,21 +15,21 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/taikoxyz/taiko-mono/packages/prover-register/internal/formatter"
-	"github.com/taikoxyz/taiko-mono/packages/prover-register/internal/logger"
+	"go.uber.org/zap"
 )
 
 type Client struct {
 	ethClient       *ethclient.Client
 	verifierAddress common.Address
 	privateKey      *ecdsa.PrivateKey
-	log             *logger.Logger
+	log             *zap.SugaredLogger
 	chainID         *big.Int
 	address         common.Address
 	dryRun          bool
 	dryRunAsOwner   bool
 }
 
-func NewClient(ethClient *ethclient.Client, verifierAddress common.Address, privateKey *ecdsa.PrivateKey, log *logger.Logger, dryRun bool, dryRunAsOwner bool) (*Client, error) {
+func NewClient(ethClient *ethclient.Client, verifierAddress common.Address, privateKey *ecdsa.PrivateKey, log *zap.SugaredLogger, dryRun bool, dryRunAsOwner bool) (*Client, error) {
 	chainID, err := ethClient.ChainID(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chain ID: %w", err)
@@ -159,7 +159,7 @@ func (c *Client) trustTDXCollateral(ctx context.Context, data *formatter.TDXProc
 	if c.dryRun {
 		c.log.Info("[DRY RUN] Raw TDX collateral would be trusted")
 	} else {
-		c.log.Info("raw TDX collateral trusted", "tx", txHash.Hex())
+		c.log.Infow("raw TDX collateral trusted", "tx", txHash.Hex())
 	}
 	return nil
 }
@@ -239,7 +239,7 @@ func (c *Client) trustAzureTDXCollateral(ctx context.Context, data *formatter.Az
 	if c.dryRun {
 		c.log.Info("[DRY RUN] Azure TDX collateral would be trusted")
 	} else {
-		c.log.Info("Azure TDX collateral trusted", "tx", txHash.Hex())
+		c.log.Infow("Azure TDX collateral trusted", "tx", txHash.Hex())
 	}
 	return nil
 }
@@ -296,7 +296,7 @@ func (c *Client) registerTDXInstance(ctx context.Context, data *formatter.TDXPro
 	if c.dryRun {
 		c.log.Info("[DRY RUN] Raw TDX instance would be registered")
 	} else {
-		c.log.Info("raw TDX instance registered", "tx", txHash.Hex())
+		c.log.Infow("raw TDX instance registered", "tx", txHash.Hex())
 	}
 	return nil
 }
@@ -425,14 +425,14 @@ func (c *Client) registerAzureTDXInstance(ctx context.Context, data *formatter.A
 	if c.dryRun {
 		c.log.Info("[DRY RUN] Azure TDX instance would be registered")
 	} else {
-		c.log.Info("Azure TDX instance registered", "tx", txHash.Hex())
+		c.log.Infow("Azure TDX instance registered", "tx", txHash.Hex())
 	}
 	return nil
 }
 
 // SGX specific methods
 func (c *Client) trustSGXCollateral(ctx context.Context, data *formatter.SGXProcessedData) error {
-	c.log.Info("SGX doesn't require explicit collateral trust", "mr_enclave", data.MrEnclave)
+	c.log.Infow("SGX doesn't require explicit collateral trust", "mr_enclave", data.MrEnclave)
 	// SGX verifier doesn't have a separate trust collateral step
 	// The trust is established through the attestation process
 	return nil
@@ -475,7 +475,7 @@ func (c *Client) registerSGXInstance(ctx context.Context, data *formatter.SGXPro
 		return fmt.Errorf("failed to send transaction: %w", err)
 	}
 
-	c.log.Info("SGX instance registered", "tx", txHash.Hex())
+	c.log.Infow("SGX instance registered", "tx", txHash.Hex())
 	return nil
 }
 
@@ -512,7 +512,7 @@ func (c *Client) trustSP1Collateral(ctx context.Context, data *formatter.SP1Proc
 	if err != nil {
 		return fmt.Errorf("failed to trust aggregation program: %w", err)
 	}
-	c.log.Info("SP1 aggregation program trusted", "tx", txHash.Hex(), "hash", data.AggregationProgramHash)
+	c.log.Infow("SP1 aggregation program trusted", "tx", txHash.Hex(), "hash", data.AggregationProgramHash)
 
 	// Trust block program
 	callData, err = parsedABI.Pack("setProgramTrusted", blockHash, true)
@@ -524,7 +524,7 @@ func (c *Client) trustSP1Collateral(ctx context.Context, data *formatter.SP1Proc
 	if err != nil {
 		return fmt.Errorf("failed to trust block program: %w", err)
 	}
-	c.log.Info("SP1 block program trusted", "tx", txHash.Hex(), "hash", data.BlockProgramHash)
+	c.log.Infow("SP1 block program trusted", "tx", txHash.Hex(), "hash", data.BlockProgramHash)
 
 	return nil
 }
@@ -573,7 +573,7 @@ func (c *Client) trustRISC0Collateral(ctx context.Context, data *formatter.RISC0
 	if err != nil {
 		return fmt.Errorf("failed to trust aggregation image: %w", err)
 	}
-	c.log.Info("RISC0 aggregation image trusted", "tx", txHash.Hex(), "hash", data.AggregationProgramHash)
+	c.log.Infow("RISC0 aggregation image trusted", "tx", txHash.Hex(), "hash", data.AggregationProgramHash)
 
 	// Trust block image
 	callData, err = parsedABI.Pack("setImageIdTrusted", blockHash, true)
@@ -585,7 +585,7 @@ func (c *Client) trustRISC0Collateral(ctx context.Context, data *formatter.RISC0
 	if err != nil {
 		return fmt.Errorf("failed to trust block image: %w", err)
 	}
-	c.log.Info("RISC0 block image trusted", "tx", txHash.Hex(), "hash", data.BlockProgramHash)
+	c.log.Infow("RISC0 block image trusted", "tx", txHash.Hex(), "hash", data.BlockProgramHash)
 
 	return nil
 }
@@ -648,7 +648,7 @@ func (c *Client) sendTransaction(ctx context.Context, callData []byte) (common.H
 		return common.Hash{}, fmt.Errorf("failed to send transaction: %w", err)
 	}
 
-	c.log.Info("transaction sent", "hash", signedTx.Hash().Hex())
+	c.log.Infow("transaction sent", "hash", signedTx.Hash().Hex())
 
 	// Wait for receipt
 	receipt, err := c.waitForReceipt(ctx, signedTx.Hash())
@@ -671,10 +671,10 @@ func (c *Client) simulateTransaction(ctx context.Context, callData []byte) (comm
 	if c.dryRunAsOwner {
 		ownerAddress, err := c.getContractOwner(ctx)
 		if err != nil {
-			c.log.Warn("[DRY RUN] Could not fetch contract owner, using zero address", "error", err)
+			c.log.Warnw("[DRY RUN] Could not fetch contract owner, using zero address", "error", err)
 			ownerAddress = common.Address{}
 		} else {
-			c.log.Info("[DRY RUN] Simulating as owner", "owner", ownerAddress.Hex())
+			c.log.Infow("[DRY RUN] Simulating as owner", "owner", ownerAddress.Hex())
 		}
 		msg = ethereum.CallMsg{
 			From: ownerAddress,
@@ -693,19 +693,19 @@ func (c *Client) simulateTransaction(ctx context.Context, callData []byte) (comm
 	gasLimit, err := c.ethClient.EstimateGas(ctx, msg)
 	if err != nil {
 		// If gas estimation fails, try the call anyway to get more details
-		c.log.Warn("[DRY RUN] Gas estimation failed, attempting call anyway", "error", err)
+		c.log.Warnw("[DRY RUN] Gas estimation failed, attempting call anyway", "error", err)
 		gasLimit = uint64(0)
 	}
 
 	// Perform the call to check if it would succeed
 	result, err := c.ethClient.CallContract(ctx, msg, nil)
 	if err != nil {
-		c.log.Error("[DRY RUN] Call failed", "error", err, "from", msg.From.Hex())
+		c.log.Errorw("[DRY RUN] Call failed", "error", err, "from", msg.From.Hex())
 		return common.Hash{}, fmt.Errorf("[DRY RUN] call failed (simulating as %s): %w", msg.From.Hex(), err)
 	}
 
 	// Log simulation results
-	c.log.Info("[DRY RUN] Transaction simulation successful",
+	c.log.Infow("[DRY RUN] Transaction simulation successful",
 		"simulatedFrom", msg.From.Hex(),
 		"estimatedGas", gasLimit,
 		"callDataSize", len(callData),

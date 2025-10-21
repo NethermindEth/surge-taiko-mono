@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/taikoxyz/taiko-mono/packages/prover-register/internal/logger"
+	"go.uber.org/zap"
 )
 
 type SP1Formatter struct {
-	log *logger.Logger
+	log *zap.SugaredLogger
 }
 
-func NewSP1Formatter(log *logger.Logger) *SP1Formatter {
+func NewSP1Formatter(log *zap.SugaredLogger) *SP1Formatter {
 	return &SP1Formatter{log: log}
 }
 

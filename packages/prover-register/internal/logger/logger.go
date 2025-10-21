@@ -1,61 +1,46 @@
 package logger
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"time"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
-type Logger struct {
-	output *json.Encoder
-}
+// NewLogger creates a new zap logger with the specified configuration
+func NewLogger(json bool, debug bool) (*zap.SugaredLogger, error) {
+	var config zap.Config
 
-func NewJSONLogger() *Logger {
-	return &Logger{
-		output: json.NewEncoder(os.Stderr),
-	}
-}
-
-func (l *Logger) log(level string, msg string, fields ...interface{}) {
-	entry := map[string]interface{}{
-		"time":  time.Now().Format(time.RFC3339),
-		"level": level,
-		"msg":   msg,
+	if json {
+		config = zap.NewProductionConfig()
+		config.EncoderConfig.TimeKey = "time"
+		config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	} else {
+		config = zap.NewDevelopmentConfig()
+		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		config.Development = true
 	}
 
-	// Add fields as key-value pairs
-	for i := 0; i < len(fields)-1; i += 2 {
-		if key, ok := fields[i].(string); ok {
-			entry[key] = fields[i+1]
-		}
+	if debug {
+		config.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+	} else {
+		config.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
 	}
 
-	l.output.Encode(entry)
+	logger, err := config.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	return logger.Sugar(), nil
 }
 
-func (l *Logger) Info(msg string, fields ...interface{}) {
-	l.log("info", msg, fields...)
+// NewJSONLogger creates a production JSON logger
+func NewJSONLogger() *zap.SugaredLogger {
+	logger, _ := NewLogger(true, false)
+	return logger
 }
 
-func (l *Logger) Error(msg string, fields ...interface{}) {
-	l.log("error", msg, fields...)
-}
-
-func (l *Logger) Debug(msg string, fields ...interface{}) {
-	l.log("debug", msg, fields...)
-}
-
-func (l *Logger) Warn(msg string, fields ...interface{}) {
-	l.log("warn", msg, fields...)
-}
-
-func (l *Logger) Fatal(msg string, fields ...interface{}) {
-	l.log("fatal", msg, fields...)
-	os.Exit(1)
-}
-
-// Printf for compatibility with standard logger interface
-func (l *Logger) Printf(format string, v ...interface{}) {
-	l.Info(fmt.Sprintf(format, v...))
+// NewDevelopmentLogger creates a development console logger
+func NewDevelopmentLogger() *zap.SugaredLogger {
+	logger, _ := NewLogger(false, true)
+	return logger
 }
