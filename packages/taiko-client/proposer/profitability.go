@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
@@ -30,7 +31,7 @@ func (p *Proposer) isProfitable(
 ) (bool, bool, error) {
 	estimatedCost, err := p.costEstimator.estimateL1Cost(ctx, candidate)
 	if err != nil {
-		return false, false, fmt.Errorf("failed to estimate L2 cost: %w", err)
+		return false, false, fmt.Errorf("failed to estimate L1 cost: %w", err)
 	}
 
 	// Compute collected fees for the original batch/base fee
@@ -253,45 +254,12 @@ type txWithBaseFee struct {
 	gas     uint64
 }
 
-// sortTxsByBaseFeeDesc sorts transactions by base fee in descending order using quicksort.
-// This is O(n log n) on average, much better than O(n²) bubble sort for large datasets.
-func (p *Proposer) sortTxsByBaseFeeDesc(txs []txWithBaseFee) {
-	if len(txs) <= 1 {
-		return
-	}
-	p.quickSortDesc(txs, 0, len(txs)-1)
-}
-
-// quickSortDesc implements quicksort for descending order
-func (p *Proposer) quickSortDesc(txs []txWithBaseFee, low, high int) {
-	if low < high {
-		pivotIdx := p.partitionDesc(txs, low, high)
-		p.quickSortDesc(txs, low, pivotIdx-1)
-		p.quickSortDesc(txs, pivotIdx+1, high)
-	}
-}
-
-// partitionDesc partitions the array for quicksort (descending order)
-func (p *Proposer) partitionDesc(txs []txWithBaseFee, low, high int) int {
-	pivot := txs[high].baseFee
-	i := low - 1
-
-	for j := low; j < high; j++ {
-		// For descending order: if current element is greater than pivot
-		if txs[j].baseFee.Cmp(pivot) > 0 {
-			i++
-			txs[i], txs[j] = txs[j], txs[i]
-		}
-	}
-	txs[i+1], txs[high] = txs[high], txs[i+1]
-	return i + 1
-}
-
 // findOptimalBaseFeeThreshold finds the optimal base fee threshold that maximizes collected fees.
-// This algorithm is O(n log n) where n is the number of transactions:
+// This algorithm has complexity:
 // - O(n) to flatten and extract base fees
 // - O(n log n) to sort transactions by base fee
-// - O(n) to find the optimal threshold in a single pass
+// - O(n^2) to find the optimal threshold
+// Total: O(n^2) where n is the number of transactions
 // Returns the optimal base fee and the collected fees at that threshold.
 func (p *Proposer) findOptimalBaseFeeThreshold(txBatch []types.Transactions) (*big.Int, *big.Int) {
 	// Flatten all transactions into a single slice with their base fees
@@ -317,24 +285,23 @@ func (p *Proposer) findOptimalBaseFeeThreshold(txBatch []types.Transactions) (*b
 	}
 
 	// Sort transactions by base fee in descending order (highest first)
-	// Using quicksort-based approach for O(n log n) performance
-	p.sortTxsByBaseFeeDesc(allTxs)
+	sort.Slice(allTxs, func(i, j int) bool {
+		return allTxs[i].baseFee.Cmp(allTxs[j].baseFee) > 0
+	})
 
-	// Now iterate through sorted transactions to find optimal threshold
-	// Key insight: if we set base fee to tx[i].baseFee, we include tx[0..i]
-	// Collected fees = (baseFee * proposerSharePct + avgTip) * sum(gas[0..i])
 	baseFeeSharePct := p.protocolConfigs.BaseFeeConfig().SharingPctg
-
 	var bestBaseFee *big.Int
 	bestCollectedFees := big.NewInt(0)
 	cumulativeGas := uint64(0)
 
+	// Now iterate through sorted transactions to find optimal threshold
+	// Key insight: if we set base fee to tx[i].baseFee, we include tx[0..i]
+	// Collected fees = (baseFee * proposerSharePct + avgTip) * sum(gas[0..i])
 	for i := 0; i < len(allTxs); i++ {
 		cumulativeGas += allTxs[i].gas
-		currentBaseFee := allTxs[i].baseFee
-
 		// Calculate collected fees if we use this base fee as threshold
 		// All transactions from 0 to i have baseFee >= currentBaseFee
+		currentBaseFee := allTxs[i].baseFee
 
 		// Calculate total revenue from base fees (proposer share)
 		baseFeeForProposer := new(big.Int).Mul(

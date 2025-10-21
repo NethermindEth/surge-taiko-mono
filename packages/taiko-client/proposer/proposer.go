@@ -420,7 +420,7 @@ func (p *Proposer) monitorBridgeMessages() {
 			// Get transaction details
 			tx, isPending, err := p.rpc.L1.TransactionByHash(p.ctx, txHash)
 			if err != nil {
-				log.Error("Failed to get transaction details", "hash", txHash, "error", err)
+				log.Warn("Failed to get transaction details", "hash", txHash, "error", err)
 				continue
 			}
 
