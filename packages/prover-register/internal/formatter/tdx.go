@@ -98,25 +98,21 @@ func (f *TDXFormatter) ExtractTrustedParams(data *TDXProcessedData) (*TDXTrusted
 		copy(teeTcbSvn[:], body.TeeTcbSvn)
 	}
 
-	// Extract individual RTMRs (Runtime Measurement Registers)
-	// TDX has 4 RTMRs, each 48 bytes
+	if len(body.Rtmrs) != 4 {
+		return nil, fmt.Errorf("RTMRs is not 4")
+	}
+
+	for i, rtMr := range body.Rtmrs {
+		if len(rtMr) != 48 {
+			return nil, fmt.Errorf("RTMR %d is not 48 bytes", i)
+		}
+	}
+
 	var rtMr0, rtMr1, rtMr2, rtMr3 []byte
-	if len(body.Rtmrs) >= 1 && len(body.Rtmrs[0]) == 48 {
-		rtMr0 = make([]byte, 48)
-		copy(rtMr0, body.Rtmrs[0])
-	}
-	if len(body.Rtmrs) >= 2 && len(body.Rtmrs[1]) == 48 {
-		rtMr1 = make([]byte, 48)
-		copy(rtMr1, body.Rtmrs[1])
-	}
-	if len(body.Rtmrs) >= 3 && len(body.Rtmrs[2]) == 48 {
-		rtMr2 = make([]byte, 48)
-		copy(rtMr2, body.Rtmrs[2])
-	}
-	if len(body.Rtmrs) >= 4 && len(body.Rtmrs[3]) == 48 {
-		rtMr3 = make([]byte, 48)
-		copy(rtMr3, body.Rtmrs[3])
-	}
+	copy(rtMr0, body.Rtmrs[0])
+	copy(rtMr1, body.Rtmrs[1])
+	copy(rtMr2, body.Rtmrs[2])
+	copy(rtMr3, body.Rtmrs[3])
 
 	params := &TDXTrustedParams{
 		TeeTcbSvn: teeTcbSvn,
