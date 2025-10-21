@@ -296,8 +296,8 @@ func (f *AzureTDXFormatter) ExtractTrustedParams(data *AzureTDXProcessedData) (*
 
 	// Extract measurements from the TD quote body
 	var teeTcbSvn [16]byte
-	var mrSeam []byte
-	var mrTd []byte
+	var mrSeam [48]byte
+	var mrTd [48]byte
 
 	if quoteV4.TdQuoteBody == nil {
 		return nil, fmt.Errorf("TDQuoteBody is nil")
@@ -313,8 +313,8 @@ func (f *AzureTDXFormatter) ExtractTrustedParams(data *AzureTDXProcessedData) (*
 	}
 
 	copy(teeTcbSvn[:], quoteV4.TdQuoteBody.TeeTcbSvn)
-	copy(mrSeam, quoteV4.TdQuoteBody.MrSeam)
-	copy(mrTd, quoteV4.TdQuoteBody.MrTd)
+	copy(mrSeam[:], quoteV4.TdQuoteBody.MrSeam)
+	copy(mrTd[:], quoteV4.TdQuoteBody.MrTd)
 
 	var pcrs = make([][]byte, 24)
 	for _, pcr := range data.Pcrs {
@@ -328,16 +328,16 @@ func (f *AzureTDXFormatter) ExtractTrustedParams(data *AzureTDXProcessedData) (*
 	params := &AzureTDXTrustedParams{
 		TeeTcbSvn: teeTcbSvn,
 		PcrBitmap: bitmap,
-		MrSeam:    mrSeam,
-		MrTd:      mrTd,
+		MrSeam:    mrSeam[:],
+		MrTd:      mrTd[:],
 		Pcrs:      collectedPcrs,
 	}
 
 	f.log.Info("extracted trusted params successfully",
 		"teeTcbSvn", hex.EncodeToString(teeTcbSvn[:]),
 		"pcrBitmap", fmt.Sprintf("0x%x", bitmap),
-		"mrSeam", hex.EncodeToString(mrSeam),
-		"mrTd", hex.EncodeToString(mrTd),
+		"mrSeam", hex.EncodeToString(mrSeam[:]),
+		"mrTd", hex.EncodeToString(mrTd[:]),
 		"pcrCount", len(collectedPcrs))
 	return params, nil
 }

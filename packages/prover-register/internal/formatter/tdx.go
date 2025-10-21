@@ -108,20 +108,20 @@ func (f *TDXFormatter) ExtractTrustedParams(data *TDXProcessedData) (*TDXTrusted
 		}
 	}
 
-	var rtMr0, rtMr1, rtMr2, rtMr3 []byte
-	copy(rtMr0, body.Rtmrs[0])
-	copy(rtMr1, body.Rtmrs[1])
-	copy(rtMr2, body.Rtmrs[2])
-	copy(rtMr3, body.Rtmrs[3])
+	var rtMr0, rtMr1, rtMr2, rtMr3 [48]byte
+	copy(rtMr0[:], body.Rtmrs[0])
+	copy(rtMr1[:], body.Rtmrs[1])
+	copy(rtMr2[:], body.Rtmrs[2])
+	copy(rtMr3[:], body.Rtmrs[3])
 
 	params := &TDXTrustedParams{
 		TeeTcbSvn: teeTcbSvn,
 		MrSeam:    body.MrSeam,
 		MrTd:      body.MrTd,
-		RtMr0:     rtMr0,
-		RtMr1:     rtMr1,
-		RtMr2:     rtMr2,
-		RtMr3:     rtMr3,
+		RtMr0:     rtMr0[:],
+		RtMr1:     rtMr1[:],
+		RtMr2:     rtMr2[:],
+		RtMr3:     rtMr3[:],
 	}
 
 	f.log.Info("extracted trusted params successfully",
