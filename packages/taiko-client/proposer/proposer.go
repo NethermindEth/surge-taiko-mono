@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/ethereum-optimism/optimism/op-service/eth"
-
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -63,6 +61,9 @@ type Proposer struct {
 	wg  sync.WaitGroup
 
 	checkProfitability bool
+
+	// Cost estimator for profitability checks (can be mocked in tests)
+	costEstimator CostEstimator
 
 	// Signal-based force proposing
 	signalServiceAddress      common.Address
@@ -117,6 +118,11 @@ func (p *Proposer) InitFromConfig(
 		return fmt.Errorf("failed to get protocol configs: %w", err)
 	}
 	config.ReportProtocolConfigs(p.protocolConfigs)
+
+	// Initialize cost estimator with default implementation (can be overridden in tests)
+	if p.costEstimator == nil {
+		p.costEstimator = p
+	}
 
 	if txMgr == nil {
 		if txMgr, err = txmgr.NewSimpleTxManager(
@@ -308,7 +314,7 @@ func (p *Proposer) shouldForcePropose() (bool, string) {
 func (p *Proposer) resetSignalForcePropose(isSignalForcePropose bool) {
 	p.signalMu.Lock()
 	defer p.signalMu.Unlock()
-	
+
 	hadPendingSignal := p.pendingSignalForcePropose
 	p.pendingSignalForcePropose = false
 
@@ -414,7 +420,7 @@ func (p *Proposer) monitorBridgeMessages() {
 			// Get transaction details
 			tx, isPending, err := p.rpc.L1.TransactionByHash(p.ctx, txHash)
 			if err != nil {
-				log.Error("Failed to get transaction details", "hash", txHash, "error", err)
+				log.Warn("Failed to get transaction details", "hash", txHash, "error", err)
 				continue
 			}
 
@@ -706,7 +712,10 @@ func (p *Proposer) ProposeTxListPacaya(
 
 	// Check profitability if enabled, but bypass check when force proposing due to signal
 	if p.checkProfitability && !isSignalForcePropose {
-		profitable, err := p.isProfitable(ctx, txBatch, l2BaseFee, txCandidate, txs)
+		originalBaseFee := new(big.Int).Set(l2BaseFee)
+		originalTxCount := txs
+
+		profitable, baseFeeAdjusted, err := p.isProfitable(ctx, &txBatch, &l2BaseFee, txCandidate, &txs)
 		if err != nil {
 			return err
 		}
@@ -717,6 +726,32 @@ func (p *Proposer) ProposeTxListPacaya(
 				"l2BaseFee", utils.WeiToEther(l2BaseFee),
 			)
 			return nil
+		}
+
+		// If profitability check adjusted the base fee and filtered transactions, rebuild the transaction candidate
+		if baseFeeAdjusted {
+			log.Info("Rebuilding transaction with adjusted base fee",
+				"originalBaseFee", utils.WeiToEther(originalBaseFee),
+				"adjustedBaseFee", utils.WeiToEther(l2BaseFee),
+				"originalTxCount", originalTxCount,
+				"filteredTxCount", txs,
+			)
+
+			// Rebuild the transaction candidate with filtered transactions and adjusted base fee
+			txCandidate, err = p.txBuilder.BuildPacaya(
+				ctx,
+				txBatch,
+				forcedInclusion,
+				minTxsPerForcedInclusion,
+				parentMetaHash,
+				l2BaseFee,
+			)
+			if err != nil {
+				log.Warn("Failed to rebuild TaikoInbox.proposeBatch transaction with adjusted base fee",
+					"error",
+					encoding.TryParsingCustomError(err))
+				return err
+			}
 		}
 	} else if isSignalForcePropose {
 		log.Info("Bypassing profitability check for signal-based force propose")
@@ -743,130 +778,6 @@ func (p *Proposer) ProposeTxListPacaya(
 	metrics.ProposerProposedTxsCounter.Add(float64(txs))
 
 	return nil
-}
-
-func (p *Proposer) isProfitable(
-	ctx context.Context,
-	txBatch []types.Transactions,
-	l2BaseFee *big.Int,
-	candidate *txmgr.TxCandidate,
-	txs uint64,
-) (bool, error) {
-	estimatedCost, err := p.estimateL2Cost(ctx, candidate)
-	if err != nil {
-		return false, fmt.Errorf("failed to estimate L2 cost: %w", err)
-	}
-
-	collectedFees := p.computeL2Fees(txBatch, l2BaseFee)
-
-	isProfitable := collectedFees.Cmp(estimatedCost) >= 0
-
-	log.Info("Profitability check",
-		"estimatedCost", utils.WeiToEther(estimatedCost),
-		"collectedFees", utils.WeiToEther(collectedFees),
-		"isProfitable", isProfitable,
-		"l2BaseFee", utils.WeiToEther(l2BaseFee),
-		"numBatches", len(txBatch),
-		"numTransactions", txs,
-	)
-
-	return isProfitable, nil
-}
-
-func (p *Proposer) estimateL2Cost(
-	ctx context.Context,
-	candidate *txmgr.TxCandidate,
-) (*big.Int, error) {
-	// Fetch the latest L1 base fee
-	feeHistory, err := p.rpc.L1.FeeHistory(ctx, 1, nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get L1 base fee: %w", err)
-	}
-
-	if len(feeHistory.BaseFee) == 0 {
-		return nil, fmt.Errorf("no base fee data available")
-	}
-	l1BaseFee := feeHistory.BaseFee[len(feeHistory.BaseFee)-1]
-
-	blobBaseFee := new(big.Int)
-	costWithBlobs := new(big.Int)
-	costWithCalldata := new(big.Int)
-	totalCost := new(big.Int)
-
-	// If blobs are used, calculate batch posting cost with blobs
-	if len(candidate.Blobs) > 0 {
-		blobBaseFee, err = p.rpc.L1.BlobBaseFee(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get L1 blob base fee: %w", err)
-		}
-
-		costWithBlobs = new(big.Int).Mul(
-			new(big.Int).SetUint64(p.BatchPostingGasWithBlobs),
-			l1BaseFee,
-		)
-
-		costOfBlobs := new(big.Int).Mul(
-			blobBaseFee,
-			big.NewInt(eth.BlobSize*int64(len(candidate.Blobs))),
-		)
-
-		costWithBlobs = new(big.Int).Add(
-			costWithBlobs,
-			costOfBlobs,
-		)
-		totalCost = costWithBlobs
-	} else {
-		// Calculate batch posting cost with calldata
-		costWithCalldata = new(big.Int).Mul(
-			big.NewInt(int64(p.BatchPostingGasWithCalldata)),
-			l1BaseFee,
-		)
-		totalCost = costWithCalldata
-	}
-
-	// Add proving and proof posting cost
-	totalCost.Add(totalCost, p.ProvingCostPerL2Batch)
-	proofPostingCost := new(big.Int).Mul(
-		big.NewInt(int64(p.ProofPostingGas)),
-		l1BaseFee,
-	)
-	totalCost = new(big.Int).Add(totalCost, proofPostingCost)
-
-	log.Info("L2 cost estimation",
-		"l1BaseFee", utils.WeiToEther(l1BaseFee),
-		"costWithCalldata", utils.WeiToEther(costWithCalldata),
-		"costWithBlobs", utils.WeiToEther(costWithBlobs),
-		"blobBaseFee", utils.WeiToEther(blobBaseFee),
-		"proofPostingCost", utils.WeiToEther(proofPostingCost),
-		"provingCostPerL2Batch", utils.WeiToEther(p.ProvingCostPerL2Batch),
-		"totalCost", utils.WeiToEther(totalCost),
-	)
-
-	return totalCost, nil
-}
-
-func (p *Proposer) computeL2Fees(txBatch []types.Transactions, l2BaseFee *big.Int) *big.Int {
-	baseFeeForProposer := p.getPercentageFromBaseFeeToTheProposer(l2BaseFee)
-
-	collectedFees := new(big.Int)
-	for _, txs := range txBatch {
-		for _, tx := range txs {
-			gasConsumed := big.NewInt(int64(tx.Gas()))
-			expectedFee := new(big.Int).Mul(gasConsumed, baseFeeForProposer)
-			collectedFees.Add(collectedFees, expectedFee)
-		}
-	}
-
-	return collectedFees
-}
-
-func (p *Proposer) getPercentageFromBaseFeeToTheProposer(num *big.Int) *big.Int {
-	if p.protocolConfigs.BaseFeeConfig().SharingPctg == 0 {
-		return big.NewInt(0)
-	}
-
-	result := new(big.Int).Mul(num, big.NewInt(int64(p.protocolConfigs.BaseFeeConfig().SharingPctg)))
-	return new(big.Int).Div(result, big.NewInt(100))
 }
 
 func retryOnError(operation func() error, retryon string, maxRetries int, delay time.Duration) error {
