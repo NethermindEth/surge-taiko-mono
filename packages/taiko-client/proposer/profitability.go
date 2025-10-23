@@ -36,6 +36,7 @@ func (p *Proposer) isProfitable(
 
 	// Compute collected fees for the original batch/base fee
 	originalCollectedFees := p.computeL2Fees(*txBatch, *l2BaseFee)
+	collectedFees := originalCollectedFees
 
 	log.Info("Profitability check (standard base fee)",
 		"estimatedCost", utils.WeiToEther(estimatedCost),
@@ -45,25 +46,23 @@ func (p *Proposer) isProfitable(
 		"numTransactions", *txs,
 	)
 
-	// We'll keep track of the best option found (highest collected fees)
-	bestCollectedFees := new(big.Int).Set(originalCollectedFees)
-	bestTxBatch := *txBatch
-	bestL2BaseFee := new(big.Int).Set(*l2BaseFee)
-	bestTxs := *txs
-	bestAdjusted := false
-
-	// Use optimized algorithm to find the best base fee threshold
-	// This is O(n log n) instead of O(n²)
+	// Try to find a better base fee threshold
 	optimalBaseFee, optimalCollectedFees := p.findOptimalBaseFeeThreshold(*txBatch)
+	baseFeeAdjusted := false
 
-	if optimalBaseFee != nil && optimalCollectedFees.Cmp(bestCollectedFees) > 0 {
+	if optimalBaseFee != nil && optimalCollectedFees.Cmp(originalCollectedFees) > 0 {
 		// Filter transactions with the optimal base fee
 		filteredTxBatch := p.filterTxsByBaseFee(*txBatch, optimalBaseFee)
 		filteredTxCount := countTxsInBatch(filteredTxBatch)
 
-		// Calculate improvement percentage
-		improvementPct := float64(optimalCollectedFees.Int64()-originalCollectedFees.Int64()) * 100 /
-			float64(originalCollectedFees.Int64())
+		// Calculate improvement percentage using big.Float to avoid int64 overflow
+		optimalFloat := new(big.Float).SetInt(optimalCollectedFees)
+		originalFloat := new(big.Float).SetInt(originalCollectedFees)
+		diff := new(big.Float).Sub(optimalFloat, originalFloat)
+		improvementPct, _ := new(big.Float).Quo(
+			new(big.Float).Mul(diff, big.NewFloat(100)),
+			originalFloat,
+		).Float64()
 
 		log.Info("Found better base fee threshold using optimized algorithm",
 			"optimalBaseFee", utils.WeiToEther(optimalBaseFee),
@@ -74,34 +73,27 @@ func (p *Proposer) isProfitable(
 			"improvement", fmt.Sprintf("%.2f%%", improvementPct),
 		)
 
-		bestCollectedFees.Set(optimalCollectedFees)
-		bestTxBatch = filteredTxBatch
-		bestL2BaseFee.Set(optimalBaseFee)
-		bestTxs = filteredTxCount
-		bestAdjusted = true
-	}
-
-	// Apply the best found batch/base fee
-	if bestAdjusted {
 		log.Info("Selecting adjusted batch/baseFee as it yields higher collected fees",
-			"bestCollectedFees", utils.WeiToEther(bestCollectedFees),
+			"optimalCollectedFees", utils.WeiToEther(optimalCollectedFees),
 			"estimatedCost", utils.WeiToEther(estimatedCost),
-			"bestL2BaseFee", utils.WeiToEther(bestL2BaseFee),
+			"optimalBaseFee", utils.WeiToEther(optimalBaseFee),
 			"originalCollectedFees", utils.WeiToEther(originalCollectedFees),
 			"originalL2BaseFee", utils.WeiToEther(*l2BaseFee),
 			"originalTxCount", *txs,
-			"bestTxCount", bestTxs,
+			"filteredTxCount", filteredTxCount,
 		)
 
-		// Modify the references in-place to the best option
-		*txBatch = bestTxBatch
-		*l2BaseFee = bestL2BaseFee
-		*txs = bestTxs
+		// Apply the optimal configuration
+		*txBatch = filteredTxBatch
+		*l2BaseFee = optimalBaseFee
+		*txs = filteredTxCount
+		collectedFees = optimalCollectedFees
+		baseFeeAdjusted = true
 	}
 
-	// Final profitability decision based on the bestCollectedFees
-	isProfitable := bestCollectedFees.Cmp(estimatedCost) >= 0
-	return isProfitable, bestAdjusted, nil
+	// Final profitability decision
+	isProfitable := collectedFees.Cmp(estimatedCost) >= 0
+	return isProfitable, baseFeeAdjusted, nil
 }
 
 // estimateL1Cost estimates the cost of proposing the L2 batch to L1.

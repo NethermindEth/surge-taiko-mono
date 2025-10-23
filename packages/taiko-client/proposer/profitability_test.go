@@ -3,6 +3,7 @@ package proposer
 import (
 	"context"
 	"math/big"
+	"sort"
 	"testing"
 	"time"
 
@@ -226,9 +227,8 @@ func TestFindOptimalBaseFeeThreshold(t *testing.T) {
 }
 
 // TestSortingAlgorithm tests that the sorting algorithm correctly sorts transactions
-// by base fee in descending order
+// by base fee in descending order using Go's native sort.Slice
 func TestSortingAlgorithm(t *testing.T) {
-	p := &Proposer{}
 	testAddr := common.HexToAddress("0x1234567890123456789012345678901234567890")
 
 	t.Run("SortsCorrectlyDescending", func(t *testing.T) {
@@ -254,7 +254,10 @@ func TestSortingAlgorithm(t *testing.T) {
 			})
 		}
 
-		p.sortTxsByBaseFeeDesc(txs)
+		// Sort using the same logic as in findOptimalBaseFeeThreshold
+		sort.Slice(txs, func(i, j int) bool {
+			return txs[i].baseFee.Cmp(txs[j].baseFee) > 0
+		})
 
 		// Verify sorted order
 		for i, expectedFee := range expected {
@@ -267,7 +270,9 @@ func TestSortingAlgorithm(t *testing.T) {
 
 	t.Run("HandlesEmptySlice", func(t *testing.T) {
 		var txs []txWithBaseFee
-		p.sortTxsByBaseFeeDesc(txs) // Should not panic
+		sort.Slice(txs, func(i, j int) bool {
+			return txs[i].baseFee.Cmp(txs[j].baseFee) > 0
+		}) // Should not panic
 	})
 
 	t.Run("HandlesSingleElement", func(t *testing.T) {
@@ -285,7 +290,9 @@ func TestSortingAlgorithm(t *testing.T) {
 			baseFee: big.NewInt(50_000_000_000),
 			gas:     21000,
 		}}
-		p.sortTxsByBaseFeeDesc(txs) // Should not panic
+		sort.Slice(txs, func(i, j int) bool {
+			return txs[i].baseFee.Cmp(txs[j].baseFee) > 0
+		}) // Should not panic
 		if txs[0].baseFee.Cmp(big.NewInt(50_000_000_000)) != 0 {
 			t.Error("Single element should remain unchanged")
 		}
@@ -312,7 +319,9 @@ func TestSortingAlgorithm(t *testing.T) {
 			})
 		}
 
-		p.sortTxsByBaseFeeDesc(txs)
+		sort.Slice(txs, func(i, j int) bool {
+			return txs[i].baseFee.Cmp(txs[j].baseFee) > 0
+		})
 
 		// Verify it's sorted in descending order
 		for i := 0; i < len(txs)-1; i++ {

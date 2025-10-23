@@ -38,12 +38,12 @@ hive_tests:
 	@sh ./integration_test/hive_tests.sh
 
 dev_net:
-		@COMPILE_PROTOCOL=${COMPILE_PROTOCOL} \
-		./integration_test/entrypoint.sh
+	@COMPILE_PROTOCOL=${COMPILE_PROTOCOL} \
+	./integration_test/entrypoint.sh
 
 gen_bindings:
 	@TAIKO_GETH_DIR=${TAIKO_GETH_DIR} \
-		./scripts/gen_bindings.sh
-		
+	./scripts/gen_bindings.sh
+
 # -------- Targets ----------
 .PHONY: build clean lint test hive_tests dev_net gen_bindings check-bash
