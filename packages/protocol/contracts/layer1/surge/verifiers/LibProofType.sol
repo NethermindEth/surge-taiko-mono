@@ -65,9 +65,8 @@ library LibProofType {
         return (pt & ZK_MASK) != 0 && (pt & TEE_MASK) != 0;
     }
 
-    // TODO: set some other rule after TDX testing
     function isFinalizingProof(ProofType _proofType) internal pure returns (bool) {
-        return equals(_proofType, tdxNethermind()) || equals(_proofType, azureTdxNethermind());
+        return isZkTeeProof(_proofType);
     }
 
     // Misc helpers

@@ -251,35 +251,35 @@ func (s *ComposeProofProducer) Aggregate(
 		})
 		batchIDs = append(batchIDs, item.Meta.Pacaya().GetBatchID())
 	}
-	// g.Go(func() error {
-	// 	if s.Dummy {
-	// 		log.Debug("Dummy proof producer requested SGX batch proof aggregation", "batchSize", len(items))
+	g.Go(func() error {
+		if s.Dummy {
+			log.Debug("Dummy proof producer requested SGX batch proof aggregation", "batchSize", len(items))
 
-	// 		resp, _ := s.DummyProofProducer.RequestBatchProofs(items, ProofTypeSgx)
-	// 		sgxBatchProofs = resp.BatchProof
-	// 		return nil
-	// 	}
+			resp, _ := s.DummyProofProducer.RequestBatchProofs(items, ProofTypeSgx)
+			sgxBatchProofs = resp.BatchProof
+			return nil
+		}
 
-	// 	resp, err := s.requestBatchProof(
-	// 		ctx,
-	// 		batches,
-	// 		firstItem.Opts.GetProverAddress(),
-	// 		true,
-	// 		ProofTypeSgx,
-	// 		requestAt,
-	// 		firstItem.Opts.PacayaOptions().IsRethSGXProofAggregationGenerated,
-	// 	)
-	// 	if err != nil {
-	// 		return err
-	// 	}
+		resp, err := s.requestBatchProof(
+			ctx,
+			batches,
+			firstItem.Opts.GetProverAddress(),
+			true,
+			ProofTypeSgx,
+			requestAt,
+			firstItem.Opts.PacayaOptions().IsRethSGXProofAggregationGenerated,
+		)
+		if err != nil {
+			return err
+		}
 
-	// 	// Note: we mark the `IsRethSGXProofAggregationGenerated` in the first item with true
-	// 	// to record if it is first time generated
-	// 	firstItem.Opts.PacayaOptions().IsRethSGXProofAggregationGenerated = true
-	// 	sgxBatchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
+		// Note: we mark the `IsRethSGXProofAggregationGenerated` in the first item with true
+		// to record if it is first time generated
+		firstItem.Opts.PacayaOptions().IsRethSGXProofAggregationGenerated = true
+		sgxBatchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
 
-	// 	return nil
-	// })
+		return nil
+	})
 	g.Go(func() error {
 		if s.Dummy {
 			log.Debug("Dummy proof producer requested TDX batch proof aggregation", "batchSize", len(items))
@@ -338,36 +338,36 @@ func (s *ComposeProofProducer) Aggregate(
 
 		return nil
 	})
-	// g.Go(func() error {
-	// 	if s.Dummy {
-	// 		log.Debug("Dummy proof producer requested ZK batch proof aggregation", "batchSize", len(items))
+	g.Go(func() error {
+		if s.Dummy {
+			log.Debug("Dummy proof producer requested ZK batch proof aggregation", "batchSize", len(items))
 
-	// 		proofType = s.ProofType
-	// 		resp, _ := s.DummyProofProducer.RequestBatchProofs(items, s.ProofType)
-	// 		batchProofs = resp.BatchProof
-	// 		return nil
-	// 	}
+			proofType = s.ProofType
+			resp, _ := s.DummyProofProducer.RequestBatchProofs(items, s.ProofType)
+			batchProofs = resp.BatchProof
+			return nil
+		}
 
-	// 	resp, err := s.requestBatchProof(
-	// 		ctx,
-	// 		batches,
-	// 		firstItem.Opts.GetProverAddress(),
-	// 		true,
-	// 		proofType,
-	// 		requestAt,
-	// 		firstItem.Opts.PacayaOptions().IsRethZKProofAggregationGenerated,
-	// 	)
-	// 	if err != nil {
-	// 		return err
-	// 	}
+		resp, err := s.requestBatchProof(
+			ctx,
+			batches,
+			firstItem.Opts.GetProverAddress(),
+			true,
+			proofType,
+			requestAt,
+			firstItem.Opts.PacayaOptions().IsRethZKProofAggregationGenerated,
+		)
+		if err != nil {
+			return err
+		}
 
-	// 	// Note: we mark the `IsRethZKProofAggregationGenerated` in the first item with true
-	// 	// to record if it is first time generated
-	// 	firstItem.Opts.PacayaOptions().IsRethZKProofAggregationGenerated = true
-	// 	batchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
+		// Note: we mark the `IsRethZKProofAggregationGenerated` in the first item with true
+		// to record if it is first time generated
+		firstItem.Opts.PacayaOptions().IsRethZKProofAggregationGenerated = true
+		batchProofs = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
 
-	// 	return nil
-	// })
+		return nil
+	})
 	if err := g.Wait(); err != nil {
 		return nil, fmt.Errorf("failed to get batches proofs: %w", err)
 	}
