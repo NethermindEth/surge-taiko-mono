@@ -8,8 +8,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 // Third-party verifiers
 import "@risc0/contracts/groth16/RiscZeroGroth16Verifier.sol";
-import { SP1Verifier as SuccinctVerifier } from
-    "@sp1-contracts/src/v4.0.0-rc.3/SP1VerifierPlonk.sol";
+import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v5.0.0/SP1VerifierPlonk.sol";
 import "@p256-verifier/contracts/P256Verifier.sol";
 
 // Shared contracts
@@ -278,47 +277,13 @@ contract DeploySurgeL1 is DeployCapability {
             console2.log("** timelockController initialised");
         }
 
-        // Transfer ownership of deployed verifiers
-        if (deploySgxRethVerifier && verifiers.sgxRethVerifier != address(0)) {
-            SgxVerifier(verifiers.sgxRethVerifier).transferOwnership(l1Owner);
-            console2.log("** sgxRethVerifier ownership transferred to:", l1Owner);
-            AutomataDcapV3Attestation(verifiers.automataRethProxy).transferOwnership(l1Owner);
-            console2.log("** automataRethProxy ownership transferred to:", l1Owner);
-        }
-        
-        if (deploySgxGethVerifier && verifiers.sgxGethVerifier != address(0)) {
-            SgxVerifier(verifiers.sgxGethVerifier).transferOwnership(l1Owner);
-            console2.log("** sgxGethVerifier ownership transferred to:", l1Owner);
-            AutomataDcapV3Attestation(verifiers.automataGethProxy).transferOwnership(l1Owner);
-            console2.log("** automataGethProxy ownership transferred to:", l1Owner);
-        }
-
-        if (deployTdxVerifier && verifiers.tdxNethermindVerifier != address(0)) {
-            TdxVerifier(verifiers.tdxNethermindVerifier).transferOwnership(l1Owner);
-            console2.log("** tdxNethermindVerifier ownership transferred to:", l1Owner);
-        }
-
-        if (deployAzureTdxVerifier && verifiers.azureTdxNethermindVerifier != address(0)) {
-            AzureTdxVerifier(verifiers.azureTdxNethermindVerifier).transferOwnership(l1Owner);
-            console2.log("** azureTdxNethermindVerifier ownership transferred to:", l1Owner);
-        }
-
-        if (deployRisc0RethVerifier && verifiers.risc0RethVerifier != address(0)) {
-            Risc0Verifier(verifiers.risc0RethVerifier).transferOwnership(l1Owner);
-            console2.log("** risc0RethVerifier ownership transferred to:", l1Owner);
-        }
-
-        if (deploySp1RethVerifier && verifiers.sp1RethVerifier != address(0)) {
-            SP1Verifier(verifiers.sp1RethVerifier).transferOwnership(l1Owner);
-            console2.log("** sp1RethVerifier ownership transferred to:", l1Owner);
-        }
-
         TaikoInbox(payable(rollupContracts.taikoInbox)).init(l1Owner, l2GenesisHash);
         console2.log("** taikoInbox initialised and ownership transferred to:", l1Owner);
 
         SurgeVerifier(rollupContracts.proofVerifier).init(
             l1Owner,
             verifiers.sgxRethVerifier,
+            verifiers.sgxGethVerifier,
             verifiers.tdxNethermindVerifier,
             verifiers.azureTdxNethermindVerifier,
             verifiers.risc0RethVerifier,
@@ -647,6 +612,7 @@ contract DeploySurgeL1 is DeployCapability {
     // - SetupSP1Verifier.s.sol
     // - SetupSGXVerifier.s.sol
     // - SetupTDXVerifier.s.sol
+    // - SetupAzureTDXVerifier.s.sol
 
     /// @dev Deploy the inbox contract based on the L2 network
     function deployInbox(

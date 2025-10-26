@@ -31,7 +31,6 @@ type ProofResponse struct {
 	Meta         metadata.TaikoProposalMetaData
 	Proof        []byte
 	Opts         ProofRequestOptions
-	ProofType    ProofType // ZK proof type for backward compatibility
 	ZKProofType  ProofType
 	SGXProofType ProofType
 	TDXProofType ProofType
@@ -39,15 +38,19 @@ type ProofResponse struct {
 
 // BatchProofs represents a response of a batch proof request.
 type BatchProofs struct {
-	ProofResponses        []*ProofResponse
-	BatchProof            []byte
-	BatchIDs              []*big.Int
-	ProofType             ProofType
-	Verifier              common.Address
+	ProofResponses []*ProofResponse
+	BatchProof     []byte
+	BatchIDs       []*big.Int
+	ProofType      ProofType
+	Verifier       common.Address
+
+	SgxProofType          ProofType
 	SgxBatchProof         []byte
 	SgxProofVerifier      common.Address
+	TdxProofType          ProofType
 	TdxBatchProof         []byte
 	TdxProofVerifier      common.Address
+	AzureTdxProofType     ProofType
 	AzureTdxBatchProof    []byte
 	AzureTdxProofVerifier common.Address
 }

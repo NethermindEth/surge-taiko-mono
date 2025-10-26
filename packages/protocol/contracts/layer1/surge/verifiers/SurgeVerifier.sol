@@ -17,12 +17,15 @@ contract SurgeVerifier is EssentialContract, ISurgeVerifier {
     using LibProofType for LibProofType.ProofType;
 
     address public immutable taikoInbox;
-    /// proofs come from reth client
-    InternalVerifier public sgxRethVerifier;
+    // proofs come from Nethermind client
     InternalVerifier public tdxNethermindVerifier;
     InternalVerifier public azureTdxNethermindVerifier;
+    /// proofs come from Reth client
+    InternalVerifier public sgxRethVerifier;
     InternalVerifier public risc0RethVerifier;
     InternalVerifier public sp1RethVerifier;
+    // proofs come from Geth client
+    InternalVerifier public sgxGethVerifier;
 
     uint256[46] private __gap;
 
@@ -35,6 +38,7 @@ contract SurgeVerifier is EssentialContract, ISurgeVerifier {
     function init(
         address _owner,
         address _sgxRethVerifier,
+        address _sgxGethVerifier,
         address _tdxNethermindVerifier,
         address _azureTdxNethermindVerifier,
         address _risc0RethVerifier,
@@ -46,6 +50,7 @@ contract SurgeVerifier is EssentialContract, ISurgeVerifier {
         __Essential_init(_owner);
 
         sgxRethVerifier.addr = _sgxRethVerifier;
+        sgxGethVerifier.addr = _sgxGethVerifier;
         tdxNethermindVerifier.addr = _tdxNethermindVerifier;
         azureTdxNethermindVerifier.addr = _azureTdxNethermindVerifier;
         risc0RethVerifier.addr = _risc0RethVerifier;
@@ -76,26 +81,22 @@ contract SurgeVerifier is EssentialContract, ISurgeVerifier {
     }
 
     function markUpgradeable(LibProofType.ProofType _proofType) external onlyFrom(taikoInbox) {
-        uint16 pt = LibProofType.ProofType.unwrap(_proofType);
-
-        if ((pt & 0x01) != 0) {
-            // SGX Reth (0b00001)
+        if (_proofType.includes(LibProofType.sgxReth())) {
             sgxRethVerifier.upgradeable = true;
         }
-        if ((pt & 0x02) != 0) {
-            // TDX Reth (0b00010)
+        if (_proofType.includes(LibProofType.tdxNethermind())) {
             tdxNethermindVerifier.upgradeable = true;
         }
-        if ((pt & 0x04) != 0) {
-            // Azure TDX Nethermind (0b00100)
+        if (_proofType.includes(LibProofType.azureTdxNethermind())) {
             azureTdxNethermindVerifier.upgradeable = true;
         }
-        if ((pt & 0x08) != 0) {
-            // RISC0 Reth (0b01000)
+        if (_proofType.includes(LibProofType.sgxGeth())) {
+            sgxGethVerifier.upgradeable = true;
+        }
+        if (_proofType.includes(LibProofType.risc0Reth())) {
             risc0RethVerifier.upgradeable = true;
         }
-        if ((pt & 0x10) != 0) {
-            // SP1 Reth (0b10000)
+        if (_proofType.includes(LibProofType.sp1Reth())) {
             sp1RethVerifier.upgradeable = true;
         }
     }
@@ -114,6 +115,8 @@ contract SurgeVerifier is EssentialContract, ISurgeVerifier {
             _verifier = tdxNethermindVerifier;
         } else if (_proofType.equals(LibProofType.azureTdxNethermind())) {
             _verifier = azureTdxNethermindVerifier;
+        } else if (_proofType.equals(LibProofType.sgxGeth())) {
+            _verifier = sgxGethVerifier;
         } else if (_proofType.equals(LibProofType.sp1Reth())) {
             _verifier = sp1RethVerifier;
         } else if (_proofType.equals(LibProofType.risc0Reth())) {
@@ -138,6 +141,8 @@ contract SurgeVerifier is EssentialContract, ISurgeVerifier {
             return tdxNethermindVerifier.addr;
         } else if (_proofType.equals(LibProofType.azureTdxNethermind())) {
             return azureTdxNethermindVerifier.addr;
+        } else if (_proofType.equals(LibProofType.sgxGeth())) {
+            return sgxGethVerifier.addr;
         } else if (_proofType.equals(LibProofType.sp1Reth())) {
             return sp1RethVerifier.addr;
         } else if (_proofType.equals(LibProofType.risc0Reth())) {

@@ -29,16 +29,18 @@ contract SurgeVerifierTestBase is CommonTest {
     MockInternalVerifier internal sgxRethVerifier;
     MockInternalVerifier internal tdxNethermindVerifier;
     MockInternalVerifier internal azureTdxNethermindVerifier;
+    MockInternalVerifier internal sgxGethVerifier;
     MockInternalVerifier internal risc0RethVerifier;
     MockInternalVerifier internal sp1RethVerifier;
 
     function setUpOnEthereum() internal override {
         taikoInbox = address(new MockTaikoInbox());
         sgxRethVerifier = new MockInternalVerifier(0);
-        tdxNethermindVerifier = new MockInternalVerifier(1);
-        azureTdxNethermindVerifier = new MockInternalVerifier(2);
-        risc0RethVerifier = new MockInternalVerifier(3);
-        sp1RethVerifier = new MockInternalVerifier(4);
+        sgxGethVerifier = new MockInternalVerifier(1);
+        tdxNethermindVerifier = new MockInternalVerifier(2);
+        azureTdxNethermindVerifier = new MockInternalVerifier(3);
+        risc0RethVerifier = new MockInternalVerifier(4);
+        sp1RethVerifier = new MockInternalVerifier(5);
 
         address surgeVerifierAddr = deploy({
             name: "surge_verifier",
@@ -48,6 +50,7 @@ contract SurgeVerifierTestBase is CommonTest {
                 (
                     Alice,
                     address(sgxRethVerifier),
+                    address(sgxGethVerifier),
                     address(tdxNethermindVerifier),
                     address(azureTdxNethermindVerifier),
                     address(risc0RethVerifier),
@@ -242,15 +245,18 @@ contract SurgeVerifierTest is SurgeVerifierTestBase, ProofTypeFixtures {
                 (upgradeable,) = surgeVerifier.sgxRethVerifier();
                 assertTrue(upgradeable);
             } else if (_indices[i] == 1) {
-                (upgradeable,) = surgeVerifier.tdxNethermindVerifier();
+                (upgradeable,) = surgeVerifier.sgxGethVerifier();
                 assertTrue(upgradeable);
             } else if (_indices[i] == 2) {
-                (upgradeable,) = surgeVerifier.azureTdxNethermindVerifier();
+                (upgradeable,) = surgeVerifier.tdxNethermindVerifier();
                 assertTrue(upgradeable);
             } else if (_indices[i] == 3) {
-                (upgradeable,) = surgeVerifier.sp1RethVerifier();
+                (upgradeable,) = surgeVerifier.azureTdxNethermindVerifier();
                 assertTrue(upgradeable);
             } else if (_indices[i] == 4) {
+                (upgradeable,) = surgeVerifier.sp1RethVerifier();
+                assertTrue(upgradeable);
+            } else if (_indices[i] == 5) {
                 (upgradeable,) = surgeVerifier.risc0RethVerifier();
                 assertTrue(upgradeable);
             }
@@ -264,12 +270,14 @@ contract SurgeVerifierTest is SurgeVerifierTestBase, ProofTypeFixtures {
         if (_index == 0) {
             (upgradeable, expectedVerifier) = surgeVerifier.sgxRethVerifier();
         } else if (_index == 1) {
-            (upgradeable, expectedVerifier) = surgeVerifier.tdxNethermindVerifier();
+            (upgradeable, expectedVerifier) = surgeVerifier.sgxGethVerifier();
         } else if (_index == 2) {
-            (upgradeable, expectedVerifier) = surgeVerifier.azureTdxNethermindVerifier();
+            (upgradeable, expectedVerifier) = surgeVerifier.tdxNethermindVerifier();
         } else if (_index == 3) {
-            (upgradeable, expectedVerifier) = surgeVerifier.sp1RethVerifier();
+            (upgradeable, expectedVerifier) = surgeVerifier.azureTdxNethermindVerifier();
         } else if (_index == 4) {
+            (upgradeable, expectedVerifier) = surgeVerifier.sp1RethVerifier();
+        } else if (_index == 5) {
             (upgradeable, expectedVerifier) = surgeVerifier.risc0RethVerifier();
         }
 
@@ -282,18 +290,22 @@ contract SurgeVerifierTest is SurgeVerifierTestBase, ProofTypeFixtures {
             assertTrue(expectedVerifier != _newVerifier);
         }
         if (_index != 1) {
-            (, expectedVerifier) = surgeVerifier.tdxNethermindVerifier();
+            (, expectedVerifier) = surgeVerifier.sgxGethVerifier();
             assertTrue(expectedVerifier != _newVerifier);
         }
         if (_index != 2) {
-            (, expectedVerifier) = surgeVerifier.azureTdxNethermindVerifier();
+            (, expectedVerifier) = surgeVerifier.tdxNethermindVerifier();
             assertTrue(expectedVerifier != _newVerifier);
         }
         if (_index != 3) {
-            (, expectedVerifier) = surgeVerifier.sp1RethVerifier();
+            (, expectedVerifier) = surgeVerifier.azureTdxNethermindVerifier();
             assertTrue(expectedVerifier != _newVerifier);
         }
         if (_index != 4) {
+            (, expectedVerifier) = surgeVerifier.sp1RethVerifier();
+            assertTrue(expectedVerifier != _newVerifier);
+        }
+        if (_index != 5) {
             (, expectedVerifier) = surgeVerifier.risc0RethVerifier();
             assertTrue(expectedVerifier != _newVerifier);
         }

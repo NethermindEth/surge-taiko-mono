@@ -11,8 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum-optimism/optimism/op-service/eth"
-
+	"github.com/cenkalti/backoff/v4"
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -63,7 +62,14 @@ type Proposer struct {
 
 	checkProfitability bool
 
-	forceProposeOnce bool // TODO: to verify that this works as expected
+	// Cost estimator for profitability checks (can be mocked in tests)
+	costEstimator CostEstimator
+
+	// Signal-based force proposing
+	signalServiceAddress      common.Address
+	lastSignalSentEventAt     time.Time
+	pendingSignalForcePropose bool
+	signalMu                  sync.RWMutex
 
 	// Bridge message monitoring
 	pendingBridgeMessages map[common.Hash]*types.Transaction
@@ -113,6 +119,11 @@ func (p *Proposer) InitFromConfig(
 	}
 	config.ReportProtocolConfigs(p.protocolConfigs)
 
+	// Initialize cost estimator with default implementation (can be overridden in tests)
+	if p.costEstimator == nil {
+		p.costEstimator = p
+	}
+
 	if txMgr == nil {
 		if txMgr, err = txmgr.NewSimpleTxManager(
 			"proposer",
@@ -157,8 +168,9 @@ func (p *Proposer) InitFromConfig(
 		cfg.FallbackToCalldata,
 	)
 
-	if (cfg.ClientConfig.InboxAddress != common.Address{}) {
-		if err := p.subscribeToSignalSentEvent(); err != nil {
+	// Initialize SignalService address and subscription if ForceProposingDelay is enabled
+	if cfg.ForceProposingDelay > 0 {
+		if err := p.initSignalServiceSubscription(); err != nil {
 			return err
 		}
 	}
@@ -166,15 +178,41 @@ func (p *Proposer) InitFromConfig(
 	return nil
 }
 
-// subscribeToSignalSentEvent subscribes to SignalSent event on eth l1 RPC
-func (p *Proposer) subscribeToSignalSentEvent() error {
-	logChan := make(chan types.Log)
-	sub, err := p.rpc.L1.SubscribeFilterLogs(p.ctx, ethereum.FilterQuery{
-		Addresses: []common.Address{p.Config.InboxAddress},
-		Topics:    [][]common.Hash{{common.HexToHash("0x0ad2d108660a211f47bf7fb43a0443cae181624995d3d42b88ee6879d200e973")}},
-	}, logChan)
+// initSignalServiceSubscription initializes the SignalService address and subscribes to SignalSent events
+func (p *Proposer) initSignalServiceSubscription() error {
+	// Get SignalService address from TaikoInbox contract
+	signalServiceAddress, err := p.rpc.PacayaClients.TaikoInbox.SignalService(&bind.CallOpts{Context: p.ctx})
 	if err != nil {
-		return fmt.Errorf("subscribe error: %w", err)
+		return fmt.Errorf("failed to get SignalService address from TaikoInbox: %w", err)
+	}
+
+	if signalServiceAddress == (common.Address{}) {
+		return fmt.Errorf("SignalService address is zero")
+	}
+
+	p.signalServiceAddress = signalServiceAddress
+	log.Info("SignalService address retrieved", "address", signalServiceAddress.Hex())
+
+	return p.subscribeToSignalSentEvent()
+}
+
+// subscribeToSignalSentEvent subscribes to SignalSent event on SignalService contract
+func (p *Proposer) subscribeToSignalSentEvent() error {
+	createSubscription := func() (chan types.Log, ethereum.Subscription, error) {
+		logChan := make(chan types.Log)
+		sub, err := p.rpc.L1.SubscribeFilterLogs(p.ctx, ethereum.FilterQuery{
+			Addresses: []common.Address{p.signalServiceAddress},
+			Topics: [][]common.Hash{{
+				crypto.Keccak256Hash([]byte("SignalSent(address,bytes32,bytes32,bytes32)")),
+			}},
+		}, logChan)
+		return logChan, sub, err
+	}
+
+	logChan, sub, err := createSubscription()
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to SignalSent events on SignalService %s: %w",
+			p.signalServiceAddress.Hex(), err)
 	}
 
 	p.wg.Add(1)
@@ -182,20 +220,108 @@ func (p *Proposer) subscribeToSignalSentEvent() error {
 		defer p.wg.Done()
 		defer sub.Unsubscribe()
 
+		log.Info("Started SignalSent event subscription",
+			"signalServiceAddress", p.signalServiceAddress.Hex(),
+			"forceProposingDelay", p.Config.ForceProposingDelay,
+		)
+
 		for {
 			select {
 			case <-p.ctx.Done():
+				log.Info("SignalSent event subscription stopped due to context cancellation")
 				return
 			case err := <-sub.Err():
-				log.Error("subscription error", "err", err)
-				return
+				log.Error("SignalSent event subscription error, attempting to reconnect", "err", err)
+
+				// Attempt to reconnect with exponential backoff, retrying indefinitely
+				_ = backoff.Retry(func() error {
+					newLogChan, newSub, err := createSubscription()
+					if err != nil {
+						log.Warn("Failed to reconnect to SignalSent events, retrying", "err", err)
+						return err
+					}
+
+					log.Info("Successfully reconnected to SignalSent events")
+					sub = newSub
+					logChan = newLogChan
+					return nil
+				}, backoff.WithContext(backoff.NewExponentialBackOff(), p.ctx))
 			case vLog := <-logChan:
-				log.Info("SignalSent event received", "log", vLog)
-				p.forceProposeOnce = true
+				p.handleSignalSentEvent(vLog)
 			}
 		}
 	}()
 	return nil
+}
+
+// handleSignalSentEvent processes a SignalSent event and schedules force propose if needed
+func (p *Proposer) handleSignalSentEvent(vLog types.Log) {
+	log.Info("SignalSent event received",
+		"txHash", vLog.TxHash.Hex(),
+		"blockNumber", vLog.BlockNumber,
+		"address", vLog.Address.Hex(),
+	)
+
+	p.signalMu.Lock()
+	defer p.signalMu.Unlock()
+
+	// Only process the first signal event if no pending force propose
+	if !p.pendingSignalForcePropose {
+		p.lastSignalSentEventAt = time.Now()
+		p.pendingSignalForcePropose = true
+
+		log.Debug("Scheduled force propose after SignalSent event",
+			"delay", p.Config.ForceProposingDelay,
+			"scheduledFor", time.Now().Add(p.Config.ForceProposingDelay),
+		)
+	} else {
+		log.Debug("Ignoring subsequent SignalSent event - force propose already pending",
+			"txHash", vLog.TxHash.Hex(),
+			"blockNumber", vLog.BlockNumber,
+		)
+	}
+}
+
+// shouldForcePropose checks if we should force propose based on SignalSent events
+func (p *Proposer) shouldForcePropose() (bool, string) {
+	// If feature is disabled, return false
+	if p.Config.ForceProposingDelay == 0 {
+		return false, "force proposing after signal disabled"
+	}
+
+	p.signalMu.RLock()
+	defer p.signalMu.RUnlock()
+
+	// If no pending signal force propose, return false
+	if !p.pendingSignalForcePropose {
+		return false, "no pending signal force propose"
+	}
+
+	// Check if enough time has passed since the SignalSent event
+	now := time.Now()
+	timeSinceSignal := now.Sub(p.lastSignalSentEventAt)
+
+	if timeSinceSignal >= p.Config.ForceProposingDelay {
+		return true, fmt.Sprintf("force proposing due to SignalSent event %v ago (delay: %v)",
+			timeSinceSignal, p.Config.ForceProposingDelay)
+	}
+
+	return false, fmt.Sprintf("signal received %v ago, waiting %v more",
+		timeSinceSignal, p.Config.ForceProposingDelay-timeSinceSignal)
+}
+
+// resetSignalForcePropose resets the pending signal force propose state and logs if it was actually a force propose
+func (p *Proposer) resetSignalForcePropose(isSignalForcePropose bool) {
+	p.signalMu.Lock()
+	defer p.signalMu.Unlock()
+
+	hadPendingSignal := p.pendingSignalForcePropose
+	p.pendingSignalForcePropose = false
+
+	// Only log completion message if this was actually a force propose due to signal
+	if isSignalForcePropose && hadPendingSignal {
+		log.Info("Completed signal-based force propose")
+	}
 }
 
 // Start starts the proposer's main loop.
@@ -294,7 +420,7 @@ func (p *Proposer) monitorBridgeMessages() {
 			// Get transaction details
 			tx, isPending, err := p.rpc.L1.TransactionByHash(p.ctx, txHash)
 			if err != nil {
-				log.Error("Failed to get transaction details", "hash", txHash, "error", err)
+				log.Warn("Failed to get transaction details", "hash", txHash, "error", err)
 				continue
 			}
 
@@ -370,13 +496,14 @@ func (p *Proposer) fetchPoolContent(allowEmptyPoolContent bool, l2BaseFee *big.I
 	for _, txs := range preBuiltTxList {
 		txLists = append(txLists, txs.TxList)
 	}
-	// If the pool content is empty and the `--epoch.minProposingInterval` flag is set, we check
-	// whether the proposer should propose an empty block.
+	// If the pool content is empty and we should propose empty blocks (either due to
+	// `--epoch.minProposingInterval` timeout or signal-based force proposing), create an empty block.
 	if allowEmptyPoolContent && len(txLists) == 0 {
 		log.Info(
 			"Pool content is empty, proposing an empty block",
 			"lastProposedAt", p.lastProposedAt,
-			"minProposingInternal", p.MinProposingInternal,
+			"minProposingInterval", p.MinProposingInterval,
+			"forceProposingDelay", p.ForceProposingDelay,
 		)
 		txLists = append(txLists, types.Transactions{})
 	}
@@ -433,14 +560,24 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 	// TODO(@jmadibekov): Add a check that the transaction is valid and hasn't been mined already
 	// (whether by relayer or some other way) and include it in the proposed block
 
-	// Check whether it's time to allow proposing empty pool content, if the `--epoch.minProposingInterval` flag is set.
-	allowEmptyPoolContent := p.MinProposingInternal != 0 && time.Now().After(p.lastProposedAt.Add(p.MinProposingInternal))
+	// Check whether it's time to allow proposing empty pool content. Only allows empty blocks if
+	// `--epoch.minProposingInterval` is > 0 and enough time has passed since the last proposal.
+	allowEmptyPoolContent := p.MinProposingInterval != 0 && time.Now().After(p.lastProposedAt.Add(p.MinProposingInterval))
+
+	// Check if we should force propose due to SignalSent events
+	shouldForcePropose, forceReason := p.shouldForcePropose()
+	if shouldForcePropose {
+		log.Info("Force proposing triggered by SignalSent event", "reason", forceReason)
+		allowEmptyPoolContent = true // Allow empty blocks when force proposing due to signals
+	}
 
 	log.Info(
 		"Start fetching L2 execution engine's transaction pool content",
 		"proposer", p.proposerAddress.Hex(),
-		"minProposingInternal", p.MinProposingInternal,
+		"minProposingInterval", p.MinProposingInterval,
 		"allowEmpty", allowEmptyPoolContent,
+		"shouldForcePropose", shouldForcePropose,
+		"forceReason", forceReason,
 		"lastProposedAt", p.lastProposedAt,
 	)
 
@@ -463,7 +600,14 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 	}
 
 	// Propose the transactions lists.
-	return p.ProposeTxLists(ctx, txLists, parentMetaHash, l2BaseFee)
+	err = p.ProposeTxLists(ctx, txLists, parentMetaHash, l2BaseFee, shouldForcePropose)
+
+	// If proposal was successful, reset any pending signal force propose state
+	if err == nil {
+		p.resetSignalForcePropose(shouldForcePropose)
+	}
+
+	return err
 }
 
 // ProposeTxList proposes the given transactions lists to TaikoInbox smart contract.
@@ -472,8 +616,9 @@ func (p *Proposer) ProposeTxLists(
 	txLists []types.Transactions,
 	parentMetaHash common.Hash,
 	l2BaseFee *big.Int,
+	isSignalForcePropose bool,
 ) error {
-	if err := p.ProposeTxListPacaya(ctx, txLists, parentMetaHash, l2BaseFee); err != nil {
+	if err := p.ProposeTxListPacaya(ctx, txLists, parentMetaHash, l2BaseFee, isSignalForcePropose); err != nil {
 		return err
 	}
 	p.lastProposedAt = time.Now()
@@ -486,6 +631,7 @@ func (p *Proposer) ProposeTxListPacaya(
 	txBatch []types.Transactions,
 	parentMetaHash common.Hash,
 	l2BaseFee *big.Int,
+	isSignalForcePropose bool,
 ) error {
 	var (
 		proposerAddress = p.proposerAddress
@@ -564,9 +710,12 @@ func (p *Proposer) ProposeTxListPacaya(
 		return err
 	}
 
-	// Check profitability if enabled
-	if p.checkProfitability {
-		profitable, err := p.isProfitable(ctx, txBatch, l2BaseFee, txCandidate, txs)
+	// Check profitability if enabled, but bypass check when force proposing due to signal
+	if p.checkProfitability && !isSignalForcePropose {
+		originalBaseFee := new(big.Int).Set(l2BaseFee)
+		originalTxCount := txs
+
+		profitable, baseFeeAdjusted, err := p.isProfitable(ctx, &txBatch, &l2BaseFee, txCandidate, &txs)
 		if err != nil {
 			return err
 		}
@@ -578,6 +727,34 @@ func (p *Proposer) ProposeTxListPacaya(
 			)
 			return nil
 		}
+
+		// If profitability check adjusted the base fee and filtered transactions, rebuild the transaction candidate
+		if baseFeeAdjusted {
+			log.Info("Rebuilding transaction with adjusted base fee",
+				"originalBaseFee", utils.WeiToEther(originalBaseFee),
+				"adjustedBaseFee", utils.WeiToEther(l2BaseFee),
+				"originalTxCount", originalTxCount,
+				"filteredTxCount", txs,
+			)
+
+			// Rebuild the transaction candidate with filtered transactions and adjusted base fee
+			txCandidate, err = p.txBuilder.BuildPacaya(
+				ctx,
+				txBatch,
+				forcedInclusion,
+				minTxsPerForcedInclusion,
+				parentMetaHash,
+				l2BaseFee,
+			)
+			if err != nil {
+				log.Warn("Failed to rebuild TaikoInbox.proposeBatch transaction with adjusted base fee",
+					"error",
+					encoding.TryParsingCustomError(err))
+				return err
+			}
+		}
+	} else if isSignalForcePropose {
+		log.Info("Bypassing profitability check for signal-based force propose")
 	}
 
 	err = retryOnError(
@@ -590,138 +767,17 @@ func (p *Proposer) ProposeTxListPacaya(
 	if err != nil {
 		return err
 	}
-	p.forceProposeOnce = false
 
-	log.Info("📝 Propose blocks batch succeeded", "blocksInBatch", len(txBatch), "txs", txs)
+	log.Info("📝 Propose blocks batch succeeded",
+		"blocksInBatch", len(txBatch),
+		"txs", txs,
+		"isSignalForcePropose", isSignalForcePropose,
+	)
 
 	metrics.ProposerProposedTxListsCounter.Add(float64(len(txBatch)))
 	metrics.ProposerProposedTxsCounter.Add(float64(txs))
 
 	return nil
-}
-
-func (p *Proposer) isProfitable(
-	ctx context.Context,
-	txBatch []types.Transactions,
-	l2BaseFee *big.Int,
-	candidate *txmgr.TxCandidate,
-	txs uint64,
-) (bool, error) {
-	estimatedCost, err := p.estimateL2Cost(ctx, candidate)
-	if err != nil {
-		return false, fmt.Errorf("failed to estimate L2 cost: %w", err)
-	}
-
-	collectedFees := p.computeL2Fees(txBatch, l2BaseFee)
-
-	isProfitable := collectedFees.Cmp(estimatedCost) >= 0
-
-	log.Info("Profitability check",
-		"estimatedCost", utils.WeiToEther(estimatedCost),
-		"collectedFees", utils.WeiToEther(collectedFees),
-		"isProfitable", isProfitable,
-		"l2BaseFee", utils.WeiToEther(l2BaseFee),
-		"numBatches", len(txBatch),
-		"numTransactions", txs,
-	)
-
-	return isProfitable, nil
-}
-
-func (p *Proposer) estimateL2Cost(
-	ctx context.Context,
-	candidate *txmgr.TxCandidate,
-) (*big.Int, error) {
-	// Fetch the latest L1 base fee
-	feeHistory, err := p.rpc.L1.FeeHistory(ctx, 1, nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get L1 base fee: %w", err)
-	}
-
-	if len(feeHistory.BaseFee) == 0 {
-		return nil, fmt.Errorf("no base fee data available")
-	}
-	l1BaseFee := feeHistory.BaseFee[len(feeHistory.BaseFee)-1]
-
-	blobBaseFee := new(big.Int)
-	costWithBlobs := new(big.Int)
-	costWithCalldata := new(big.Int)
-	totalCost := new(big.Int)
-
-	// If blobs are used, calculate batch posting cost with blobs
-	if len(candidate.Blobs) > 0 {
-		blobBaseFee, err = p.rpc.L1.BlobBaseFee(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get L1 blob base fee: %w", err)
-		}
-
-		costWithBlobs = new(big.Int).Mul(
-			new(big.Int).SetUint64(p.BatchPostingGasWithBlobs),
-			l1BaseFee,
-		)
-
-		costOfBlobs := new(big.Int).Mul(
-			blobBaseFee,
-			big.NewInt(eth.BlobSize*int64(len(candidate.Blobs))),
-		)
-
-		costWithBlobs = new(big.Int).Add(
-			costWithBlobs,
-			costOfBlobs,
-		)
-		totalCost = costWithBlobs
-	} else {
-		// Calculate batch posting cost with calldata
-		costWithCalldata = new(big.Int).Mul(
-			big.NewInt(int64(p.BatchPostingGasWithCalldata)),
-			l1BaseFee,
-		)
-		totalCost = costWithCalldata
-	}
-
-	// Add proving and proof posting cost
-	totalCost.Add(totalCost, p.ProvingCostPerL2Batch)
-	proofPostingCost := new(big.Int).Mul(
-		big.NewInt(int64(p.ProofPostingGas)),
-		l1BaseFee,
-	)
-	totalCost = new(big.Int).Add(totalCost, proofPostingCost)
-
-	log.Info("L2 cost estimation",
-		"l1BaseFee", utils.WeiToEther(l1BaseFee),
-		"costWithCalldata", utils.WeiToEther(costWithCalldata),
-		"costWithBlobs", utils.WeiToEther(costWithBlobs),
-		"blobBaseFee", utils.WeiToEther(blobBaseFee),
-		"proofPostingCost", utils.WeiToEther(proofPostingCost),
-		"provingCostPerL2Batch", utils.WeiToEther(p.ProvingCostPerL2Batch),
-		"totalCost", utils.WeiToEther(totalCost),
-	)
-
-	return totalCost, nil
-}
-
-func (p *Proposer) computeL2Fees(txBatch []types.Transactions, l2BaseFee *big.Int) *big.Int {
-	baseFeeForProposer := p.getPercentageFromBaseFeeToTheProposer(l2BaseFee)
-
-	collectedFees := new(big.Int)
-	for _, txs := range txBatch {
-		for _, tx := range txs {
-			gasConsumed := big.NewInt(int64(tx.Gas()))
-			expectedFee := new(big.Int).Mul(gasConsumed, baseFeeForProposer)
-			collectedFees.Add(collectedFees, expectedFee)
-		}
-	}
-
-	return collectedFees
-}
-
-func (p *Proposer) getPercentageFromBaseFeeToTheProposer(num *big.Int) *big.Int {
-	if p.protocolConfigs.BaseFeeConfig().SharingPctg == 0 {
-		return big.NewInt(0)
-	}
-
-	result := new(big.Int).Mul(num, big.NewInt(int64(p.protocolConfigs.BaseFeeConfig().SharingPctg)))
-	return new(big.Int).Div(result, big.NewInt(100))
 }
 
 func retryOnError(operation func() error, retryon string, maxRetries int, delay time.Duration) error {
