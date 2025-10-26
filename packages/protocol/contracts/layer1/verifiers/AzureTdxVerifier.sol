@@ -183,10 +183,9 @@ contract AzureTdxVerifier is EssentialContract, IVerifier {
             .verifyAndAttestOnChain(AzureTDX.verify(_attestation));
         require(verified, TDX_INVALID_ATTESTATION());
 
-        // TODO: uncomment this after first tests
-        // TrustedParams memory params = trustedParams[_trustedParamsIdx];
-        // require(params.pcrBitmap != 0, TDX_INVALID_TRUSTED_PARAMS());
-        // _validateAttestationOutput(output, _attestation, params);
+        TrustedParams memory params = trustedParams[_trustedParamsIdx];
+        require(params.pcrBitmap != 0, TDX_INVALID_TRUSTED_PARAMS());
+        _validateAttestationOutput(output, _attestation, params);
 
         bytes32 nonceHash = keccak256(_attestation.nonce);
         require(!nonceUsed[nonceHash], TDX_INVALID_ATTESTATION());
