@@ -302,7 +302,7 @@ func (s *ComposeProofProducer) requestBatchProof(
 
 	var endpoints []string
 	switch proofType {
-	case ProofTypeSgx, ProofTypeSgxAny:
+	case ProofTypeSgx, ProofTypeSgxGeth, ProofTypeSgxAny:
 		endpoints = append(endpoints, s.RaikoSGXHostEndpoint)
 	case ProofTypeTdx:
 		endpoints = append(endpoints, s.RaikoTDXHostEndpoint)
@@ -312,6 +312,8 @@ func (s *ComposeProofProducer) requestBatchProof(
 		endpoints = append(endpoints, s.RaikoTDXHostEndpoint, s.RaikoAzureTDXHostEndpoint)
 	case ProofTypeZKAny, ProofTypeZKR0, ProofTypeZKSP1:
 		endpoints = append(endpoints, s.RaikoZKVMHostEndpoint)
+	case ProofTypeOp:
+		return nil, fmt.Errorf("ProofTypeOp is not supported in this producer")
 	default:
 		return nil, fmt.Errorf("unexpected proof type: %s", proofType)
 	}
