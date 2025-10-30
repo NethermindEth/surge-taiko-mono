@@ -93,10 +93,12 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 		proofProducer producer.ProofProducer
 
 		// Proof verifiers addresses.
-		sgxGethVerifierAddress common.Address
-		sgxRethVerifierAddress common.Address
-		risc0VerifierAddress   common.Address
-		sp1VerifierAddress     common.Address
+		sgxRethVerifierAddress  common.Address
+		sgxGethVerifierAddress  common.Address
+		tdxVerifierAddress      common.Address
+		azureTdxVerifierAddress common.Address
+		risc0VerifierAddress    common.Address
+		sp1VerifierAddress      common.Address
 
 		// All activated proof types in protocol.
 		proofTypes = make([]producer.ProofType, 0, proofSubmitter.MaxNumSupportedProofTypes)
@@ -121,9 +123,24 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 		verifiers[producer.ProofTypeSgx] = sgxRethVerifierAddress
 	}
 
-	if len(verifiers) == 0 {
-		return fmt.Errorf("at least one of the sgx verifiers (sgx geth, sgx reth) must be set")
+	// Get the required TDX verifier
+	if tdxVerifierAddress, err = p.rpc.GetTDXVerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
+		return fmt.Errorf("failed to get tdx verifier: %w", err)
 	}
+	if tdxVerifierAddress == rpc.ZeroAddress {
+		return fmt.Errorf("tdx verifier not found")
+	}
+	proofTypes = append(proofTypes, producer.ProofTypeTdx)
+	verifiers[producer.ProofTypeTdx] = tdxVerifierAddress
+
+	if azureTdxVerifierAddress, err = p.rpc.GetAzureTDXVerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
+		return fmt.Errorf("failed to get azure tdx verifier: %w", err)
+	}
+	if azureTdxVerifierAddress == rpc.ZeroAddress {
+		return fmt.Errorf("azure tdx verifier not found")
+	}
+	proofTypes = append(proofTypes, producer.ProofTypeAzureTdx)
+	verifiers[producer.ProofTypeAzureTdx] = azureTdxVerifierAddress
 
 	// Initialize the zk verifiers and zkvm proof producers
 	if risc0VerifierAddress, err = p.rpc.GetRISC0VerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
@@ -141,17 +158,24 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 		verifiers[producer.ProofTypeZKSP1] = sp1VerifierAddress
 	}
 
+	// Initialize the zk verifiers and zkvm proof producers.
+	if len(verifiers) == 0 {
+		return fmt.Errorf("at least one of the sgx verifiers (sgx geth, sgx reth) must be set")
+	}
+
 	if verifiers[producer.ProofTypeZKR0] == rpc.ZeroAddress && verifiers[producer.ProofTypeZKSP1] == rpc.ZeroAddress {
 		return fmt.Errorf("at least one of the zk verifiers (risc0, sp1) must be set")
 	}
 
 	proofProducer = &producer.ComposeProofProducer{
-		Verifiers:             verifiers,
-		RaikoSGXHostEndpoint:  p.cfg.RaikoSGXHostEndpoint,  // used for sgx geth + sgx reth
-		RaikoZKVMHostEndpoint: p.cfg.RaikoZKVMHostEndpoint, // used for risc0 + sp1
-		JWT:                   p.cfg.RaikoJWT,
-		RaikoRequestTimeout:   p.cfg.RaikoRequestTimeout,
-		Dummy:                 p.cfg.Dummy,
+		Verifiers:                 verifiers,
+		RaikoSGXHostEndpoint:      p.cfg.RaikoSGXHostEndpoint,
+		RaikoTDXHostEndpoint:      p.cfg.RaikoTDXHostEndpoint,
+		RaikoAzureTDXHostEndpoint: p.cfg.RaikoAzureTDXHostEndpoint,
+		RaikoZKVMHostEndpoint:     p.cfg.RaikoZKVMHostEndpoint,
+		JWT:                       p.cfg.RaikoJWT,
+		RaikoRequestTimeout:       p.cfg.RaikoRequestTimeout,
+		Dummy:                     p.cfg.Dummy,
 	}
 
 	log.Info("Initialize prover", "proofProducer", proofProducer)

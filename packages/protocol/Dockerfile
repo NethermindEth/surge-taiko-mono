@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN apt-get update && apt-get install -y jq
+RUN apt-get update && apt-get install -y jq xxd
 
 RUN git init && \
     curl -L https://foundry.paradigm.xyz | bash && \

@@ -188,7 +188,7 @@ library LibVerifying {
         // If there are no conflicting transitions
         if (numTransitions == 1) {
             // If the first transition is just ZK or TEE proven
-            if (!_transitions[0].proofType.isZkTeeProof()) {
+            if (!_transitions[0].proofType.isFinalizingProof()) {
                 // If the cooldown window has not expired, we cannot finalise the transition
                 if (_transitions[0].createdAt + _config.cooldownWindow > block.timestamp) {
                     return fti;
@@ -203,7 +203,7 @@ library LibVerifying {
 
             // Try to find a finalising proof
             for (uint256 i; i < numTransitions; ++i) {
-                if (_transitions[i].proofType.isZkTeeProof()) {
+                if (_transitions[i].proofType.isFinalizingProof()) {
                     fti = i;
                 } else {
                     ptToUpgrade = ptToUpgrade.combine(_transitions[i].proofType);

@@ -33,6 +33,7 @@ type ProofResponse struct {
 	Opts         ProofRequestOptions
 	ZKProofType  ProofType
 	SGXProofType ProofType
+	TDXProofType ProofType
 }
 
 // BatchProofs represents a response of a batch proof request.
@@ -43,9 +44,15 @@ type BatchProofs struct {
 	ProofType      ProofType
 	Verifier       common.Address
 
-	SgxProofType     ProofType
-	SgxBatchProof    []byte
-	SgxProofVerifier common.Address
+	SgxProofType          ProofType
+	SgxBatchProof         []byte
+	SgxProofVerifier      common.Address
+	TdxProofType          ProofType
+	TdxBatchProof         []byte
+	TdxProofVerifier      common.Address
+	AzureTdxProofType     ProofType
+	AzureTdxBatchProof    []byte
+	AzureTdxProofVerifier common.Address
 }
 
 // ProofProducer is an interface that contains all methods to generate a proof.

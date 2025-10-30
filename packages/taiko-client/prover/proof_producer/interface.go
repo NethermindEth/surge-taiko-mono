@@ -21,6 +21,10 @@ const (
 	ProofTypeZKR0  ProofType = "risc0"
 	ProofTypeZKSP1 ProofType = "sp1"
 	ProofTypeZKAny ProofType = "zk_any"
+
+	ProofTypeTdx      ProofType = "tdx"
+	ProofTypeAzureTdx ProofType = "azure_tdx"
+	ProofTypeTdxAny   ProofType = "tdx_any"
 )
 
 // ProofRequestOptions is an interface that contains all options that need to be passed to a backend proof producer
@@ -45,6 +49,9 @@ type ProofRequestOptionsPacaya struct {
 
 	IsSGXProofGenerated            bool
 	IsSGXProofAggregationGenerated bool
+
+	IsTDXProofGenerated            bool
+	IsTDXProofAggregationGenerated bool
 
 	IsZKProofGenerated            bool
 	IsZKProofAggregationGenerated bool

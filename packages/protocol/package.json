@@ -46,6 +46,7 @@
   "dependencies": {
     "@openzeppelin/contracts": "4.9.6",
     "@openzeppelin/contracts-upgradeable": "4.9.6",
+    "@openzeppelin/contracts-v5": "npm:@openzeppelin/contracts@5.4.0",
     "ds-test": "github:dapphub/ds-test#e282159d5170298eb2455a6c05280ab5a73a4ef0",
     "forge-std": "github:foundry-rs/forge-std#v1.9.5",
     "merkletreejs": "^0.4.0",
@@ -53,6 +54,9 @@
     "p256-verifier": "github:taikoxyz/p256-verifier#v0.1.0",
     "risc0-ethereum": "github:risc0/risc0-ethereum#v3.0.1",
     "solady": "github:Vectorized/solady#v0.0.231",
-    "sp1-contracts": "github:succinctlabs/sp1-contracts#v5.0.0"
+    "sp1-contracts": "github:succinctlabs/sp1-contracts#v5.0.0",
+    "azure-tdx-verifier": "github:Hyodar/azure-tdx-verifier#master",
+    "@automata-network/automata-dcap-attestation": "github:automata-network/automata-dcap-attestation#evm-v1.0.0",
+    "@automata-network/automata-on-chain-pccs": "github:automata-network/automata-on-chain-pccs#v1.0.0"
   }
 }

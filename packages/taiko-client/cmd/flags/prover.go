@@ -22,6 +22,20 @@ var (
 		Category: proverCategory,
 		EnvVars:  []string{"RAIKO_HOST_SGX"},
 	}
+	RaikoTDXHostEndpoint = &cli.StringFlag{
+		Name:     "raiko.host.tdx",
+		Usage:    "RPC endpoint of a Raiko TDX host service",
+		Required: true,
+		Category: proverCategory,
+		EnvVars:  []string{"RAIKO_HOST_TDX"},
+	}
+	RaikoAzureTDXHostEndpoint = &cli.StringFlag{
+		Name:     "raiko.host.azure_tdx",
+		Usage:    "RPC endpoint of a Raiko Azure TDX host service",
+		Required: true,
+		Category: proverCategory,
+		EnvVars:  []string{"RAIKO_HOST_AZURE_TDX"},
+	}
 	RaikoZKVMHostEndpoint = &cli.StringFlag{
 		Name:     "raiko.host.zkvm",
 		Usage:    "RPC endpoint of a Raiko ZKVM host service",
@@ -113,6 +127,22 @@ var (
 		Category: proverCategory,
 		EnvVars:  []string{"PROVER_SGX_BATCH_SIZE"},
 	}
+	TDXBatchSize = &cli.Uint64Flag{
+		Name: "prover.tdx.batchSize",
+		Usage: "The default size of batch tdx proofs, when it arrives, submit a batch of proof immediately, " +
+			"this flag only works for post Ontake fork blocks",
+		Value:    1,
+		Category: proverCategory,
+		EnvVars:  []string{"PROVER_TDX_BATCH_SIZE"},
+	}
+	AzureTDXBatchSize = &cli.Uint64Flag{
+		Name: "prover.azure_tdx.batchSize",
+		Usage: "The default size of batch azure_tdx proofs, when it arrives, submit a batch of proof immediately, " +
+			"this flag only works for post Ontake fork blocks",
+		Value:    1,
+		Category: proverCategory,
+		EnvVars:  []string{"PROVER_AZURE_TDX_BATCH_SIZE"},
+	}
 	ZKVMBatchSize = &cli.Uint64Flag{
 		Name: "prover.zkvm.batchSize",
 		Usage: "The size of batch ZKVM proof, when it arrives, submit a batch of proof immediately, " +
@@ -128,6 +158,9 @@ var ProverFlags = MergeFlags(CommonFlags, []cli.Flag{
 	L2WSEndpoint,
 	L2HTTPEndpoint,
 	RaikoSGXHostEndpoint,
+	RaikoTDXHostEndpoint,
+	RaikoAzureTDXHostEndpoint,
+	RaikoZKVMHostEndpoint,
 	RaikoJWTPath,
 	L1ProverPrivKey,
 	StartingBatchID,
@@ -139,8 +172,9 @@ var ProverFlags = MergeFlags(CommonFlags, []cli.Flag{
 	LocalProposerAddresses,
 	BlockConfirmations,
 	RaikoRequestTimeout,
-	RaikoZKVMHostEndpoint,
 	SGXBatchSize,
+	TDXBatchSize,
+	AzureTDXBatchSize,
 	ZKVMBatchSize,
 	ForceBatchProvingInterval,
 }, TxmgrFlags)

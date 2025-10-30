@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
+
 // Third-party verifiers
 import "@risc0/contracts/groth16/RiscZeroGroth16Verifier.sol";
 import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v5.0.0/SP1VerifierPlonk.sol";
@@ -32,6 +33,8 @@ import "src/layer1/preconf/impl/PreconfRouter.sol";
 import "src/layer1/verifiers/Risc0Verifier.sol";
 import "src/layer1/verifiers/SP1Verifier.sol";
 import "src/layer1/verifiers/SgxVerifier.sol";
+import {TdxVerifier} from "src/layer1/verifiers/TdxVerifier.sol";
+import {AzureTdxVerifier} from "src/layer1/verifiers/AzureTdxVerifier.sol";
 
 // Surge contracts
 import "src/layer1/surge/SurgeDevnetInbox.sol";
@@ -55,6 +58,7 @@ import { SurgeTimelockController } from "src/layer1/surge/common/SurgeTimelockCo
 /// @title DeploySurgeL1
 /// @notice This script deploys the core Taiko protocol modified for Nethermind's Surge.
 contract DeploySurgeL1 is DeployCapability {
+    
     uint256 internal constant ADDRESS_LENGTH = 40;
 
     // Deployment configuration
@@ -97,8 +101,17 @@ contract DeploySurgeL1 is DeployCapability {
     // ---------------------------------------------------------------
     bool internal immutable deploySgxRethVerifier = vm.envBool("DEPLOY_SGX_RETH_VERIFIER");
     bool internal immutable deploySgxGethVerifier = vm.envBool("DEPLOY_SGX_GETH_VERIFIER");
+    bool internal immutable deployTdxVerifier = vm.envBool("DEPLOY_TDX_VERIFIER");
+    bool internal immutable deployAzureTdxVerifier = vm.envBool("DEPLOY_AZURE_TDX_VERIFIER");
     bool internal immutable deployRisc0RethVerifier = vm.envBool("DEPLOY_RISC0_RETH_VERIFIER");
     bool internal immutable deploySp1RethVerifier = vm.envBool("DEPLOY_SP1_RETH_VERIFIER");
+
+    // TDX Automata contract addresses for setup (used in separate setup scripts)
+    address internal immutable tdxPcsDao = vm.envOr("TDX_PCS_DAO_ADDRESS", address(0));
+    address internal immutable tdxFmspcTcbDao = vm.envOr("TDX_FMSPC_TCB_DAO_ADDRESS", address(0));
+    address internal immutable tdxEnclaveIdentityDao = vm.envOr("TDX_ENCLAVE_IDENTITY_DAO_ADDRESS", address(0));
+    address internal immutable tdxEnclaveIdentityHelper = vm.envOr("TDX_ENCLAVE_IDENTITY_HELPER_ADDRESS", address(0));
+    address internal immutable tdxAutomataDcapAttestation = vm.envOr("TDX_AUTOMATA_DCAP_ATTESTATION_ADDRESS", address(0));
 
     struct SharedContracts {
         address sharedResolver;
@@ -116,9 +129,11 @@ contract DeploySurgeL1 is DeployCapability {
 
     struct VerifierContracts {
         address sgxRethVerifier;
+        address sgxGethVerifier;
+        address azureTdxNethermindVerifier;
+        address tdxNethermindVerifier;
         address risc0RethVerifier;
         address sp1RethVerifier;
-        address sgxGethVerifier;
         address automataRethProxy;
         address automataGethProxy;
         address pemCertChainLibAddr;
@@ -246,7 +261,7 @@ contract DeploySurgeL1 is DeployCapability {
         );
 
         // Note: Verifier setup is now handled by separate scripts
-        // See SetupRisc0Verifier.s.sol, SetupSP1Verifier.s.sol, SetupSGXVerifier.s.sol
+        // See SetupRisc0Verifier.s.sol, SetupSP1Verifier.s.sol, SetupSGXVerifier.s.sol, SetupTDXVerifier.s.sol
 
         // Initialise and transfer ownership to either the timelock controller or the deployer
         // -----------------------------------------------------------------------------------
@@ -268,9 +283,11 @@ contract DeploySurgeL1 is DeployCapability {
         SurgeVerifier(rollupContracts.proofVerifier).init(
             l1Owner,
             verifiers.sgxRethVerifier,
+            verifiers.sgxGethVerifier,
+            verifiers.tdxNethermindVerifier,
+            verifiers.azureTdxNethermindVerifier,
             verifiers.risc0RethVerifier,
-            verifiers.sp1RethVerifier,
-            verifiers.sgxGethVerifier
+            verifiers.sp1RethVerifier
         );
         console2.log("** proofVerifier initialised and ownership transferred to:", l1Owner);
 
@@ -465,6 +482,26 @@ contract DeploySurgeL1 is DeployCapability {
             }
         }
 
+        // Deploy Azure TDX verifier if enabled
+        if (deployAzureTdxVerifier) {
+            verifiers.azureTdxNethermindVerifier = deployProxy({
+                name: "azure_tdx_nethermind_verifier",
+                impl: address(new AzureTdxVerifier(l2ChainId, _taikoInbox, _proofVerifier, tdxAutomataDcapAttestation)),
+                data: abi.encodeCall(AzureTdxVerifier.init, address(0))
+            });
+            console2.log("** Azure TDX Nethermind verifier deployed");
+        }
+
+        // Deploy TDX verifier if enabled
+        if (deployTdxVerifier) {
+            verifiers.tdxNethermindVerifier = deployProxy({
+                name: "tdx_nethermind_verifier",
+                impl: address(new TdxVerifier(l2ChainId, _taikoInbox, _proofVerifier, tdxAutomataDcapAttestation)),
+                data: abi.encodeCall(TdxVerifier.init, address(0))
+            });
+            console2.log("** TDX Nethermind verifier deployed");
+        }
+
         // Deploy ZK verifiers if enabled
         if (deployRisc0RethVerifier || deploySp1RethVerifier) {
             (verifiers.risc0RethVerifier, verifiers.sp1RethVerifier) = deployZKVerifiers();
@@ -574,6 +611,8 @@ contract DeploySurgeL1 is DeployCapability {
     // - SetupRisc0Verifier.s.sol
     // - SetupSP1Verifier.s.sol
     // - SetupSGXVerifier.s.sol
+    // - SetupTDXVerifier.s.sol
+    // - SetupAzureTDXVerifier.s.sol
 
     /// @dev Deploy the inbox contract based on the L2 network
     function deployInbox(
@@ -662,7 +701,7 @@ contract DeploySurgeL1 is DeployCapability {
 
         // Build L1 contracts list (filter out zero addresses)
         // ---------------------------------------------------------------
-        address[] memory l1Contracts = new address[](17);
+        address[] memory l1Contracts = new address[](19);
         l1Contracts[0] = _sharedContracts.signalService;
         l1Contracts[1] = _sharedContracts.bridge;
         l1Contracts[2] = _sharedContracts.erc20Vault;
@@ -680,6 +719,8 @@ contract DeploySurgeL1 is DeployCapability {
         l1Contracts[14] = _verifiers.sp1RethVerifier;
         l1Contracts[15] = _verifiers.sgxRethVerifier;
         l1Contracts[16] = _verifiers.sgxGethVerifier;
+        l1Contracts[17] = _verifiers.tdxNethermindVerifier;
+        l1Contracts[18] = _verifiers.azureTdxNethermindVerifier;
 
         // Verify ownership
         // ---------------------------------------------------------------

@@ -15,20 +15,20 @@ The blob indexer ingests EIP-4844 blob sidecars from a Deneb-compatible beacon n
 
 All configuration values can be provided via CLI flags or the matching environment variables.
 
-| Flag | Env | Description | Default |
-|------|-----|-------------|---------|
-| `--beacon-api` | `BLOB_INDEXER_BEACON_URL` | Beacon node REST endpoint | _required_ |
-| `--database-url` | `BLOB_INDEXER_DATABASE_URL` | MySQL connection string | _required_ |
-| `--watch-address` | `BLOB_INDEXER_WATCH_ADDRESSES` | Addresses to watch for blobs | `` |
-| `--http-bind` | `BLOB_INDEXER_HTTP_BIND` | HTTP bind address | `0.0.0.0:9000` |
-| `--poll-interval` | `BLOB_INDEXER_POLL_INTERVAL` | Indexer poll cadence (`6s`, `1m`, …) | `6s` |
-| `--http-timeout` | `BLOB_INDEXER_HTTP_TIMEOUT` | Beacon client request timeout | `20s` |
-| `--max-concurrency` | `BLOB_INDEXER_MAX_CONCURRENCY` | Concurrent beacon fetches | `4` |
-| `--backfill-batch` | `BLOB_INDEXER_BACKFILL_BATCH` | Slots fetched per iteration | `32` |
-| `--start-slot` | `BLOB_INDEXER_START_SLOT` | Optional bootstrapping slot | _none_ |
-| `--reorg-lookback` | `BLOB_INDEXER_REORG_LOOKBACK` | Slots re-scanned each tick | `128` |
-| `--finality-confirmations` | `BLOB_INDEXER_FINALITY_CONFIRMATIONS` | Finality margin before pruning | `64` |
-| `--log-format` | `BLOB_INDEXER_LOG_FORMAT` | `pretty` or `json` | `pretty` |
+| Flag                       | Env                                   | Description                          | Default        |
+| -------------------------- | ------------------------------------- | ------------------------------------ | -------------- |
+| `--beacon-api`             | `BLOB_INDEXER_BEACON_URL`             | Beacon node REST endpoint            | _required_     |
+| `--database-url`           | `BLOB_INDEXER_DATABASE_URL`           | MySQL connection string              | _required_     |
+| `--watch-address`          | `BLOB_INDEXER_WATCH_ADDRESSES`        | Addresses to watch for blobs         | ``             |
+| `--http-bind`              | `BLOB_INDEXER_HTTP_BIND`              | HTTP bind address                    | `0.0.0.0:9000` |
+| `--poll-interval`          | `BLOB_INDEXER_POLL_INTERVAL`          | Indexer poll cadence (`6s`, `1m`, …) | `6s`           |
+| `--http-timeout`           | `BLOB_INDEXER_HTTP_TIMEOUT`           | Beacon client request timeout        | `20s`          |
+| `--max-concurrency`        | `BLOB_INDEXER_MAX_CONCURRENCY`        | Concurrent beacon fetches            | `4`            |
+| `--backfill-batch`         | `BLOB_INDEXER_BACKFILL_BATCH`         | Slots fetched per iteration          | `32`           |
+| `--start-slot`             | `BLOB_INDEXER_START_SLOT`             | Optional bootstrapping slot          | _none_         |
+| `--reorg-lookback`         | `BLOB_INDEXER_REORG_LOOKBACK`         | Slots re-scanned each tick           | `128`          |
+| `--finality-confirmations` | `BLOB_INDEXER_FINALITY_CONFIRMATIONS` | Finality margin before pruning       | `64`           |
+| `--log-format`             | `BLOB_INDEXER_LOG_FORMAT`             | `pretty` or `json`                   | `pretty`       |
 
 ## Database
 

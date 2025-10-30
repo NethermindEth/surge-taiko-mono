@@ -34,7 +34,7 @@ importers:
         version: 2.6.2(@types/react@18.3.3)(react@18.3.1)
       '@web3modal/wagmi':
         specifier: ^4.1.11
-        version: 4.1.11(9ecc8b7aeee8c74c3518124cbf094f4f)
+        version: 4.1.11(465hcphkttv2p5txznqylpmnwa)
       '@zerodevx/svelte-toast':
         specifier: ^0.9.5
         version: 0.9.5(svelte@4.2.15)
@@ -320,12 +320,24 @@ importers:
 
   packages/protocol:
     dependencies:
+      '@automata-network/automata-dcap-attestation':
+        specifier: github:automata-network/automata-dcap-attestation#evm-v1.0.0
+        version: automata-dcap-attestation#evm-v1.0.0@https://codeload.github.com/automata-network/automata-dcap-attestation/tar.gz/e747e3e6ec1ba841160ca652fdd3789739265462
+      '@automata-network/automata-on-chain-pccs':
+        specifier: github:automata-network/automata-on-chain-pccs#v1.0.0
+        version: automata-on-chain-pccs#v1.0.0@https://codeload.github.com/automata-network/automata-on-chain-pccs/tar.gz/dc74d902a1eed6dae0913820f9d0213550200788
       '@openzeppelin/contracts':
         specifier: 4.9.6
         version: 4.9.6
       '@openzeppelin/contracts-upgradeable':
         specifier: 4.9.6
         version: 4.9.6
+      '@openzeppelin/contracts-v5':
+        specifier: npm:@openzeppelin/contracts@5.4.0
+        version: '@openzeppelin/contracts@5.4.0'
+      azure-tdx-verifier:
+        specifier: github:Hyodar/azure-tdx-verifier#master
+        version: https://codeload.github.com/Hyodar/azure-tdx-verifier/tar.gz/5b4ce85f7ceae5d1f44e2d663aca535ff153b640
       ds-test:
         specifier: github:dapphub/ds-test#e282159d5170298eb2455a6c05280ab5a73a4ef0
         version: https://codeload.github.com/dapphub/ds-test/tar.gz/e282159d5170298eb2455a6c05280ab5a73a4ef0
@@ -343,13 +355,13 @@ importers:
         version: p256-verifier#v0.1.0@https://codeload.github.com/taikoxyz/p256-verifier/tar.gz/6ef45b117642786b08a37b4c37c6a6ce151166da
       risc0-ethereum:
         specifier: github:risc0/risc0-ethereum#v3.0.1
-        version: https://codeload.github.com/risc0/risc0-ethereum/tar.gz/365e7b2db4f620fa256580c27558d2623362b9ae
+        version: risc0-ethereum#v3.0.1@https://codeload.github.com/risc0/risc0-ethereum/tar.gz/365e7b2db4f620fa256580c27558d2623362b9ae
       solady:
         specifier: github:Vectorized/solady#v0.0.231
         version: https://codeload.github.com/Vectorized/solady/tar.gz/a12a2575c899a328c1bafdada632dabbff27cf6b
       sp1-contracts:
         specifier: github:succinctlabs/sp1-contracts#v5.0.0
-        version: https://codeload.github.com/succinctlabs/sp1-contracts/tar.gz/512b5e029abc27f6e46a3c7eba220dac83ecc306
+        version: sp1-contracts#v5.0.0@https://codeload.github.com/succinctlabs/sp1-contracts/tar.gz/512b5e029abc27f6e46a3c7eba220dac83ecc306
     devDependencies:
       '@types/node':
         specifier: ^20.11.30
@@ -650,7 +662,7 @@ importers:
         version: 4.1.11
       '@web3modal/wagmi':
         specifier: ^4.1.1
-        version: 4.1.11(eda42001c1d6ea60fc09d76f6c806d0c)
+        version: 4.1.11(nhv3btjcneav7vr3ub73tnaqau)
       '@zerodevx/svelte-toast':
         specifier: ^0.9.5
         version: 0.9.5(svelte@4.2.15)
@@ -3333,6 +3345,9 @@ packages:
   '@openzeppelin/contracts@5.0.2':
     resolution: {integrity: sha512-ytPc6eLGcHHnapAZ9S+5qsdomhjo6QBHTDRRBFfTxXIpsicMhVPouPgmUPebZZZGX7vt9USA+Z+0M0dSVtSUEA==}
 
+  '@openzeppelin/contracts@5.4.0':
+    resolution: {integrity: sha512-eCYgWnLg6WO+X52I16TZt8uEjbtdkgLC0SUX/xnAksjjrQI4Xfn4iBRoI5j55dmlOhDv1Y7BoR3cU7e3WWhC6A==}
+
   '@openzeppelin/defender-as-code@3.0.1':
     resolution: {integrity: sha512-AeGMBk81Bak6B4u3pXjO1aOrIbJqrE6gZJqTJiBRGzKRGWxqQycriojZ3/lns/DcrNElA2BBHD0ONESrpMbZAg==}
 
@@ -5382,6 +5397,14 @@ packages:
     resolution: {integrity: sha512-kNOjDqAh7px0XWNI+4QbzoiR/nTkHAWNud2uvnJquD1/x5a7EQZMJT0AczqK0Qn67oY/TTQ1LbUKajZpp3I9tQ==}
     engines: {node: '>=8.0.0'}
 
+  automata-dcap-attestation#evm-v1.0.0@https://codeload.github.com/automata-network/automata-dcap-attestation/tar.gz/e747e3e6ec1ba841160ca652fdd3789739265462:
+    resolution: {tarball: https://codeload.github.com/automata-network/automata-dcap-attestation/tar.gz/e747e3e6ec1ba841160ca652fdd3789739265462}
+    version: 0.0.0
+
+  automata-on-chain-pccs#v1.0.0@https://codeload.github.com/automata-network/automata-on-chain-pccs/tar.gz/dc74d902a1eed6dae0913820f9d0213550200788:
+    resolution: {tarball: https://codeload.github.com/automata-network/automata-on-chain-pccs/tar.gz/dc74d902a1eed6dae0913820f9d0213550200788}
+    version: 0.0.0
+
   autoprefixer@10.4.19:
     resolution: {integrity: sha512-BaENR2+zBZ8xXhM4pUaKUxlVdxZ0EZhjvbopwnXmxRUfqDmwSpC2lAi/QXvx7NRdPCo1WKEcEF6mV64si1z4Ew==}
     engines: {node: ^10 || ^12 || >=14}
@@ -5414,6 +5437,10 @@ packages:
   axobject-query@4.1.0:
     resolution: {integrity: sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==}
     engines: {node: '>= 0.4'}
+
+  azure-tdx-verifier@https://codeload.github.com/Hyodar/azure-tdx-verifier/tar.gz/5b4ce85f7ceae5d1f44e2d663aca535ff153b640:
+    resolution: {tarball: https://codeload.github.com/Hyodar/azure-tdx-verifier/tar.gz/5b4ce85f7ceae5d1f44e2d663aca535ff153b640}
+    version: 0.0.2
 
   babel-core@7.0.0-bridge.0:
     resolution: {integrity: sha512-poPX9mZH/5CSanm50Q+1toVci6pv5KSRv/5TWCwtzQS5XEwn40BcCrgIeMFWP9CKKIniKXNxoIOnOq4VVlGXhg==}
@@ -10089,7 +10116,7 @@ packages:
   ripemd160@2.0.2:
     resolution: {integrity: sha512-ii4iagi25WusVoiC4B4lq7pbXfAp3D9v5CwfkY33vffw2+pkDjY1D8GaN7spsxvCSx8dkPqOZCEZyfxcmJG2IA==}
 
-  risc0-ethereum@https://codeload.github.com/risc0/risc0-ethereum/tar.gz/365e7b2db4f620fa256580c27558d2623362b9ae:
+  risc0-ethereum#v3.0.1@https://codeload.github.com/risc0/risc0-ethereum/tar.gz/365e7b2db4f620fa256580c27558d2623362b9ae:
     resolution: {tarball: https://codeload.github.com/risc0/risc0-ethereum/tar.gz/365e7b2db4f620fa256580c27558d2623362b9ae}
     version: 0.0.0
 
@@ -10399,7 +10426,7 @@ packages:
     resolution: {integrity: sha512-l3BikUxvPOcn5E74dZiq5BGsTb5yEwhaTSzccU6t4sDOH8NWJCstKO5QT2CvtFoK6F0saL7p9xHAqHOlCPJygA==}
     engines: {node: '>= 8'}
 
-  sp1-contracts@https://codeload.github.com/succinctlabs/sp1-contracts/tar.gz/512b5e029abc27f6e46a3c7eba220dac83ecc306:
+  sp1-contracts#v5.0.0@https://codeload.github.com/succinctlabs/sp1-contracts/tar.gz/512b5e029abc27f6e46a3c7eba220dac83ecc306:
     resolution: {tarball: https://codeload.github.com/succinctlabs/sp1-contracts/tar.gz/512b5e029abc27f6e46a3c7eba220dac83ecc306}
     version: 0.0.0
 
@@ -16008,6 +16035,8 @@ snapshots:
 
   '@openzeppelin/contracts@5.0.2': {}
 
+  '@openzeppelin/contracts@5.4.0': {}
+
   '@openzeppelin/defender-as-code@3.0.1(bufferutil@4.0.8)(encoding@0.1.13)(utf-8-validate@5.0.10)(web3-core-helpers@1.10.4)(web3-core@1.10.4(encoding@0.1.13))(web3-utils@1.10.4)(web3@1.10.4(bufferutil@4.0.8)(encoding@0.1.13)(utf-8-validate@5.0.10))':
     dependencies:
       '@openzeppelin/defender-sdk': 1.15.0(bufferutil@4.0.8)(encoding@0.1.13)(utf-8-validate@5.0.10)(web3-core-helpers@1.10.4)(web3-core@1.10.4(encoding@0.1.13))(web3-utils@1.10.4)(web3@1.10.4(bufferutil@4.0.8)(encoding@0.1.13)(utf-8-validate@5.0.10))
@@ -19586,7 +19615,7 @@ snapshots:
       lit: 3.1.0
       qrcode: 1.5.3
 
-  '@web3modal/wagmi@4.1.11(9ecc8b7aeee8c74c3518124cbf094f4f)':
+  '@web3modal/wagmi@4.1.11(465hcphkttv2p5txznqylpmnwa)':
     dependencies:
       '@wagmi/connectors': 4.3.3(@types/react@18.3.3)(@wagmi/core@2.9.1(@types/react@18.3.3)(bufferutil@4.0.8)(react@18.3.1)(typescript@5.4.5)(utf-8-validate@5.0.10)(viem@2.9.31(bufferutil@4.0.8)(typescript@5.4.5)(utf-8-validate@5.0.10)(zod@3.23.8))(zod@3.23.8))(bufferutil@4.0.8)(encoding@0.1.13)(react-dom@18.3.1(react@18.3.1))(react-i18next@13.5.0(i18next@23.11.5)(react-dom@18.3.1(react@18.3.1))(react-native@0.74.1(@babel/core@7.25.2)(@babel/preset-env@7.24.5(@babel/core@7.25.2))(@types/react@18.3.3)(bufferutil@4.0.8)(encoding@0.1.13)(react@18.3.1)(utf-8-validate@5.0.10))(react@18.3.1))(react-native@0.74.1(@babel/core@7.25.2)(@babel/preset-env@7.24.5(@babel/core@7.25.2))(@types/react@18.3.3)(bufferutil@4.0.8)(encoding@0.1.13)(react@18.3.1)(utf-8-validate@5.0.10))(react@18.3.1)(rollup@4.17.2)(typescript@5.4.5)(utf-8-validate@5.0.10)(viem@2.9.31(bufferutil@4.0.8)(typescript@5.4.5)(utf-8-validate@5.0.10)(zod@3.23.8))(zod@3.23.8)
       '@wagmi/core': 2.9.1(@types/react@18.3.3)(bufferutil@4.0.8)(react@18.3.1)(typescript@5.4.5)(utf-8-validate@5.0.10)(viem@2.9.31(bufferutil@4.0.8)(typescript@5.4.5)(utf-8-validate@5.0.10)(zod@3.23.8))(zod@3.23.8)
@@ -19603,7 +19632,7 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
 
-  '@web3modal/wagmi@4.1.11(eda42001c1d6ea60fc09d76f6c806d0c)':
+  '@web3modal/wagmi@4.1.11(nhv3btjcneav7vr3ub73tnaqau)':
     dependencies:
       '@wagmi/connectors': 4.3.3(@types/react@18.3.3)(@wagmi/core@2.9.1(@types/react@18.3.3)(bufferutil@4.0.8)(react@18.3.1)(typescript@5.4.5)(utf-8-validate@5.0.10)(viem@2.18.8(bufferutil@4.0.8)(typescript@5.4.5)(utf-8-validate@5.0.10)(zod@3.23.6))(zod@3.23.6))(bufferutil@4.0.8)(encoding@0.1.13)(react-dom@18.3.1(react@18.3.1))(react-i18next@13.5.0(i18next@22.5.1)(react-dom@18.3.1(react@18.3.1))(react-native@0.74.1(@babel/core@7.25.2)(@babel/preset-env@7.24.5(@babel/core@7.25.2))(@types/react@18.3.3)(bufferutil@4.0.8)(encoding@0.1.13)(react@18.3.1)(utf-8-validate@5.0.10))(react@18.3.1))(react-native@0.74.1(@babel/core@7.25.2)(@babel/preset-env@7.24.5(@babel/core@7.25.2))(@types/react@18.3.3)(bufferutil@4.0.8)(encoding@0.1.13)(react@18.3.1)(utf-8-validate@5.0.10))(react@18.3.1)(rollup@4.17.2)(typescript@5.4.5)(utf-8-validate@5.0.10)(viem@2.18.8(bufferutil@4.0.8)(typescript@5.4.5)(utf-8-validate@5.0.10)(zod@3.23.6))(zod@3.23.6)
       '@wagmi/core': 2.9.1(@types/react@18.3.3)(bufferutil@4.0.8)(react@18.3.1)(typescript@5.4.5)(utf-8-validate@5.0.10)(viem@2.18.8(bufferutil@4.0.8)(typescript@5.4.5)(utf-8-validate@5.0.10)(zod@3.23.6))(zod@3.23.6)
@@ -20026,6 +20055,10 @@ snapshots:
 
   atomic-sleep@1.0.0: {}
 
+  automata-dcap-attestation#evm-v1.0.0@https://codeload.github.com/automata-network/automata-dcap-attestation/tar.gz/e747e3e6ec1ba841160ca652fdd3789739265462: {}
+
+  automata-on-chain-pccs#v1.0.0@https://codeload.github.com/automata-network/automata-on-chain-pccs/tar.gz/dc74d902a1eed6dae0913820f9d0213550200788: {}
+
   autoprefixer@10.4.19(postcss@8.4.38):
     dependencies:
       browserslist: 4.23.0
@@ -20079,6 +20112,8 @@ snapshots:
       dequal: 2.0.3
 
   axobject-query@4.1.0: {}
+
+  azure-tdx-verifier@https://codeload.github.com/Hyodar/azure-tdx-verifier/tar.gz/5b4ce85f7ceae5d1f44e2d663aca535ff153b640: {}
 
   babel-core@7.0.0-bridge.0(@babel/core@7.24.5):
     dependencies:
@@ -26111,7 +26146,7 @@ snapshots:
       hash-base: 3.1.0
       inherits: 2.0.4
 
-  risc0-ethereum@https://codeload.github.com/risc0/risc0-ethereum/tar.gz/365e7b2db4f620fa256580c27558d2623362b9ae: {}
+  risc0-ethereum#v3.0.1@https://codeload.github.com/risc0/risc0-ethereum/tar.gz/365e7b2db4f620fa256580c27558d2623362b9ae: {}
 
   rlp@2.2.7:
     dependencies:
@@ -26545,7 +26580,7 @@ snapshots:
 
   source-map@0.7.4: {}
 
-  sp1-contracts@https://codeload.github.com/succinctlabs/sp1-contracts/tar.gz/512b5e029abc27f6e46a3c7eba220dac83ecc306: {}
+  sp1-contracts#v5.0.0@https://codeload.github.com/succinctlabs/sp1-contracts/tar.gz/512b5e029abc27f6e46a3c7eba220dac83ecc306: {}
 
   space-separated-tokens@2.0.2: {}
 

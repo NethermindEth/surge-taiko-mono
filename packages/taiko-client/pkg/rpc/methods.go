@@ -937,6 +937,24 @@ func (c *Client) GetSGXRethVerifierPacaya(opts *bind.CallOpts) (common.Address, 
 	return getImmutableAddressFromStructPacaya(c, opts, c.PacayaClients.SurgeVerifier.SgxRethVerifier)
 }
 
+// GetTDXVerifierPacaya resolves the Pacaya tdx verifier address.
+func (c *Client) GetTDXVerifierPacaya(opts *bind.CallOpts) (common.Address, error) {
+	if c.PacayaClients.SurgeVerifier == nil {
+		return common.Address{}, errors.New("surgeVerifier contract is not set")
+	}
+
+	return getImmutableAddressFromStructPacaya(c, opts, c.PacayaClients.SurgeVerifier.TdxNethermindVerifier)
+}
+
+// GetAzureTDXVerifierPacaya resolves the Pacaya azure_tdx verifier address.
+func (c *Client) GetAzureTDXVerifierPacaya(opts *bind.CallOpts) (common.Address, error) {
+	if c.PacayaClients.SurgeVerifier == nil {
+		return common.Address{}, errors.New("surgeVerifier contract is not set")
+	}
+
+	return getImmutableAddressFromStructPacaya(c, opts, c.PacayaClients.SurgeVerifier.AzureTdxNethermindVerifier)
+}
+
 // GetRISC0VerifierPacaya resolves the Pacaya risc0 verifier address.
 func (c *Client) GetRISC0VerifierPacaya(opts *bind.CallOpts) (common.Address, error) {
 	if c.PacayaClients.SurgeVerifier == nil {

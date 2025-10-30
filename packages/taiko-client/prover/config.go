@@ -37,6 +37,8 @@ type Config struct {
 	ProveBatchesGasLimit        uint64
 	Allowance                   *big.Int
 	RaikoSGXHostEndpoint        string
+	RaikoTDXHostEndpoint        string
+	RaikoAzureTDXHostEndpoint   string
 	RaikoZKVMHostEndpoint       string
 	RaikoJWT                    string
 	RaikoRequestTimeout         time.Duration
@@ -45,6 +47,8 @@ type Config struct {
 	TxmgrConfigs                *txmgr.CLIConfig
 	PrivateTxmgrConfigs         *txmgr.CLIConfig
 	SGXProofBufferSize          uint64
+	TDXProofBufferSize          uint64
+	AzureTDXProofBufferSize     uint64
 	ZKVMProofBufferSize         uint64
 	ForceBatchProvingInterval   time.Duration
 	ProofPollingInterval        time.Duration
@@ -106,6 +110,8 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		SurgeProposerWrapperAddress: common.HexToAddress(c.String(flags.SurgeProposerWrapperAddress.Name)),
 		L1ProverPrivKey:             l1ProverPrivKey,
 		RaikoSGXHostEndpoint:        c.String(flags.RaikoSGXHostEndpoint.Name),
+		RaikoTDXHostEndpoint:        c.String(flags.RaikoTDXHostEndpoint.Name),
+		RaikoAzureTDXHostEndpoint:   c.String(flags.RaikoAzureTDXHostEndpoint.Name),
 		RaikoZKVMHostEndpoint:       c.String(flags.RaikoZKVMHostEndpoint.Name),
 		RaikoJWT:                    common.Bytes2Hex(jwtSecret),
 		RaikoRequestTimeout:         c.Duration(flags.RaikoRequestTimeout.Name),
@@ -126,6 +132,8 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			c,
 		),
 		SGXProofBufferSize:        c.Uint64(flags.SGXBatchSize.Name),
+		TDXProofBufferSize:        c.Uint64(flags.TDXBatchSize.Name),
+		AzureTDXProofBufferSize:   c.Uint64(flags.AzureTDXBatchSize.Name),
 		ZKVMProofBufferSize:       c.Uint64(flags.ZKVMBatchSize.Name),
 		ForceBatchProvingInterval: c.Duration(flags.ForceBatchProvingInterval.Name),
 		ProofPollingInterval:      c.Duration(flags.ProofPollingInterval.Name),

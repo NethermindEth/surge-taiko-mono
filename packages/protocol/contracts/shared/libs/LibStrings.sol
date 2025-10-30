@@ -26,6 +26,7 @@ library LibStrings {
     bytes32 internal constant B_SGX_GETH_VERIFIER = bytes32("sgx_geth_verifier");
     bytes32 internal constant B_RISC0_RETH_VERIFIER = bytes32("risc0_reth_verifier");
     bytes32 internal constant B_SP1_RETH_VERIFIER = bytes32("sp1_reth_verifier");
+    bytes32 internal constant B_AZURE_TDX_VERIFIER = bytes32("azure_tdx_verifier");
     bytes32 internal constant B_PROVER_SET = bytes32("prover_set");
     bytes32 internal constant B_QUOTA_MANAGER = bytes32("quota_manager");
     bytes32 internal constant B_SIGNAL_SERVICE = bytes32("signal_service");

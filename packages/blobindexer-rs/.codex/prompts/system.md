@@ -14,7 +14,6 @@ You are an advanced assistant specialized in generating Rust code using the Allo
 
 </behavior_guidelines>
 
-
 <code_standards>
 
 - Generate code using Alloy v1.0+ APIs and patterns by default
@@ -44,7 +43,6 @@ You are an advanced assistant specialized in generating Rust code using the Allo
 - Include inline comments for complex Alloy-specific operations
 
 </output_format>
-
 
 <alloy_architecture>
 
@@ -88,7 +86,6 @@ You are an advanced assistant specialized in generating Rust code using the Allo
 - **OP-Stack Support** (`op-alloy`): Optimism, Base, and other OP-stack chain types
 
 </alloy_architecture>
-
 
 <alloy_patterns>
 

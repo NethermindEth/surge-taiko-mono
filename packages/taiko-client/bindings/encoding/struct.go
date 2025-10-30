@@ -15,12 +15,13 @@ var GoldenTouchPrivKey = "92954368afd3caa1f3ce3ead0069c1af414054aefe1ef9aeacc1bf
 
 // LibProofType.ProofType constants
 const (
-	ProofTypeEmpty     uint16 = 0x00 // 0b0000
-	ProofTypeSgxReth   uint16 = 0x01 // 0b0001
-	ProofTypeTdxReth   uint16 = 0x02 // 0b0010
-	ProofTypeRisc0Reth uint16 = 0x04 // 0b0100
-	ProofTypeSp1Reth   uint16 = 0x08 // 0b1000
-	ProofTypeSgxGeth   uint16 = 0x10 // 0b10000
+	ProofTypeEmpty              uint16 = 0x00 // 0b00000
+	ProofTypeSgxReth            uint16 = 0x01 // 0b000001
+	ProofTypeSgxGeth            uint16 = 0x02 // 0b000010
+	ProofTypeTdxNethermind      uint16 = 0x04 // 0b000100
+	ProofTypeAzureTdxNethermind uint16 = 0x08 // 0b001000
+	ProofTypeRisc0Reth          uint16 = 0x10 // 0b010000
+	ProofTypeSp1Reth            uint16 = 0x20 // 0b100000
 )
 
 // GetProofTypeFromString converts a producer.ProofType string to the corresponding LibProofType.ProofType constant
@@ -29,7 +30,9 @@ func GetProofTypeFromString(proofType string) uint16 {
 	case "sgx":
 		return ProofTypeSgxReth
 	case "tdx":
-		return ProofTypeTdxReth
+		return ProofTypeTdxNethermind
+	case "azure_tdx":
+		return ProofTypeAzureTdxNethermind
 	case "risc0":
 		return ProofTypeRisc0Reth
 	case "sp1":
