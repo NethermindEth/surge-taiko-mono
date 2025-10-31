@@ -105,11 +105,21 @@ jobs:
             echo "is_branch=false" >> $GITHUB_OUTPUT
             VERSION=${GITHUB_REF#refs/tags/}
             echo "version=$VERSION" >> $GITHUB_OUTPUT
-            echo "tag_list=type=raw,type=sha,value=$VERSION" >> $GITHUB_OUTPUT
+            {
+              echo "tag_list<<EOF"
+              echo "type=raw,value=$VERSION"
+              echo "type=sha"
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
           else
             echo "is_tag=false" >> $GITHUB_OUTPUT
             echo "is_branch=true" >> $GITHUB_OUTPUT
-            echo "tag_list=type=raw,type=sha,value=latest" >> $GITHUB_OUTPUT
+            {
+              echo "tag_list<<EOF"
+              echo "type=raw,value=latest"
+              echo "type=sha"
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
           fi
 
       - name: Docker meta
