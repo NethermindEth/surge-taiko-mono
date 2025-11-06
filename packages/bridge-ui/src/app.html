@@ -14,6 +14,16 @@
     %sveltekit.head%
 
     <script>
+      // Polyfill for crypto.randomUUID() in insecure contexts (HTTP)
+      if (typeof crypto !== 'undefined' && !crypto.randomUUID) {
+        crypto.randomUUID = function() {
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+          });
+        };
+      }
       // On page load or when changing themes, best to add inline in `head` to avoid FOUC
       if (
         (localStorage.getItem('theme') && localStorage.theme.toLocaleLowerCase() === 'dark') ||
