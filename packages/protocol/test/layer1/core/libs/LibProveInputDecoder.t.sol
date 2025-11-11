@@ -37,7 +37,7 @@ contract LibProveInputDecoderTest is Test {
 
         // Create ProveInput (no endBlockHeader field)
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            verifierId: 0, proposals: proposals, transitions: transitions, metadata: metadata
         });
 
         // Test encoding
@@ -121,7 +121,7 @@ contract LibProveInputDecoderTest is Test {
         });
 
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            verifierId: 0, proposals: proposals, transitions: transitions, metadata: metadata
         });
 
         // Test encoding/decoding
@@ -151,6 +151,7 @@ contract LibProveInputDecoderTest is Test {
     function test_encode_decode_empty_arrays() public pure {
         // Test with empty arrays
         IInbox.ProveInput memory input = IInbox.ProveInput({
+            verifierId: 0,
             proposals: new IInbox.Proposal[](0),
             transitions: new IInbox.Transition[](0),
             metadata: new IInbox.TransitionMetadata[](0)
@@ -191,7 +192,7 @@ contract LibProveInputDecoderTest is Test {
         });
 
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            verifierId: 0, proposals: proposals, transitions: transitions, metadata: metadata
         });
 
         bytes memory optimized = LibProveInputDecoder.encode(input);

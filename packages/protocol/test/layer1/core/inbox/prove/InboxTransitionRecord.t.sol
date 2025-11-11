@@ -42,7 +42,7 @@ contract InboxTransitionRecord is InboxTestHelper {
         inbox.prove(proveData, proof);
 
         // Verify the transition record was stored
-        (uint48 deadline, bytes26 recordHash) =
+        (uint40 deadline, bytes26 recordHash) =
             inbox.getTransitionRecordHash(proposal.id, _getGenesisTransitionHash());
 
         assertTrue(recordHash != bytes26(0), "Record hash should be non-zero");
@@ -50,7 +50,7 @@ contract InboxTransitionRecord is InboxTestHelper {
         // Grace period is 48 hours for standard Inbox
         assertEq(
             deadline,
-            uint48(block.timestamp + 48 hours),
+            uint40(block.timestamp + 48 hours),
             "Deadline should be timestamp + grace period"
         );
 
@@ -132,7 +132,7 @@ contract InboxTransitionRecord is InboxTestHelper {
         proposals[0] = proposal;
 
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            verifierId: 0, proposals: proposals, transitions: transitions, metadata: metadata
         });
 
         bytes memory proveData2 = _codec().encodeProveInput(input);
@@ -150,9 +150,9 @@ contract InboxTransitionRecord is InboxTestHelper {
         assertTrue(inbox.conflictingTransitionDetected(), "Conflict flag should be set");
 
         // Verify finalization deadline was set to max
-        (uint48 conflictDeadline, bytes26 conflictRecordHash) =
+        (uint40 conflictDeadline, bytes26 conflictRecordHash) =
             inbox.getTransitionRecordHash(proposal.id, _getGenesisTransitionHash());
-        assertEq(conflictDeadline, type(uint48).max, "Deadline should be set to max on conflict");
+        assertEq(conflictDeadline, type(uint40).max, "Deadline should be set to max on conflict");
         assertEq(
             conflictRecordHash,
             firstRecordHash,
@@ -272,7 +272,7 @@ contract InboxTransitionRecord is InboxTestHelper {
         proposals[0] = proposal1;
 
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            verifierId: 0, proposals: proposals, transitions: transitions, metadata: metadata
         });
 
         bytes memory conflictingProveData = _codec().encodeProveInput(input);
@@ -370,7 +370,7 @@ contract InboxTransitionRecord is InboxTestHelper {
         metadata[0] = _createMetadataForTransition(currentProver, currentProver);
 
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            verifierId: 0, proposals: proposals, transitions: transitions, metadata: metadata
         });
 
         return _codec().encodeProveInput(input);
@@ -411,7 +411,7 @@ contract InboxTransitionRecord is InboxTestHelper {
         proposals[0] = _proposal;
 
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            verifierId: 0, proposals: proposals, transitions: transitions, metadata: metadata
         });
 
         return _codec().encodeProveInput(input);

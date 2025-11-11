@@ -200,7 +200,7 @@ abstract contract AbstractFinalizeTest is InboxTestHelper {
             proven[maxFinalizationCount - 1].record.transitionHash
         );
 
-        (uint48 deadline, bytes26 recordHash) = inbox.getTransitionRecordHash(
+        (uint40 deadline, bytes26 recordHash) = inbox.getTransitionRecordHash(
             proven[maxFinalizationCount].proposal.id,
             proven[maxFinalizationCount - 1].record.transitionHash
         );
@@ -277,7 +277,7 @@ abstract contract AbstractFinalizeTest is InboxTestHelper {
             firstProven.record.transitionHash
         );
 
-        (uint48 deadline, bytes26 recordHash) = inbox.getTransitionRecordHash(
+        (uint40 deadline, bytes26 recordHash) = inbox.getTransitionRecordHash(
             secondPayload.proposal.id, firstProven.record.transitionHash
         );
         assertEq(recordHash, bytes26(0), "Unproven proposal should not have a record");
@@ -481,7 +481,7 @@ abstract contract AbstractFinalizeTest is InboxTestHelper {
         metadataArr[0] = metadata;
 
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadataArr
+            verifierId: 0, proposals: proposals, transitions: transitions, metadata: metadataArr
         });
 
         IInbox.TransitionRecord memory record;
