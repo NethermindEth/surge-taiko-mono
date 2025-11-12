@@ -22,15 +22,13 @@ import "./Inbox_Layout.sol"; // DO NOT DELETE
 /// @title Inbox
 /// @notice Core contract for managing L2 proposals, proof verification, and forced inclusion in
 /// Taiko's based rollup architecture.
-/// @dev The Pacaya inbox contract is not being upgraded to the Shasta implementation;
-///      instead, Shasta uses a separate inbox address.
 /// @dev This contract implements the fundamental inbox logic including:
 ///      - Proposal submission with forced inclusion support
 ///      - Proof verification with transition record management
 ///      - Ring buffer storage for efficient state management
 ///      - Bond instruction calculation(but actual funds are managed on L2)
 ///      - Finalization of proven proposals with checkpoint rate limiting
-/// @custom:security-contact security@taiko.xyz
+/// @custom:security-contact security@nethermind.io
 contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     using LibAddress for address;
     using LibMath for uint48;
@@ -50,7 +48,11 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     /// @dev Stores transition record hash and finalization deadline.
     struct TransitionRecordHashAndDeadline {
         bytes26 recordHash;
-        uint48 finalizationDeadline;
+        /// Surge: changed the type from uint48 to uint40
+        uint40 finalizationDeadline;
+        /// Surge: required for feature handlers
+        /// @notice The ID of the internal verifier contract that is used to verify the transition
+        uint8 verifierId;
     }
 
     /// @notice Result from consuming forced inclusions
@@ -75,8 +77,10 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     /// @notice The token used for bonds.
     IERC20 internal immutable _bondToken;
 
+    /// Surge: This has been changed to `address` and it is up to the feature handler to manage
+    /// the interface
     /// @notice The proof verifier contract.
-    IProofVerifier internal immutable _proofVerifier;
+    address internal immutable _proofVerifier;
 
     /// @notice The proposer checker contract.
     IProposerChecker internal immutable _proposerChecker;
@@ -155,7 +159,8 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     /// @dev 2 slots used
     LibForcedInclusion.Storage private _forcedInclusionStorage;
 
-    uint256[37] private __gap;
+    /// Surge: We do not need the pacaya slots gap. Changed from 37 -> 45
+    uint256[45] private __gap;
 
     // ---------------------------------------------------------------
     // Constructor
@@ -169,7 +174,7 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
 
         _codec = _config.codec;
         _bondToken = IERC20(_config.bondToken);
-        _proofVerifier = IProofVerifier(_config.proofVerifier);
+        _proofVerifier = _config.proofVerifier;
         _proposerChecker = IProposerChecker(_config.proposerChecker);
         _checkpointStore = ICheckpointStore(_config.checkpointStore);
         _provingWindow = _config.provingWindow;
@@ -307,17 +312,8 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
         // Build transition records with validation and bond calculations
         _buildAndSaveTransitionRecords(input);
 
-        uint256 proposalAge;
-        if (input.proposals.length == 1) {
-            unchecked {
-                proposalAge = block.timestamp - input.proposals[0].timestamp;
-            }
-        }
-
-        bytes32 aggregatedProvingHash =
-            _hashTransitionsWithMetadata(input.transitions, input.metadata);
-
-        _proofVerifier.verifyProof(proposalAge, aggregatedProvingHash, _proof);
+        // Surge: Extract proof verification to a handler
+        _handleProofVerification(input, _proof);
     }
 
     /// @inheritdoc IForcedInclusionStore
@@ -385,7 +381,7 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     )
         external
         view
-        returns (uint48 finalizationDeadline_, bytes26 recordHash_)
+        returns (uint40 finalizationDeadline_, bytes26 recordHash_)
     {
         (recordHash_, finalizationDeadline_) =
             _getTransitionRecordHashAndDeadline(_proposalId, _parentTransitionHash);
@@ -478,6 +474,7 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
         );
 
         _setTransitionRecordHashAndDeadline(
+            _input.verifierId,
             _input.proposals[_index].id,
             _input.transitions[_index],
             _input.metadata[_index],
@@ -494,11 +491,13 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     /// @dev Stores transition record hash and emits `Proved` event
     /// Virtual function to allow optimization in derived contracts
     /// @dev Uses composite key for unique transition identification
+    /// @param _verifierId The ID of the internal verifier contract
     /// @param _proposalId The ID of the proposal being proven
     /// @param _transition The transition data to include in the event
     /// @param _metadata The metadata containing prover information to include in the event
     /// @param _transitionRecord The transition record to hash and store
     function _setTransitionRecordHashAndDeadline(
+        uint8 _verifierId,
         uint48 _proposalId,
         Transition memory _transition,
         TransitionMetadata memory _metadata,
@@ -508,10 +507,14 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
         virtual
     {
         (bytes26 transitionRecordHash, TransitionRecordHashAndDeadline memory hashAndDeadline) =
-            _computeTransitionRecordHashAndDeadline(_transitionRecord);
+            _computeTransitionRecordHashAndDeadline(_transitionRecord, _verifierId);
 
         _storeTransitionRecord(
-            _proposalId, _transition.parentTransitionHash, transitionRecordHash, hashAndDeadline
+            _verifierId,
+            _proposalId,
+            _transition.parentTransitionHash,
+            transitionRecordHash,
+            hashAndDeadline
         );
 
         ProvedEventPayload memory payload = ProvedEventPayload({
@@ -526,11 +529,13 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     /// @dev Persists transition record metadata in storage.
     /// Returns false when an identical record already exists, avoiding redundant event
     /// emissions.
+    /// @param _verifierId The ID of the internal verifier contract
     /// @param _proposalId The proposal identifier.
     /// @param _parentTransitionHash Hash of the parent transition for uniqueness.
     /// @param _recordHash The keccak hash representing the transition record.
     /// @param _hashAndDeadline The finalization metadata to store alongside the hash.
     function _storeTransitionRecord(
+        uint8 _verifierId,
         uint48 _proposalId,
         bytes32 _parentTransitionHash,
         bytes26 _recordHash,
@@ -547,12 +552,13 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
         if (recordHash == 0) {
             entry.recordHash = _recordHash;
             entry.finalizationDeadline = _hashAndDeadline.finalizationDeadline;
+            entry.verifierId = _verifierId;
         } else if (recordHash == _recordHash) {
             emit TransitionDuplicateDetected();
         } else {
             emit TransitionConflictDetected();
-            conflictingTransitionDetected = true;
-            entry.finalizationDeadline = type(uint48).max;
+            // Surge: extract conflict management to a handler
+            _handleTransitionConflict(entry, _verifierId);
         }
     }
 
@@ -568,7 +574,7 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
         internal
         view
         virtual
-        returns (bytes26 recordHash_, uint48 finalizationDeadline_)
+        returns (bytes26 recordHash_, uint40 finalizationDeadline_)
     {
         bytes32 compositeKey = _composeTransitionKey(_proposalId, _parentTransitionHash);
         TransitionRecordHashAndDeadline storage hashAndDeadline =
@@ -629,9 +635,13 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
 
     /// @dev Computes the hash and finalization deadline for a transition record.
     /// @param _transitionRecord The transition record to hash.
+    /// @param _verifierId The ID of the internal verifier contract
     /// @return recordHash_ The keccak hash of the transition record.
     /// @return hashAndDeadline_ The struct containing the hash and deadline to persist.
-    function _computeTransitionRecordHashAndDeadline(TransitionRecord memory _transitionRecord)
+    function _computeTransitionRecordHashAndDeadline(
+        TransitionRecord memory _transitionRecord,
+        uint8 _verifierId
+    )
         internal
         view
         returns (bytes26 recordHash_, TransitionRecordHashAndDeadline memory hashAndDeadline_)
@@ -639,8 +649,9 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
         unchecked {
             recordHash_ = _hashTransitionRecord(_transitionRecord);
             hashAndDeadline_ = TransitionRecordHashAndDeadline({
-                finalizationDeadline: uint48(block.timestamp + _finalizationGracePeriod),
-                recordHash: recordHash_
+                finalizationDeadline: uint40(block.timestamp + _finalizationGracePeriod),
+                recordHash: recordHash_,
+                verifierId: _verifierId
             });
         }
     }
@@ -970,7 +981,7 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
                 if (proposalId >= coreState.nextProposalId) break;
 
                 // Try to finalize the current proposal
-                (bytes26 recordHash, uint48 finalizationDeadline) = _getTransitionRecordHashAndDeadline(
+                (bytes26 recordHash, uint40 finalizationDeadline) = _getTransitionRecordHashAndDeadline(
                     proposalId, coreState.lastFinalizedTransitionHash
                 );
 
@@ -1125,6 +1136,50 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
                 );
             }
         }
+    }
+
+    // Surge: These may be overridden by the client inbox contracts
+    // ---------------------------------------------------------------
+    // Surge Handlers
+    // ---------------------------------------------------------------
+
+    /// @notice Handles proof verification logic
+    /// @dev Override this function in derived contracts to customize proof verification handling.
+    /// @param _input Structured prove input
+    function _handleProofVerification(
+        ProveInput memory _input,
+        bytes calldata _proof
+    )
+        internal
+        virtual
+    {
+        uint256 proposalAge;
+        if (_input.proposals.length == 1) {
+            unchecked {
+                proposalAge = block.timestamp - _input.proposals[0].timestamp;
+            }
+        }
+
+        bytes32 aggregatedProvingHash =
+            _hashTransitionsWithMetadata(_input.transitions, _input.metadata);
+
+        IProofVerifier(_proofVerifier).verifyProof(proposalAge, aggregatedProvingHash, _proof);
+    }
+
+    /// @notice Handles a transition conflict when two different transition records exist
+    /// for the same proposal and parent hash.
+    /// @dev Override this function in derived contracts to provide custom conflict handling logic.
+    /// @param _entry Storage pointer to the transition record and deadline
+    /// @param _conflictingVerifierId The verifier ID of the proposed conflicting transition
+    function _handleTransitionConflict(
+        TransitionRecordHashAndDeadline storage _entry,
+        uint8 _conflictingVerifierId
+    )
+        internal
+        virtual
+    {
+        conflictingTransitionDetected = true;
+        _entry.finalizationDeadline = type(uint40).max;
     }
 
     // ---------------------------------------------------------------

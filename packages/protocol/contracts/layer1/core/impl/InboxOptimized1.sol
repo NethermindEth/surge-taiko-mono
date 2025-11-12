@@ -82,11 +82,13 @@ contract InboxOptimized1 is Inbox {
     ///      1. New proposal ID: overwrite the reusable slot.
     ///      2. Same ID and parent: detect duplicates or conflicts and update accordingly.
     ///      3. Same ID but different parent: fall back to the composite key mapping.
+    /// @param _verifierId The verifier ID associated with the proof
     /// @param _proposalId The proposal ID for this transition record
     /// @param _parentTransitionHash Parent transition hash used as part of the key
     /// @param _recordHash The keccak hash representing the transition record
     /// @param _hashAndDeadline The finalization metadata to persist
     function _storeTransitionRecord(
+        uint8 _verifierId,
         uint48 _proposalId,
         bytes32 _parentTransitionHash,
         bytes26 _recordHash,
@@ -117,12 +119,11 @@ contract InboxOptimized1 is Inbox {
                 emit TransitionDuplicateDetected();
             } else {
                 emit TransitionConflictDetected();
-                conflictingTransitionDetected = true;
-                record.hashAndDeadline.finalizationDeadline = type(uint48).max;
+                _handleTransitionConflict(record.hashAndDeadline, _verifierId);
             }
         } else {
             super._storeTransitionRecord(
-                _proposalId, _parentTransitionHash, _recordHash, _hashAndDeadline
+                _verifierId, _proposalId, _parentTransitionHash, _recordHash, _hashAndDeadline
             );
         }
     }
@@ -149,7 +150,7 @@ contract InboxOptimized1 is Inbox {
         internal
         view
         override
-        returns (bytes26 recordHash_, uint48 finalizationDeadline_)
+        returns (bytes26 recordHash_, uint40 finalizationDeadline_)
     {
         uint256 bufferSlot = _proposalId % _ringBufferSize;
         ReusableTransitionRecord storage record = _reusableTransitionRecords[bufferSlot];
@@ -209,6 +210,7 @@ contract InboxOptimized1 is Inbox {
                 } else {
                     // Save current group and start new one
                     _setTransitionRecordHashAndDeadline(
+                        _input.verifierId,
                         currentGroupStartId,
                         _input.transitions[firstIndex],
                         _input.metadata[firstIndex],
@@ -226,6 +228,7 @@ contract InboxOptimized1 is Inbox {
 
             // Save the final aggregated record
             _setTransitionRecordHashAndDeadline(
+                _input.verifierId,
                 currentGroupStartId,
                 _input.transitions[firstIndex],
                 _input.metadata[firstIndex],

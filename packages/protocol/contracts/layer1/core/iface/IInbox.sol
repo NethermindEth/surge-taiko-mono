@@ -163,6 +163,11 @@ interface IInbox {
 
     /// @notice Input data for the prove function
     struct ProveInput {
+        /// Surge: Required for feature handlers.
+        /// This is the Id of internal prover-specific (Risc0, SP1 etc) verifier that we want the
+        /// `SurgeVerifier` to route the proof to. Refer to `LibVerifiedId.sol` to resolve the prover type.
+        /// @dev Set this to 0 if it is not being used by a handler.
+        uint8 verifierId;
         /// @notice Array of proposals to prove.
         Proposal[] proposals;
         /// @notice Array of transitions containing proof details.
@@ -252,7 +257,7 @@ interface IInbox {
     )
         external
         view
-        returns (uint48 finalizationDeadline_, bytes26 recordHash_);
+        returns (uint40 finalizationDeadline_, bytes26 recordHash_);
 
     /// @notice Returns the configuration parameters of the Inbox contract
     /// @return config_ The configuration struct containing all immutable parameters
