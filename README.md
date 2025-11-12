@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./.github/SurgeLogoOnly.svg" width="80" alt="Logo for Surge" />
+  <img src="./.github/surge-logo.png" width="80" alt="Logo for Surge" />
 </p>
 
 <h1 align="center">
@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-  A based rollup template of the Taiko Alethia stack. 
+  A based rollup template of the Taiko Alethia stack.
 </p>
 
 <p align="center">

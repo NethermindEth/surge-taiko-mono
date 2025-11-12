@@ -711,50 +711,52 @@ func (p *Proposer) ProposeTxListPacaya(
 	}
 
 	// Check profitability if enabled, but bypass check when force proposing due to signal
-	if p.checkProfitability && !isSignalForcePropose {
-		originalBaseFee := new(big.Int).Set(l2BaseFee)
-		originalTxCount := txs
+	if p.checkProfitability {
+		if !isSignalForcePropose {
+			originalBaseFee := new(big.Int).Set(l2BaseFee)
+			originalTxCount := txs
 
-		profitable, baseFeeAdjusted, err := p.isProfitable(ctx, &txBatch, &l2BaseFee, txCandidate, &txs)
-		if err != nil {
-			return err
-		}
-		if !profitable {
-			log.Warn("Proposing transaction is not profitable",
-				"numBatches", len(txBatch),
-				"numTransactions", txs,
-				"l2BaseFee", utils.WeiToEther(l2BaseFee),
-			)
-			return nil
-		}
-
-		// If profitability check adjusted the base fee and filtered transactions, rebuild the transaction candidate
-		if baseFeeAdjusted {
-			log.Info("Rebuilding transaction with adjusted base fee",
-				"originalBaseFee", utils.WeiToEther(originalBaseFee),
-				"adjustedBaseFee", utils.WeiToEther(l2BaseFee),
-				"originalTxCount", originalTxCount,
-				"filteredTxCount", txs,
-			)
-
-			// Rebuild the transaction candidate with filtered transactions and adjusted base fee
-			txCandidate, err = p.txBuilder.BuildPacaya(
-				ctx,
-				txBatch,
-				forcedInclusion,
-				minTxsPerForcedInclusion,
-				parentMetaHash,
-				l2BaseFee,
-			)
+			profitable, baseFeeAdjusted, err := p.isProfitable(ctx, &txBatch, &l2BaseFee, txCandidate, &txs)
 			if err != nil {
-				log.Warn("Failed to rebuild TaikoInbox.proposeBatch transaction with adjusted base fee",
-					"error",
-					encoding.TryParsingCustomError(err))
 				return err
 			}
+			if !profitable {
+				log.Warn("Proposing transaction is not profitable",
+					"numBatches", len(txBatch),
+					"numTransactions", txs,
+					"l2BaseFee", utils.WeiToEther(l2BaseFee),
+				)
+				return fmt.Errorf("proposing transaction is not profitable")
+			}
+
+			// If profitability check adjusted the base fee and filtered transactions, rebuild the transaction candidate
+			if baseFeeAdjusted {
+				log.Info("Rebuilding transaction with adjusted base fee",
+					"originalBaseFee", utils.WeiToEther(originalBaseFee),
+					"adjustedBaseFee", utils.WeiToEther(l2BaseFee),
+					"originalTxCount", originalTxCount,
+					"filteredTxCount", txs,
+				)
+
+				// Rebuild the transaction candidate with filtered transactions and adjusted base fee
+				txCandidate, err = p.txBuilder.BuildPacaya(
+					ctx,
+					txBatch,
+					forcedInclusion,
+					minTxsPerForcedInclusion,
+					parentMetaHash,
+					l2BaseFee,
+				)
+				if err != nil {
+					log.Warn("Failed to rebuild TaikoInbox.proposeBatch transaction with adjusted base fee",
+						"error",
+						encoding.TryParsingCustomError(err))
+					return err
+				}
+			}
+		} else {
+			log.Info("Bypassing profitability check for signal-based force propose")
 		}
-	} else if isSignalForcePropose {
-		log.Info("Bypassing profitability check for signal-based force propose")
 	}
 
 	err = retryOnError(
@@ -768,9 +770,18 @@ func (p *Proposer) ProposeTxListPacaya(
 		return err
 	}
 
+	// Collect all transaction hashes for logging
+	var txHashes []common.Hash
+	for _, txList := range txBatch {
+		for _, tx := range txList {
+			txHashes = append(txHashes, tx.Hash())
+		}
+	}
+
 	log.Info("📝 Propose blocks batch succeeded",
 		"blocksInBatch", len(txBatch),
 		"txs", txs,
+		"txHashes", txHashes,
 		"isSignalForcePropose", isSignalForcePropose,
 	)
 

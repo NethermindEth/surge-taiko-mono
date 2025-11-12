@@ -244,12 +244,24 @@ func (i *BlocksInserterPacaya) InsertBlocks(
 			return fmt.Errorf("failed to wait for L2 header (%d): %w", lastPayloadData.Number, err)
 		}
 
+		// Extract transaction hashes for logging
+		txHashes := make([]string, 0, len(lastPayloadData.Transactions))
+		for _, txBytes := range lastPayloadData.Transactions {
+			var tx types.Transaction
+			if err := tx.UnmarshalBinary(txBytes); err != nil {
+				log.Warn("Failed to unmarshal transaction for logging", "error", err)
+				continue
+			}
+			txHashes = append(txHashes, tx.Hash().Hex())
+		}
+
 		log.Info(
 			"🔗 New L2 block inserted",
 			"blockID", lastPayloadData.Number,
 			"hash", lastPayloadData.BlockHash,
 			"coinbase", lastPayloadData.FeeRecipient.Hex(),
 			"transactions", len(lastPayloadData.Transactions),
+			"txHashes", txHashes,
 			"timestamp", lastPayloadData.Timestamp,
 			"baseFee", utils.WeiToGWei(lastPayloadData.BaseFeePerGas),
 			"withdrawals", len(lastPayloadData.Withdrawals),
