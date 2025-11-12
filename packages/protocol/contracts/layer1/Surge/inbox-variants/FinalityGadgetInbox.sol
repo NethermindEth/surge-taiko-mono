@@ -52,9 +52,7 @@ contract FinalityGadgetInbox is Inbox {
         internal
         override
     {
-        // Existing state changes
-        conflictingTransitionDetected = true;
-        _entry.finalizationDeadline = type(uint40).max;
+        super._handleTransitionConflict(_entry, _conflictingVerifierId);
 
         // Allow instant upgrade of conflicting verifiers
         SurgeVerifier(_proofVerifier).markVerifierUpgradeable(_entry.verifierId, true);
