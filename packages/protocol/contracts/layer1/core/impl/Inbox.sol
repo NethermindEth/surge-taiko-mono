@@ -230,19 +230,61 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     ///         process at least `config.minForcedInclusionCount` if they are due.
     ///      4. Updates core state and emits `Proposed` event
     /// NOTE: This function can only be called once per block to prevent spams that can fill the ring buffer.
+    /// Surge: Most of the logic of this function is extracted away to an internal _propose function
+    /// to assist with feature handlers
     function propose(bytes calldata _lookahead, bytes calldata _data) external nonReentrant {
-        unchecked {
-            // Decode and validate input data
-            ProposeInput memory input = _decodeProposeInput(_data);
+        ProposeInput memory input = _decodeProposeInput(_data);
+        // Surge: A feature handler for customised checks on proposing
+        _handleOnPropose(input);
+        _propose(_lookahead, input);
+    }
 
-            _validateProposeInput(input);
+    /// @inheritdoc IInbox
+    /// @notice Proves the validity of proposed L2 blocks
+    /// @dev Validates transitions, calculates bond instructions, and verifies proofs
+    /// NOTE: this function sends the proposal age to the proof verifier when proving a single proposal.
+    /// This can be used by the verifier system to change its behavior
+    /// if the proposal is too old(e.g. this can serve as a signal that a prover killer proposal was produced)
+    /// Surge: Make this function public to allow for internal calls
+    /// Surge: Most of the logic of this function is extracted away to an internal _prove function
+    /// to assist with feature handlers
+    function prove(bytes calldata _data, bytes calldata _proof) external nonReentrant {
+        ProveInput memory input = _decodeProveInput(_data);
+        // Surge: A feature handler for customised checks on proposing
+        _handleOnProve(input);
+        _prove(input, _proof);
+    }
+
+    /// @inheritdoc IForcedInclusionStore
+    function saveForcedInclusion(LibBlobs.BlobReference memory _blobReference) external payable {
+        uint256 refund = LibForcedInclusion.saveForcedInclusion(
+            _forcedInclusionStorage,
+            _forcedInclusionFeeInGwei,
+            _forcedInclusionFeeDoubleThreshold,
+            _blobReference
+        );
+
+        // Refund excess payment to the sender
+        if (refund > 0) {
+            msg.sender.sendEtherAndVerify(refund);
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Surge: Internal functions for Propose and Prove
+    // ---------------------------------------------------------------
+
+    function _propose(bytes calldata _lookahead, ProposeInput memory _input) internal {
+        unchecked {
+            _validateProposeInput(_input);
 
             // Verify parentProposals[0] is actually the last proposal stored on-chain.
-            _verifyChainHead(input.parentProposals);
+            // Surge: Move chain head verification to a feature handler
+            _handleChainHeadVerification(_input.parentProposals);
 
             // IMPORTANT: Finalize first to free ring buffer space and prevent deadlock
             (CoreState memory coreState, LibBonds.BondInstruction[] memory bondInstructions) =
-                _finalize(input);
+                _finalize(_input);
 
             // Enforce one propose call per Ethereum block to prevent spam attacks that could
             // deplete the ring buffer
@@ -253,11 +295,11 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
 
             // Consume forced inclusions (validation happens inside)
             ConsumptionResult memory result =
-                _consumeForcedInclusions(msg.sender, input.numForcedInclusions);
+                _consumeForcedInclusions(msg.sender, _input.numForcedInclusions);
 
             // Add normal proposal source in last slot
             result.sources[result.sources.length - 1] =
-                DerivationSource(false, LibBlobs.validateBlobReference(input.blobReference));
+                DerivationSource(false, LibBlobs.validateBlobReference(_input.blobReference));
 
             // If forced inclusion is old enough, allow anyone to propose
             // and set endOfSubmissionWindowTimestamp = 0
@@ -292,39 +334,16 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
         }
     }
 
-    /// @inheritdoc IInbox
-    /// @notice Proves the validity of proposed L2 blocks
-    /// @dev Validates transitions, calculates bond instructions, and verifies proofs
-    /// NOTE: this function sends the proposal age to the proof verifier when proving a single proposal.
-    /// This can be used by the verifier system to change its behavior
-    /// if the proposal is too old(e.g. this can serve as a signal that a prover killer proposal was produced)
-    function prove(bytes calldata _data, bytes calldata _proof) external nonReentrant {
-        // Decode and validate input
-        ProveInput memory input = _decodeProveInput(_data);
-        require(input.proposals.length != 0, EmptyProposals());
-        require(input.proposals.length == input.transitions.length, InconsistentParams());
-        require(input.transitions.length == input.metadata.length, InconsistentParams());
+    function _prove(ProveInput memory _input, bytes calldata _proof) internal {
+        require(_input.proposals.length != 0, EmptyProposals());
+        require(_input.proposals.length == _input.transitions.length, InconsistentParams());
+        require(_input.transitions.length == _input.metadata.length, InconsistentParams());
 
         // Build transition records with validation and bond calculations
-        _buildAndSaveTransitionRecords(input);
+        _buildAndSaveTransitionRecords(_input);
 
         // Surge: Extract proof verification to a handler
-        _handleProofVerification(input, _proof);
-    }
-
-    /// @inheritdoc IForcedInclusionStore
-    function saveForcedInclusion(LibBlobs.BlobReference memory _blobReference) external payable {
-        uint256 refund = LibForcedInclusion.saveForcedInclusion(
-            _forcedInclusionStorage,
-            _forcedInclusionFeeInGwei,
-            _forcedInclusionFeeDoubleThreshold,
-            _blobReference
-        );
-
-        // Refund excess payment to the sender
-        if (refund > 0) {
-            msg.sender.sendEtherAndVerify(refund);
-        }
+        _handleProofVerification(_input, _proof);
     }
 
     // ---------------------------------------------------------------
@@ -408,7 +427,7 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     }
 
     // ---------------------------------------------------------------
-    // Internal Functions
+    // Other Internal Functions
     // ---------------------------------------------------------------
 
     /// @dev Activates the inbox with genesis state so that it can start accepting proposals.
@@ -1096,10 +1115,22 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
         );
     }
 
+    // Surge: These may be overridden by the client inbox contracts
+    // ---------------------------------------------------------------
+    // Surge Handlers
+    // ---------------------------------------------------------------
+
+    /// @dev Override this function to perform custom checks on proposals.
+    function _handleOnPropose(ProposeInput memory _input) internal view virtual { }
+
+    /// @dev Override this function to perform custom checks on proving.
+    function _handleOnProve(ProveInput memory _input) internal view virtual { }
+
     /// @dev Verifies that parentProposals[0] is the current chain head
     /// Requires 1 element if next slot empty, 2 if occupied with older proposal
+    /// @dev Override this function in derived contracts to customize head checks.
     /// @param _parentProposals Array of 1-2 proposals to verify chain head
-    function _verifyChainHead(Proposal[] memory _parentProposals) private view {
+    function _handleChainHeadVerification(Proposal[] memory _parentProposals) internal virtual {
         unchecked {
             // First verify parentProposals[0] matches what's stored on-chain
             _checkProposalHash(_parentProposals[0]);
@@ -1123,11 +1154,6 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
             }
         }
     }
-
-    // Surge: These may be overridden by the client inbox contracts
-    // ---------------------------------------------------------------
-    // Surge Handlers
-    // ---------------------------------------------------------------
 
     /// @notice Handles proof verification logic
     /// @dev Override this function in derived contracts to customize proof verification handling.
