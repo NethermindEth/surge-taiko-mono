@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 /// @title LibVerifierId
-/// @dev This bindings from this library shall be used by the client to compute the verifier id.
+/// @dev The bindings from this library shall be used by the client to compute the verifier id.
 /// @custom:security-contact security@nethermind.io
 library LibVerifierId {
     enum Verifier {
