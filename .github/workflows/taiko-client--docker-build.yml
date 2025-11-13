@@ -100,7 +100,16 @@ jobs:
       - name: Determine event type and set tags
         id: event
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "is_tag=false" >> $GITHUB_OUTPUT
+            echo "is_branch=false" >> $GITHUB_OUTPUT
+            {
+              echo "tag_list<<EOF"
+              echo "type=sha"
+              echo "type=ref,event=pr"
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             echo "is_tag=true" >> $GITHUB_OUTPUT
             echo "is_branch=false" >> $GITHUB_OUTPUT
             VERSION=${GITHUB_REF#refs/tags/}
@@ -108,16 +117,14 @@ jobs:
             {
               echo "tag_list<<EOF"
               echo "type=raw,value=$VERSION"
-              echo "type=sha"
               echo "EOF"
             } >> $GITHUB_OUTPUT
-          else
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "is_tag=false" >> $GITHUB_OUTPUT
             echo "is_branch=true" >> $GITHUB_OUTPUT
             {
               echo "tag_list<<EOF"
               echo "type=raw,value=latest"
-              echo "type=sha"
               echo "EOF"
             } >> $GITHUB_OUTPUT
           fi
