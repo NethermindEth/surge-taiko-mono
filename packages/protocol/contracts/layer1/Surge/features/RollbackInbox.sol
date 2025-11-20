@@ -5,8 +5,7 @@ import { IInbox } from "../../core/iface/IInbox.sol";
 import { Inbox } from "../../core/impl/Inbox.sol";
 
 /// @title RollbackInbox
-/// @dev This is intended to be for demonstration only.
-/// @notice Inbox variant that implements chain rollback and limp mode feature.
+/// @dev Inbox variant that implements chain rollback and limp mode feature.
 /// @custom:security-contact security@nethermind.io
 contract RollbackInbox is Inbox {
     struct RollbackMetadata {
