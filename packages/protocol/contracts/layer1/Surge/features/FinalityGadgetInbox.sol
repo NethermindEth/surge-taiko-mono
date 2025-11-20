@@ -521,7 +521,7 @@ contract FinalityGadgetInbox is Inbox {
         // _surgeTransitionRecords is empty
 
         for (uint256 i; i < _surgeTransitionRecords.length; ++i) {
-            // If a matching transition record is found
+            // If a matching transition record is found, merge the proof bitmaps
             if (
                 _surgeTransitionRecords[i].hashAndDeadline.recordHash == _hashAndDeadline.recordHash
             ) {
@@ -534,6 +534,7 @@ contract FinalityGadgetInbox is Inbox {
         SurgeTransitionRecord memory newSurgeTransitionRecord =
             SurgeTransitionRecord({ proofBitmap: _proofBitmap, hashAndDeadline: _hashAndDeadline });
 
+        // We have a conflicting proof that needs to be appended to the list of records
         // TODO: Move to optimised hashing
         SurgeTransitionRecord[] memory updatedSurgeTransitionRecords =
             new SurgeTransitionRecord[](_surgeTransitionRecords.length + 1);
