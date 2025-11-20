@@ -132,7 +132,7 @@ contract InboxTransitionRecord is InboxTestHelper {
         proposals[0] = proposal;
 
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            proposals: proposals, transitions: transitions, metadata: metadata, extra: bytes("")
         });
 
         bytes memory proveData2 = _codec().encodeProveInput(input);
@@ -272,7 +272,7 @@ contract InboxTransitionRecord is InboxTestHelper {
         proposals[0] = proposal1;
 
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            proposals: proposals, transitions: transitions, metadata: metadata, extra: bytes("")
         });
 
         bytes memory conflictingProveData = _codec().encodeProveInput(input);
@@ -370,7 +370,7 @@ contract InboxTransitionRecord is InboxTestHelper {
         metadata[0] = _createMetadataForTransition(currentProver, currentProver);
 
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            proposals: proposals, transitions: transitions, metadata: metadata, extra: bytes("")
         });
 
         return _codec().encodeProveInput(input);
@@ -411,7 +411,7 @@ contract InboxTransitionRecord is InboxTestHelper {
         proposals[0] = _proposal;
 
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            proposals: proposals, transitions: transitions, metadata: metadata, extra: bytes("")
         });
 
         return _codec().encodeProveInput(input);
