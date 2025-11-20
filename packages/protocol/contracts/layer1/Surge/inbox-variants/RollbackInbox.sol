@@ -76,15 +76,16 @@ contract RollbackInbox is Inbox {
             MaxFinalizationWindowNotCrossed()
         );
 
-        // Enforce a chain rollback on next proposal
+        // Enforce a chain rollback on next proposal and enable limp mode
         _rollbackMetadata = RollbackMetadata(true, true, _firstUnfinalizedProposal.id);
 
         emit Rollback(_firstUnfinalizedProposal.id, _headProposals[0].id);
     }
 
     /// @notice Sets the contract into limp mode, disabling proposal and proving operations.
-    /// @dev Only callable externally, e.g., by a governance or admin address if such access is desired.
-    function setLimpMode(bool _inLimpMode) external {
+    /// @dev This will primarily be used by the owner to disable the limp mode after a rollback
+    /// incident.
+    function setLimpMode(bool _inLimpMode) external onlyOwner {
         // Insert appropriate access control in production (e.g., onlyOwner or onlyGovernance)
         _rollbackMetadata.inLimpMode = _inLimpMode;
     }
