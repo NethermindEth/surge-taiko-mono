@@ -193,7 +193,8 @@ func (s *ProverTestSuite) TestOnBatchProposed() {
 	if m.IsPacaya() {
 		s.Nil(s.p.aggregateOp(<-s.p.batchesAggregationNotifyPacaya, false))
 	} else {
-		s.Nil(s.p.aggregateOp(<-s.p.batchesAggregationNotifyShasta, true))
+		<-s.p.batchesAggregationNotifyShasta
+		s.Nil(s.p.aggregateShastaOp())
 	}
 	if m.IsPacaya() {
 		s.Nil(s.p.proofSubmitterPacaya.BatchSubmitProofs(context.Background(), <-s.p.batchProofGenerationCh))
@@ -218,7 +219,8 @@ func (s *ProverTestSuite) TestProveAfterExtendedWindow() {
 	s.Nil(s.p.eventHandlers.batchProposedHandler.Handle(context.Background(), meta, func() {}))
 	req := <-s.p.proofSubmissionCh
 	s.Nil(s.p.requestProofOp(req.Meta))
-	s.Nil(s.p.aggregateOp(<-s.p.batchesAggregationNotifyShasta, true))
+	<-s.p.batchesAggregationNotifyShasta
+	s.Nil(s.p.aggregateShastaOp())
 	s.Nil(s.p.proofSubmitterShasta.BatchSubmitProofs(context.Background(), <-s.p.batchProofGenerationCh))
 
 	state, err := s.RPCClient.ShastaClients.Anchor.GetProposalState(nil)
@@ -242,7 +244,8 @@ func (s *ProverTestSuite) TestProveAfterExtendedWindow() {
 	s.Nil(s.p.eventHandlers.batchProposedHandler.Handle(context.Background(), m, func() {}))
 	req = <-s.p.proofSubmissionCh
 	s.Nil(s.p.requestProofOp(req.Meta))
-	s.Nil(s.p.aggregateOp(<-s.p.batchesAggregationNotifyShasta, true))
+	<-s.p.batchesAggregationNotifyShasta
+	s.Nil(s.p.aggregateShastaOp())
 	s.Nil(s.p.proofSubmitterShasta.BatchSubmitProofs(context.Background(), <-s.p.batchProofGenerationCh))
 
 	// Propose `BondProcessingDelay + 1` more Shasta proposals to ensure the bond instructions are processed.

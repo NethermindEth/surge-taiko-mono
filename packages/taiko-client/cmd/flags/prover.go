@@ -16,23 +16,38 @@ var (
 		Category: proverCategory,
 		EnvVars:  []string{"L1_PROVER_PRIV_KEY"},
 	}
-	RaikoHostEndpoint = &cli.StringFlag{
-		Name:     "raiko.host",
-		Usage:    "RPC endpoint of a Raiko host service",
+	RaikoZKVMHostEndpoint1 = &cli.StringFlag{
+		Name:     "raiko.host.zkvm1",
+		Usage:    "RPC endpoint of the first Raiko ZKVM host service",
 		Required: true,
 		Category: proverCategory,
-		EnvVars:  []string{"RAIKO_HOST"},
+		EnvVars:  []string{"RAIKO_HOST_ZKVM1"},
+	}
+	RaikoZKVMHostEndpoint2 = &cli.StringFlag{
+		Name:     "raiko.host.zkvm2",
+		Usage:    "RPC endpoint of the second Raiko ZKVM host service",
+		Required: true,
+		Category: proverCategory,
+		EnvVars:  []string{"RAIKO_HOST_ZKVM2"},
+	}
+	ZKVMProofType1 = &cli.StringFlag{
+		Name:     "raiko.zkvm.proofType1",
+		Usage:    "Proof type for the first ZKVM (risc0 or sp1)",
+		Required: true,
+		Category: proverCategory,
+		EnvVars:  []string{"ZKVM_PROOF_TYPE1"},
+	}
+	ZKVMProofType2 = &cli.StringFlag{
+		Name:     "raiko.zkvm.proofType2",
+		Usage:    "Proof type for the second ZKVM (risc0 or sp1)",
+		Required: true,
+		Category: proverCategory,
+		EnvVars:  []string{"ZKVM_PROOF_TYPE2"},
 	}
 )
 
 // Optional flags used by prover.
 var (
-	RaikoZKVMHostEndpoint = &cli.StringFlag{
-		Name:     "raiko.host.zkvm",
-		Usage:    "RPC endpoint of a Raiko ZKVM host service",
-		Category: proverCategory,
-		EnvVars:  []string{"RAIKO_HOST_ZKVM"},
-	}
 	RaikoApiKeyPath = &cli.StringFlag{
 		Name:     "raiko.apiKeyPath",
 		Usage:    "Path to an Api key for the Raiko service",
@@ -127,7 +142,6 @@ var (
 var ProverFlags = MergeFlags(CommonFlags, []cli.Flag{
 	L2WSEndpoint,
 	L2HTTPEndpoint,
-	RaikoHostEndpoint,
 	RaikoApiKeyPath,
 	L1ProverPrivKey,
 	StartingBatchID,
@@ -139,7 +153,10 @@ var ProverFlags = MergeFlags(CommonFlags, []cli.Flag{
 	LocalProposerAddresses,
 	BlockConfirmations,
 	RaikoRequestTimeout,
-	RaikoZKVMHostEndpoint,
+	RaikoZKVMHostEndpoint1,
+	RaikoZKVMHostEndpoint2,
+	ZKVMProofType1,
+	ZKVMProofType2,
 	SGXBatchSize,
 	ZKVMBatchSize,
 	ForceBatchProvingInterval,

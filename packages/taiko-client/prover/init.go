@@ -82,24 +82,9 @@ func (p *Prover) setApprovalAmount(ctx context.Context, contract common.Address)
 
 // initShastaProofSubmitter initializes the proof submitter from the non-zero verifier addresses set in protocol.
 func (p *Prover) initShastaProofSubmitter(ctx context.Context, txBuilder *transaction.ProveBatchesTxBuilder) error {
-	var (
-		// ZKVM proof producers.
-		zkvmProducer producer.ProofProducer
+	var err error
 
-		// All activated proof types in protocol.
-		proofTypes = make([]producer.ProofType, 0, proofSubmitter.MaxNumSupportedProofTypes)
-
-		err error
-	)
-	// Proof verifiers addresses.
-	sgxGethVerifierID, err := p.rpc.ShastaClients.ComposeVerifier.SGXGETH(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return err
-	}
-	sgxRethVerifierID, err := p.rpc.ShastaClients.ComposeVerifier.SGXRETH(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return err
-	}
+	// Get verifier IDs for RISC0 and SP1
 	risc0RethVerifierID, err := p.rpc.ShastaClients.ComposeVerifier.RISC0RETH(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return err
@@ -109,64 +94,45 @@ func (p *Prover) initShastaProofSubmitter(ctx context.Context, txBuilder *transa
 		return err
 	}
 
-	sgxGethProducer := &producer.SgxGethProofProducer{
-		RaikoHostEndpoint:   p.cfg.RaikoHostEndpoint,
-		VerifierID:          sgxGethVerifierID,
+	// Map proof type strings to ProofType constants
+	proofTypeMap := map[string]producer.ProofType{
+		string(producer.ProofTypeZKR0):  producer.ProofTypeZKR0,
+		string(producer.ProofTypeZKSP1): producer.ProofTypeZKSP1,
+	}
+
+	zkvm1ProofType := proofTypeMap[p.cfg.ZKVMProofType1]
+	zkvm2ProofType := proofTypeMap[p.cfg.ZKVMProofType2]
+
+	// Create verifier ID map for both ZKVM proof types
+	verifierIDs := make(map[producer.ProofType]uint8)
+	verifierIDs[producer.ProofTypeZKR0] = risc0RethVerifierID
+	verifierIDs[producer.ProofTypeZKSP1] = sp1RethVerifierID
+
+	// Create single ComposeProofProducer with dual ZKVM endpoints
+	composeProducer := &producer.ComposeProofProducer{
+		VerifierIDs:         verifierIDs,
+		RaikoZKVMEndpoint1:  p.cfg.RaikoZKVMHostEndpoint1,
+		RaikoZKVMEndpoint2:  p.cfg.RaikoZKVMHostEndpoint2,
+		ZKVMProofType1:      zkvm1ProofType,
+		ZKVMProofType2:      zkvm2ProofType,
 		ApiKey:              p.cfg.RaikoApiKey,
 		RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
 		Dummy:               p.cfg.Dummy,
 	}
-	// Initialize the sgx proof producer.
-	proofTypes = append(proofTypes, producer.ProofTypeSgx)
-	sgxRethProducer := &producer.ComposeProofProducer{
-		SgxGethProducer: sgxGethProducer,
-		VerifierIDs: map[producer.ProofType]uint8{
-			producer.ProofTypeSgx: sgxRethVerifierID,
-		},
-		RaikoHostEndpoint:   p.cfg.RaikoHostEndpoint,
-		ProofType:           producer.ProofTypeSgx,
-		ApiKey:              p.cfg.RaikoApiKey,
-		RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
-		Dummy:               p.cfg.Dummy,
-	}
 
-	// Initialize the zk verifiers and zkvm proof producers.
-	var zkVerifierIDs = make(map[producer.ProofType]uint8, proofSubmitter.MaxNumSupportedZkTypes)
-	proofTypes = append(proofTypes, producer.ProofTypeZKR0)
-	zkVerifierIDs[producer.ProofTypeZKR0] = risc0RethVerifierID
-	proofTypes = append(proofTypes, producer.ProofTypeZKSP1)
-	zkVerifierIDs[producer.ProofTypeZKSP1] = sp1RethVerifierID
+	log.Info(
+		"Initialized dual ZKVM proof producer",
+		"zkvm1Type", zkvm1ProofType,
+		"zkvm2Type", zkvm2ProofType,
+		"zkvm1Endpoint", p.cfg.RaikoZKVMHostEndpoint1,
+		"zkvm2Endpoint", p.cfg.RaikoZKVMHostEndpoint2,
+	)
 
-	if len(p.cfg.RaikoZKVMHostEndpoint) != 0 {
-		zkvmProducer = &producer.ComposeProofProducer{
-			VerifierIDs:         zkVerifierIDs,
-			SgxGethProducer:     sgxGethProducer,
-			RaikoHostEndpoint:   p.cfg.RaikoZKVMHostEndpoint,
-			ApiKey:              p.cfg.RaikoApiKey,
-			RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
-			ProofType:           producer.ProofTypeZKAny,
-			Dummy:               p.cfg.Dummy,
-		}
-	}
-
-	// Init proof buffers.
-	var proofBuffers = make(map[producer.ProofType]*producer.ProofBuffer, proofSubmitter.MaxNumSupportedProofTypes)
-	// nolint:exhaustive
-	// We deliberately handle only known proof types and catch others in default case
-	for _, proofType := range proofTypes {
-		switch proofType {
-		case producer.ProofTypeOp, producer.ProofTypeSgx:
-			proofBuffers[proofType] = producer.NewProofBuffer(p.cfg.SGXProofBufferSize)
-		case producer.ProofTypeZKR0, producer.ProofTypeZKSP1:
-			proofBuffers[proofType] = producer.NewProofBuffer(p.cfg.ZKVMProofBufferSize)
-		default:
-			return fmt.Errorf("unexpected proof type: %s", proofType)
-		}
-	}
+	// Init single proof buffer for dual ZKVM proofs
+	proofBuffer := producer.NewProofBuffer(p.cfg.ZKVMProofBufferSize)
 
 	if p.proofSubmitterShasta, err = proofSubmitter.NewProofSubmitterShasta(
-		sgxRethProducer,
-		zkvmProducer,
+		composeProducer,
 		p.batchProofGenerationCh,
 		p.batchesAggregationNotifyShasta,
 		p.proofSubmissionCh,
@@ -180,7 +146,7 @@ func (p *Prover) initShastaProofSubmitter(ctx context.Context, txBuilder *transa
 		},
 		txBuilder,
 		p.cfg.ProofPollingInterval,
-		proofBuffers,
+		proofBuffer,
 		p.cfg.ForceBatchProvingInterval,
 	); err != nil {
 		return fmt.Errorf("failed to initialize Shasta proof submitter: %w", err)

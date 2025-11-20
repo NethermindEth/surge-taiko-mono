@@ -65,7 +65,7 @@ type Prover struct {
 	assignmentExpiredCh            chan metadata.TaikoProposalMetaData
 	proveNotify                    chan struct{}
 	batchesAggregationNotifyPacaya chan proofProducer.ProofType
-	batchesAggregationNotifyShasta chan proofProducer.ProofType
+	batchesAggregationNotifyShasta chan bool
 
 	// Proof related channels
 	proofSubmissionCh      chan *proofProducer.ProofRequestBody
@@ -139,7 +139,7 @@ func InitFromConfig(
 	p.proofSubmissionCh = make(chan *proofProducer.ProofRequestBody, chBufferSize)
 	p.proveNotify = make(chan struct{}, 1)
 	p.batchesAggregationNotifyPacaya = make(chan proofProducer.ProofType, 1)
-	p.batchesAggregationNotifyShasta = make(chan proofProducer.ProofType, 1)
+	p.batchesAggregationNotifyShasta = make(chan bool, 1)
 
 	if err := p.shastaIndexer.Start(); err != nil {
 		return fmt.Errorf("failed to start Shasta state indexer: %w", err)
@@ -274,8 +274,8 @@ func (p *Prover) eventLoop() {
 			}
 		case proofType := <-p.batchesAggregationNotifyPacaya:
 			p.withRetry(func() error { return p.aggregateOp(proofType, false) })
-		case proofType := <-p.batchesAggregationNotifyShasta:
-			p.withRetry(func() error { return p.aggregateOp(proofType, true) })
+		case <-p.batchesAggregationNotifyShasta:
+			p.withRetry(func() error { return p.aggregateShastaOp() })
 		case e := <-batchesVerifiedCh:
 			if err := p.eventHandlers.batchesVerifiedHandler.HandlePacaya(p.ctx, e); err != nil {
 				log.Error("Failed to handle new BatchesVerified event", "error", err)
@@ -321,12 +321,22 @@ func (p *Prover) proveOp() error {
 func (p *Prover) aggregateOp(proofType proofProducer.ProofType, isShasta bool) error {
 	var err error
 	if isShasta {
-		err = p.proofSubmitterShasta.AggregateProofsByType(p.ctx, proofType)
+		// Shasta uses a different method now
+		return p.aggregateShastaOp()
 	} else {
 		err = p.proofSubmitterPacaya.AggregateProofsByType(p.ctx, proofType)
 	}
 	if err != nil {
 		log.Error("Failed to aggregate proofs", "error", err, "proofType", proofType)
+		return err
+	}
+	return nil
+}
+
+// aggregateShastaOp aggregates dual ZKVM proofs for Shasta.
+func (p *Prover) aggregateShastaOp() error {
+	if err := p.proofSubmitterShasta.AggregateProofs(p.ctx); err != nil {
+		log.Error("Failed to aggregate Shasta dual proofs", "error", err)
 		return err
 	}
 	return nil

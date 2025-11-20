@@ -18,6 +18,7 @@ import (
 	pkgFlags "github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/flags"
 	shastaIndexer "github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/state_indexer"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
+	producer "github.com/taikoxyz/taiko-mono/packages/taiko-client/prover/proof_producer"
 )
 
 // Config contains the configurations to initialize a Taiko prover.
@@ -39,8 +40,12 @@ type Config struct {
 	RPCTimeout                time.Duration
 	ProveBatchesGasLimit      uint64
 	Allowance                 *big.Int
-	RaikoHostEndpoint         string
-	RaikoZKVMHostEndpoint     string
+	RaikoHostEndpoint         string // Pacaya (not set from flags, kept for compatibility)
+	RaikoZKVMHostEndpoint     string // Pacaya (not set from flags, kept for compatibility)
+	RaikoZKVMHostEndpoint1    string
+	RaikoZKVMHostEndpoint2    string
+	ZKVMProofType1            string
+	ZKVMProofType2            string
 	RaikoApiKey               string
 	RaikoRequestTimeout       time.Duration
 	LocalProposerAddresses    []common.Address
@@ -102,6 +107,30 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 	}
 	log.Info("Local proposer addresses", "addresses", localProposerAddresses)
 
+	// Read and validate ZKVM proof types
+	zkvmProofType1 := c.String(flags.ZKVMProofType1.Name)
+	zkvmProofType2 := c.String(flags.ZKVMProofType2.Name)
+
+	// Validate proof types using constants from producer package
+	validProofTypes := map[string]bool{
+		string(producer.ProofTypeZKR0):  true,
+		string(producer.ProofTypeZKSP1): true,
+	}
+
+	if !validProofTypes[zkvmProofType1] {
+		return nil, fmt.Errorf("invalid ZKVM proof type 1: %s (must be %s or %s)",
+			zkvmProofType1, producer.ProofTypeZKR0, producer.ProofTypeZKSP1)
+	}
+	if !validProofTypes[zkvmProofType2] {
+		return nil, fmt.Errorf("invalid ZKVM proof type 2: %s (must be %s or %s)",
+			zkvmProofType2, producer.ProofTypeZKR0, producer.ProofTypeZKSP1)
+	}
+	if zkvmProofType1 == zkvmProofType2 {
+		return nil, fmt.Errorf("ZKVM proof types must be different: both are set to %s", zkvmProofType1)
+	}
+
+	log.Info("ZKVM configuration", "proofType1", zkvmProofType1, "proofType2", zkvmProofType2)
+
 	return &Config{
 		L1WsEndpoint:           c.String(flags.L1WSEndpoint.Name),
 		L2WsEndpoint:           c.String(flags.L2WSEndpoint.Name),
@@ -113,8 +142,10 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		ProverSetAddress:       common.HexToAddress(c.String(flags.ProverSetAddress.Name)),
 		ShastaForkTime:         c.Uint64(flags.ShastaForkTime.Name),
 		L1ProverPrivKey:        l1ProverPrivKey,
-		RaikoHostEndpoint:      c.String(flags.RaikoHostEndpoint.Name),
-		RaikoZKVMHostEndpoint:  c.String(flags.RaikoZKVMHostEndpoint.Name),
+		RaikoZKVMHostEndpoint1: c.String(flags.RaikoZKVMHostEndpoint1.Name),
+		RaikoZKVMHostEndpoint2: c.String(flags.RaikoZKVMHostEndpoint2.Name),
+		ZKVMProofType1:         zkvmProofType1,
+		ZKVMProofType2:         zkvmProofType2,
 		RaikoApiKey:            strings.TrimSpace(string(raikoApiKey)),
 		RaikoRequestTimeout:    c.Duration(flags.RaikoRequestTimeout.Name),
 		StartingBatchID:        startingBatchID,
