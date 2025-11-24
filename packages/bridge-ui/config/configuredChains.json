@@ -7,7 +7,7 @@
         "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
           "default": {
-            "http": ["https://l1-rpc-internal.hoodi.surge.wtf"]
+            "http": ["https://l1-rpc-internal.staging.surge.wtf"]
           }
         },
         "nativeCurrency": {
@@ -24,13 +24,13 @@
       }
     },
     {
-      "763375": {
-        "name": "Surge Testnet",
+      "763374": {
+        "name": "Surge Staging",
         "type": "L2",
         "icon": "https://cdn.worldvectorlogo.com/logos/ethereum-eth.svg",
         "rpcUrls": {
           "default": {
-            "http": ["https://l2-rpc.hoodi.surge.wtf"]
+            "http": ["https://l2-rpc.staging.surge.wtf"]
           }
         },
         "nativeCurrency": {
@@ -40,8 +40,8 @@
         },
         "blockExplorers": {
           "default": {
-            "name": "Surge Testnet Block Explorer",
-            "url": "https://explorer.hoodi.surge.wtf"
+            "name": "Surge Staging Block Explorer",
+            "url": "https://explorer.staging.surge.wtf"
           }
         }
       }
