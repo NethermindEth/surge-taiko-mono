@@ -171,21 +171,23 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesShasta(batchProof *proofProduce
 			return nil, encoding.TryParsingCustomError(err)
 		}
 		log.Info(
-			"Verifier information",
-			"GethVerifierID", batchProof.SgxGethVerifierID,
-			"GethProof", common.Bytes2Hex(batchProof.SgxGethBatchProof),
-			"VerifierID", batchProof.VerifierID,
-			"Proof", common.Bytes2Hex(batchProof.BatchProof),
+			"Dual ZKVM verifier information",
+			"Verifier1Type", batchProof.ProofType1,
+			"VerifierID1", batchProof.VerifierID1,
+			"Proof1", common.Bytes2Hex(batchProof.BatchProof1),
+			"Verifier2Type", batchProof.ProofType2,
+			"VerifierID2", batchProof.VerifierID2,
+			"Proof2", common.Bytes2Hex(batchProof.BatchProof2),
 		)
 
 		subProofs := []encoding.SubProofShasta{
 			{
-				VerifierId: batchProof.SgxGethVerifierID,
-				Proof:      batchProof.SgxGethBatchProof,
+				VerifierId: batchProof.VerifierID1,
+				Proof:      batchProof.BatchProof1,
 			},
 			{
-				VerifierId: batchProof.VerifierID,
-				Proof:      batchProof.BatchProof,
+				VerifierId: batchProof.VerifierID2,
+				Proof:      batchProof.BatchProof2,
 			},
 		}
 		encodedSubProofs, err := encoding.EncodeBatchesSubProofsShasta(subProofs)

@@ -483,3 +483,9 @@ func (s *ProofSubmitterPacaya) validateBatchProofs(
 
 	return invalidBatchIDs, nil
 }
+
+// AggregateProofs is not used by Pacaya (only for Shasta dual proofs).
+func (s *ProofSubmitterPacaya) AggregateProofs(ctx context.Context) error {
+	// Pacaya uses AggregateProofsByType instead
+	return nil
+}
