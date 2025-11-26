@@ -15,12 +15,12 @@ on:
         description: 'JSON content for configuredCustomTokens.json'
         required: false
         type: string
-      configuredRelayer:
-        description: 'JSON content for configuredRelayer.json'
-        required: false
-        type: string
       configuredEventIndexer:
         description: 'JSON content for configuredEventIndexer.json'
+        required: false
+        type: string
+      configuredRelayer:
+        description: 'JSON content for configuredRelayer.json'
         required: false
         type: string
   pull_request:
@@ -74,8 +74,8 @@ jobs:
           CONFIGURED_BRIDGES: ${{ inputs.configuredBridges }}
           CONFIGURED_CHAINS: ${{ inputs.configuredChains }}
           CONFIGURED_CUSTOM_TOKENS: ${{ inputs.configuredCustomTokens }}
-          CONFIGURED_RELAYER: ${{ inputs.configuredRelayer }}
           CONFIGURED_EVENT_INDEXER: ${{ inputs.configuredEventIndexer }}
+          CONFIGURED_RELAYER: ${{ inputs.configuredRelayer }}
         run: |
           python3 << 'PYTHON_SCRIPT'
           import json
@@ -86,16 +86,16 @@ jobs:
               'configuredBridges.json': 'configuredBridges',
               'configuredChains.json': 'configuredChains',
               'configuredCustomTokens.json': None,
+              'configuredEventIndexer.json': 'configuredEventIndexer',
               'configuredRelayer.json': 'configuredRelayer',
-              'configuredEventIndexer.json': 'configuredEventIndexer'
           }
           
           DEFAULT_STRUCTURES = {
               'configuredBridges.json': {"configuredBridges": []},
               'configuredChains.json': {"configuredChains": []},
               'configuredCustomTokens.json': [],
+              'configuredEventIndexer.json': {"configuredEventIndexer": []},
               'configuredRelayer.json': {"configuredRelayer": []},
-              'configuredEventIndexer.json': {"configuredEventIndexer": []}
           }
           
           def write_config(env_var, filename):
@@ -133,8 +133,8 @@ jobs:
           write_config('CONFIGURED_BRIDGES', 'configuredBridges.json')
           write_config('CONFIGURED_CHAINS', 'configuredChains.json')
           write_config('CONFIGURED_CUSTOM_TOKENS', 'configuredCustomTokens.json')
-          write_config('CONFIGURED_RELAYER', 'configuredRelayer.json')
           write_config('CONFIGURED_EVENT_INDEXER', 'configuredEventIndexer.json')
+          write_config('CONFIGURED_RELAYER', 'configuredRelayer.json')
           PYTHON_SCRIPT
 
       - name: Set up QEMU
