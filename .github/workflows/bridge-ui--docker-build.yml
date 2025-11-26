@@ -70,27 +70,30 @@ jobs:
       - name: Write config files from inputs
         if: github.event_name == 'workflow_dispatch'
         working-directory: packages/bridge-ui/config
+        env:
+          CONFIGURED_BRIDGES: ${{ inputs.configuredBridges }}
+          CONFIGURED_CHAINS: ${{ inputs.configuredChains }}
+          CONFIGURED_CUSTOM_TOKENS: ${{ inputs.configuredCustomTokens }}
+          CONFIGURED_RELAYER: ${{ inputs.configuredRelayer }}
+          CONFIGURED_EVENT_INDEXER: ${{ inputs.configuredEventIndexer }}
         run: |
-          if [ -n "${{ inputs.configuredBridges }}" ]; then
-            echo "${{ inputs.configuredBridges }}" | jq . > configuredBridges.json
-            echo "✓ Written configuredBridges.json"
-          fi
-          if [ -n "${{ inputs.configuredChains }}" ]; then
-            echo "${{ inputs.configuredChains }}" | jq . > configuredChains.json
-            echo "✓ Written configuredChains.json"
-          fi
-          if [ -n "${{ inputs.configuredCustomTokens }}" ]; then
-            echo "${{ inputs.configuredCustomTokens }}" | jq . > configuredCustomTokens.json
-            echo "✓ Written configuredCustomTokens.json"
-          fi
-          if [ -n "${{ inputs.configuredRelayer }}" ]; then
-            echo "${{ inputs.configuredRelayer }}" | jq . > configuredRelayer.json
-            echo "✓ Written configuredRelayer.json"
-          fi
-          if [ -n "${{ inputs.configuredEventIndexer }}" ]; then
-            echo "${{ inputs.configuredEventIndexer }}" | jq . > configuredEventIndexer.json
-            echo "✓ Written configuredEventIndexer.json"
-          fi
+          write_config() {
+            local var_name=$1
+            local file_name=$2
+            local content="${!var_name}"
+            if [ -n "$content" ]; then
+              echo "$content" | jq . > "$file_name" || {
+                echo "Error: Failed to parse JSON for $file_name"
+                exit 1
+              }
+              echo "✓ Written $file_name"
+            fi
+          }
+          write_config CONFIGURED_BRIDGES configuredBridges.json
+          write_config CONFIGURED_CHAINS configuredChains.json
+          write_config CONFIGURED_CUSTOM_TOKENS configuredCustomTokens.json
+          write_config CONFIGURED_RELAYER configuredRelayer.json
+          write_config CONFIGURED_EVENT_INDEXER configuredEventIndexer.json
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
