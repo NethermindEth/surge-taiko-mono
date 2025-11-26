@@ -89,15 +89,13 @@ var (
 		Category: commonCategory,
 		EnvVars:  []string{"TAIKO_ANCHOR"},
 	}
+	// Optional flags used by all client software.
 	TaikoTokenAddress = &cli.StringFlag{
 		Name:     "taikoToken",
 		Usage:    "TaikoToken contract `address`",
-		Required: true,
 		Category: commonCategory,
 		EnvVars:  []string{"TAIKO_TOKEN"},
 	}
-
-	// Optional flags used by all client software.
 	// Logging
 	Verbosity = &cli.IntFlag{
 		Name:     "verbosity",
