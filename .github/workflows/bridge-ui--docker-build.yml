@@ -15,12 +15,12 @@ on:
         description: 'JSON content for configuredCustomTokens.json'
         required: false
         type: string
-      configuredRelayer:
-        description: 'JSON content for configuredRelayer.json'
-        required: false
-        type: string
       configuredEventIndexer:
         description: 'JSON content for configuredEventIndexer.json'
+        required: false
+        type: string
+      configuredRelayer:
+        description: 'JSON content for configuredRelayer.json'
         required: false
         type: string
   pull_request:
@@ -70,27 +70,72 @@ jobs:
       - name: Write config files from inputs
         if: github.event_name == 'workflow_dispatch'
         working-directory: packages/bridge-ui/config
+        env:
+          CONFIGURED_BRIDGES: ${{ inputs.configuredBridges }}
+          CONFIGURED_CHAINS: ${{ inputs.configuredChains }}
+          CONFIGURED_CUSTOM_TOKENS: ${{ inputs.configuredCustomTokens }}
+          CONFIGURED_EVENT_INDEXER: ${{ inputs.configuredEventIndexer }}
+          CONFIGURED_RELAYER: ${{ inputs.configuredRelayer }}
         run: |
-          if [ -n "${{ inputs.configuredBridges }}" ]; then
-            echo "${{ inputs.configuredBridges }}" | jq . > configuredBridges.json
-            echo "✓ Written configuredBridges.json"
-          fi
-          if [ -n "${{ inputs.configuredChains }}" ]; then
-            echo "${{ inputs.configuredChains }}" | jq . > configuredChains.json
-            echo "✓ Written configuredChains.json"
-          fi
-          if [ -n "${{ inputs.configuredCustomTokens }}" ]; then
-            echo "${{ inputs.configuredCustomTokens }}" | jq . > configuredCustomTokens.json
-            echo "✓ Written configuredCustomTokens.json"
-          fi
-          if [ -n "${{ inputs.configuredRelayer }}" ]; then
-            echo "${{ inputs.configuredRelayer }}" | jq . > configuredRelayer.json
-            echo "✓ Written configuredRelayer.json"
-          fi
-          if [ -n "${{ inputs.configuredEventIndexer }}" ]; then
-            echo "${{ inputs.configuredEventIndexer }}" | jq . > configuredEventIndexer.json
-            echo "✓ Written configuredEventIndexer.json"
-          fi
+          python3 << 'PYTHON_SCRIPT'
+          import json
+          import os
+          import sys
+          
+          EXPECTED_KEYS = {
+              'configuredBridges.json': 'configuredBridges',
+              'configuredChains.json': 'configuredChains',
+              'configuredCustomTokens.json': None,
+              'configuredEventIndexer.json': 'configuredEventIndexer',
+              'configuredRelayer.json': 'configuredRelayer',
+          }
+          
+          DEFAULT_STRUCTURES = {
+              'configuredBridges.json': {"configuredBridges": []},
+              'configuredChains.json': {"configuredChains": []},
+              'configuredCustomTokens.json': [],
+              'configuredEventIndexer.json': {"configuredEventIndexer": []},
+              'configuredRelayer.json': {"configuredRelayer": []},
+          }
+          
+          def write_config(env_var, filename):
+              content = os.environ.get(env_var, '').strip()
+              default_structure = DEFAULT_STRUCTURES.get(filename)
+              expected_key = EXPECTED_KEYS.get(filename)
+              
+              if not content:
+                  if default_structure is not None:
+                      with open(filename, 'w') as f:
+                          json.dump(default_structure, f, indent=2)
+                  return
+              
+              try:
+                  parsed = json.loads(content)
+                  
+                  if expected_key is None:
+                      if not isinstance(parsed, list):
+                          print(f"Error: {filename} should be an array")
+                          sys.exit(1)
+                  else:
+                      if not isinstance(parsed, dict):
+                          print(f"Error: {filename} should be an object")
+                          sys.exit(1)
+                      if expected_key not in parsed:
+                          print(f"Error: {filename} missing required key '{expected_key}'")
+                          sys.exit(1)
+                  
+                  with open(filename, 'w') as f:
+                      json.dump(parsed, f, indent=2)
+              except json.JSONDecodeError as e:
+                  print(f"Error: Invalid JSON for {filename}: {e}")
+                  sys.exit(1)
+          
+          write_config('CONFIGURED_BRIDGES', 'configuredBridges.json')
+          write_config('CONFIGURED_CHAINS', 'configuredChains.json')
+          write_config('CONFIGURED_CUSTOM_TOKENS', 'configuredCustomTokens.json')
+          write_config('CONFIGURED_EVENT_INDEXER', 'configuredEventIndexer.json')
+          write_config('CONFIGURED_RELAYER', 'configuredRelayer.json')
+          PYTHON_SCRIPT
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
