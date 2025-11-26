@@ -115,10 +115,20 @@ jobs:
           
           # Use Python to write config files from environment variables
           # If input is empty, write valid empty JSON structure
+          # Also validate that the JSON structure matches the expected schema
           python3 << 'PYTHON_SCRIPT'
           import json
           import os
           import sys
+          
+          # Expected top-level keys for each file
+          EXPECTED_KEYS = {
+              'configuredBridges.json': 'configuredBridges',
+              'configuredChains.json': 'configuredChains',
+              'configuredCustomTokens.json': None,  # Array, not object
+              'configuredRelayer.json': 'configuredRelayer',
+              'configuredEventIndexer.json': 'configuredEventIndexer'
+          }
           
           # Default empty structures that match the schemas
           DEFAULT_STRUCTURES = {
@@ -132,6 +142,7 @@ jobs:
           def write_config(env_var, filename):
               content = os.environ.get(env_var, '').strip()
               default_structure = DEFAULT_STRUCTURES.get(filename)
+              expected_key = EXPECTED_KEYS.get(filename)
               
               if not content:
                   # Write default empty structure if content is empty
@@ -144,6 +155,24 @@ jobs:
               try:
                   # Parse JSON to validate it
                   parsed = json.loads(content)
+                  
+                  # Validate structure matches expected schema
+                  if expected_key is None:
+                      # For configuredCustomTokens, should be an array
+                      if not isinstance(parsed, list):
+                          print(f"Error: {filename} should be an array, but got {type(parsed).__name__}")
+                          sys.exit(1)
+                  else:
+                      # For others, should be an object with the expected key
+                      if not isinstance(parsed, dict):
+                          print(f"Error: {filename} should be an object, but got {type(parsed).__name__}")
+                          sys.exit(1)
+                      if expected_key not in parsed:
+                          print(f"Error: {filename} is missing required top-level key '{expected_key}'")
+                          print(f"Found keys: {list(parsed.keys())}")
+                          print(f"Content preview: {json.dumps(parsed, indent=2)[:500]}")
+                          sys.exit(1)
+                  
                   # Write formatted JSON
                   with open(filename, 'w') as f:
                       json.dump(parsed, f, indent=2)
