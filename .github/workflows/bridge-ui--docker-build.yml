@@ -70,30 +70,111 @@ jobs:
       - name: Write config files from inputs
         if: github.event_name == 'workflow_dispatch'
         working-directory: packages/bridge-ui/config
-        env:
-          CONFIGURED_BRIDGES: ${{ inputs.configuredBridges }}
-          CONFIGURED_CHAINS: ${{ inputs.configuredChains }}
-          CONFIGURED_CUSTOM_TOKENS: ${{ inputs.configuredCustomTokens }}
-          CONFIGURED_RELAYER: ${{ inputs.configuredRelayer }}
-          CONFIGURED_EVENT_INDEXER: ${{ inputs.configuredEventIndexer }}
         run: |
-          write_config() {
-            local var_name=$1
-            local file_name=$2
-            local content="${!var_name}"
-            if [ -n "$content" ]; then
-              echo "$content" | jq . > "$file_name" || {
-                echo "Error: Failed to parse JSON for $file_name"
-                exit 1
-              }
-              echo "✓ Written $file_name"
-            fi
-          }
-          write_config CONFIGURED_BRIDGES configuredBridges.json
-          write_config CONFIGURED_CHAINS configuredChains.json
-          write_config CONFIGURED_CUSTOM_TOKENS configuredCustomTokens.json
-          write_config CONFIGURED_RELAYER configuredRelayer.json
-          write_config CONFIGURED_EVENT_INDEXER configuredEventIndexer.json
+          # Write each input to a temporary file, then process with Python
+          # This avoids GitHub Actions environment variable size limits
+          mkdir -p /tmp/config_inputs
+          
+          # Debug: Display input lengths and previews before writing
+          # Write inputs to temp files first, then read them for debugging
+          if [ -n "${{ inputs.configuredBridges }}" ]; then
+            printf '%s\n' '${{ inputs.configuredBridges }}' > /tmp/config_inputs/bridges_debug.txt
+          fi
+          if [ -n "${{ inputs.configuredChains }}" ]; then
+            printf '%s\n' '${{ inputs.configuredChains }}' > /tmp/config_inputs/chains_debug.txt
+          fi
+          if [ -n "${{ inputs.configuredCustomTokens }}" ]; then
+            printf '%s\n' '${{ inputs.configuredCustomTokens }}' > /tmp/config_inputs/tokens_debug.txt
+          fi
+          if [ -n "${{ inputs.configuredRelayer }}" ]; then
+            printf '%s\n' '${{ inputs.configuredRelayer }}' > /tmp/config_inputs/relayer_debug.txt
+          fi
+          if [ -n "${{ inputs.configuredEventIndexer }}" ]; then
+            printf '%s\n' '${{ inputs.configuredEventIndexer }}' > /tmp/config_inputs/indexer_debug.txt
+          fi
+          
+          # Debug script to display what was received
+          python3 << 'DEBUG_SCRIPT'
+          import os
+          
+          def debug_file(name, filepath):
+              print(f"\n=== {name} ===")
+              if os.path.exists(filepath):
+                  with open(filepath, 'r', encoding='utf-8') as f:
+                      content = f.read()
+                  length = len(content)
+                  print(f"Length: {length} characters")
+                  if length > 0:
+                      preview = content[:200] if len(content) > 200 else content
+                      print(f"Preview (first 200 chars): {preview}")
+                      if len(content) > 200:
+                          print(f"Last 200 chars: {content[-200:]}")
+              else:
+                  print("File not found (input was empty or not provided)")
+          
+          print("=" * 60)
+          print("DEBUG: Input content received from GitHub Actions")
+          print("=" * 60)
+          
+          debug_file("CONFIGURED_BRIDGES", "/tmp/config_inputs/bridges_debug.txt")
+          debug_file("CONFIGURED_CHAINS", "/tmp/config_inputs/chains_debug.txt")
+          debug_file("CONFIGURED_CUSTOM_TOKENS", "/tmp/config_inputs/tokens_debug.txt")
+          debug_file("CONFIGURED_RELAYER", "/tmp/config_inputs/relayer_debug.txt")
+          debug_file("CONFIGURED_EVENT_INDEXER", "/tmp/config_inputs/indexer_debug.txt")
+          
+          print("\n" + "=" * 60)
+          DEBUG_SCRIPT
+          
+          # Move debug files to final locations (they'll be processed by Python script below)
+          mv /tmp/config_inputs/bridges_debug.txt /tmp/config_inputs/bridges.txt 2>/dev/null || true
+          mv /tmp/config_inputs/chains_debug.txt /tmp/config_inputs/chains.txt 2>/dev/null || true
+          mv /tmp/config_inputs/tokens_debug.txt /tmp/config_inputs/tokens.txt 2>/dev/null || true
+          mv /tmp/config_inputs/relayer_debug.txt /tmp/config_inputs/relayer.txt 2>/dev/null || true
+          mv /tmp/config_inputs/indexer_debug.txt /tmp/config_inputs/indexer.txt 2>/dev/null || true
+          
+          # Debug: Verify what was written to files
+          echo ""
+          echo "=== DEBUG: File sizes after writing ==="
+          ls -lh /tmp/config_inputs/*.txt 2>/dev/null || echo "No files written"
+          
+          # Process files with Python to validate and format JSON
+          python3 << 'PYTHON_SCRIPT'
+          import json
+          import os
+          import sys
+          
+          def process_file(input_file, output_file):
+              if not os.path.exists(input_file):
+                  return
+              try:
+                  with open(input_file, 'r', encoding='utf-8') as f:
+                      content = f.read().strip()
+                  if not content:
+                      return
+                  # Parse JSON to validate it
+                  parsed = json.loads(content)
+                  # Write formatted JSON
+                  with open(output_file, 'w') as f:
+                      json.dump(parsed, f, indent=2)
+                  print(f"✓ Written {output_file}")
+                  # Clean up temp file
+                  os.remove(input_file)
+              except json.JSONDecodeError as e:
+                  print(f"Error: Invalid JSON for {output_file}: {e}")
+                  if os.path.exists(input_file):
+                      with open(input_file, 'r', encoding='utf-8') as f:
+                          content = f.read()
+                      print(f"Content length: {len(content)} chars")
+                      if len(content) > 0:
+                          print(f"Content preview (first 500 chars): {content[:500]}")
+                  sys.exit(1)
+          
+          process_file('/tmp/config_inputs/bridges.txt', 'configuredBridges.json')
+          process_file('/tmp/config_inputs/chains.txt', 'configuredChains.json')
+          process_file('/tmp/config_inputs/tokens.txt', 'configuredCustomTokens.json')
+          process_file('/tmp/config_inputs/relayer.txt', 'configuredRelayer.json')
+          process_file('/tmp/config_inputs/indexer.txt', 'configuredEventIndexer.json')
+          PYTHON_SCRIPT
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
