@@ -153,6 +153,11 @@ func (m *TaikoDataBlockMetadataPacaya) GetTxHash() common.Hash {
 	return m.Log.TxHash
 }
 
+// GetLogIndex returns the log index.
+func (m *TaikoDataBlockMetadataPacaya) GetLogIndex() uint {
+	return m.Log.Index
+}
+
 // IsOntakeBlock returns whether the block is an ontake block.
 func (m *TaikoDataBlockMetadataPacaya) IsOntakeBlock() bool {
 	return true
@@ -161,4 +166,9 @@ func (m *TaikoDataBlockMetadataPacaya) IsOntakeBlock() bool {
 // InnerMetadata returns the inner metadata.
 func (m *TaikoDataBlockMetadataPacaya) InnerMetadata() *pacayaBindings.ITaikoInboxBatchMetadata {
 	return &m.ITaikoInboxBatchMetadata
+}
+
+// GetBaseFee returns the base fee of this batch.
+func (m *TaikoDataBlockMetadataPacaya) GetBaseFee() *big.Int {
+	return m.BaseFee
 }

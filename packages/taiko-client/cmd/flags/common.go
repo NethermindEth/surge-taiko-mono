@@ -82,15 +82,15 @@ var (
 		Category: commonCategory,
 		EnvVars:  []string{"TAIKO_ANCHOR"},
 	}
+
+	// Optional flags used by all client software.
 	TaikoTokenAddress = &cli.StringFlag{
 		Name:     "taikoToken",
 		Usage:    "TaikoToken contract `address`",
-		Required: true,
+		Value:    rpc.ZeroAddress.Hex(),
 		Category: commonCategory,
 		EnvVars:  []string{"TAIKO_TOKEN"},
 	}
-
-	// Optional flags used by all client software.
 	// Logging
 	Verbosity = &cli.IntFlag{
 		Name:     "verbosity",
@@ -155,6 +155,13 @@ var (
 		Category: commonCategory,
 		EnvVars:  []string{"PROVER_SET"},
 	}
+	SurgeProposerWrapperAddress = &cli.StringFlag{
+		Name:     "surgeProposerWrapper",
+		Usage:    "SurgeProposerWrapper contract `address` - Wrapper for propose/prove operations to avoid nonce conflicts",
+		Value:    rpc.ZeroAddress.Hex(),
+		Category: commonCategory,
+		EnvVars:  []string{"SURGE_PROPOSER_WRAPPER"},
+	}
 )
 
 // CommonFlags All common flags.
@@ -174,6 +181,7 @@ var CommonFlags = []cli.Flag{
 	BackOffRetryInterval,
 	RPCTimeout,
 	L1PrivateEndpoint,
+	SurgeProposerWrapperAddress,
 }
 
 // MergeFlags merges the given flag slices.

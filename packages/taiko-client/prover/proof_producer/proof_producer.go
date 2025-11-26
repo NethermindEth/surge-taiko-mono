@@ -27,22 +27,25 @@ type ProofRequestBody struct {
 
 // ProofResponse represents a response of a proof request.
 type ProofResponse struct {
-	BatchID   *big.Int
-	Meta      metadata.TaikoProposalMetaData
-	Proof     []byte
-	Opts      ProofRequestOptions
-	ProofType ProofType
+	BatchID      *big.Int
+	Meta         metadata.TaikoProposalMetaData
+	Proof        []byte
+	Opts         ProofRequestOptions
+	ZKProofType  ProofType
+	SGXProofType ProofType
 }
 
 // BatchProofs represents a response of a batch proof request.
 type BatchProofs struct {
-	ProofResponses       []*ProofResponse
-	BatchProof           []byte
-	BatchIDs             []*big.Int
-	ProofType            ProofType
-	Verifier             common.Address
-	SgxGethBatchProof    []byte
-	SgxGethProofVerifier common.Address
+	ProofResponses []*ProofResponse
+	BatchProof     []byte
+	BatchIDs       []*big.Int
+	ProofType      ProofType
+	Verifier       common.Address
+
+	SgxProofType     ProofType
+	SgxBatchProof    []byte
+	SgxProofVerifier common.Address
 }
 
 // ProofProducer is an interface that contains all methods to generate a proof.

@@ -27,8 +27,9 @@ type PacayaClients struct {
 	TaikoToken           *pacayaBindings.TaikoToken
 	ProverSet            *pacayaBindings.ProverSet
 	ForkRouter           *pacayaBindings.ForkRouter
-	ComposeVerifier      *pacayaBindings.ComposeVerifier
+	SurgeVerifier        *pacayaBindings.SurgeVerifier
 	PreconfWhitelist     *pacayaBindings.PreconfWhitelist
+	SurgeProposerWrapper *pacayaBindings.SurgeProposerWrapper
 	ForkHeights          *pacayaBindings.ITaikoInboxForkHeights
 }
 
@@ -61,6 +62,8 @@ type ClientConfig struct {
 	ForcedInclusionStoreAddress common.Address
 	PreconfWhitelistAddress     common.Address
 	ProverSetAddress            common.Address
+	SurgeProposerWrapperAddress common.Address
+	BridgeAddress               common.Address
 	L2EngineEndpoint            string
 	JwtSecret                   string
 	Timeout                     time.Duration
@@ -188,13 +191,13 @@ func (c *Client) initPacayaClients(cfg *ClientConfig) error {
 	opts := &bind.CallOpts{Context: context.Background()}
 	opts.Context, cancel = CtxWithTimeoutOrDefault(opts.Context, defaultTimeout)
 	defer cancel()
-	composeVerifierAddress, err := taikoInbox.Verifier(opts)
+	surgeVerifierAddress, err := taikoInbox.Verifier(opts)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve compose verifier address: %w", err)
+		return fmt.Errorf("failed to retrieve surge verifier address: %w", err)
 	}
-	composeVerifier, err := pacayaBindings.NewComposeVerifier(composeVerifierAddress, c.L1)
+	surgeVerifier, err := pacayaBindings.NewSurgeVerifier(surgeVerifierAddress, c.L1)
 	if err != nil {
-		return fmt.Errorf("failed to create new instance of ComposeVerifier: %w", err)
+		return fmt.Errorf("failed to create new instance of SurgeVerifier: %w", err)
 	}
 
 	if cfg.TaikoWrapperAddress.Hex() != ZeroAddress.Hex() {
@@ -219,6 +222,14 @@ func (c *Client) initPacayaClients(cfg *ClientConfig) error {
 		}
 	}
 
+	var surgeProposerWrapper *pacayaBindings.SurgeProposerWrapper
+	if cfg.SurgeProposerWrapperAddress.Hex() != ZeroAddress.Hex() {
+		surgeProposerWrapper, err = pacayaBindings.NewSurgeProposerWrapper(cfg.SurgeProposerWrapperAddress, c.L1)
+		if err != nil {
+			return fmt.Errorf("failed to create new instance of SurgeProposerWrapper: %w", err)
+		}
+	}
+
 	c.PacayaClients = &PacayaClients{
 		TaikoInbox:           taikoInbox,
 		TaikoAnchor:          taikoAnchor,
@@ -227,8 +238,9 @@ func (c *Client) initPacayaClients(cfg *ClientConfig) error {
 		ForkRouter:           forkRouter,
 		TaikoWrapper:         taikoWrapper,
 		ForcedInclusionStore: forcedInclusionStore,
-		ComposeVerifier:      composeVerifier,
+		SurgeVerifier:        surgeVerifier,
 		PreconfWhitelist:     preconfWhitelist,
+		SurgeProposerWrapper: surgeProposerWrapper,
 	}
 
 	return nil

@@ -177,10 +177,10 @@ func (s *ProverTestSuite) TestSubmitProofAggregationOp() {
 						Opts:    &proofProducer.ProofRequestOptionsPacaya{},
 					},
 				},
-				BatchProof:        []byte{},
-				BatchIDs:          []*big.Int{common.Big1},
-				ProofType:         proofProducer.ProofTypeOp,
-				SgxGethBatchProof: []byte{},
+				BatchProof:    []byte{},
+				BatchIDs:      []*big.Int{common.Big1},
+				ProofType:     proofProducer.ProofTypeOp,
+				SgxBatchProof: []byte{},
 			})
 		})
 	})
@@ -281,7 +281,10 @@ func (s *ProverTestSuite) TestProveMultiBlobBatch() {
 			}
 		}
 
-		s.Nil(s.proposer.ProposeTxListPacaya(context.Background(), txsBatch, common.Hash{}))
+		l2BaseFee, err := s.RPCClient.L2.SuggestGasPrice(context.Background())
+		s.Nil(err)
+
+		s.Nil(s.proposer.ProposeTxListPacaya(context.Background(), txsBatch, common.Hash{}, l2BaseFee, false))
 		s.Nil(s.d.ChainSyncer().EventSyncer().ProcessL1Blocks(context.Background()))
 	}
 
@@ -554,6 +557,7 @@ func (s *ProverTestSuite) TestInvalidPacayaProof() {
 		s.RPCClient,
 		common.HexToAddress(os.Getenv("TAIKO_INBOX")),
 		common.Address{},
+		common.Address{}, // surgeProposerWrapperAddress
 	)
 	originalRoot := res.Opts.PacayaOptions().Headers[len(res.Opts.PacayaOptions().Headers)-1].Root
 	res.Opts.PacayaOptions().Headers[len(res.Opts.PacayaOptions().Headers)-1].Root = testutils.RandomHash()
@@ -564,12 +568,14 @@ func (s *ProverTestSuite) TestInvalidPacayaProof() {
 	))
 
 	// Transition should be created, and blockHash should not be zero.
-	transition, err := s.p.rpc.PacayaClients.TaikoInbox.GetTransitionByParentHash(
+	transitions, err := s.p.rpc.PacayaClients.TaikoInbox.GetTransitionsByParentHash(
 		nil,
 		req.Meta.Pacaya().GetBatchID().Uint64(),
 		res.Opts.PacayaOptions().Headers[len(res.Opts.PacayaOptions().Headers)-1].ParentHash,
 	)
 	s.Nil(err)
+	s.Equal(1, len(transitions))
+	transition := transitions[0]
 	s.Equal(
 		res.Opts.PacayaOptions().Headers[len(res.Opts.PacayaOptions().Headers)-1].ParentHash,
 		common.BytesToHash(transition.ParentHash[:]),
@@ -600,12 +606,14 @@ func (s *ProverTestSuite) TestInvalidPacayaProof() {
 	))
 
 	// BlockHash of the transition should be zero now, and Inbox should be paused.
-	transition, err = s.p.rpc.PacayaClients.TaikoInbox.GetTransitionByParentHash(
+	transitions, err = s.p.rpc.PacayaClients.TaikoInbox.GetTransitionsByParentHash(
 		nil,
 		req.Meta.Pacaya().GetBatchID().Uint64(),
 		res.Opts.PacayaOptions().Headers[len(res.Opts.PacayaOptions().Headers)-1].ParentHash,
 	)
 	s.Nil(err)
+	s.Equal(1, len(transitions))
+	transition = transitions[0]
 	s.Equal(
 		res.Opts.PacayaOptions().Headers[len(res.Opts.PacayaOptions().Headers)-1].ParentHash,
 		common.BytesToHash(transition.ParentHash[:]),
@@ -646,12 +654,14 @@ func (s *ProverTestSuite) TestInvalidPacayaProof() {
 	))
 
 	// BlockHash of the transition should not be zero now, and Inbox should be unpaused.
-	transition, err = s.p.rpc.PacayaClients.TaikoInbox.GetTransitionByParentHash(
+	transitions, err = s.p.rpc.PacayaClients.TaikoInbox.GetTransitionsByParentHash(
 		nil,
 		req.Meta.Pacaya().GetBatchID().Uint64(),
 		res.Opts.PacayaOptions().Headers[len(res.Opts.PacayaOptions().Headers)-1].ParentHash,
 	)
 	s.Nil(err)
+	s.Equal(1, len(transitions))
+	transition = transitions[0]
 	s.Equal(
 		res.Opts.PacayaOptions().Headers[len(res.Opts.PacayaOptions().Headers)-1].ParentHash,
 		common.BytesToHash(transition.ParentHash[:]),

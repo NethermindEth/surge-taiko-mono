@@ -31,6 +31,12 @@ func (p *Prover) setApprovalAmount(ctx context.Context, contract common.Address)
 		return nil
 	}
 
+	// Skip setting allowance if taiko token contract is not found.
+	if p.rpc.PacayaClients.TaikoToken == nil {
+		log.Info("Skipping setting allowance, taiko token contract not found")
+		return nil
+	}
+
 	// Check the existing allowance for the contract.
 	allowance, err := p.rpc.PacayaClients.TaikoToken.Allowance(&bind.CallOpts{Context: ctx}, p.ProverAddress(), contract)
 	if err != nil {
@@ -83,72 +89,72 @@ func (p *Prover) setApprovalAmount(ctx context.Context, contract common.Address)
 // initPacayaProofSubmitter initializes the proof submitter from the non-zero verifier addresses set in protocol.
 func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxBuilder) error {
 	var (
-		// Proof producers.
-		baseLevelProofType     producer.ProofType
-		baseLevelProofProducer producer.ProofProducer
-
-		// ZKVM proof producers.
-		zkvmProducer producer.ProofProducer
+		// A single proof producer -- unlike upstream taiko-client
+		proofProducer producer.ProofProducer
 
 		// Proof verifiers addresses.
 		sgxGethVerifierAddress common.Address
+		sgxRethVerifierAddress common.Address
 		risc0VerifierAddress   common.Address
 		sp1VerifierAddress     common.Address
 
 		// All activated proof types in protocol.
 		proofTypes = make([]producer.ProofType, 0, proofSubmitter.MaxNumSupportedProofTypes)
+		verifiers  = make(map[producer.ProofType]common.Address, proofSubmitter.MaxNumSupportedProofTypes)
 
 		err error
 	)
 
-	// Get the required sgx geth verifier address from the protocol, and initialize the sgx geth producer.
-	if sgxGethVerifierAddress, err = p.rpc.GetSgxGethVerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
+	// Get the sgx geth verifier address from the protocol
+	if sgxGethVerifierAddress, err = p.rpc.GetSGXGethVerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
 		return fmt.Errorf("failed to get sgx geth verifier: %w", err)
 	}
-	if sgxGethVerifierAddress == rpc.ZeroAddress {
-		return fmt.Errorf("sgx geth verifier not found")
-	}
-	sgxGethProducer := &producer.SgxGethProofProducer{
-		Verifier:            sgxGethVerifierAddress,
-		RaikoHostEndpoint:   p.cfg.RaikoHostEndpoint,
-		JWT:                 p.cfg.RaikoJWT,
-		RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
-		Dummy:               p.cfg.Dummy,
+	if sgxGethVerifierAddress != rpc.ZeroAddress {
+		verifiers[producer.ProofTypeSgxGeth] = sgxGethVerifierAddress
 	}
 
-	// Initialize the base level prover.
-	if baseLevelProofType, baseLevelProofProducer, err = p.initBaseLevelProofProducerPacaya(sgxGethProducer); err != nil {
-		return fmt.Errorf("failed to initialize base level prover: %w", err)
+	// Get the sgx reth verifier address from the protocol
+	if sgxRethVerifierAddress, err = p.rpc.GetSGXRethVerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
+		return fmt.Errorf("failed to get sgx verifier: %w", err)
 	}
-	proofTypes = append(proofTypes, baseLevelProofType)
+	if sgxRethVerifierAddress != rpc.ZeroAddress {
+		verifiers[producer.ProofTypeSgx] = sgxRethVerifierAddress
+	}
 
-	// Initialize the zk verifiers and zkvm proof producers.
-	var zkVerifiers = make(map[producer.ProofType]common.Address, proofSubmitter.MaxNumSupportedZkTypes)
+	if len(verifiers) == 0 {
+		return fmt.Errorf("at least one of the sgx verifiers (sgx geth, sgx reth) must be set")
+	}
+
+	// Initialize the zk verifiers and zkvm proof producers
 	if risc0VerifierAddress, err = p.rpc.GetRISC0VerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
 		return fmt.Errorf("failed to get risc0 verifier: %w", err)
 	}
 	if risc0VerifierAddress != rpc.ZeroAddress {
 		proofTypes = append(proofTypes, producer.ProofTypeZKR0)
-		zkVerifiers[producer.ProofTypeZKR0] = risc0VerifierAddress
+		verifiers[producer.ProofTypeZKR0] = risc0VerifierAddress
 	}
 	if sp1VerifierAddress, err = p.rpc.GetSP1VerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
 		return fmt.Errorf("failed to get sp1 verifier: %w", err)
 	}
 	if sp1VerifierAddress != rpc.ZeroAddress {
 		proofTypes = append(proofTypes, producer.ProofTypeZKSP1)
-		zkVerifiers[producer.ProofTypeZKSP1] = sp1VerifierAddress
+		verifiers[producer.ProofTypeZKSP1] = sp1VerifierAddress
 	}
-	if len(p.cfg.RaikoZKVMHostEndpoint) != 0 && len(zkVerifiers) > 0 {
-		zkvmProducer = &producer.ComposeProofProducer{
-			Verifiers:           zkVerifiers,
-			SgxGethProducer:     sgxGethProducer,
-			RaikoHostEndpoint:   p.cfg.RaikoZKVMHostEndpoint,
-			JWT:                 p.cfg.RaikoJWT,
-			RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
-			ProofType:           producer.ProofTypeZKAny,
-			Dummy:               p.cfg.Dummy,
-		}
+
+	if verifiers[producer.ProofTypeZKR0] == rpc.ZeroAddress && verifiers[producer.ProofTypeZKSP1] == rpc.ZeroAddress {
+		return fmt.Errorf("at least one of the zk verifiers (risc0, sp1) must be set")
 	}
+
+	proofProducer = &producer.ComposeProofProducer{
+		Verifiers:             verifiers,
+		RaikoSGXHostEndpoint:  p.cfg.RaikoSGXHostEndpoint,  // used for sgx geth + sgx reth
+		RaikoZKVMHostEndpoint: p.cfg.RaikoZKVMHostEndpoint, // used for risc0 + sp1
+		JWT:                   p.cfg.RaikoJWT,
+		RaikoRequestTimeout:   p.cfg.RaikoRequestTimeout,
+		Dummy:                 p.cfg.Dummy,
+	}
+
+	log.Info("Initialize prover", "proofProducer", proofProducer)
 
 	// Init proof buffers.
 	var proofBuffers = make(map[producer.ProofType]*producer.ProofBuffer, proofSubmitter.MaxNumSupportedProofTypes)
@@ -156,9 +162,7 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 	// We deliberately handle only known proof types and catch others in default case
 	for _, proofType := range proofTypes {
 		switch proofType {
-		case producer.ProofTypeOp, producer.ProofTypeSgx:
-			proofBuffers[proofType] = producer.NewProofBuffer(p.cfg.SGXProofBufferSize)
-		case producer.ProofTypeZKR0, producer.ProofTypeZKSP1:
+		case producer.ProofTypeZKR0, producer.ProofTypeZKSP1: // only for risc0 + sp1 by design
 			proofBuffers[proofType] = producer.NewProofBuffer(p.cfg.ZKVMProofBufferSize)
 		default:
 			return fmt.Errorf("unexpected proof type: %s", proofType)
@@ -166,8 +170,7 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 	}
 
 	if p.proofSubmitterPacaya, err = proofSubmitter.NewProofSubmitterPacaya(
-		baseLevelProofProducer,
-		zkvmProducer,
+		proofProducer,
 		p.batchProofGenerationCh,
 		p.batchesAggregationNotify,
 		p.proofSubmissionCh,
@@ -187,60 +190,6 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 		return fmt.Errorf("failed to initialize Pacaya proof submitter: %w", err)
 	}
 	return nil
-}
-
-// initBaseLevelProofProducerPacaya fetches the SGX / OP verifier addresses from the protocol, if the verifier exists,
-// then initialize the corresponding base level proof producers.
-func (p *Prover) initBaseLevelProofProducerPacaya(sgxGethProducer *producer.SgxGethProofProducer) (
-	producer.ProofType,
-	producer.ProofProducer,
-	error,
-) {
-	var (
-		// Proof verifiers addresses
-		opVerifierAddress  common.Address
-		sgxVerifierAddress common.Address
-		err                error
-	)
-
-	// If there is an SGX verifier, then initialize the SGX prover as the base level prover.
-	if sgxVerifierAddress, err = p.rpc.GetSGXVerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
-		return "", nil, fmt.Errorf("failed to get sgx verifier: %w", err)
-	}
-	if sgxVerifierAddress != rpc.ZeroAddress {
-		log.Info("Initialize baseLevelProver", "type", producer.ProofTypeSgx, "verifier", sgxVerifierAddress)
-
-		return producer.ProofTypeSgx, &producer.ComposeProofProducer{
-			SgxGethProducer:     sgxGethProducer,
-			Verifiers:           map[producer.ProofType]common.Address{producer.ProofTypeSgx: sgxVerifierAddress},
-			RaikoHostEndpoint:   p.cfg.RaikoHostEndpoint,
-			ProofType:           producer.ProofTypeSgx,
-			JWT:                 p.cfg.RaikoJWT,
-			RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
-			Dummy:               p.cfg.Dummy,
-		}, nil
-	} else {
-		// If there is no SGX verifier, then try to get the OP verifier address, and initialize
-		// the OP prover as the base level prover.
-		if opVerifierAddress, err = p.rpc.GetOPVerifierPacaya(&bind.CallOpts{Context: p.ctx}); err != nil {
-			return "", nil, fmt.Errorf("failed to get op verifier address: %w", err)
-		}
-		if opVerifierAddress != rpc.ZeroAddress {
-			log.Info("Initialize baseLevelProver", "type", producer.ProofTypeOp, "verifier", opVerifierAddress)
-
-			return producer.ProofTypeOp, &producer.ComposeProofProducer{
-				SgxGethProducer:     sgxGethProducer,
-				Verifiers:           map[producer.ProofType]common.Address{producer.ProofTypeOp: opVerifierAddress},
-				RaikoHostEndpoint:   p.cfg.RaikoHostEndpoint,
-				ProofType:           producer.ProofTypeOp,
-				JWT:                 p.cfg.RaikoJWT,
-				Dummy:               true,
-				RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
-			}, nil
-		}
-	}
-	// If no base level prover found, return an error.
-	return "", nil, fmt.Errorf("no proving base level prover found")
 }
 
 // initL1Current initializes prover's L1Current cursor.
@@ -308,22 +257,29 @@ func (p *Prover) initEventHandlers() error {
 	p.eventHandlers = &eventHandlers{}
 	// ------- BatchProposed -------
 	opts := &handler.NewBatchProposedEventHandlerOps{
-		SharedState:            p.sharedState,
-		ProverAddress:          p.ProverAddress(),
-		ProverSetAddress:       p.cfg.ProverSetAddress,
-		RPC:                    p.rpc,
-		LocalProposerAddresses: p.cfg.LocalProposerAddresses,
-		AssignmentExpiredCh:    p.assignmentExpiredCh,
-		ProofSubmissionCh:      p.proofSubmissionCh,
-		BackOffRetryInterval:   p.cfg.BackOffRetryInterval,
-		BackOffMaxRetrys:       p.cfg.BackOffMaxRetries,
-		ProveUnassignedBlocks:  p.cfg.ProveUnassignedBlocks,
+		SharedState:                 p.sharedState,
+		ProverAddress:               p.ProverAddress(),
+		ProverSetAddress:            p.cfg.ProverSetAddress,
+		SurgeProposerWrapperAddress: p.cfg.SurgeProposerWrapperAddress,
+		RPC:                         p.rpc,
+		LocalProposerAddresses:      p.cfg.LocalProposerAddresses,
+		AssignmentExpiredCh:         p.assignmentExpiredCh,
+		ProofSubmissionCh:           p.proofSubmissionCh,
+		BackOffRetryInterval:        p.cfg.BackOffRetryInterval,
+		BackOffMaxRetrys:            p.cfg.BackOffMaxRetries,
+		ProveUnassignedBlocks:       p.cfg.ProveUnassignedBlocks,
 	}
 	p.eventHandlers.batchProposedHandler = handler.NewBatchProposedEventHandler(opts)
 	// ------- BatchesProved -------
 	p.eventHandlers.batchesProvedHandler = handler.NewBatchesProvedEventHandler(
 		p.rpc,
 		p.proofSubmissionCh,
+	)
+	// ------- BatchesRollbacked -------
+	p.eventHandlers.batchesRollbackedHandler = handler.NewBatchesRollbackedEventHandler(
+		&handler.NewBatchesRollbackedEventHandlerOps{
+			SharedState: p.sharedState,
+		},
 	)
 	// ------- AssignmentExpired -------
 	p.eventHandlers.assignmentExpiredHandler = handler.NewAssignmentExpiredEventHandler(
