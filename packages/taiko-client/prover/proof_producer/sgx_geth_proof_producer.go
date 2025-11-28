@@ -17,7 +17,7 @@ import (
 type SgxGethProofProducer struct {
 	Verifier            common.Address
 	RaikoHostEndpoint   string // a prover RPC endpoint
-	JWT                 string // JWT provided by Raiko
+	ApiKey              string // ApiKey provided by Raiko
 	Dummy               bool
 	RaikoRequestTimeout time.Duration
 	DummyProofProducer
@@ -40,7 +40,7 @@ func (s *SgxGethProofProducer) RequestProof(
 	)
 
 	if s.Dummy {
-		return s.DummyProofProducer.RequestProof(opts, batchID, meta, requestAt)
+		return s.DummyProofProducer.RequestProof(ctx, opts, batchID, meta, requestAt)
 	}
 
 	resp, err := s.requestBatchProof(
@@ -128,7 +128,7 @@ func (s *SgxGethProofProducer) requestBatchProof(
 	output, err := requestHTTPProof[RaikoRequestProofBodyV3Pacaya, RaikoRequestProofBodyResponseV2](
 		ctx,
 		s.RaikoHostEndpoint+"/v3/proof/batch",
-		s.JWT,
+		s.ApiKey,
 		RaikoRequestProofBodyV3Pacaya{
 			Type:      proofType,
 			Batches:   batches,

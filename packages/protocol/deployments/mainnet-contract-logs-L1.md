@@ -11,7 +11,7 @@
 - ens: `sam.based.taiko.eth`
 - proxy: `0xEf9EaA1dd30a9AA1df01c36411b5F082aA65fBaa`
 - impl: `0xEC1a9aa1C648F047752fe4eeDb2C21ceab0c6449`
-- owner: `admin.taiko.eth`
+- owner : `controller.taiko.eth`
 - names:
   - taiko_token: `0x10dea67478c5F8C5E2D90e5E9B26dBe60c54d800`
   - signal_service: `0x9e0a24964e5397B566c1ed39258e21aB5E35C77C`
@@ -44,7 +44,7 @@
 - ens: `token.taiko.eth`
 - proxy: `0x10dea67478c5F8C5E2D90e5E9B26dBe60c54d800`
 - impl: `0x5C96Ff5B7F61b9E3436Ef04DA1377C8388dfC106`
-- owner: `admin.taiko.eth`
+- owner: `controller.taiko.eth`
 - logs:
   - deployed on April 25, 2024 @commit`2f6d3c62e`
   - upgraded impl from `0x9ae1a067f9655dd0511390e3d70bb25933ae61eb` to `0xea53c0f4b129Cf3f3FBA896F9f23ca18246e9B3c` @commit`b90b932` and,
@@ -54,13 +54,14 @@
   - upgraded impl from `0x55833dA2962c2330ccCF043ff8037e6D2939bCF6` to `0xcfe803378D79d1180EbF030455040EA6513869dF` @commit`d2b00ce` @tx`0xc9f468d33d8d55911e4e5b5c301ed244a5f81ab0f389d2b4f398eb5b89d417ef`
   - upgrade impl to `0x87C752b0F70cAa237Edd7571B0845470A37DE040` @commit`619af45e72b76bdbd9a71f99d32b08dec373d72a` @tx`0xdb7d5de46738ad3f676db47b61772db531f9858b7a01e8c3b5aee49fa74cac95`
   - upgrade impl to `0x5C96Ff5B7F61b9E3436Ef04DA1377C8388dfC106` @PR[19457](https://github.com/taikoxyz/taiko-mono/pull/19461) @tx`0x986fc2c7ae945cdd358b2f2ae54364b350026f965f5861ed470f78e145f12626`
+  - change owner to `controller.taiko.eth` @tx`https://etherscan.io/tx/0xa4dfb66625f58d2056a180be420cd7c33f103547848c4eae848089c8808288da`
 
 #### signal_service
 
 - ens: `signals.based.taiko.eth`
 - proxy: `0x9e0a24964e5397B566c1ed39258e21aB5E35C77C`
 - impl: `0x42Ec977eb6B09a8D78c6D486c3b0e63569bA851c`
-- owner: `admin.taiko.eth`
+- owner: `controller.taiko.eth`
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
   - admin.taiko.eth accepted the ownership @tx`0x0ed114fee6de4e3e2206cea44e6632ec0c4588f73648d98d8df5dc0183b07885`
@@ -71,13 +72,14 @@
   - Upgraded from `0xDF8642a1FBFc2014de27E8E87283D6f3eEF315DF` to `0x45fed11Ba70D4217545F18E27DDAF7D76Ff499f3` @commit`9345f14` @tx`0x13ea4d044a313cf667d16514465e6b96227ef7198bda7b19c70eefee44e9bccd`
   - Upgraded from `0x45fed11Ba70D4217545F18E27DDAF7D76Ff499f3` to `0x0783Ee019C9b0f918A741469bD488A88827b3617` @commit`cf55838` @tx`0x97789b6668d0a287b1f57bb6c8e23cce62308fb887139faeb0f06b77855995fd`
   - Upgraded from `0x0783Ee019C9b0f918A741469bD488A88827b3617` to `0x42Ec977eb6B09a8D78c6D486c3b0e63569bA851c` @commit`cf55838` @tx`0x0ae99d24b294622e3d3868c8dca911a5936231ce1f97254ec0c6a6f65f7aa81c`
+  - Change owner to controller @tx`0x6348cbb8f4c907bd72ded06cb9ba587d4ca794a546dab7e7ab6f0281a9c48c2c`
 
 #### bridge
 
 - ens: `bridge.based.taiko.eth`
 - proxy: `0xd60247c6848B7Ca29eDdF63AA924E53dB6Ddd8EC`
 - impl: `0x2705B12a971dA766A3f9321a743d61ceAD67dA2F`
-- owner: `admin.taiko.eth`
+- owner: `controller.taiko.eth`
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
   - admin.taiko.eth accepted the ownership @tx`0x0ed114fee6de4e3e2206cea44e6632ec0c4588f73648d98d8df5dc0183b07885`
@@ -93,12 +95,13 @@
   - upgrade impl to `0x01E7D369a619eF1B0E92563d8737F42C09789986` @commit`04d8c87` @tx`0x13f54109cb7f7507ad03562b06ea8d8b472043186e44252302583bc64acfb20b`
   - Upgrade impl to `0xAc96FF285158bceBB8573D20d853e86BB2915aF3` @commit`bb2abc5` @tx`0x7d584f0a645cad61e634f64ffaf7e1bbfb92749878eb25b39ce0e5cf698897c7`
   - Upgrade impl to `0x2705B12a971dA766A3f9321a743d61ceAD67dA2F` @commit`9345f14` @tx`0x13ea4d044a313cf667d16514465e6b96227ef7198bda7b19c70eefee44e9bccd`
+  - Change owner to controller @tx`0x6348cbb8f4c907bd72ded06cb9ba587d4ca794a546dab7e7ab6f0281a9c48c2c`
 
 #### quota_manager
 
 - proxy: `0x91f67118DD47d502B1f0C354D0611997B022f29E`
 - impl: `0xdb627bfD79e81fE42138Eb875287F94FAd5BBc64`
-- owner: `admin.taiko.eth`
+- owner: `controller.taiko.eth`
 - quota:
   - Quota Period: 24 hours
   - ETH: 1000 ETH
@@ -110,13 +113,14 @@
   - deployed on May 13, 2024 at commit `b90b932`
   - admin.taiko.eth accepted the ownership @tx`0x2d6ce1781137899f65c1810e42f556c27caa4e9bd13077ba5bc7a9a0975eefcb`
   - upgraded from `0x49c5e5F131314Bb24b17E249960F8B12F925ef22` to `0xdb627bfD79e81fE42138Eb875287F94FAd5BBc64` @commit`a3faee0` @tx`0x8de1631a25b337c1e702f9ce9d9ab8a3b626922441855e959b2d79dae40bd131`
+  - change owner to controller @tx`0x4445a905ba77f382914a1dcbb1ddd3ce704822c1fd4512042a8195ebb816c631`
 
 #### erc20_vault
 
 - ens: `v20.based.taiko.eth`
 - proxy: `0x996282cA11E5DEb6B5D122CC3B9A1FcAAD4415Ab`
 - impl: `0xb20C8Ffc2dD49596508d262b6E8B6817e9790E63`
-- owner: `admin.taiko.eth`
+- owner: `controller.taiko.eth`
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
   - upgraded from `0x15D9F7e12aEa18DAEF5c651fBf97567CAd4a4BEc` to `0xC722d9f3f8D60288589F7f67a9CFAd34d3B9bf8E` @commit`b90b932` @tx`0x416560cd96dc75ccffebe889e8d1ab3e08b33f814dc4a2bf7c6f9555071d1f6f`
@@ -125,13 +129,14 @@
   - upgraded from `0xF8bdaC4E68bA2595Be8381aaa5456917e374E737` to `0xa303784B0557BF1F1FB8b8abEF2B18a005722689` @commit`04d8c87` @tx`0x13f54109cb7f7507ad03562b06ea8d8b472043186e44252302583bc64acfb20b`
   - upgraded from `0xa303784B0557BF1F1FB8b8abEF2B18a005722689` to `0x7ACFBb369a552C45d402448A4d64b9da54C3FF30` @commit`bb2abc5` @tx`0xee632b50626beb2f7db84c9c7f303f29366f86dfaccd24ddd831ceac714c20e5`
   - upgraded from `0x7ACFBb369a552C45d402448A4d64b9da54C3FF30` to `0xb20C8Ffc2dD49596508d262b6E8B6817e9790E63` @commit`9345f14` @tx`0x13ea4d044a313cf667d16514465e6b96227ef7198bda7b19c70eefee44e9bccd`
+  - change owner to controller.taiko.eth @tx`0xc67a1ab94e6c4ccc5a357269c54a15b99f64ac9ed0c089b853d634772dbe40e0`
 
 #### erc721_vault
 
 - ens: `v721.based.taiko.eth`
 - proxy: `0x0b470dd3A0e1C41228856Fb319649E7c08f419Aa`
 - impl: `0xA4C5c20aB33C96B1c281Dca37D03E23609274C49`
-- owner: `admin.taiko.eth`
+- owner: `controller.taiko.eth`
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
   - upgraded from `0xEC04849E7722Fd69797a155796Db75aC8F94f692` to `0x41A7BDD153a5AfFb10Ed1AD3D6a4e5ad001495FA` @commit`b90b932` @tx`0x416560cd96dc75ccffebe889e8d1ab3e08b33f814dc4a2bf7c6f9555071d1f6f`
@@ -139,13 +144,14 @@
   - upgraded from `0x2dfef0339009Ce10786fc118C883BB97af3163eD` to `0x55B5df6B53466446221180498BfD1C59e54732c4` @commit`d907359` @tx`0xdb5e926c96d112ce1389da77a927fba6c7d04a711839b9e14777530ebcf83914`
   - upgraded from `0x55B5df6B53466446221180498BfD1C59e54732c4` to `0xD961e3Ef2D7DF58cDc67BFd9055255430E5e3fEc` @commit`bb2abc5` @tx`0x7d584f0a645cad61e634f64ffaf7e1bbfb92749878eb25b39ce0e5cf698897c7`
   - upgraded from `0xD961e3Ef2D7DF58cDc67BFd9055255430E5e3fEc` to `0xA4C5c20aB33C96B1c281Dca37D03E23609274C49` @commit`9345f14` @tx`0x13ea4d044a313cf667d16514465e6b96227ef7198bda7b19c70eefee44e9bccd`
+  - change owner to controller.taiko.eth @tx`0xc67a1ab94e6c4ccc5a357269c54a15b99f64ac9ed0c089b853d634772dbe40e0`
 
 #### erc1155_vault
 
 - ens: `v1155.based.taiko.eth`
 - proxy: `0xaf145913EA4a56BE22E120ED9C24589659881702`
 - impl: `0x838ed469db456b67EB3b0B74D759Be4DA999b9c8`
-- owner: `admin.taiko.eth`
+- owner: `controller.taiko.eth`
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
   - upgraded from `0x7748dA086A2e6EDd8Db97eD236840910013c6396` to `0xd90b5fcf8d00d333d107E4Ab7F94c0c0A41CDcfE` @commit`b90b932` @tx`0x416560cd96dc75ccffebe889e8d1ab3e08b33f814dc4a2bf7c6f9555071d1f6f`
@@ -153,6 +159,7 @@
   - upgraded from `0x097BBBef669AaD66030aB223195D200eF9A47dc3` to `0xca92880829139b310B6b0CB41f66D566Db1a59C8` @commit`d907359` @tx`0xdb5e926c96d112ce1389da77a927fba6c7d04a711839b9e14777530ebcf83914`
   - upgraded from `0xca92880829139b310B6b0CB41f66D566Db1a59C8` to `0x89C68Bc7028f8b1e69A91382b0a4b1825085617b` @commit`bb2abc5` @tx`0x7d584f0a645cad61e634f64ffaf7e1bbfb92749878eb25b39ce0e5cf698897c7`
   - upgraded from `0x89C68Bc7028f8b1e69A91382b0a4b1825085617b` to `0x838ed469db456b67EB3b0B74D759Be4DA999b9c8` @commit`9345f14` @tx`0x13ea4d044a313cf667d16514465e6b96227ef7198bda7b19c70eefee44e9bccd`
+  - change owner to controller.taiko.eth @tx`0xc67a1ab94e6c4ccc5a357269c54a15b99f64ac9ed0c089b853d634772dbe40e0`
 
 #### bridged_erc20
 
@@ -226,10 +233,10 @@
 
 - ens: `inbox_based.taiko.eth`
 - proxy: `0x06a9Ab27c7e2255df1815E6CC0168d7755Feb19a`
-- impl: `0x4e030b19135869F6fd926614754B7F9c184E2B83`
+- impl: `0xb4530aBee1Dd239C02266e73ca83Fe6617e77F2F`
 - oldFork: `0x904Da4C5bD76f932fE09fF32Ae5D7E3d2A5D2264` at commit `c80373d`
-- newFork: `0x497B13f9192B09244de9b5F0964830969FB26F07` at commit `c5b4a3d`
-- owner: `admin.taiko.eth`
+- newFork: `0x257df77Ec059ca5CF9B7eD523f85B731A2eCdb82` at commit `c2a941e`
+- owner : `controller.taiko.eth`
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
   - Upgraded from `0x99Ba70E62cab0cB983e66F72330fBDDC11d85501` to `0x9fBBedBBcBb753E7214BE08381efE10d89D712fE` @commit`b90b932` @tx`0x416560cd96dc75ccffebe889e8d1ab3e08b33f814dc4a2bf7c6f9555071d1f6f`
@@ -255,6 +262,8 @@
   - Upgrade to `0x2784423f7c61Bc7B75dB6CdA26959946f437588D` @commit`9d2aac8` @tx`0xc0e8ec30d1479ca2414d4d28a09a543c2845247d80387f78c179d663ffe55c3c`
   - Upgrade to `0x5110634593Ccb8072d161A7d260A409A7E74D7Ca` @commit`9a89166` @tx`0x6368890b9aa2f87c6a6b727efdd8af0ea357a11460b546d8a7f3e19e38a34e41`
   - Upgrade to `0x4e030b19135869F6fd926614754B7F9c184E2B83` @commit`cf55838` @tx`0x78f766ae83ce94ef2293c9c7d81ae514e8fa0a79fbce1530c3c68d7624708795`
+  - Upgrade to `0xde813DD3b89702E5Eb186FeE6FBC5dCf02aE6319` @commit`3328024` @tx`0xffedb70a513e71486c3a47079508d3ba87ae5362e7efb3300febac1be69276bc`
+  - Upgrade to `0xb4530aBee1Dd239C02266e73ca83Fe6617e77F2F` @commit`c2a941e` @tx`0x9e26e018d5dc07349ea34f907728a43cd47a8a62058467c30cf21df975e59090`
 
 #### tier_router
 
@@ -272,7 +281,7 @@
 
 - proxy: `0xb0f3186FC1963f774f52ff455DC86aEdD0b31F81`
 - impl: `0x81DFEA931500cdcf0460e9EC45FA283A6B7f0838`
-- owner: `admin.taiko.eth`
+- owner : `controller.taiko.eth`
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
   - Upgraded from `0x3f54067EF5d8B414Bdb1945cdF482BD158Aad175` to `0xf381868DD6B2aC8cca468D63B42F9040DE2257E9` @commit`b90b932` @tx`0x416560cd96dc75ccffebe889e8d1ab3e08b33f814dc4a2bf7c6f9555071d1f6f`
@@ -313,26 +322,11 @@
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
 
-#### risc0_groth16_verifier
-
-- impl: `0x48E32eFbe22e180A3FFe617f4955cD83B983dd98`
-- logs:
-  - deployed on Nov 6, 2024 @commit`bfb0386`
-  - deployed on Jan 13, 2025 @commit`a58852f`
-  - deployed on Jan 13, 2025 @commit`e0805e3`
-
-#### sp1_remote_verifier
-
-- impl: `0x68593ad19705E9Ce919b2E368f5Cb7BAF04f7371`
-- logs:
-  - deployed on Nov 8, 2024 @commit`0b11101`
-  - deployed on Jan 13, 2025 @commit`a58852f`
-
 #### automata_dcap_attestation
 
 - proxy: `0x8d7C954960a36a7596d7eA4945dDf891967ca8A3`
 - impl: `0x5f73f0AdC7dAA6134Fe751C4a78d524f9384e0B5`
-- owner: `admin.taiko.eth`
+- owner : `controller.taiko.eth`
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
   - Upgraded from `0xEE8FC1dbb8D345f5bF35dFb939C6f9EdC5fCDAFc` to `0xde1b1FBe7D721af4A56651272ef91A59B7303323` @commit`b90b932` @tx`0x416560cd96dc75ccffebe889e8d1ab3e08b33f814dc4a2bf7c6f9555071d1f6f`
@@ -415,7 +409,7 @@
 
 - proxy: `0x8Efa01564425692d0a0838DC10E300BD310Cb43e`
 - impl: `0xFca4F0Ab7B95EEf2e3A60EF2Bc0c42DdAA62E66D`
-- owner: `admin.taiko.eth`
+- owner : `controller.taiko.eth`
 - names:
   - taiko_token: `0x10dea67478c5F8C5E2D90e5E9B26dBe60c54d800`
   - bond_token: `0x10dea67478c5F8C5E2D90e5E9B26dBe60c54d800`
@@ -440,15 +434,13 @@
 
 - proxy: `0x5A982Fb1818c22744f5d7D36D0C4c9f61937b33a`
 - impl: `0xE78659fbF234c84C909Cf317D84edc2f6C0D8413`
-- owner: `admin.taiko.eth`
+- owner : `controller.taiko.eth`
 - names:
   - bond_token: `0x10dea67478c5F8C5E2D90e5E9B26dBe60c54d800`
   - taiko_token: `0x10dea67478c5F8C5E2D90e5E9B26dBe60c54d800`
   - signal_service: `0x9e0a24964e5397B566c1ed39258e21aB5E35C77C`
   - bridge: `0xd60247c6848B7Ca29eDdF63AA924E53dB6Ddd8EC`
   - taiko: `0x06a9Ab27c7e2255df1815E6CC0168d7755Feb19a`
-  - risc0_groth16_verifier: `0x48E32eFbe22e180A3FFe617f4955cD83B983dd98`
-  - sp1_remote_verifier: `0x68593ad19705E9Ce919b2E368f5Cb7BAF04f7371`
   - automata_dcap_attestation: `0x8d7C954960a36a7596d7eA4945dDf891967ca8A3`
   - prover_set: `0xB8826B144eB895eFE2923b61b3b117B1298A9526`
   - sgx_geth_automata: `0x0ffa4A625ED9DB32B70F99180FD00759fc3e9261`
@@ -456,6 +448,8 @@
   - sgx_reth_verifier: `0x9e322fC59b8f4A29e6b25c3a166ac1892AA30136`
   - risc0_reth_verifier: `0x73Ee496dA20e5C65340c040B0D8c3C891C1f74AE`
   - sp1_reth_verifier: `0xbee1040D0Aab17AE19454384904525aE4A3602B9`
+  - preconf_whitelist: `0xFD019460881e6EeC632258222393d5821029b2ac`
+  - preconf_router: `0xD5AA0e20e8A6e9b04F080Cf8797410fafAa9688a`
 - logs:
   - deployed on May 15, 2025 @commit`cf55838b2` @tx `0x479a582b4bb2a262e395c94e009c996781cb5ef5c55478be6dd2f322b12ba156`
 
@@ -463,23 +457,56 @@
 
 - proxy : `0x05d88855361808fA1d7fc28084Ef3fCa191c4e03`
 - impl : `0xcdb25e201Ad3fdcFe16730A6CA2cC0B1Ce2137a2`
-- owner : `admin.taiko.eth`
+- owner : `controller.taiko.eth`
 - logs:
   - deployed on May 15, 2025 @commit `cf55838` @tx `0x042beff750bfb1b1167a5acc32f68c4565a6e698c162ecff445eaac9fca66fdf`
 
 ### taiko_wrapper
 
 - proxy : `0x9F9D2fC7abe74C79f86F0D1212107692430eef72`
-- impl : `0xAdBa78120E85Add0dBD2050dBA0548CEDA81A31b`
-- owner : `admin.taiko.eth`
+- impl : `0xa2D216dD9c84cb2e738240aac0956BE98293be61`
+- owner : `controller.taiko.eth`
 - logs:
   - deployed on May 15, 2025 @commit `cf55838` @tx `0xe0c52c898ce19785fb139e822a9b5a088b374692820bc402eb31e7a6086664e7`
+  - upgraded to `0xa2D216dD9c84cb2e738240aac0956BE98293be61` @commit`31094a6` @tx`0x9e26e018d5dc07349ea34f907728a43cd47a8a62058467c30cf21df975e59090`
+
+### preconf_whitelist
+
+- proxy : `0xFD019460881e6EeC632258222393d5821029b2ac`
+- impl : `0x44eC275996BD69361EF062ed488882a58256CF11`
+- owner : `controller.taiko.eth`
+- enabled operators:
+  - taiko proposer `0x5F62d006C10C009ff50C878Cd6157aC861C99990`(sequencer `0x5F62d006C10C009ff50C878Cd6157aC861C99990`)
+  - gattaca proposer `0xe2dA8aC2E550cd141198a117520D4EDc8692AB74`(sequencer `0xe2dA8aC2E550cd141198a117520D4EDc8692AB74`)
+  - nethermind proposer `0xCbeB5d484b54498d3893A0c3Eb790331962e9e9d`(sequencer `0x2ABD9afD6D41d0c37b8d55df11BFc73B53c3ac61`)
+  - chainbound proposer `0x000cb000E880A92a8f383D69dA2142a969B93DE7`(sequencer `0x000cb000E880A92a8f383D69dA2142a969B93DE7`)
+- ejectors:
+  - `0x45D4403351Bc34283CE6450D91c099f40D06dA4e`
+  - `0x0F026a3efE44E0Fe34B87375EFe69b16c05D0438`
+- logs:
+  - deployed on Jul 23, 2025 @commit `c2a941e` @tx `0x797256dc575734f2af55c2c2138aaf72aaed91e0909b6cd03d637b54b0c99bba`
+  - upgraded to `0x44eC275996BD69361EF062ed488882a58256CF11` @commit`31094a6` @tx`0xbfd772cb4571eb6275f23d4fd8c7eb1502462b55821ee59dae0d15ab3325fc22`
+  - added proposer `0x5F62d006C10C009ff50C878Cd6157aC861C99990` @tx`0xbfd772cb4571eb6275f23d4fd8c7eb1502462b55821ee59dae0d15ab3325fc22`
+  - added proposer `0x000cb000E880A92a8f383D69dA2142a969B93DE7` @tx`0xbfd772cb4571eb6275f23d4fd8c7eb1502462b55821ee59dae0d15ab3325fc22`
+  - added proposer `0xe2dA8aC2E550cd141198a117520D4EDc8692AB74` @tx`0xb714b8a82f04f73f9c0581fe59fd1887abf3e3cd51e71ff5d5ba4bd13ac77e70`
+  - added proposer `0xCbeB5d484b54498d3893A0c3Eb790331962e9e9d` @tx`0x8e5968f459f817b986153d607fd44c279b613447557d51be390331135bccfafd`
+  - removed proposer `0x000cb000E880A92a8f383D69dA2142a969B93DE7` @tx`0xa11e6650c33072f4229773e6cbaac404ad66595485c3aed747a47de00d5dfc28`
+  - added proposer `0x000cb000E880A92a8f383D69dA2142a969B93DE7` @tx`0x2c03bd01a944dc1ecfc254946a62c8f652df5730facc79f965742acd7319b4c4`
+
+### preconf_router
+
+- proxy : `0xD5AA0e20e8A6e9b04F080Cf8797410fafAa9688a`
+- impl : `0xf571E2626E2CE68127852123A2cC6AA522C586A0`
+- owner : `controller.taiko.eth`
+- logs:
+  - deployed on Jul 23, 2025 @commit `c2a941e` @tx `0x5a309fa38d79de894c96e5082356b0e52e9653726b1400b1d8d72e181b50d5d8`
+  - upgraded to `0xf571E2626E2CE68127852123A2cC6AA522C586A0` @commit`31094a6` @tx`0xbfd772cb4571eb6275f23d4fd8c7eb1502462b55821ee59dae0d15ab3325fc22`
 
 ### proof_verifier
 
 - proxy : `0xB16931e78d0cE3c9298bbEEf3b5e2276D34b8da1`
 - impl : `0x8C520BB75590deaBC30c4fcaFD8778A43E5481b9`
-- owner : `admin.taiko.eth`
+- owner : `controller.taiko.eth`
 - logs:
   - deployed on May 15, 2025 @commit `cf55838` @tx `0x67b886b503de0cf84155cfcfe08f841808178bc40101d2dea2155db069121e08`
 
@@ -487,31 +514,35 @@
 
 - proxy : `0x9e322fC59b8f4A29e6b25c3a166ac1892AA30136`
 - impl : `0x8ADDcf5d4CD7BD9dA1CE62eF84AeE22c9E2BfbA5`
-- owner : `admin.taiko.eth`
+- owner : `controller.taiko.eth`
 - logs:
   - deployed on May 15, 2025 @commit `cf55838` @tx `0x89e2ab8f03ee8042c48afb3577a840f9b63be9d88907b7171a590374e6f8e5d3`
 
 ### risc0_reth_verifier(Pacaya)
 
 - proxy : `0x73Ee496dA20e5C65340c040B0D8c3C891C1f74AE`
-- impl : `0x801878e56A8DA58d6a837006345CDD11a9E6a852`
-- owner : `admin.taiko.eth`
+- impl : `0xDF6327caafC5FeB8910777Ac811e0B1d27dCdf36`
+- owner : `controller.taiko.eth`
 - logs:
   - deployed on May 15, 2025 @commit `cf55838` @tx `0x8480ac4bcdf12dedf9c79bed7407bd290670d9fe9c867c5354e574c56c5ff48b`
+  - upgraded on Jun 11, 2025 at commit `9dfb5b9` @tx `0x2b9250ebdcf10b1a1ec658e5cc9e7fd9aa19dd32573e6ab5bc036499682dea3a`
+  - upgraded on Jul 21, 2025 at commit `92ad14e` @tx `0x95d0cfffe42dc984ce8b24104a28d1083100ab638bb4fe396d1a145c17460db9`
+  - upgraded on Sep 30, 2025 at commit `c459c0d` @tx `` //TODO(@yue): fill the tx hash
 
 ### sp1_reth_verifier(Pacaya)
 
 - proxy : `0xbee1040D0Aab17AE19454384904525aE4A3602B9`
-- impl : `0x35f26e14D0dAeDd1904843370f761C60B891D466`
-- owner : `admin.taiko.eth`
+- impl : `0x2e17ac86cafc1db939c9942e478f92bf0e548ee7`
+- owner : `controller.taiko.eth`
 - logs:
   - deployed on May 15, 2025 @commit `cf55838` @tx `0x88351319725a8f90fcbd22eaaee3b627b21d83fddb86db0014f7d3e194016d4a`
+  - upgraded on Jun 3, 2025 at commit `52bc719` @tx `0xbdc86ada3808a5987cd1f4bbc49ecd2d7e577bf90642956442a3d14cffa827ec`
 
 ### sgx_geth_verifier
 
 - proxy : `0x7e6409e9b6c5e2064064a6cC994f9a2e95680782`
 - impl : `0xDb7AEe4fA967C2aB0eC28f63C8675224E59340A5`
-- owner : `admin.taiko.eth`
+- owner : `controller.taiko.eth`
 - logs:
   - deployed on May 15, 2025 @commit `cf55838` @tx `0x4bfe3199637c49162ce8bdd928a06e2318cd7bfadb9c0ca02ed7304d1599e3e8`
 
@@ -519,13 +550,13 @@
 
 - proxy : `0x0ffa4A625ED9DB32B70F99180FD00759fc3e9261`
 - impl : `0x5e46443bd131eB6d4c6Fb4849bAD29af9596dd72`
-- owner : `admin.taiko.eth`
+- owner : `controller.taiko.eth`
 - logs:
   - deployed on May 15, 2025 @commit `cf55838` @tx `0x7486b942c054eb6641ea701f0835d23fa606accad0e96051791da26c56a10771`
 
 ## Taiko DAO Specific
 
-### TaikoDAOController
+### MainnetDAOController
 
 - ens: `controller.taiko.eth`
 - proxy: `0x75Ba76403b13b26AD1beC70D6eE937314eeaCD0a`

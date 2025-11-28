@@ -9,6 +9,8 @@ Ethereum is **expensive** and **congested**. However, Ethereum's core principles
 
 Taiko Alethia is an **Ethereum-equivalent, permissionless, based rollup** designed to scale Ethereum without compromising its fundamental properties. Unlike traditional rollups that rely on centralized sequencers, Taiko Alethia leverages Ethereum itself for sequencing, ensuring that block ordering is decentralized and censorship-resistant.
 
+Find Taiko Alethia's whitepaper [here](https://github.com/taikoxyz/taiko-mono/blob/main/packages/whitepaper).
+
 ### Why Taiko Alethia?
 
 - **Fully Ethereum-equivalent**: Runs an unmodified Ethereum execution layer, making it easy for developers to migrate smart contracts and tooling.
@@ -41,9 +43,9 @@ Taiko Alethia operates as a fully decentralized protocol governed by **DAOs, com
 | **Taiko Community**                      | Open social groups and discussions (Discord, Twitter, forums).                           |
 | **Taiko Labs**                           | Research and development entity supporting the Taiko Alethia protocol.                   |
 | **Taiko Treasury**                       | Collects fees from L2 congestion pricing and distributes funds for development.          |
-| **Taiko DAO**              | Governing body managing smart contract upgrades, network parameters, and protocol funds. |
+| **Taiko DAO**                            | Governing body managing smart contract upgrades, network parameters, and protocol funds. |
 | **Taiko Foundation**                     | Funds technical development, partnerships, and ecosystem growth.                         |
-| **Taiko Security Council (in progress)** | Handles critical protocol security and emergency network decisions.   |
+| **Taiko Security Council (in progress)** | Handles critical protocol security and emergency network decisions.                      |
 
 ---
 
@@ -66,9 +68,8 @@ These services are open-source, meaning anyone can replicate or improve them.
 
 - [Event Indexer](/api-reference/event-indexer) → Tracks rollup transactions & events.
 - [Bridge Relayer](/api-reference/bridge-relayer) → Facilitates trust-minimized bridging.
-- [Taiko Alethia & Hekla P2P Bootstrapping Nodes](https://github.com/taikoxyz/simple-taiko-node/tree/v1.16.1) → Helps decentralized peers sync with the network. Found in their respective `.env.sample` files.
+- [Taiko Alethia, Taiko Hekla & Taiko Hoodi P2P Bootstrapping Nodes](https://github.com/taikoxyz/simple-taiko-node/tree/v1.20.1) → Helps decentralized peers sync with the network. Found in their respective `.env.sample` files.
 - [Taiko Alethia Taiko Labs' proposers and provers](/network-reference/contract-addresses)
-
 
 ---
 
@@ -77,7 +78,7 @@ These services are open-source, meaning anyone can replicate or improve them.
 | Feature                        | Traditional Rollups                  | Taiko Alethia                          |
 | ------------------------------ | ------------------------------------ | -------------------------------------- |
 | **Sequencing**                 | Centralized (single sequencer)       | Decentralized (L1 validators sequence) |
-| **Proof System**               | Single proof type (ZK or Optimistic) | Multiproving (TEE + TEE or TEE +ZK)    |
+| **Proof System**               | Single proof type (ZK or Optimistic) | Multiproving (TEE + TEE or TEE + ZK)   |
 | **Censorship Resistance**      | Operator can censor transactions     | Permissionless transaction inclusion   |
 | **Smart Contract Equivalence** | Modified Ethereum (Geth changes)     | 100% Ethereum-equivalent               |
 | **Decentralization**           | Relies on multisig governance        | DAO-controlled with open participation |

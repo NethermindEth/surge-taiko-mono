@@ -32,6 +32,8 @@ module.exports = {
       // Rollup Contracts
       TaikoAnchorImpl: getConstantAddress(`0${this.chainId}`, 10001),
       RollupResolverImpl: getConstantAddress(`0${this.chainId}`, 10002),
+      BondManagerImpl: getConstantAddress(`0${this.chainId}`, 10003),
+      AnchorForkRouterImpl: getConstantAddress(`0${this.chainId}`, 10004),
       // ============ Proxies ============
       // Shared Contracts
       Bridge: getConstantAddress(this.chainId, 1),
@@ -43,6 +45,7 @@ module.exports = {
       // Rollup Contracts
       TaikoAnchor: getConstantAddress(this.chainId, 10001),
       RollupResolver: getConstantAddress(this.chainId, 10002),
+      BondManager: getConstantAddress(this.chainId, 10003),
     };
   },
   // L2 EIP-1559 baseFee calculation related fields.
@@ -51,8 +54,13 @@ module.exports = {
   },
   // Option to pre-deploy an ERC-20 token.
   predeployERC20: true,
-  pacayaForkHeight: 1024,
-  shastaForkHeight: 2048,
+  livenessBond: "128000000000000000000",
+  provabilityBond: "128000000000000000000",
+  withdrawalDelay: 3600,
+  minBond: 0,
+  bondToken: "0x0000000000000000000000000000000000000000",
+  remoteSignalService: "0x0000000000000000000000000000000000000000",
+  pacayaTaikoAnchor: "0x0000000000000000000000000000000000000000",
 };
 
 function getConstantAddress(prefix, suffix) {

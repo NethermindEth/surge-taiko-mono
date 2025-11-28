@@ -10,7 +10,7 @@ Taiko Alethia nodes are minimally modified Ethereum **execution clients** that a
 
 This architecture mirrors Ethereum’s execution/consensus split but **replaces the consensus layer** with Taiko’s own `taiko-client`. The `taiko-client` drives `taiko-geth` over the [Engine API](https://github.com/ethereum/execution-apis/tree/main/src/engine), allowing **modular execution client compatibility**.
 
-![Taiko Alethia nodes diagram](~/assets/content/docs/taiko-alethia-protocol/taiko-nodes.png)
+![Taiko Alethia nodes diagram](../../../../assets/content/docs/taiko-alethia-protocol/taiko-nodes.png)
 
 ## Execution Layer: taiko-geth
 
@@ -58,7 +58,6 @@ All modifications to `go-ethereum` can be reviewed in the [Geth fork diff](https
 The **Taiko Alethia consensus model** differs from Ethereum’s due to its rollup-based structure.
 
 1. **Driver Initialization**
-
    - Fetches the latest **verified L2 head** from `TaikoInbox`.
    - Tries to sync state **via P2P**.
    - If P2P sync fails, inserts **verified L2 blocks sequentially** using the Engine API.
@@ -67,7 +66,6 @@ The **Taiko Alethia consensus model** differs from Ethereum’s due to its rollu
 <br/>
 
 2. **Batch Proposal Ingestion**
-
    - Listens for `TaikoInbox.BatchProposed` events.
    - Retrieves the **transaction calldata** from `TaikoInbox.proposeBatch`.
    - Decompresses `txListBytes` and reconstructs **blocks shared metadata**.
@@ -75,7 +73,6 @@ The **Taiko Alethia consensus model** differs from Ethereum’s due to its rollu
 <br/>
 
 3. **Validation and Execution**
-
    - If `txList` is **valid**, constructs an **L2 anchor transaction** and inserts the block.
    - If `txList` is **invalid**, constructs an **empty L2 block**.
 
@@ -104,7 +101,6 @@ For a **valid or invalid txList**, the prover:
 2. Verifies the **TaikoAnchor.anchorV3** transaction in the **Merkle Patricia Trie (MPT)**.
 
 3. Submits:
-
    - `TaikoAnchor.anchorV3` transaction’s **RLP-encoded bytes**.
    - **Merkle proofs**.
    - **Proof-of-validity** to `TaikoInbox.proveBatches`.
@@ -129,7 +125,7 @@ For a complete diff, check the [Geth fork comparison](https://geth.taiko.xyz).
 
 ### JSON-RPC API
 
-Supports all **standard Ethereum execution APIs**. See [Ethereum Execution API Docs](https://ethereum.github.io/execution-apis/docs/reference/json-rpc-api/).
+Supports all **standard Ethereum execution APIs**. See [Ethereum Execution API Docs](https://ethereum.org/en/developers/docs/apis/json-rpc).
 
 ### Engine API
 

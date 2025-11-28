@@ -4,17 +4,18 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/prysmaticlabs/prysm/v5/io/file"
 	"github.com/urfave/cli/v2"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/cmd/flags"
 	pkgFlags "github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/flags"
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/jwt"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
 
@@ -23,7 +24,8 @@ type Config struct {
 	L1WsEndpoint              string
 	L2WsEndpoint              string
 	L2HttpEndpoint            string
-	TaikoInboxAddress         common.Address
+	PacayaInboxAddress        common.Address
+	ShastaInboxAddress        common.Address
 	TaikoAnchorAddress        common.Address
 	TaikoTokenAddress         common.Address
 	ProverSetAddress          common.Address
@@ -37,7 +39,7 @@ type Config struct {
 	Allowance                 *big.Int
 	RaikoHostEndpoint         string
 	RaikoZKVMHostEndpoint     string
-	RaikoJWT                  string
+	RaikoApiKey               string
 	RaikoRequestTimeout       time.Duration
 	LocalProposerAddresses    []common.Address
 	BlockConfirmations        uint64
@@ -53,7 +55,7 @@ type Config struct {
 // NewConfigFromCliContext creates a new config instance from command line flags.
 func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 	var (
-		jwtSecret []byte
+		raikoApiKey []byte
 	)
 	l1ProverPrivKey, err := crypto.ToECDSA(common.FromHex(c.String(flags.L1ProverPrivKey.Name)))
 	if err != nil {
@@ -75,10 +77,10 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		allowance = amt
 	}
 
-	if c.IsSet(flags.RaikoJWTPath.Name) {
-		jwtSecret, err = jwt.ParseSecretFromFile(c.String(flags.RaikoJWTPath.Name))
+	if c.IsSet(flags.RaikoApiKeyPath.Name) {
+		raikoApiKey, err = file.ReadFileAsBytes(c.String(flags.RaikoApiKeyPath.Name))
 		if err != nil {
-			return nil, fmt.Errorf("invalid JWT secret file: %w", err)
+			return nil, fmt.Errorf("invalid ApiKey secret file: %w", err)
 		}
 	}
 
@@ -98,14 +100,15 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		L1WsEndpoint:           c.String(flags.L1WSEndpoint.Name),
 		L2WsEndpoint:           c.String(flags.L2WSEndpoint.Name),
 		L2HttpEndpoint:         c.String(flags.L2HTTPEndpoint.Name),
-		TaikoInboxAddress:      common.HexToAddress(c.String(flags.TaikoInboxAddress.Name)),
+		PacayaInboxAddress:     common.HexToAddress(c.String(flags.PacayaInboxAddress.Name)),
+		ShastaInboxAddress:     common.HexToAddress(c.String(flags.ShastaInboxAddress.Name)),
 		TaikoAnchorAddress:     common.HexToAddress(c.String(flags.TaikoAnchorAddress.Name)),
 		TaikoTokenAddress:      common.HexToAddress(c.String(flags.TaikoTokenAddress.Name)),
 		ProverSetAddress:       common.HexToAddress(c.String(flags.ProverSetAddress.Name)),
 		L1ProverPrivKey:        l1ProverPrivKey,
 		RaikoHostEndpoint:      c.String(flags.RaikoHostEndpoint.Name),
 		RaikoZKVMHostEndpoint:  c.String(flags.RaikoZKVMHostEndpoint.Name),
-		RaikoJWT:               common.Bytes2Hex(jwtSecret),
+		RaikoApiKey:            strings.TrimSpace(string(raikoApiKey)),
 		RaikoRequestTimeout:    c.Duration(flags.RaikoRequestTimeout.Name),
 		StartingBatchID:        startingBatchID,
 		Dummy:                  c.Bool(flags.Dummy.Name),

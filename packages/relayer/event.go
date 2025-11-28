@@ -19,7 +19,7 @@ var (
 )
 
 // EventStatus is used to indicate whether processing has been attempted
-// for this particular event, and it's success
+// for this particular event, and its success
 type EventStatus int
 
 const (
@@ -50,7 +50,7 @@ func (e EventType) String() string {
 
 // Event represents a stored EVM event. The fields will be serialized
 // into the Data field to be unmarshalled into a concrete struct
-// dependant on the name of the event
+// dependent on the name of the event
 type Event struct {
 	ID                      int            `json:"id"`
 	Name                    string         `json:"name"`
