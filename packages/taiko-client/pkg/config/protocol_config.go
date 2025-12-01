@@ -159,7 +159,7 @@ func (c *PacayaProtocolConfigs) MaxProposals() uint64 {
 
 // ProvingWindow implements the ProtocolConfigs interface.
 func (c *PacayaProtocolConfigs) ProvingWindow() (time.Duration, error) {
-	return time.Duration(c.configs.ProvingWindow) * time.Second, nil
+	return time.Duration(c.configs.ProvingWindow.Int64()) * time.Second, nil
 }
 
 // MaxBlocksPerBatch implements the ProtocolConfigs interface.

@@ -21,14 +21,28 @@ import (
 
 func (s *TransactionBuilderTestSuite) TestBuildCalldataOnly() {
 	builder := s.newTestBuilderWithFallback(false, false, nil)
-	candidate, err := builder.BuildPacaya(context.Background(), []types.Transactions{{}}, nil, nil, common.Hash{})
+	candidate, err := builder.BuildPacaya(
+		context.Background(),
+		[]types.Transactions{{}},
+		nil,
+		nil,
+		common.Hash{},
+		new(big.Int).SetUint64(params.GWei),
+	)
 	s.Nil(err)
 	s.Zero(len(candidate.Blobs))
 }
 
 func (s *TransactionBuilderTestSuite) TestBuildCalldataWithBlobAllowed() {
 	builder := s.newTestBuilderWithFallback(true, false, nil)
-	candidate, err := builder.BuildPacaya(context.Background(), []types.Transactions{{}}, nil, nil, common.Hash{})
+	candidate, err := builder.BuildPacaya(
+		context.Background(),
+		[]types.Transactions{{}},
+		nil,
+		nil,
+		common.Hash{},
+		new(big.Int).SetUint64(params.GWei),
+	)
 	s.Nil(err)
 	s.NotZero(len(candidate.Blobs))
 }
@@ -51,6 +65,7 @@ func (s *TransactionBuilderTestSuite) TestFallback() {
 		nil,
 		nil,
 		common.Hash{},
+		new(big.Int).SetUint64(params.GWei),
 	)
 	s.Nil(err)
 	s.NotZero(len(candidate.Blobs))
@@ -71,6 +86,7 @@ func (s *TransactionBuilderTestSuite) TestFallback() {
 		nil,
 		nil,
 		common.Hash{},
+		new(big.Int).SetUint64(params.GWei),
 	)
 	s.Nil(err)
 	s.Zero(len(candidate.Blobs))
@@ -94,6 +110,7 @@ func (s *TransactionBuilderTestSuite) TestFallback() {
 		nil,
 		nil,
 		common.Hash{},
+		new(big.Int).SetUint64(params.GWei),
 	)
 	s.Nil(err)
 	s.NotZero(len(candidate.Blobs))
@@ -146,6 +163,7 @@ func (s *TransactionBuilderTestSuite) newTestBuilderWithFallback(
 		common.HexToAddress(os.Getenv("TAIKO_INBOX")),
 		common.HexToAddress(os.Getenv("TAIKO_WRAPPER")),
 		common.Address{},
+		common.Address{}, // surgeProposerWrapperAddress
 		10_000_000,
 		chainConfig,
 		txmgrSelector,

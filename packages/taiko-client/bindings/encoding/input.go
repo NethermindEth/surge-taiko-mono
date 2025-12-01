@@ -19,6 +19,7 @@ var (
 		{Name: "proposer", Type: "address"},
 		{Name: "coinbase", Type: "address"},
 		{Name: "parentMetaHash", Type: "bytes32"},
+		{Name: "baseFee", Type: "uint96"},
 		{Name: "anchorBlockId", Type: "uint64"},
 		{Name: "lastBlockTimestamp", Type: "uint64"},
 		{Name: "revertIfNotFirstProposal", Type: "bool"},
@@ -56,7 +57,7 @@ var (
 		{Name: "stateRoot", Type: "bytes32"},
 	}
 	SubProofComponents = []abi.ArgumentMarshaling{
-		{Name: "verifier", Type: "address"},
+		{Name: "proofType", Type: "uint16"},
 		{Name: "proof", Type: "bytes"},
 	}
 )
@@ -68,11 +69,13 @@ var (
 	}
 	BatchMetaDataComponentsArrayType, _   = abi.NewType("tuple[]", "ITaikoInbox.BatchMetadata", BatchMetaDataComponents)
 	BatchTransitionComponentsArrayType, _ = abi.NewType("tuple[]", "ITaikoInbox.Transition", BatchTransitionComponents)
-	SubProofsComponentsArrayType, _       = abi.NewType("tuple[]", "ComposeVerifier.SubProof", SubProofComponents)
+	SubProofsComponentsArrayType, _       = abi.NewType("tuple[]", "SurgeVerifier.SubProof", SubProofComponents)
 	SubProofsComponentsArrayArgs          = abi.Arguments{
-		{Name: "ComposeVerifier.SubProof[]", Type: SubProofsComponentsArrayType},
+		{Name: "SurgeVerifier.SubProof[]", Type: SubProofsComponentsArrayType},
 	}
+	uint16Type, _         = abi.NewType("uint16", "", nil)
 	ProveBatchesInputArgs = abi.Arguments{
+		{Name: "LibProofType.ProofType", Type: uint16Type},
 		{Name: "ITaikoInbox.BlockMetadata[]", Type: BatchMetaDataComponentsArrayType},
 		{Name: "TaikoData.Transition[]", Type: BatchTransitionComponentsArrayType},
 	}
@@ -109,7 +112,7 @@ var (
 	ForcedInclusionStoreABI *abi.ABI
 	TaikoAnchorABI          *abi.ABI
 	ResolverBaseABI         *abi.ABI
-	ComposeVerifierABI      *abi.ABI
+	SurgeVerifierABI        *abi.ABI
 	ForkRouterPacayaABI     *abi.ABI
 	TaikoTokenPacayaABI     *abi.ABI
 	ProverSetPacayaABI      *abi.ABI
@@ -180,8 +183,8 @@ func init() {
 		log.Crit("Get ResolverBase ABI error", "error", err)
 	}
 
-	if ComposeVerifierABI, err = pacayaBindings.ComposeVerifierMetaData.GetAbi(); err != nil {
-		log.Crit("Get ComposeVerifier ABI error", "error", err)
+	if SurgeVerifierABI, err = pacayaBindings.SurgeVerifierMetaData.GetAbi(); err != nil {
+		log.Crit("Get SurgeVerifier ABI error", "error", err)
 	}
 
 	if ForkRouterPacayaABI, err = pacayaBindings.ForkRouterMetaData.GetAbi(); err != nil {
@@ -211,7 +214,7 @@ func init() {
 		ForcedInclusionStoreABI.Errors,
 		TaikoAnchorABI.Errors,
 		ResolverBaseABI.Errors,
-		ComposeVerifierABI.Errors,
+		SurgeVerifierABI.Errors,
 		ForkRouterPacayaABI.Errors,
 		TaikoTokenPacayaABI.Errors,
 		ProverSetPacayaABI.Errors,
@@ -247,6 +250,7 @@ func EncodeBatchesSubProofs(subProofs []SubProof) ([]byte, error) {
 
 // EncodeProveBatchesInput performs the solidity `abi.encode` for the given TaikoInbox.proveBatches input.
 func EncodeProveBatchesInput(
+	proofType uint16,
 	metas []metadata.TaikoProposalMetaData,
 	transitions []pacayaBindings.ITaikoInboxTransition,
 ) ([]byte, error) {
@@ -262,7 +266,7 @@ func EncodeProveBatchesInput(
 			ProposedAt: metas[i].Pacaya().GetProposedAt(),
 		})
 	}
-	input, err := ProveBatchesInputArgs.Pack(pacayaMetas, transitions)
+	input, err := ProveBatchesInputArgs.Pack(proofType, pacayaMetas, transitions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to abi.encode TaikoInbox.proveBatches input item after pacaya fork, %w", err)
 	}

@@ -25,9 +25,10 @@ type TxBuilder func(txOpts *bind.TransactOpts) (*txmgr.TxCandidate, error)
 
 // ProveBatchesTxBuilder is responsible for building ProveBatches transactions.
 type ProveBatchesTxBuilder struct {
-	rpc               *rpc.Client
-	taikoInboxAddress common.Address
-	proverSetAddress  common.Address
+	rpc                         *rpc.Client
+	taikoInboxAddress           common.Address
+	proverSetAddress            common.Address
+	surgeProposerWrapperAddress common.Address
 }
 
 // NewProveBatchesTxBuilder creates a new ProveBatchesTxBuilder instance.
@@ -35,8 +36,14 @@ func NewProveBatchesTxBuilder(
 	rpc *rpc.Client,
 	taikoInboxAddress common.Address,
 	proverSetAddress common.Address,
+	surgeProposerWrapperAddress common.Address,
 ) *ProveBatchesTxBuilder {
-	return &ProveBatchesTxBuilder{rpc, taikoInboxAddress, proverSetAddress}
+	return &ProveBatchesTxBuilder{
+		rpc:                         rpc,
+		taikoInboxAddress:           taikoInboxAddress,
+		proverSetAddress:            proverSetAddress,
+		surgeProposerWrapperAddress: surgeProposerWrapperAddress,
+	}
 }
 
 // BuildProveBatchesPacaya creates a new TaikoInbox.ProveBatches transaction.
@@ -68,18 +75,39 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesPacaya(batchProof *proofProduce
 				"startBlockID", proof.Opts.PacayaOptions().Headers[0].Number,
 				"endBlockID", proof.Opts.PacayaOptions().Headers[len(proof.Opts.PacayaOptions().Headers)-1].Number,
 				"gasLimit", txOpts.GasLimit,
-				"verifier", batchProof.Verifier,
+				"zkVerifier", batchProof.Verifier,
+				"sgxVerifier", batchProof.SgxProofVerifier,
 			)
 		}
-		if bytes.Compare(batchProof.Verifier.Bytes(), batchProof.SgxGethProofVerifier.Bytes()) < 0 {
-			subProofs[0] = encoding.SubProof{Verifier: batchProof.Verifier, Proof: batchProof.BatchProof}
-			subProofs[1] = encoding.SubProof{Verifier: batchProof.SgxGethProofVerifier, Proof: batchProof.SgxGethBatchProof}
+		if bytes.Compare(batchProof.Verifier.Bytes(), batchProof.SgxProofVerifier.Bytes()) < 0 {
+			subProofs[0] = encoding.SubProof{
+				ProofType: encoding.GetProofTypeFromString(string(batchProof.ProofType)),
+				Proof:     batchProof.BatchProof,
+			}
+			subProofs[1] = encoding.SubProof{
+				ProofType: encoding.GetProofTypeFromString(string(batchProof.SgxProofType)),
+				Proof:     batchProof.SgxBatchProof,
+			}
 		} else {
-			subProofs[0] = encoding.SubProof{Verifier: batchProof.SgxGethProofVerifier, Proof: batchProof.SgxGethBatchProof}
-			subProofs[1] = encoding.SubProof{Verifier: batchProof.Verifier, Proof: batchProof.BatchProof}
+			subProofs[0] = encoding.SubProof{
+				ProofType: encoding.GetProofTypeFromString(string(batchProof.SgxProofType)),
+				Proof:     batchProof.SgxBatchProof,
+			}
+			subProofs[1] = encoding.SubProof{
+				ProofType: encoding.GetProofTypeFromString(string(batchProof.ProofType)),
+				Proof:     batchProof.BatchProof,
+			}
 		}
 
-		input, err := encoding.EncodeProveBatchesInput(metas, transitions)
+		combinedProofType := subProofs[0].ProofType + subProofs[1].ProofType
+		log.Debug(
+			"Combined proof type details",
+			"subProof0Type", subProofs[0].ProofType,
+			"subProof1Type", subProofs[1].ProofType,
+			"combinedProofType", combinedProofType,
+		)
+
+		input, err := encoding.EncodeProveBatchesInput(combinedProofType, metas, transitions)
 		if err != nil {
 			return nil, err
 		}
@@ -88,17 +116,37 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesPacaya(batchProof *proofProduce
 			return nil, err
 		}
 
-		if a.proverSetAddress != rpc.ZeroAddress {
-			if data, err = encoding.ProverSetPacayaABI.Pack("proveBatches", input, encodedSubProofs); err != nil {
-				return nil, encoding.TryParsingCustomError(err)
-			}
-			to = a.proverSetAddress
+		// Use SurgeProposerWrapper ABI (same interface as TaikoInbox)
+		if data, err = encoding.TaikoInboxABI.Pack("proveBatches", input, encodedSubProofs); err != nil {
+			return nil, encoding.TryParsingCustomError(err)
+		}
+
+		if a.surgeProposerWrapperAddress != rpc.ZeroAddress {
+			to = a.surgeProposerWrapperAddress
+			log.Info("Using SurgeProposerWrapper for proof submission at proveBatches",
+				"surgeProposerWrapper", a.surgeProposerWrapperAddress.Hex(),
+				"taikoInbox", a.taikoInboxAddress.Hex())
 		} else {
-			if data, err = encoding.TaikoInboxABI.Pack("proveBatches", input, encodedSubProofs); err != nil {
-				return nil, encoding.TryParsingCustomError(err)
-			}
 			to = a.taikoInboxAddress
 		}
+
+		log.Debug("Transaction data being sent",
+			"to", to.Hex(),
+			"dataLength", len(data),
+			"dataHex", common.Bytes2Hex(data),
+			"gasLimit", txOpts.GasLimit,
+			"value", txOpts.Value,
+			"subProof0Type", subProofs[0].ProofType,
+			"subProof0Length", len(subProofs[0].Proof),
+			"subProof0Hex", common.Bytes2Hex(subProofs[0].Proof),
+			"subProof1Type", subProofs[1].ProofType,
+			"subProof1Length", len(subProofs[1].Proof),
+			"subProof1Hex", common.Bytes2Hex(subProofs[1].Proof),
+			"zkProofType", batchProof.ProofType,
+			"sgxProofType", batchProof.SgxProofType,
+			"zkBatchProofLength", len(batchProof.BatchProof),
+			"sgxBatchProofLength", len(batchProof.SgxBatchProof),
+		)
 
 		return &txmgr.TxCandidate{
 			TxData:   data,

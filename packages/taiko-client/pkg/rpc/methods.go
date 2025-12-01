@@ -24,7 +24,6 @@ import (
 	ontakeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/ontake"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
-	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
 
 var (
@@ -381,27 +380,6 @@ func (c *Client) WaitL2Header(ctx context.Context, blockID *big.Int) (*types.Hea
 	return nil, fmt.Errorf("failed to fetch block header from L2 execution engine, blockID: %d", blockID)
 }
 
-// CalculateBaseFee calculates the base fee from the L2 protocol.
-func (c *Client) CalculateBaseFee(
-	ctx context.Context,
-	l2Head *types.Header,
-	baseFeeConfig *pacayaBindings.LibSharedDataBaseFeeConfig,
-	currentTimestamp uint64,
-) (*big.Int, error) {
-	var (
-		baseFee *big.Int
-		err     error
-	)
-
-	if baseFee, err = c.calculateBaseFeePacaya(ctx, l2Head, currentTimestamp, baseFeeConfig); err != nil {
-		return nil, err
-	}
-
-	log.Info("Base fee information", "fee", utils.WeiToGWei(baseFee), "l2Head", l2Head.Number)
-
-	return baseFee, nil
-}
-
 // GetPoolContent fetches the transactions list from L2 execution engine's transactions pool with given
 // upper limit.
 func (c *Client) GetPoolContent(
@@ -412,21 +390,10 @@ func (c *Client) GetPoolContent(
 	locals []common.Address,
 	maxTransactionsLists uint64,
 	minTip uint64,
-	chainConfig *config.ChainConfig,
-	baseFeeConfig *pacayaBindings.LibSharedDataBaseFeeConfig,
+	baseFee *big.Int,
 ) ([]*miner.PreBuiltTxList, error) {
 	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, defaultTimeout)
 	defer cancel()
-
-	l2Head, err := c.L2.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	baseFee, err := c.CalculateBaseFee(ctx, l2Head, baseFeeConfig, uint64(time.Now().Unix()))
-	if err != nil {
-		return nil, err
-	}
 
 	var localsArg []string
 	for _, local := range locals {
@@ -851,35 +818,6 @@ func (c *Client) getSyncedL1SnippetFromAnchor(tx *types.Transaction) (
 	return l1StateRoot, l1Height, parentGasUsed, nil
 }
 
-// calculateBaseFeePacaya calculates the base fee after Pacaya fork from the L2 protocol.
-func (c *Client) calculateBaseFeePacaya(
-	ctx context.Context,
-	l2Head *types.Header,
-	currentTimestamp uint64,
-	baseFeeConfig *pacayaBindings.LibSharedDataBaseFeeConfig,
-) (*big.Int, error) {
-	log.Info(
-		"Calculate base fee for the Pacaya block",
-		"parentNumber", l2Head.Number,
-		"parentHash", l2Head.Hash(),
-		"parentGasUsed", l2Head.GasUsed,
-		"currentTimestamp", currentTimestamp,
-		"baseFeeConfig", baseFeeConfig,
-	)
-
-	baseFeeInfo, err := c.PacayaClients.TaikoAnchor.GetBasefeeV2(
-		&bind.CallOpts{BlockNumber: l2Head.Number, BlockHash: l2Head.Hash(), Context: ctx},
-		uint32(l2Head.GasUsed),
-		currentTimestamp,
-		*baseFeeConfig,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate pacaya block base fee by GetBasefeeV2: %w", err)
-	}
-
-	return baseFeeInfo.Basefee, nil
-}
-
 // getGenesisHeight fetches the genesis height from the protocol.
 func (c *Client) getGenesisHeight(ctx context.Context) (*big.Int, error) {
 	stateVars, err := c.GetProtocolStateVariablesPacaya(&bind.CallOpts{Context: ctx})
@@ -990,49 +928,40 @@ func (c *Client) GetForcedInclusionPacaya(ctx context.Context) (
 	return &forcedInclusion, new(big.Int).SetUint64(uint64(minTxsPerForcedInclusion)), nil
 }
 
-// GetOPVerifierPacaya resolves the Pacaya op verifier address.
-func (c *Client) GetOPVerifierPacaya(opts *bind.CallOpts) (common.Address, error) {
-	if c.PacayaClients.ComposeVerifier == nil {
-		return common.Address{}, errors.New("composeVerifier contract is not set")
+// GetSGXRethVerifierPacaya resolves the Pacaya sgx reth verifier address.
+func (c *Client) GetSGXRethVerifierPacaya(opts *bind.CallOpts) (common.Address, error) {
+	if c.PacayaClients.SurgeVerifier == nil {
+		return common.Address{}, errors.New("surgeVerifier contract is not set")
 	}
 
-	return getImmutableAddressPacaya(c, opts, c.PacayaClients.ComposeVerifier.OpVerifier)
-}
-
-// GetSGXVerifierPacaya resolves the Pacaya sgx verifier address.
-func (c *Client) GetSGXVerifierPacaya(opts *bind.CallOpts) (common.Address, error) {
-	if c.PacayaClients.ComposeVerifier == nil {
-		return common.Address{}, errors.New("composeVerifier contract is not set")
-	}
-
-	return getImmutableAddressPacaya(c, opts, c.PacayaClients.ComposeVerifier.SgxRethVerifier)
+	return getImmutableAddressFromStructPacaya(c, opts, c.PacayaClients.SurgeVerifier.SgxRethVerifier)
 }
 
 // GetRISC0VerifierPacaya resolves the Pacaya risc0 verifier address.
 func (c *Client) GetRISC0VerifierPacaya(opts *bind.CallOpts) (common.Address, error) {
-	if c.PacayaClients.ComposeVerifier == nil {
-		return common.Address{}, errors.New("composeVerifier contract is not set")
+	if c.PacayaClients.SurgeVerifier == nil {
+		return common.Address{}, errors.New("surgeVerifier contract is not set")
 	}
 
-	return getImmutableAddressPacaya(c, opts, c.PacayaClients.ComposeVerifier.Risc0RethVerifier)
+	return getImmutableAddressFromStructPacaya(c, opts, c.PacayaClients.SurgeVerifier.Risc0RethVerifier)
 }
 
 // GetSP1VerifierPacaya resolves the Pacaya sp1 verifier address.
 func (c *Client) GetSP1VerifierPacaya(opts *bind.CallOpts) (common.Address, error) {
-	if c.PacayaClients.ComposeVerifier == nil {
-		return common.Address{}, errors.New("composeVerifier contract is not set")
+	if c.PacayaClients.SurgeVerifier == nil {
+		return common.Address{}, errors.New("surgeVerifier contract is not set")
 	}
 
-	return getImmutableAddressPacaya(c, opts, c.PacayaClients.ComposeVerifier.Sp1RethVerifier)
+	return getImmutableAddressFromStructPacaya(c, opts, c.PacayaClients.SurgeVerifier.Sp1RethVerifier)
 }
 
-// GetSgxGethVerifierPacaya resolves the Pacaya sgx geth verifier address.
-func (c *Client) GetSgxGethVerifierPacaya(opts *bind.CallOpts) (common.Address, error) {
-	if c.PacayaClients.ComposeVerifier == nil {
-		return common.Address{}, errors.New("composeVerifier contract is not set")
+// GetSGXGethVerifierPacaya resolves the Pacaya sgx geth verifier address.
+func (c *Client) GetSGXGethVerifierPacaya(opts *bind.CallOpts) (common.Address, error) {
+	if c.PacayaClients.SurgeVerifier == nil {
+		return common.Address{}, errors.New("surgeVerifier contract is not set")
 	}
 
-	return getImmutableAddressPacaya(c, opts, c.PacayaClients.ComposeVerifier.SgxGethVerifier)
+	return getImmutableAddressFromStructPacaya(c, opts, c.PacayaClients.SurgeVerifier.SgxGethVerifier)
 }
 
 // GetPreconfRouterPacaya resolves the preconfirmation router address.
@@ -1062,4 +991,32 @@ func getImmutableAddressPacaya[T func(opts *bind.CallOpts) (common.Address, erro
 	defer cancel()
 
 	return resolveFunc(opts)
+}
+
+// getImmutableAddressPacaya resolves the Pacaya contract address with upgradeable flag.
+func getImmutableAddressFromStructPacaya[T func(opts *bind.CallOpts) (struct {
+	Upgradeable bool
+	Addr        common.Address
+}, error)](
+	c *Client,
+	opts *bind.CallOpts,
+	resolveFunc T,
+) (common.Address, error) {
+	if resolveFunc == nil {
+		return common.Address{}, errors.New("resolver contract is not set")
+	}
+
+	var cancel context.CancelFunc
+	if opts == nil {
+		opts = &bind.CallOpts{Context: context.Background()}
+	}
+	opts.Context, cancel = CtxWithTimeoutOrDefault(opts.Context, defaultTimeout)
+	defer cancel()
+
+	result, err := resolveFunc(opts)
+	if err != nil {
+		return common.Address{}, err
+	}
+
+	return result.Addr, nil
 }
