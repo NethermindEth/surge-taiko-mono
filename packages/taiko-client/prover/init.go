@@ -84,7 +84,7 @@ func (p *Prover) setApprovalAmount(ctx context.Context, contract common.Address)
 func (p *Prover) initShastaProofSubmitter(ctx context.Context, txBuilder *transaction.ProveBatchesTxBuilder) error {
 	var err error
 
-	// Get verifier IDs for RISC0 and SP1
+	// Get verifier IDs for RISC0, SP1, and ZISK
 	risc0RethVerifierID, err := p.rpc.ShastaClients.ComposeVerifier.RISC0RETH(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return err
@@ -93,11 +93,16 @@ func (p *Prover) initShastaProofSubmitter(ctx context.Context, txBuilder *transa
 	if err != nil {
 		return err
 	}
+	ziskRethVerifierID, err := p.rpc.ShastaClients.ComposeVerifier.ZISKRETH(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return err
+	}
 
 	// Map proof type strings to ProofType constants
 	proofTypeMap := map[string]producer.ProofType{
-		string(producer.ProofTypeZKR0):  producer.ProofTypeZKR0,
-		string(producer.ProofTypeZKSP1): producer.ProofTypeZKSP1,
+		string(producer.ProofTypeZKR0):   producer.ProofTypeZKR0,
+		string(producer.ProofTypeZKSP1):  producer.ProofTypeZKSP1,
+		string(producer.ProofTypeZKZisk): producer.ProofTypeZKZisk,
 	}
 
 	zkvm1ProofType := proofTypeMap[p.cfg.ZKVMProofType1]
@@ -107,6 +112,7 @@ func (p *Prover) initShastaProofSubmitter(ctx context.Context, txBuilder *transa
 	verifierIDs := make(map[producer.ProofType]uint8)
 	verifierIDs[producer.ProofTypeZKR0] = risc0RethVerifierID
 	verifierIDs[producer.ProofTypeZKSP1] = sp1RethVerifierID
+	verifierIDs[producer.ProofTypeZKZisk] = ziskRethVerifierID
 
 	// Create single ComposeProofProducer with dual ZKVM endpoints
 	composeProducer := &producer.ComposeProofProducer{

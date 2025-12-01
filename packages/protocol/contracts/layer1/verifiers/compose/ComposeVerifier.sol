@@ -23,6 +23,7 @@ abstract contract ComposeVerifier is IProofVerifier {
     uint8 public constant SGX_RETH = 4;
     uint8 public constant RISC0_RETH = 5;
     uint8 public constant SP1_RETH = 6;
+    uint8 public constant ZISK_RETH = 7;
 
     /// @notice Immutable verifier addresses
     /// The sgx/tdx-GethVerifier is the core verifier required in every proof.
@@ -37,6 +38,7 @@ abstract contract ComposeVerifier is IProofVerifier {
     address public immutable sgxRethVerifier;
     address public immutable risc0RethVerifier;
     address public immutable sp1RethVerifier;
+    address public immutable ziskRethVerifier;
 
     constructor(
         address _sgxGethVerifier,
@@ -44,7 +46,8 @@ abstract contract ComposeVerifier is IProofVerifier {
         address _opVerifier,
         address _sgxRethVerifier,
         address _risc0RethVerifier,
-        address _sp1RethVerifier
+        address _sp1RethVerifier,
+        address _ziskRethVerifier
     ) {
         sgxGethVerifier = _sgxGethVerifier;
         tdxGethVerifier = _tdxGethVerifier;
@@ -52,6 +55,7 @@ abstract contract ComposeVerifier is IProofVerifier {
         sgxRethVerifier = _sgxRethVerifier;
         risc0RethVerifier = _risc0RethVerifier;
         sp1RethVerifier = _sp1RethVerifier;
+        ziskRethVerifier = _ziskRethVerifier;
     }
 
     /// @inheritdoc IProofVerifier
@@ -98,6 +102,7 @@ abstract contract ComposeVerifier is IProofVerifier {
         if (_verifierId == SGX_RETH) return sgxRethVerifier;
         if (_verifierId == RISC0_RETH) return risc0RethVerifier;
         if (_verifierId == SP1_RETH) return sp1RethVerifier;
+        if (_verifierId == ZISK_RETH) return ziskRethVerifier;
         return address(0);
     }
 

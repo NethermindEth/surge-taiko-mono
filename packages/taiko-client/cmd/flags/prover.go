@@ -32,14 +32,14 @@ var (
 	}
 	ZKVMProofType1 = &cli.StringFlag{
 		Name:     "raiko.zkvm.proofType1",
-		Usage:    "Proof type for the first ZKVM (risc0 or sp1)",
+		Usage:    "Proof type for the first ZKVM (risc0, sp1, or zisk)",
 		Required: true,
 		Category: proverCategory,
 		EnvVars:  []string{"ZKVM_PROOF_TYPE1"},
 	}
 	ZKVMProofType2 = &cli.StringFlag{
 		Name:     "raiko.zkvm.proofType2",
-		Usage:    "Proof type for the second ZKVM (risc0 or sp1)",
+		Usage:    "Proof type for the second ZKVM (risc0, sp1, or zisk)",
 		Required: true,
 		Category: proverCategory,
 		EnvVars:  []string{"ZKVM_PROOF_TYPE2"},

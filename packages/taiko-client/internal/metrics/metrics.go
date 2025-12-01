@@ -181,6 +181,24 @@ var (
 	ProverSp1ProofAggregationGeneratedCounter = factory.NewCounter(prometheus.CounterOpts{
 		Name: "prover_proof_sp1_aggregation_generated",
 	})
+	ProverZiskAggregationGenerationTime = factory.NewGauge(prometheus.GaugeOpts{
+		Name: "prover_proof_zisk_aggregation_generation_time",
+	})
+	ProverZiskAggregationGenerationTimeSum = factory.NewCounter(prometheus.CounterOpts{
+		Name: "prover_proof_zisk_aggregation_generation_time_sum",
+	})
+	ProverZiskProofGeneratedCounter = factory.NewCounter(prometheus.CounterOpts{
+		Name: "prover_proof_zisk_generated",
+	})
+	ProverZiskProofGenerationTime = factory.NewGauge(prometheus.GaugeOpts{
+		Name: "prover_proof_zisk_generation_time",
+	})
+	ProverZiskProofGenerationTimeSum = factory.NewCounter(prometheus.CounterOpts{
+		Name: "prover_proof_zisk_generation_time_sum",
+	})
+	ProverZiskProofAggregationGeneratedCounter = factory.NewCounter(prometheus.CounterOpts{
+		Name: "prover_proof_zisk_aggregation_generated",
+	})
 	ProverSubmissionRevertedCounter = factory.NewCounter(prometheus.CounterOpts{
 		Name: "prover_proof_submission_reverted",
 	})

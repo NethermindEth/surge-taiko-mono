@@ -20,6 +20,7 @@ const (
 	ProofTypeSgxCPU  ProofType = "native"
 	ProofTypeZKR0    ProofType = "risc0"
 	ProofTypeZKSP1   ProofType = "sp1"
+	ProofTypeZKZisk  ProofType = "zisk"
 	ProofTypeZKAny   ProofType = "zk_any"
 )
 

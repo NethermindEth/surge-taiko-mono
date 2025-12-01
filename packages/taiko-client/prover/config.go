@@ -113,17 +113,18 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 
 	// Validate proof types using constants from producer package
 	validProofTypes := map[string]bool{
-		string(producer.ProofTypeZKR0):  true,
-		string(producer.ProofTypeZKSP1): true,
+		string(producer.ProofTypeZKR0):   true,
+		string(producer.ProofTypeZKSP1):  true,
+		string(producer.ProofTypeZKZisk): true,
 	}
 
 	if !validProofTypes[zkvmProofType1] {
-		return nil, fmt.Errorf("invalid ZKVM proof type 1: %s (must be %s or %s)",
-			zkvmProofType1, producer.ProofTypeZKR0, producer.ProofTypeZKSP1)
+		return nil, fmt.Errorf("invalid ZKVM proof type 1: %s (must be %s, %s, or %s)",
+			zkvmProofType1, producer.ProofTypeZKR0, producer.ProofTypeZKSP1, producer.ProofTypeZKZisk)
 	}
 	if !validProofTypes[zkvmProofType2] {
-		return nil, fmt.Errorf("invalid ZKVM proof type 2: %s (must be %s or %s)",
-			zkvmProofType2, producer.ProofTypeZKR0, producer.ProofTypeZKSP1)
+		return nil, fmt.Errorf("invalid ZKVM proof type 2: %s (must be %s, %s, or %s)",
+			zkvmProofType2, producer.ProofTypeZKR0, producer.ProofTypeZKSP1, producer.ProofTypeZKZisk)
 	}
 	if zkvmProofType1 == zkvmProofType2 {
 		return nil, fmt.Errorf("ZKVM proof types must be different: both are set to %s", zkvmProofType1)
