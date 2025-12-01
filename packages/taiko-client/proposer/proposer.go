@@ -758,7 +758,7 @@ func (p *Proposer) ProposeTxListPacaya(
 				}
 			}
 		} else {
-			log.Info("Bypassing profitability check for signal-based force propose")
+			log.Info("Bypassing profitability check for allowEmptyPoolContent")
 		}
 	}
 
