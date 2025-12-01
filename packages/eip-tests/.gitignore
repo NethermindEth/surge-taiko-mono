@@ -1,0 +1,17 @@
+# Foundry
+out/
+cache/
+lib/
+
+# Test results
+test-results/
+
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
