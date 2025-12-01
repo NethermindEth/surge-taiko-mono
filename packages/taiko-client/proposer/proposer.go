@@ -330,8 +330,9 @@ func (p *Proposer) Start() error {
 	go p.eventLoop()
 
 	// Start monitoring L1 Bridge messages
-	p.wg.Add(1)
-	go p.monitorBridgeMessages()
+	// TODO(@jmadibekov): Uncomment this when fast L1-to-L2 bridging work is finished
+	// p.wg.Add(1)
+	// go p.monitorBridgeMessages()
 
 	return nil
 }
@@ -364,6 +365,8 @@ func (p *Proposer) eventLoop() {
 }
 
 // monitorBridgeMessages monitors L1 transaction pool for Bridge sendMessage calls
+//
+//nolint:unused
 func (p *Proposer) monitorBridgeMessages() {
 	defer p.wg.Done()
 
@@ -545,18 +548,18 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 	}
 
 	// Add pending Bridge messages to the transaction list
-	txList := types.Transactions{}
-	p.bridgeMsgMu.Lock()
-	if len(p.pendingBridgeMessages) > 0 {
-		log.Info("Pending Bridge sendMessage transactions", "count", len(p.pendingBridgeMessages))
-		for _, tx := range p.pendingBridgeMessages {
-			txList = append(txList, tx)
-		}
-		log.Debug("Added bridge message to txList", "txList", txList)
-		p.pendingBridgeMessages = make(map[common.Hash]*types.Transaction) // Clear processed messages
-	}
-	p.bridgeMsgMu.Unlock()
-
+	// TODO(@jmadibekov): Uncomment this when fast L1-to-L2 bridging work is finished
+	// txList := types.Transactions{}
+	// p.bridgeMsgMu.Lock()
+	// if len(p.pendingBridgeMessages) > 0 {
+	// 	log.Info("Pending Bridge sendMessage transactions", "count", len(p.pendingBridgeMessages))
+	// 	for _, tx := range p.pendingBridgeMessages {
+	// 		txList = append(txList, tx)
+	// 	}
+	// 	log.Debug("Added bridge message to txList", "txList", txList)
+	// 	p.pendingBridgeMessages = make(map[common.Hash]*types.Transaction) // Clear processed messages
+	// }
+	// p.bridgeMsgMu.Unlock()
 	// TODO(@jmadibekov): Add a check that the transaction is valid and hasn't been mined already
 	// (whether by relayer or some other way) and include it in the proposed block
 
@@ -600,7 +603,7 @@ func (p *Proposer) ProposeOp(ctx context.Context) error {
 	}
 
 	// Propose the transactions lists.
-	err = p.ProposeTxLists(ctx, txLists, parentMetaHash, l2BaseFee, shouldForcePropose)
+	err = p.ProposeTxLists(ctx, txLists, parentMetaHash, l2BaseFee, allowEmptyPoolContent)
 
 	// If proposal was successful, reset any pending signal force propose state
 	if err == nil {
@@ -616,9 +619,9 @@ func (p *Proposer) ProposeTxLists(
 	txLists []types.Transactions,
 	parentMetaHash common.Hash,
 	l2BaseFee *big.Int,
-	isSignalForcePropose bool,
+	allowEmptyPoolContent bool,
 ) error {
-	if err := p.ProposeTxListPacaya(ctx, txLists, parentMetaHash, l2BaseFee, isSignalForcePropose); err != nil {
+	if err := p.ProposeTxListPacaya(ctx, txLists, parentMetaHash, l2BaseFee, allowEmptyPoolContent); err != nil {
 		return err
 	}
 	p.lastProposedAt = time.Now()
@@ -631,7 +634,7 @@ func (p *Proposer) ProposeTxListPacaya(
 	txBatch []types.Transactions,
 	parentMetaHash common.Hash,
 	l2BaseFee *big.Int,
-	isSignalForcePropose bool,
+	allowEmptyPoolContent bool,
 ) error {
 	var (
 		proposerAddress = p.proposerAddress
@@ -710,9 +713,9 @@ func (p *Proposer) ProposeTxListPacaya(
 		return err
 	}
 
-	// Check profitability if enabled, but bypass check when force proposing due to signal
+	// Check profitability if enabled, but bypass check when allowEmpty is true (signal or time-based)
 	if p.checkProfitability {
-		if !isSignalForcePropose {
+		if !allowEmptyPoolContent {
 			originalBaseFee := new(big.Int).Set(l2BaseFee)
 			originalTxCount := txs
 
@@ -755,7 +758,7 @@ func (p *Proposer) ProposeTxListPacaya(
 				}
 			}
 		} else {
-			log.Info("Bypassing profitability check for signal-based force propose")
+			log.Info("Bypassing profitability check for allowEmptyPoolContent")
 		}
 	}
 
@@ -782,7 +785,7 @@ func (p *Proposer) ProposeTxListPacaya(
 		"blocksInBatch", len(txBatch),
 		"txs", txs,
 		"txHashes", txHashes,
-		"isSignalForcePropose", isSignalForcePropose,
+		"allowEmptyPoolContent", allowEmptyPoolContent,
 	)
 
 	metrics.ProposerProposedTxListsCounter.Add(float64(len(txBatch)))
