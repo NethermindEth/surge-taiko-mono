@@ -160,6 +160,10 @@ func updateProvingMetrics(proofType ProofType, requestAt time.Time, isAggregatio
 			metrics.ProverSP1AggregationGenerationTime.Set(generationTime)
 			metrics.ProverSP1AggregationGenerationTimeSum.Add(generationTime)
 			metrics.ProverSp1ProofAggregationGeneratedCounter.Add(1)
+		case ProofTypeZKZisk:
+			metrics.ProverZiskAggregationGenerationTime.Set(generationTime)
+			metrics.ProverZiskAggregationGenerationTimeSum.Add(generationTime)
+			metrics.ProverZiskProofAggregationGeneratedCounter.Add(1)
 		default:
 			log.Error("Unknown proof type", "proofType", proofType)
 		}
@@ -183,6 +187,10 @@ func updateProvingMetrics(proofType ProofType, requestAt time.Time, isAggregatio
 			metrics.ProverSP1ProofGenerationTime.Set(generationTime)
 			metrics.ProverSP1ProofGenerationTimeSum.Add(generationTime)
 			metrics.ProverSp1ProofGeneratedCounter.Add(1)
+		case ProofTypeZKZisk:
+			metrics.ProverZiskProofGenerationTime.Set(generationTime)
+			metrics.ProverZiskProofGenerationTimeSum.Add(generationTime)
+			metrics.ProverZiskProofGeneratedCounter.Add(1)
 		default:
 			log.Error("Unknown proof type", "proofType", proofType)
 		}

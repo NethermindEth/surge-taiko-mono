@@ -21,7 +21,7 @@ contract MockERC20 is ERC20 {
 /// @notice Mock proof verifier that always accepts proofs
 contract MockProofVerifier is ComposeVerifier {
     constructor()
-        ComposeVerifier(address(0), address(0), address(0), address(0), address(0), address(0))
+        ComposeVerifier(address(0), address(0), address(0), address(0), address(0), address(0), address(0))
     { }
 
     function verifyProof(uint256, bytes32, bytes calldata) external pure override {

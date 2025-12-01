@@ -31,7 +31,7 @@ var (
 
 // ComposeVerifierMetaData contains all meta data concerning the ComposeVerifier contract.
 var ComposeVerifierMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"function\",\"name\":\"NONE\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"OP\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"RISC0_RETH\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"SGX_GETH\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"SGX_RETH\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"SP1_RETH\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"TDX_GETH\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getVerifierAddress\",\"inputs\":[{\"name\":\"_verifierId\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"opVerifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"risc0RethVerifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"sgxGethVerifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"sgxRethVerifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"sp1RethVerifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"tdxGethVerifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"verifyProof\",\"inputs\":[{\"name\":\"_proposalAge\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"_transitionsHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"_proof\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"view\"},{\"type\":\"error\",\"name\":\"CV_INVALID_SUB_VERIFIER\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"CV_INVALID_SUB_VERIFIER_ORDER\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"CV_VERIFIERS_INSUFFICIENT\",\"inputs\":[]}]",
+	ABI: "[{\"type\":\"function\",\"name\":\"NONE\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"OP\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"RISC0_RETH\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"SGX_GETH\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"SGX_RETH\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"SP1_RETH\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"TDX_GETH\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"ZISK_RETH\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getVerifierAddress\",\"inputs\":[{\"name\":\"_verifierId\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"opVerifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"risc0RethVerifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"sgxGethVerifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"sgxRethVerifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"sp1RethVerifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"tdxGethVerifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"verifyProof\",\"inputs\":[{\"name\":\"_proposalAge\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"_transitionsHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"_proof\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"ziskRethVerifier\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"error\",\"name\":\"CV_INVALID_SUB_VERIFIER\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"CV_INVALID_SUB_VERIFIER_ORDER\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"CV_VERIFIERS_INSUFFICIENT\",\"inputs\":[]}]",
 }
 
 // ComposeVerifierABI is the input ABI used to generate the binding from.
@@ -397,6 +397,37 @@ func (_ComposeVerifier *ComposeVerifierCallerSession) TDXGETH() (uint8, error) {
 	return _ComposeVerifier.Contract.TDXGETH(&_ComposeVerifier.CallOpts)
 }
 
+// ZISKRETH is a free data retrieval call binding the contract method 0xca889f91.
+//
+// Solidity: function ZISK_RETH() view returns(uint8)
+func (_ComposeVerifier *ComposeVerifierCaller) ZISKRETH(opts *bind.CallOpts) (uint8, error) {
+	var out []interface{}
+	err := _ComposeVerifier.contract.Call(opts, &out, "ZISK_RETH")
+
+	if err != nil {
+		return *new(uint8), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(uint8)).(*uint8)
+
+	return out0, err
+
+}
+
+// ZISKRETH is a free data retrieval call binding the contract method 0xca889f91.
+//
+// Solidity: function ZISK_RETH() view returns(uint8)
+func (_ComposeVerifier *ComposeVerifierSession) ZISKRETH() (uint8, error) {
+	return _ComposeVerifier.Contract.ZISKRETH(&_ComposeVerifier.CallOpts)
+}
+
+// ZISKRETH is a free data retrieval call binding the contract method 0xca889f91.
+//
+// Solidity: function ZISK_RETH() view returns(uint8)
+func (_ComposeVerifier *ComposeVerifierCallerSession) ZISKRETH() (uint8, error) {
+	return _ComposeVerifier.Contract.ZISKRETH(&_ComposeVerifier.CallOpts)
+}
+
 // GetVerifierAddress is a free data retrieval call binding the contract method 0x42b57409.
 //
 // Solidity: function getVerifierAddress(uint8 _verifierId) view returns(address)
@@ -641,4 +672,35 @@ func (_ComposeVerifier *ComposeVerifierSession) VerifyProof(_proposalAge *big.In
 // Solidity: function verifyProof(uint256 _proposalAge, bytes32 _transitionsHash, bytes _proof) view returns()
 func (_ComposeVerifier *ComposeVerifierCallerSession) VerifyProof(_proposalAge *big.Int, _transitionsHash [32]byte, _proof []byte) error {
 	return _ComposeVerifier.Contract.VerifyProof(&_ComposeVerifier.CallOpts, _proposalAge, _transitionsHash, _proof)
+}
+
+// ZiskRethVerifier is a free data retrieval call binding the contract method 0x9a6f3813.
+//
+// Solidity: function ziskRethVerifier() view returns(address)
+func (_ComposeVerifier *ComposeVerifierCaller) ZiskRethVerifier(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _ComposeVerifier.contract.Call(opts, &out, "ziskRethVerifier")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+// ZiskRethVerifier is a free data retrieval call binding the contract method 0x9a6f3813.
+//
+// Solidity: function ziskRethVerifier() view returns(address)
+func (_ComposeVerifier *ComposeVerifierSession) ZiskRethVerifier() (common.Address, error) {
+	return _ComposeVerifier.Contract.ZiskRethVerifier(&_ComposeVerifier.CallOpts)
+}
+
+// ZiskRethVerifier is a free data retrieval call binding the contract method 0x9a6f3813.
+//
+// Solidity: function ziskRethVerifier() view returns(address)
+func (_ComposeVerifier *ComposeVerifierCallerSession) ZiskRethVerifier() (common.Address, error) {
+	return _ComposeVerifier.Contract.ZiskRethVerifier(&_ComposeVerifier.CallOpts)
 }
