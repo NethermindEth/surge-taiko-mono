@@ -26,8 +26,13 @@ RUN foundryup -i 1.2.3
 COPY package.json pnpm-lock.yaml* ./
 
 # Install pnpm and dependencies
+# Use --frozen-lockfile only if lockfile exists, otherwise install normally
 RUN npm install -g pnpm@latest && \
-    pnpm install --frozen-lockfile
+    if [ -f pnpm-lock.yaml ]; then \
+      pnpm install --frozen-lockfile; \
+    else \
+      pnpm install; \
+    fi
 
 # Copy source code
 COPY . .
