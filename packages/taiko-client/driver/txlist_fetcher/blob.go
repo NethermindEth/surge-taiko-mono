@@ -3,6 +3,7 @@ package txlistfetcher
 import (
 	"context"
 	"crypto/sha256"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
@@ -21,8 +22,8 @@ type BlobFetcher struct {
 	dataSource *rpc.BlobDataSource
 }
 
-// NewBlobTxListFetcher creates a new BlobFetcher instance based on the given rpc client.
-func NewBlobTxListFetcher(cli *rpc.Client, ds *rpc.BlobDataSource) *BlobFetcher {
+// NewBlobFetcher creates a new BlobFetcher instance based on the given rpc client.
+func NewBlobFetcher(cli *rpc.Client, ds *rpc.BlobDataSource) *BlobFetcher {
 	return &BlobFetcher{cli, ds}
 }
 
@@ -42,13 +43,13 @@ func (d *BlobFetcher) FetchPacaya(ctx context.Context, meta metadata.TaikoBatchM
 	// Fetch the L1 block header with the given blob.
 	l1Header, err := d.cli.L1.HeaderByNumber(ctx, new(big.Int).SetUint64(blockNum))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch L1 header for block %d: %w", blockNum, err)
 	}
 
 	// Fetch the L1 block sidecars.
 	sidecars, err := d.dataSource.GetBlobs(ctx, l1Header.Time, meta.GetBlobHashes())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get blobs, errs: %w", err)
 	}
 
 	log.Info("Fetch sidecars", "blockNumber", blockNum, "sidecars", len(sidecars))
@@ -69,7 +70,7 @@ func (d *BlobFetcher) FetchPacaya(ctx context.Context, meta metadata.TaikoBatchM
 				blob := eth.Blob(common.FromHex(sidecar.Blob))
 				bytes, err := blob.ToData()
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to convert blob to data: %w", err)
 				}
 
 				b = append(b, bytes...)

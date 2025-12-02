@@ -30,7 +30,7 @@
   - bridge_watchdog: `0x0000000000000000000000000000000000000000`
 - todo:
   - deploy and register BridgedERC20V2
-  - change owner to DelegateOwner
+  - change owner to delegate controller
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
   - redeployed on May 22, 2024 @commit`b955e0e`
@@ -47,9 +47,8 @@
 
 - proxy: `0x1670000000000000000000000000000000000001`
 - impl: `0x95ae2918dcbc6aFF8B4c1F1BCC1bf819b6e08B83`
-- owner: `0xCa5b76Cc7A38b86Db11E5aE5B1fc9740c3bA3DE8`
+- owner: `0xfA06E15B8b4c5BF3FC5d9cfD083d45c53Cbe8C7C`
 - todo:
-  - change owner to DelegateOwner
   - upgrade the contract:https://github.com/taikoxyz/taiko-mono/pull/17529
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
@@ -61,14 +60,13 @@
   - upgrade impl to `0x8fb67c2c16dc8578b6d69bc668236924f4c1b0f7` @commit`3ae25fd` @tx`0xd95435c742c01B0E982913BcA252173Ae96DF61d`
   - upgrade impl to `0x4Ca6bE8C1Ec05beFB216bAEEF9EE36997e35E98E` @commit`a3e1cf7` @tx`0xdf0348394d5e58f801de917575aafdc1cb55533b14a6e46fd460d1437238dc02`
   - upgrade impl to `0x95ae2918dcbc6aFF8B4c1F1BCC1bf819b6e08B83` @commit`9345f14` @tx`0xdbe9caf2b1282d0fecf9a752f2c1aeade8820bb66bb5ad210f0081996504173b`
+  - changed owner to delegate controller @tx`0x75ae517cf2b1e901b26180622ca9f44c7502ad007391c33f08630042df34a86e`
 
 #### erc20_vault
 
 - proxy: `0x1670000000000000000000000000000000000002`
 - impl: `0xb96AbB41b01E3ad519D00E80355a1c3801910F62`
-- owner: `0xCa5b76Cc7A38b86Db11E5aE5B1fc9740c3bA3DE8`
-- todo:
-  - change owner to DelegateOwner
+- owner: `0xfA06E15B8b4c5BF3FC5d9cfD083d45c53Cbe8C7C`
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
   - redeployed on May 22, 2024 @commit`b955e0e`
@@ -77,46 +75,45 @@
   - linked bridged USDC to `0x07d83526730c7438048D55A4fc0b850e2aaB6f0b` @tx`0xf1752ac712779e9ae53d408abdc5eec70e63582433143d6d91a489a1e8fc4778`
   - changed owner to `0xCa5b76Cc7A38b86Db11E5aE5B1fc9740c3bA3DE8` @tx`0xf68861171c602e3e75ca69e950957fcb908c7949c6df9a9ea3026c238ebb1e9c`
   - upgrade impl to `0xb96AbB41b01E3ad519D00E80355a1c3801910F62` @commit`9345f14` @tx`0xdbe9caf2b1282d0fecf9a752f2c1aeade8820bb66bb5ad210f0081996504173b`
+  - change owner to delegate controller @tx`0x777b65f0e1bbbc5555007b63a93a4881598c90ac73684f6ad850b737d46c2434`
 
 #### erc721_vault
 
 - proxy: `0x1670000000000000000000000000000000000003`
 - impl: `0xd532f20a4751156C566Da7745db95E7f80145B36`
-- owner: `0xCa5b76Cc7A38b86Db11E5aE5B1fc9740c3bA3DE8`
-- todo:
-  - change owner to DelegateOwner
+- owner: `0xfA06E15B8b4c5BF3FC5d9cfD083d45c53Cbe8C7C`
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
   - redeployed on May 22, 2024 @commit`b955e0e`
   - upgrade to `0xD68BFe63E0f2983D89cbB225BEd068a8f19f5e08` @`0x8705703a93cb4cfc1ae69d1277f4464f807c7615237f2b04ff010c6e45708d34`
   - changed owner to `0xCa5b76Cc7A38b86Db11E5aE5B1fc9740c3bA3DE8` @tx`0xf68861171c602e3e75ca69e950957fcb908c7949c6df9a9ea3026c238ebb1e9c`
   - upgrade impl to `0xd532f20a4751156C566Da7745db95E7f80145B36` @commit`9345f14` @tx`0xdbe9caf2b1282d0fecf9a752f2c1aeade8820bb66bb5ad210f0081996504173b`
+  - change owner to delegate controller @tx`0x777b65f0e1bbbc5555007b63a93a4881598c90ac73684f6ad850b737d46c2434`
 
 #### erc1155_vault
 
 - proxy: `0x1670000000000000000000000000000000000004`
 - impl: `0xBBBC4ad39488b990E095042fa6c59A90d3817846`
-- owner: `0xCa5b76Cc7A38b86Db11E5aE5B1fc9740c3bA3DE8`
-- todo:
-  - change owner to DelegateOwner
+- owner: `0xfA06E15B8b4c5BF3FC5d9cfD083d45c53Cbe8C7C`
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
   - redeployed on May 22, 2024 @commit`b955e0e`
   - upgrade to `0x3918a2910C393A1A2EF7AAc807970EFE47A54b7e` @tx`0x264a2a553672a5480141638c3ca00a7bdf2c54e48c53f41867ca4f64703e16d7`
   - changed owner to `0xCa5b76Cc7A38b86Db11E5aE5B1fc9740c3bA3DE8` @tx`0xf68861171c602e3e75ca69e950957fcb908c7949c6df9a9ea3026c238ebb1e9c`
   - upgrade impl to `0xBBBC4ad39488b990E095042fa6c59A90d3817846` @commit`9345f14` @tx`0xdbe9caf2b1282d0fecf9a752f2c1aeade8820bb66bb5ad210f0081996504173b`
+  - change owner to delegate controller @tx`0x777b65f0e1bbbc5555007b63a93a4881598c90ac73684f6ad850b737d46c2434`
 
 #### signal_service
 
 - proxy: `0x1670000000000000000000000000000000000005`
 - impl: `0xaea51c413Bd15bBee72737C8094BE942B5208762`
-- owner: `0xCa5b76Cc7A38b86Db11E5aE5B1fc9740c3bA3DE8`
+- owner: `0xfA06E15B8b4c5BF3FC5d9cfD083d45c53Cbe8C7C`
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
   - redeployed on May 22, 2024 @commit`b955e0e`
   - changed owner to `0xCa5b76Cc7A38b86Db11E5aE5B1fc9740c3bA3DE8` @tx`0xf68861171c602e3e75ca69e950957fcb908c7949c6df9a9ea3026c238ebb1e9c`
   - upgrade impl to `0xaea51c413Bd15bBee72737C8094BE942B5208762` @commit`879fda0` @tx`0x0ae99d24b294622e3d3868c8dca911a5936231ce1f97254ec0c6a6f65f7aa81c`
-  - change owner to DelegateOwner
+  - change owner to delegate controller @tx`0x75ae517cf2b1e901b26180622ca9f44c7502ad007391c33f08630042df34a86e`
 
 ## Rollup Specific
 
@@ -129,8 +126,6 @@
   - signal_service: `0x1670000000000000000000000000000000000005`
   - bridge: `0x1670000000000000000000000000000000000001`
   - taiko: `0x1670000000000000000000000000000000010001`
-- todo:
-  - change owner to DelegateOwner
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
   - redeployed on May 22, 2024 @commit`b955e0e`
@@ -139,31 +134,32 @@
 #### Anchor
 
 - proxy: `0x1670000000000000000000000000000000010001`
-- impl: `0x3cfe9b8E0e12289D78c91295c8353aB1731F06E1`
+- impl: `0xE6d1efcC6AC8969474308C99a3805c332D33a1E0`
 - owner: `0xCa5b76Cc7A38b86Db11E5aE5B1fc9740c3bA3DE8`
-- todo:
-  - change owner to DelegateOwner
 - logs:
   - deployed on May 1, 2024 @commit`56dddf2b6`
   - redeployed on May 22, 2024 @commit`b955e0e`
   - changed owner to `0xCa5b76Cc7A38b86Db11E5aE5B1fc9740c3bA3DE8` @tx`0xf68861171c602e3e75ca69e950957fcb908c7949c6df9a9ea3026c238ebb1e9c`
   - upgrade impl to `0x75E76c367D6be621bD90e4b1e32fBB3fF59150b6` @commit`9345f14` @tx`0xdbe9caf2b1282d0fecf9a752f2c1aeade8820bb66bb5ad210f0081996504173b`
   - upgrade impl to `0x3cfe9b8E0e12289D78c91295c8353aB1731F06E1` @commit`879fda0` @tx`0x0ae99d24b294622e3d3868c8dca911a5936231ce1f97254ec0c6a6f65f7aa81c`
+  - upgrade impl to `0x1e3fa8ad01327d891ab89b13091f93e4eaf7e8a5` @commit`c2a941e` @tx`0x2f0b5bd30b1cfc929bb03518ce19a588d431bba847ae7c84daedcc2ddf521bf2`
+  - upgrade impl to `0xE6d1efcC6AC8969474308C99a3805c332D33a1E0` @commit`d6d33eb` @tx`0xf9f899beb269bd2cb1b74001493ec9ac41d83191b79b71878422c3f5a8fdb15b`
 
 #### bridged_taiko_token
 
 - proxy: `0xA9d23408b9bA935c230493c40C73824Df71A0975`
 - impl: `0x473dBf07E06f5aE693F0c44b3ce7b5b8fA71d260`
-- owner: `0xCa5b76Cc7A38b86Db11E5aE5B1fc9740c3bA3DE8`
+- owner: `0xfA06E15B8b4c5BF3FC5d9cfD083d45c53Cbe8C7C`
 - logs:
   - deployed @tx`0x3e0c2c3f7593b8af888c2b8fe3af79152426bdf2d0529f058722ae08c80c8991`
   - changed owner to `0xCa5b76Cc7A38b86Db11E5aE5B1fc9740c3bA3DE8` @tx`0xf68861171c602e3e75ca69e950957fcb908c7949c6df9a9ea3026c238ebb1e9c`
+  - change owner to `0xfA06E15B8b4c5BF3FC5d9cfD083d45c53Cbe8C7C` @tx`https://taikoscan.io/tx/0x9c41e10e3764f350deea1a15f4b22ceb0c927b83a9601a8e357ece9ed473de71`
 
 #### bridged_usdc_token (native)
 
 - proxy: `0x07d83526730c7438048D55A4fc0b850e2aaB6f0b`
 - impl: `0x996a7A32C387Fd83e127A358fBc192e110459f2d`
-- owner: `0xCa5b76Cc7A38b86Db11E5aE5B1fc9740c3bA3DE8`
+- owner: `0xfA06E15B8b4c5BF3FC5d9cfD083d45c53Cbe8C7C`
 - master minter: `0xCa5b76Cc7A38b86Db11E5aE5B1fc9740c3bA3DE8`
 - logs:
   - deployed @tx`0xbd87fc07b1accbce04174c479cf9af6bb9c50b7e4677ec7417c4c6b327c30d01`

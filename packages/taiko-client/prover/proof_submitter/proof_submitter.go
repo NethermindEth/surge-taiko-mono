@@ -25,6 +25,8 @@ var (
 	MaxNumSupportedProofTypes = 4
 )
 
+const maxProofRequestTimeout = 1 * time.Hour
+
 // ProofSubmitterPacaya is responsible requesting proofs for the given L2
 // blocks, and submitting the generated proofs to the TaikoInbox smart contract.
 type ProofSubmitterPacaya struct {
@@ -60,7 +62,7 @@ type SenderOptions struct {
 	GasLimit         uint64
 }
 
-// NewProofSubmitter creates a new ProofSubmitter instance.
+// NewProofSubmitterPacaya creates a new ProofSubmitter instance.
 func NewProofSubmitterPacaya(
 	baseLevelProver proofProducer.ProofProducer,
 	zkvmProofProducer proofProducer.ProofProducer,
@@ -74,7 +76,11 @@ func NewProofSubmitterPacaya(
 	forceBatchProvingInterval time.Duration,
 	proofPollingInterval time.Duration,
 ) (*ProofSubmitterPacaya, error) {
-	anchorValidator, err := validator.New(taikoAnchorAddress, senderOpts.RPCClient.L2.ChainID, senderOpts.RPCClient)
+	anchorValidator, err := validator.New(
+		taikoAnchorAddress,
+		senderOpts.RPCClient.L2.ChainID,
+		senderOpts.RPCClient,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -140,6 +146,7 @@ func (s *ProofSubmitterPacaya) RequestProof(ctx context.Context, meta metadata.T
 		}
 		startAt       = time.Now()
 		proofResponse *proofProducer.ProofResponse
+		useZK         = true
 	)
 
 	// If the prover set address is provided, we use that address as the prover on chain.
@@ -169,7 +176,7 @@ func (s *ProofSubmitterPacaya) RequestProof(ctx context.Context, meta metadata.T
 				return nil
 			}
 			// If zk proof is enabled, request zk proof first, and check if ZK proof is drawn.
-			if s.zkvmProofProducer != nil {
+			if s.zkvmProofProducer != nil && useZK {
 				if proofResponse, err = s.zkvmProofProducer.RequestProof(
 					ctx,
 					opts,
@@ -177,11 +184,21 @@ func (s *ProofSubmitterPacaya) RequestProof(ctx context.Context, meta metadata.T
 					meta,
 					startAt,
 				); err != nil {
-					if errors.Is(err, proofProducer.ErrZkAnyNotDrawn) {
-						// If zk proof is not drawn, request SGX proof.
-						log.Debug("ZK proof was not chosen, attempting to request SGX proof", "batchID", opts.BatchID)
+					if errors.Is(err, proofProducer.ErrProofInProgress) || errors.Is(err, proofProducer.ErrRetry) {
+						if time.Since(startAt) > maxProofRequestTimeout {
+							log.Warn("Retry timeout exceeded maxProofRequestTimeout, switching to SGX proof as fallback")
+							useZK = false
+							startAt = time.Now()
+						} else {
+							return fmt.Errorf("zk proof is WIP, status: %w", err)
+						}
 					} else {
-						return fmt.Errorf("failed to request zk proof, error: %w", err)
+						log.Debug(
+							"ZK proof was not chosen or got unexpected error, attempting to request SGX proof",
+							"batchID", opts.BatchID,
+						)
+						useZK = false
+						startAt = time.Now()
 					}
 				}
 			}
@@ -194,6 +211,9 @@ func (s *ProofSubmitterPacaya) RequestProof(ctx context.Context, meta metadata.T
 					meta,
 					startAt,
 				); err != nil {
+					if time.Since(startAt) > maxProofRequestTimeout {
+						log.Warn("WARN: Proof generation taking too long, please investigate")
+					}
 					return fmt.Errorf("failed to request base proof, error: %w", err)
 				}
 			}

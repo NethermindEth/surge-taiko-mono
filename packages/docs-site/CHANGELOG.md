@@ -1,5 +1,184 @@
 # Changelog
 
+## [1.32.3](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.32.2...docs-site-v1.32.3) (2025-11-07)
+
+
+### Chores
+
+* **docs-site:** add GoldRush LinkCard to developer tools section ([#20664](https://github.com/taikoxyz/taiko-mono/issues/20664)) ([3a1e775](https://github.com/taikoxyz/taiko-mono/commit/3a1e775b29225363c1bccd4d3671fd2c3b79792a))
+
+## [1.32.2](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.32.1...docs-site-v1.32.2) (2025-11-06)
+
+
+### Chores
+
+* **docs-site:** add other l2 contracts for hoodi ([#20650](https://github.com/taikoxyz/taiko-mono/issues/20650)) ([1f245ae](https://github.com/taikoxyz/taiko-mono/commit/1f245ae7921201f2472ce2d36c3baa9a0e93e6c6))
+
+## [1.32.1](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.32.0...docs-site-v1.32.1) (2025-10-30)
+
+
+### Chores
+
+* **whitepaper:** add v2.0.0 ([#20599](https://github.com/taikoxyz/taiko-mono/issues/20599)) ([ec933b4](https://github.com/taikoxyz/taiko-mono/commit/ec933b4732965cc48fc32c7620921c0f59608089))
+
+## [1.32.0](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.31.2...docs-site-v1.32.0) (2025-10-29)
+
+
+### Features
+
+* **docs-site:** update docs for hoodi and fusaka upgrade ([#20574](https://github.com/taikoxyz/taiko-mono/issues/20574)) ([09b96fe](https://github.com/taikoxyz/taiko-mono/commit/09b96fed73e6876b4b1a271951b8ce4772a0c156))
+
+
+### Documentation
+
+* **docs-site:** add troubleshooting entry for genesis header hash mismatch ([#20516](https://github.com/taikoxyz/taiko-mono/issues/20516)) ([c716f0c](https://github.com/taikoxyz/taiko-mono/commit/c716f0c3342b1db67b6fc52306e63f953ebd1f80))
+
+## [1.31.2](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.31.1...docs-site-v1.31.2) (2025-10-07)
+
+
+### Bug Fixes
+
+* **docs-site:** incorrect type definition for `pages` ([#20134](https://github.com/taikoxyz/taiko-mono/issues/20134)) ([5bde0b1](https://github.com/taikoxyz/taiko-mono/commit/5bde0b1a21650df0ce404577528e0f0f2c94142f))
+
+
+### Chores
+
+* **docs-site:** add supra oracle ([#20358](https://github.com/taikoxyz/taiko-mono/issues/20358)) ([51e6ebc](https://github.com/taikoxyz/taiko-mono/commit/51e6ebc9343d27b075d6ac0bcb54b09b808d0f15))
+
+## [1.31.1](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.31.0...docs-site-v1.31.1) (2025-09-25)
+
+
+### Chores
+
+* **docs-site:** update explorer for button ([#20269](https://github.com/taikoxyz/taiko-mono/issues/20269)) ([4aa8421](https://github.com/taikoxyz/taiko-mono/commit/4aa8421851730df01d702ead742386f1bf4675c3))
+
+
+### Documentation
+
+* **docs-site:** corrected IP address ([#20116](https://github.com/taikoxyz/taiko-mono/issues/20116)) ([5803f33](https://github.com/taikoxyz/taiko-mono/commit/5803f33bdf3bd6d76c8de99b36315aa029910b37))
+* **docs-site:** fix ERC-4337 doc link ([#20111](https://github.com/taikoxyz/taiko-mono/issues/20111)) ([f13659c](https://github.com/taikoxyz/taiko-mono/commit/f13659c4464a2b4aa748756eda8439a53f41247e))
+* **docs-site:** fix grammar and typos in documentation ([#20173](https://github.com/taikoxyz/taiko-mono/issues/20173)) ([f029957](https://github.com/taikoxyz/taiko-mono/commit/f02995731f89ab8c1642e11e7f891dd05af9fb5d))
+* **docs-site:** fix typos ([#20138](https://github.com/taikoxyz/taiko-mono/issues/20138)) ([dfe19eb](https://github.com/taikoxyz/taiko-mono/commit/dfe19ebf50de39ac175b41a58684a6b443ae4e85))
+* **docs-site:** new Taiko Hoodi testnet (code name Tolba) ([#20182](https://github.com/taikoxyz/taiko-mono/issues/20182)) ([6a82488](https://github.com/taikoxyz/taiko-mono/commit/6a824882d71d90af3ba2de423e45768a8cb806da))
+* **docs-site:** typo fix ([#20077](https://github.com/taikoxyz/taiko-mono/issues/20077)) ([9232838](https://github.com/taikoxyz/taiko-mono/commit/9232838a0f580567112bad253f997bec7c4a4eab))
+
+## [1.31.0](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.30.0...docs-site-v1.31.0) (2025-09-03)
+
+
+### Features
+
+* **protocol:** design and implement Shasta upgrade ([#19882](https://github.com/taikoxyz/taiko-mono/issues/19882)) ([2bc26e7](https://github.com/taikoxyz/taiko-mono/commit/2bc26e7478d91556ed6923e55ed9d112288d885c))
+
+
+### Bug Fixes
+
+* **docs-site:** modify image links for GitHub rendering ([#19997](https://github.com/taikoxyz/taiko-mono/issues/19997)) ([7bfd5fb](https://github.com/taikoxyz/taiko-mono/commit/7bfd5fb8dc0717b3600048000dd73ef3fda23757))
+
+
+### Chores
+
+* **docs-site:** image link consistency ([#20018](https://github.com/taikoxyz/taiko-mono/issues/20018)) ([9355653](https://github.com/taikoxyz/taiko-mono/commit/9355653d52f5696e05e74809f391feeae1eae92a))
+* **repo:** fix broken and dead links across the repository ([#19986](https://github.com/taikoxyz/taiko-mono/issues/19986)) ([e8e0814](https://github.com/taikoxyz/taiko-mono/commit/e8e0814601cdbcdeb45350afc144d55cd15bf37e))
+
+## [1.30.0](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.29.6...docs-site-v1.30.0) (2025-08-13)
+
+
+### Features
+
+* **docs-site:** update docs for based preconfs, node running, removal of proverset ([#19928](https://github.com/taikoxyz/taiko-mono/issues/19928)) ([1a4b568](https://github.com/taikoxyz/taiko-mono/commit/1a4b5680e9a78f9e4feb3ffb686a8d8aab2e16e0))
+
+
+### Bug Fixes
+
+* **docs-site:** fix astro.config.ts ([#19929](https://github.com/taikoxyz/taiko-mono/issues/19929)) ([dd854a7](https://github.com/taikoxyz/taiko-mono/commit/dd854a79b77f81bcc1c38b5a26273e4fd6fe3937))
+
+## [1.29.6](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.29.5...docs-site-v1.29.6) (2025-08-06)
+
+
+### Bug Fixes
+
+* **docs-site:** minor identifier mismatch ([#19876](https://github.com/taikoxyz/taiko-mono/issues/19876)) ([288ab83](https://github.com/taikoxyz/taiko-mono/commit/288ab8368601ca2c5fafbd8b6e73f45092e61ff7))
+
+## [1.29.5](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.29.4...docs-site-v1.29.5) (2025-07-31)
+
+
+### Chores
+
+* **docs-site:** missed config ([#19853](https://github.com/taikoxyz/taiko-mono/issues/19853)) ([89f14c3](https://github.com/taikoxyz/taiko-mono/commit/89f14c3bf19e816ee4630b31a38f15cdaa7716e6))
+
+## [1.29.4](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.29.3...docs-site-v1.29.4) (2025-07-31)
+
+
+### Chores
+
+* **docs-site:** add rpc, oracle and aa providers ([#19835](https://github.com/taikoxyz/taiko-mono/issues/19835)) ([bd6fe92](https://github.com/taikoxyz/taiko-mono/commit/bd6fe925bd65b8c320e048d4cc425b6cd153161f))
+* **docs-site:** update guides for based preconfs upgrade ([#19790](https://github.com/taikoxyz/taiko-mono/issues/19790)) ([4900ed9](https://github.com/taikoxyz/taiko-mono/commit/4900ed9f7311899a228e90ecb8a84610accb989f))
+
+## [1.29.3](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.29.2...docs-site-v1.29.3) (2025-07-29)
+
+
+### Chores
+
+* **repo, docs-site:** remove dead link ([#19816](https://github.com/taikoxyz/taiko-mono/issues/19816)) ([f9f7bbb](https://github.com/taikoxyz/taiko-mono/commit/f9f7bbb447b5a6c1cc4fac3ae733821f6a17380f))
+
+## [1.29.2](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.29.1...docs-site-v1.29.2) (2025-07-11)
+
+
+### Bug Fixes
+
+* **docs-site:** update ethstaker org name ([#19652](https://github.com/taikoxyz/taiko-mono/issues/19652)) ([aa76bb3](https://github.com/taikoxyz/taiko-mono/commit/aa76bb3b4c1268fae687da48c58f85f832a371ec))
+
+
+### Chores
+
+* **docs-site:** update stat ([#19718](https://github.com/taikoxyz/taiko-mono/issues/19718)) ([d64d18c](https://github.com/taikoxyz/taiko-mono/commit/d64d18cf310af86fc61f04ec11b5381c21b4dc2a))
+
+## [1.29.1](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.29.0...docs-site-v1.29.1) (2025-06-18)
+
+
+### Documentation
+
+* **docs-site:** update based-preconfirmation.mdx to avoid legal implications ([#19612](https://github.com/taikoxyz/taiko-mono/issues/19612)) ([a8f600e](https://github.com/taikoxyz/taiko-mono/commit/a8f600e269594ce8b923e4f5ad1da573b96160a5))
+
+## [1.29.0](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.28.3...docs-site-v1.29.0) (2025-06-16)
+
+
+### Features
+
+* **docs-site:** general docs update ([#19624](https://github.com/taikoxyz/taiko-mono/issues/19624)) ([8910049](https://github.com/taikoxyz/taiko-mono/commit/89100490677de42d214ca6f27c89b160ec86b5f7))
+
+
+### Bug Fixes
+
+* **docs-site:** use "preconfer" to replace "preconfirmer" ([#19616](https://github.com/taikoxyz/taiko-mono/issues/19616)) ([288f61e](https://github.com/taikoxyz/taiko-mono/commit/288f61ed266521614e207923aaacc4c7da0cbb85))
+
+
+### Chores
+
+* **docs-site:** record alethia addresses in contract-addresses page ([#19622](https://github.com/taikoxyz/taiko-mono/issues/19622)) ([95c7f38](https://github.com/taikoxyz/taiko-mono/commit/95c7f384c45f9a0b72d148559f9cc126c7d420c4))
+
+## [1.28.3](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.28.2...docs-site-v1.28.3) (2025-06-10)
+
+
+### Bug Fixes
+
+* **docs-site:** fix eth-docker docs link in run-an-ethereum-testnet-node.mdx ([#19595](https://github.com/taikoxyz/taiko-mono/issues/19595)) ([d010b6e](https://github.com/taikoxyz/taiko-mono/commit/d010b6e211f28e4ee0a2302141fea8ec6382def8))
+
+## [1.28.2](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.28.1...docs-site-v1.28.2) (2025-06-10)
+
+
+### Chores
+
+* **docs-site:** update api3 description ([#19590](https://github.com/taikoxyz/taiko-mono/issues/19590)) ([55962b3](https://github.com/taikoxyz/taiko-mono/commit/55962b36faed62f7fbcfd502cf768805fc072ade))
+
+## [1.28.1](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.28.0...docs-site-v1.28.1) (2025-06-03)
+
+
+### Bug Fixes
+
+* **docs-site:** fix incorrect link ([#19565](https://github.com/taikoxyz/taiko-mono/issues/19565)) ([4ae5483](https://github.com/taikoxyz/taiko-mono/commit/4ae54830e40435fd6728a9bbc5d9df54c0796e44))
+* **docs-site:** reflect actual live releases ([#19579](https://github.com/taikoxyz/taiko-mono/issues/19579)) ([52c08af](https://github.com/taikoxyz/taiko-mono/commit/52c08afc6cc976855865b854ab62eeb6372849e9))
+
 ## [1.28.0](https://github.com/taikoxyz/taiko-mono/compare/docs-site-v1.27.6...docs-site-v1.28.0) (2025-05-27)
 
 

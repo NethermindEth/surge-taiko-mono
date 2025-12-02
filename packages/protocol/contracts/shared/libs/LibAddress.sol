@@ -32,17 +32,16 @@ library LibAddress {
         // by assembly calling "handle" function
         // we call via assembly to avoid memcopying a very large returndata
         // returned by a malicious contract
-        assembly {
-            success_ :=
-                call(
-                    _gasLimit, // gas
-                    _to, // recipient
-                    _amount, // ether value
-                    add(_calldata, 0x20), // inloc
-                    mload(_calldata), // inlen
-                    0, // outloc
-                    0 // outlen
-                )
+        assembly ("memory-safe") {
+            success_ := call(
+                _gasLimit, // gas
+                _to, // recipient
+                _amount, // ether value
+                add(_calldata, 0x20), // inloc
+                mload(_calldata), // inlen
+                0, // outloc
+                0 // outlen
+            )
         }
     }
 

@@ -24,7 +24,7 @@ const erc20ABI = `[{"constant":true,"inputs":[],"name":"symbol","outputs":[{"nam
 // nolint: lll
 const transferEventABI = `[{"anonymous":false,"inputs":[{"indexed":true,"name":"from","type":"address"},{"indexed":true,"name":"to","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Transfer","type":"event"}]`
 
-// indexERc20Transfers indexes from a given starting block to a given end block and parses all event logs
+// indexERC20Transfers indexes from a given starting block to a given end block and parses all event logs
 // to find ERC20 transfer events and update balances
 func (i *Indexer) indexERC20Transfers(
 	ctx context.Context,
@@ -93,7 +93,7 @@ func (i *Indexer) saveERC20Transfer(ctx context.Context, chainID *big.Int, vLog 
 	// Parse the Transfer event ABI
 	parsedABI, err := abi.JSON(strings.NewReader(transferEventABI))
 	if err != nil {
-		return errors.Wrap(err, "abi.JSON(strings.NewReader")
+		return errors.Wrap(err, "abi.JSON(strings.NewReader)")
 	}
 
 	err = parsedABI.UnpackIntoInterface(&event, "Transfer", vLog.Data)
@@ -159,14 +159,18 @@ func (i *Indexer) saveERC20Transfer(ctx context.Context, chainID *big.Int, vLog 
 		}
 	}
 
-	// increment To address's balance
+	// increment To address's balance (skip if burn to zero address)
 	// decrement From address's balance
-	increaseOpts := eventindexer.UpdateERC20BalanceOpts{
-		ERC20MetadataID: int64(pk),
-		ChainID:         chainID.Int64(),
-		Address:         to,
-		ContractAddress: vLog.Address.Hex(),
-		Amount:          amount,
+	increaseOpts := eventindexer.UpdateERC20BalanceOpts{}
+
+	if to != ZeroAddress.Hex() {
+		increaseOpts = eventindexer.UpdateERC20BalanceOpts{
+			ERC20MetadataID: int64(pk),
+			ChainID:         chainID.Int64(),
+			Address:         to,
+			ContractAddress: vLog.Address.Hex(),
+			Amount:          amount,
+		}
 	}
 
 	decreaseOpts := eventindexer.UpdateERC20BalanceOpts{}

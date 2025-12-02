@@ -2,29 +2,39 @@ package preconfblocks
 
 import (
 	"context"
-	"errors"
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
+	"time"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/holiman/uint256"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
 
 // blockToEnvelope converts a block to an ExecutionPayloadEnvelope.
-func blockToEnvelope(block *types.Block, endOfSequencing *bool) (*eth.ExecutionPayloadEnvelope, error) {
+func blockToEnvelope(
+	block *types.Block,
+	endOfSequencing *bool,
+	isForcedInclusion *bool,
+	signature *[65]byte,
+) (*eth.ExecutionPayloadEnvelope, error) {
 	var u256 uint256.Int
 	if overflow := u256.SetFromBig(block.BaseFee()); overflow {
 		return nil, fmt.Errorf("failed to convert base fee to uint256: %v", overflow)
 	}
+
 	txs, err := utils.EncodeAndCompressTxList(block.Transactions())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to encode and compress transaction list: %w", err)
 	}
 
 	return &eth.ExecutionPayloadEnvelope{
@@ -41,7 +51,9 @@ func blockToEnvelope(block *types.Block, endOfSequencing *bool) (*eth.ExecutionP
 			BlockHash:     block.Hash(),
 			Transactions:  []eth.Data{hexutil.Bytes(txs)},
 		},
-		EndOfSequencing: endOfSequencing,
+		EndOfSequencing:   endOfSequencing,
+		IsForcedInclusion: isForcedInclusion,
+		Signature:         signature,
 	}, nil
 }
 
@@ -53,7 +65,7 @@ func checkMessageBlockNumber(
 	msg *eth.ExecutionPayloadEnvelope,
 ) (*rawdb.L1Origin, error) {
 	headL1Origin, err := rpc.L2.HeadL1Origin(ctx)
-	if err != nil && !errors.Is(err, ethereum.NotFound) {
+	if err != nil && err.Error() != ethereum.NotFound.Error() {
 		return nil, fmt.Errorf("failed to fetch head L1 origin: %w", err)
 	}
 
@@ -66,4 +78,13 @@ func checkMessageBlockNumber(
 	}
 
 	return headL1Origin, nil
+}
+
+// deterministicJitter returns a deterministic jitter based on the peer ID and block hash,
+// such that we dont immediately reply to messages.
+func deterministicJitter(self peer.ID, h common.Hash, max time.Duration) time.Duration {
+	b := append([]byte(self), h.Bytes()...)
+	sum := sha256.Sum256(b)
+	v := binary.LittleEndian.Uint64(sum[:8])
+	return time.Duration(v % uint64(max))
 }

@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
 import "../common/EssentialResolverContract.sol";
-import "../libs/LibNames.sol";
 import "../libs/LibAddress.sol";
 import "../libs/LibMath.sol";
+import "../libs/LibNames.sol";
 import "../libs/LibNetwork.sol";
 import "../signal/ISignalService.sol";
 import "./IBridge.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
+
+import "./Bridge_Layout.sol"; // DO NOT DELETE
 
 /// @title Bridge
 /// @notice See the documentation for {IBridge}.
 /// @dev Labeled in address resolver as "bridge". Additionally, the code hash for the same address
-/// on
-/// L1 and L2 may be different.
+/// on L1 and L2 may be different.
 /// @custom:security-contact security@taiko.xyz
 contract Bridge is EssentialResolverContract, IBridge {
     using Address for address;
@@ -92,19 +93,32 @@ contract Bridge is EssentialResolverContract, IBridge {
     error B_RETRY_FAILED();
     error B_SIGNAL_NOT_RECEIVED();
 
+    // ---------------------------------------------------------------
+    // Modifiers
+    // ---------------------------------------------------------------
+
     modifier sameChain(uint64 _chainId) {
-        if (_chainId != block.chainid) revert B_INVALID_CHAINID();
+        _checkSameChain(_chainId);
         _;
     }
 
     modifier diffChain(uint64 _chainId) {
-        if (_chainId == 0 || _chainId == block.chainid) revert B_INVALID_CHAINID();
+        _checkDiffChain(_chainId);
         _;
     }
 
-    constructor(address _resolver, address _signalService) EssentialResolverContract(_resolver) {
+    constructor(
+        address _resolver,
+        address _signalService
+    )
+        EssentialResolverContract(_resolver)
+    {
         signalService = ISignalService(_signalService);
     }
+
+    // ---------------------------------------------------------------
+    // External & Public Functions
+    // ---------------------------------------------------------------
 
     /// @notice Initializes the contract.
     /// @param _owner The owner of this contract. msg.sender will be used if this value is zero.
@@ -191,9 +205,8 @@ contract Bridge is EssentialResolverContract, IBridge {
             _storeContext(msgHash, address(this), _message.srcChainId);
 
             // Perform recall
-            IRecallableSender(_message.from).onMessageRecalled{ value: _message.value }(
-                _message, msgHash
-            );
+            IRecallableSender(_message.from)
+            .onMessageRecalled{ value: _message.value }(_message, msgHash);
 
             // Must reset the context after the message call
             _storeContext(
@@ -348,7 +361,9 @@ contract Bridge is EssentialResolverContract, IBridge {
         whenNotPaused
         nonReentrant
     {
-        if (msg.sender != _message.destOwner) revert B_PERMISSION_DENIED();
+        if (msg.sender != _message.destOwner) {
+            revert B_PERMISSION_DENIED();
+        }
 
         bytes32 msgHash = hashMessage(_message);
         _checkStatus(msgHash, Status.RETRIABLE);
@@ -427,6 +442,7 @@ contract Bridge is EssentialResolverContract, IBridge {
 
     /// @inheritdoc IBridge
     function hashMessage(Message memory _message) public pure returns (bytes32) {
+        /// forge-lint: disable-next-line(asm-keccak256)
         return keccak256(abi.encode("TAIKO_MESSAGE", _message));
     }
 
@@ -521,7 +537,9 @@ contract Bridge is EssentialResolverContract, IBridge {
     {
         try _signalService.proveSignalReceived(
             _chainId, resolve(_chainId, LibNames.B_BRIDGE, false), _signal, _proof
-        ) returns (uint256 numCacheOps) {
+        ) returns (
+            uint256 numCacheOps
+        ) {
             numCacheOps_ = uint32(numCacheOps);
         } catch {
             revert B_SIGNAL_NOT_RECEIVED();
@@ -600,6 +618,10 @@ contract Bridge is EssentialResolverContract, IBridge {
         }
     }
 
+    // ---------------------------------------------------------------
+    // Private Functions
+    // ---------------------------------------------------------------
+
     /// @dev Suggested by OpenZeppelin and copied from
     /// https://github.com/OpenZeppelin/openzeppelin-contracts/
     /// blob/83c7e45092dac350b070c421cd2bf7105616cf1a/contracts/
@@ -650,10 +672,18 @@ contract Bridge is EssentialResolverContract, IBridge {
             // since
             // neither revert or assert consume all gas since Solidity 0.8.20
             // https://docs.soliditylang.org/en/v0.8.20/control-structures.html#panic-via-assert-and-error-via-require
-            /// @solidity memory-safe-assembly
+            // / @solidity memory-safe-assembly
             assembly {
                 invalid()
             }
         }
+    }
+
+    function _checkSameChain(uint64 _chainId) internal view {
+        if (_chainId != block.chainid) revert B_INVALID_CHAINID();
+    }
+
+    function _checkDiffChain(uint64 _chainId) internal view {
+        if (_chainId == 0 || _chainId == block.chainid) revert B_INVALID_CHAINID();
     }
 }

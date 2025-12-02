@@ -8,27 +8,35 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/ethereum-optimism/optimism/op-node/p2p"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/gorilla/websocket"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/holiman/uint256"
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	lru "github.com/hashicorp/golang-lru/v2"
-
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
+	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/preconf"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
+	shastaIndexer "github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/state_indexer"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 	validator "github.com/taikoxyz/taiko-mono/packages/taiko-client/prover/anchor_tx_validator"
 )
@@ -39,9 +47,13 @@ var (
 	wsUpgrader             = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
 )
 
+const requestSyncMargin = uint64(128) // Margin for requesting sync, to avoid requesting very old blocks.
+// monitorLatestProposalOnChainInterval defines how often we reconcile the cached proposal with Pacaya on-chain state.
+const monitorLatestProposalOnChainInterval = 10 * time.Second
+
 // preconfBlockChainSyncer is an interface for preconfirmation block chain syncer.
 type preconfBlockChainSyncer interface {
-	InsertPreconfBlocksFromExecutionPayloads(context.Context, []*eth.ExecutionPayload, bool) ([]*types.Header, error)
+	InsertPreconfBlocksFromEnvelopes(context.Context, []*preconf.Envelope, bool) ([]*types.Header, error)
 }
 
 // @title Taiko Preconfirmation Block Server API
@@ -53,12 +65,14 @@ type preconfBlockChainSyncer interface {
 // @contact.email info@taiko.xyz
 
 // @license.name MIT
-// @license.url https://github.com/taikoxyz/taiko-mono/blob/main/LICENSE.md
+// @license.url https://github.com/taikoxyz/taiko-mono/blob/main/LICENSE
 // PreconfBlockAPIServer represents a preconfirmation block server instance.
 type PreconfBlockAPIServer struct {
 	echo                          *echo.Echo
 	rpc                           *rpc.Client
-	chainSyncer                   preconfBlockChainSyncer
+	pacayaChainSyncer             preconfBlockChainSyncer
+	shastaChainSyncer             preconfBlockChainSyncer
+	shastaIndexer                 *shastaIndexer.Indexer
 	anchorValidator               *validator.AnchorTxValidator
 	highestUnsafeL2PayloadBlockID uint64
 	// P2P network for preconfirmation block propagation
@@ -70,9 +84,10 @@ type PreconfBlockAPIServer struct {
 	lookahead      *Lookahead
 	lookaheadMutex sync.Mutex
 	// Cache
-	payloadsCache                *payloadQueue
+	envelopesCache               *envelopeQueue
 	blockRequestsCache           *lru.Cache[common.Hash, struct{}]
 	sequencingEndedForEpochCache *lru.Cache[uint64, common.Hash]
+	responseSeenCache            *lru.Cache[common.Hash, time.Time]
 	// ConfigureRoutes
 	preconfOperatorAddress common.Address
 	// Last seen proposal
@@ -89,38 +104,57 @@ func New(
 	jwtSecret []byte,
 	preconfOperatorAddress common.Address,
 	taikoAnchorAddress common.Address,
-	chainSyncer preconfBlockChainSyncer,
+	pacayaChainSyncer preconfBlockChainSyncer,
+	shastaChainSyncer preconfBlockChainSyncer,
 	cli *rpc.Client,
+	shastaIndexer *shastaIndexer.Indexer,
 	latestSeenProposalCh chan *encoding.LastSeenProposal,
 ) (*PreconfBlockAPIServer, error) {
-	anchorValidator, err := validator.New(taikoAnchorAddress, cli.L2.ChainID, cli)
+	anchorValidator, err := validator.New(
+		taikoAnchorAddress,
+		cli.L2.ChainID,
+		cli,
+	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize anchor validator: %w", err)
 	}
 
-	// Initialize cahces.
+	// Initialize caches.
 	blockRequestsCache, err := lru.New[common.Hash, struct{}](maxTrackedPayloads)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create block requests cache: %w", err)
 	}
 	endOfSequencingCache, err := lru.New[uint64, common.Hash](maxTrackedPayloads)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create end of sequencing cache: %w", err)
+	}
+	responseSeenCache, err := lru.New[common.Hash, time.Time](maxTrackedPayloads)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create response seen cache: %w", err)
+	}
+
+	head, err := cli.L2.BlockByNumber(context.Background(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get L2 head block: %w", err)
 	}
 
 	server := &PreconfBlockAPIServer{
-		echo:                         echo.New(),
-		anchorValidator:              anchorValidator,
-		chainSyncer:                  chainSyncer,
-		ws:                           &webSocketSever{rpc: cli, clients: make(map[*websocket.Conn]struct{})},
-		rpc:                          cli,
-		payloadsCache:                newPayloadQueue(),
-		preconfOperatorAddress:       preconfOperatorAddress,
-		lookahead:                    &Lookahead{},
-		mutex:                        sync.Mutex{},
-		blockRequestsCache:           blockRequestsCache,
-		sequencingEndedForEpochCache: endOfSequencingCache,
-		latestSeenProposalCh:         latestSeenProposalCh,
+		echo:                          echo.New(),
+		anchorValidator:               anchorValidator,
+		pacayaChainSyncer:             pacayaChainSyncer,
+		shastaChainSyncer:             shastaChainSyncer,
+		ws:                            &webSocketSever{rpc: cli, clients: make(map[*websocket.Conn]struct{})},
+		rpc:                           cli,
+		shastaIndexer:                 shastaIndexer,
+		envelopesCache:                newEnvelopeQueue(),
+		preconfOperatorAddress:        preconfOperatorAddress,
+		lookahead:                     &Lookahead{},
+		mutex:                         sync.Mutex{},
+		blockRequestsCache:            blockRequestsCache,
+		sequencingEndedForEpochCache:  endOfSequencingCache,
+		latestSeenProposalCh:          latestSeenProposalCh,
+		responseSeenCache:             responseSeenCache,
+		highestUnsafeL2PayloadBlockID: head.NumberU64(),
 	}
 
 	server.echo.HideBanner = true
@@ -199,6 +233,14 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2Payload(
 ) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	start := time.Now()
+	defer func() {
+		elapsedMs := time.Since(start).Milliseconds()
+		metrics.DriverPreconfOnUnsafeL2PayloadDuration.Observe(float64(elapsedMs) / 1_000)
+		log.Debug("OnUnsafeL2Payload completed", "elapsed", fmt.Sprintf("%dms", elapsedMs))
+	}()
+
 	// Ignore the message if it is from the current P2P node, when `from` is empty,
 	// it means the message is for importing the pending blocks from the cache after
 	// a new L2 EE chain has just finished a beacon-sync.
@@ -213,6 +255,11 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2Payload(
 		return nil
 	}
 
+	var signature [65]byte
+	if msg.Signature != nil {
+		signature = *msg.Signature
+	}
+
 	log.Info(
 		"📢 New preconfirmation block payload from P2P network",
 		"peer", from,
@@ -222,7 +269,9 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2Payload(
 		"timestamp", uint64(msg.ExecutionPayload.Timestamp),
 		"coinbase", msg.ExecutionPayload.FeeRecipient.Hex(),
 		"gasUsed", uint64(msg.ExecutionPayload.GasUsed),
-		"endOfSequencing", msg.EndOfSequencing != nil,
+		"endOfSequencing", msg.EndOfSequencing != nil && *msg.EndOfSequencing,
+		"isForcedInclusion", msg.IsForcedInclusion != nil && *msg.IsForcedInclusion,
+		"signature", common.Bytes2Hex(signature[:]),
 	)
 	metrics.DriverPreconfEnvelopeCounter.Inc()
 
@@ -241,43 +290,34 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2Payload(
 	}
 
 	// Check if the L2 execution engine is syncing from L1.
-	progress, err := s.rpc.L2ExecutionEngineSyncProgress(ctx)
+	progress, err := s.rpc.L2ExecutionEngineSyncProgress(ctx, s.shastaIndexer.GetLastCoreState())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get L2 execution engine sync progress: %w", err)
 	}
 
 	if progress.IsSyncing() {
-		if !s.payloadsCache.has(uint64(msg.ExecutionPayload.BlockNumber), msg.ExecutionPayload.BlockHash) {
-			log.Info(
-				"L2ExecutionEngine syncing: payload is cached",
-				"peer", from,
-				"blockID", uint64(msg.ExecutionPayload.BlockNumber),
-				"blockHash", msg.ExecutionPayload.BlockHash.Hex(),
-				"parentHash", msg.ExecutionPayload.ParentHash.Hex(),
-			)
-
-			s.payloadsCache.put(uint64(msg.ExecutionPayload.BlockNumber), msg.ExecutionPayload)
-		}
-
+		s.tryPutEnvelopeIntoCache(msg, from)
 		return nil
 	}
 
 	// Ensure the preconfirmation block number is greater than the current head L1 origin block ID.
 	headL1Origin, err := checkMessageBlockNumber(ctx, s.rpc, msg)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to check message block number: %w", err)
 	}
 
 	// Try to import the payload into the L2 EE chain, if can't, cache it.
-	cached, err := s.TryImportingPayload(ctx, headL1Origin, msg, from)
+	quit, err := s.TryImportingPayload(ctx, headL1Origin, msg, from)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to try importing payload: %w", err)
 	}
-	if cached {
+	if quit {
 		return nil
 	}
 
-	// If the payload is an end of sequencing message, we need to notify the clients.
+	s.tryPutEnvelopeIntoCache(msg, from)
+
+	// If the envelope is an end of sequencing message, we need to notify the clients.
 	if msg.EndOfSequencing != nil && *msg.EndOfSequencing && s.rpc.L1Beacon != nil {
 		s.sequencingEndedForEpochCache.Add(s.rpc.L1Beacon.CurrentEpoch(), msg.ExecutionPayload.BlockHash)
 		s.ws.pushEndOfSequencingNotification(s.rpc.L1Beacon.CurrentEpoch())
@@ -295,6 +335,16 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2Response(
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	start := time.Now()
+	defer func() {
+		elapsedMs := time.Since(start).Milliseconds()
+		metrics.DriverPreconfOnL2UnsafeResponseDuration.Observe(float64(elapsedMs) / 1_000)
+		log.Debug("OnUnsafeL2Response completed", "elapsed", fmt.Sprintf("%dms", elapsedMs))
+	}()
+
+	// add responses seen to cache.
+	s.responseSeenCache.Add(msg.ExecutionPayload.BlockHash, time.Now().UTC())
+
 	// Ignore the message if it is from the current P2P node, when `from` is empty,
 	// it means the message is for importing the pending blocks from the cache after
 	// a new L2 EE chain has just finished a beacon-sync.
@@ -306,9 +356,9 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2Response(
 	metrics.DriverPreconfOnL2UnsafeResponseCounter.Inc()
 
 	// Ignore the message if it is in the cache already.
-	if s.payloadsCache.has(uint64(msg.ExecutionPayload.BlockNumber), msg.ExecutionPayload.BlockHash) {
+	if s.envelopesCache.hasExact(uint64(msg.ExecutionPayload.BlockNumber), msg.ExecutionPayload.BlockHash) {
 		log.Debug(
-			"Ignore already cahced preconfirmation block response",
+			"Ignore already cached preconfirmation block response",
 			"peer", from,
 			"blockID", uint64(msg.ExecutionPayload.BlockNumber),
 			"hash", msg.ExecutionPayload.BlockHash.Hex(),
@@ -342,6 +392,7 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2Response(
 			"blockID", uint64(msg.ExecutionPayload.BlockNumber),
 			"hash", msg.ExecutionPayload.BlockHash.Hex(),
 		)
+		s.tryPutEnvelopeIntoCache(msg, from)
 		return nil
 	}
 
@@ -360,12 +411,17 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2Response(
 	// Ensure the preconfirmation block number is greater than the current head L1 origin block ID.
 	headL1Origin, err := checkMessageBlockNumber(ctx, s.rpc, msg)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to check message block number: %w", err)
 	}
 
 	// Try to import the payload into the L2 EE chain, if can't, cache it.
-	if _, err := s.TryImportingPayload(ctx, headL1Origin, msg, from); err != nil {
-		return err
+	cached, err := s.TryImportingPayload(ctx, headL1Origin, msg, from)
+	if err != nil {
+		return fmt.Errorf("failed to try importing payload: %w", err)
+	}
+
+	if !cached {
+		s.tryPutEnvelopeIntoCache(msg, from)
 	}
 
 	return nil
@@ -380,22 +436,16 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2Request(
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	start := time.Now()
+	defer func() {
+		elapsedMs := time.Since(start).Milliseconds()
+		metrics.DriverPreconfOnL2UnsafeRequestDuration.Observe(float64(elapsedMs) / 1_000)
+		log.Debug("OnUnsafeL2Request completed", "elapsed", fmt.Sprintf("%dms", elapsedMs))
+	}()
+
 	// Ignore the message if it is from the current P2P node.
 	if from != "" && s.p2pNode.Host().ID() == from {
 		log.Debug("Ignore the message from the current P2P node", "peer", from)
-		return nil
-	}
-
-	// Only respond the preconfirmation block request if you are the current operator.
-	if err := s.CheckLookaheadHandover(s.preconfOperatorAddress, s.rpc.L1Beacon.CurrentSlot()); err != nil {
-		log.Debug(
-			"Ignoring the preconfirmation block request, not the current operator",
-			"peer", from,
-			"currOperator", s.lookahead.CurrOperator.Hex(),
-			"nextOperator", s.lookahead.NextOperator.Hex(),
-			"preconfOperatorAddress", s.preconfOperatorAddress.Hex(),
-		)
-
 		return nil
 	}
 
@@ -411,16 +461,16 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2Request(
 	// Fetch the block from L2 EE and gossip it out.
 	block, err := s.rpc.L2.BlockByHash(ctx, hash)
 	if err != nil {
-		log.Warn(
+		log.Debug(
 			"Failed to fetch preconfirmation request block by hash",
 			"peer", from,
 			"hash", hash.Hex(),
 			"error", err,
 		)
-		return err
+		return fmt.Errorf("failed to fetch preconfirmation request block by hash: %w", err)
 	}
 
-	if block.NumberU64() <= headL1Origin.BlockID.Uint64() {
+	if headL1Origin != nil && block.NumberU64() <= headL1Origin.BlockID.Uint64() {
 		log.Debug(
 			"Ignore the message for outdated block",
 			"peer", from,
@@ -432,12 +482,82 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2Request(
 		return nil
 	}
 
-	envelope, err := blockToEnvelope(block, nil)
+	l1Origin, err := s.rpc.L2.L1OriginByID(ctx, block.Number())
+	if err != nil {
+		log.Warn(
+			"Failed to fetch L1 origin for the block",
+			"peer", from,
+			"blockID", block.NumberU64(),
+			"hash", block.Hash().Hex(),
+			"error", err,
+		)
+		return fmt.Errorf("failed to fetch L1 origin for the block: %w", err)
+	}
+
+	log.Info(
+		"Fetched L1 Origin",
+		"blockID", l1Origin.BlockID.Uint64(),
+		"l2BlockHash", l1Origin.L2BlockHash.Hex(),
+		"l1BlockHash", l1Origin.L1BlockHash.Hex(),
+		"l1OriginBlockID", l1Origin.BlockID.Uint64(),
+		"l1OriginIsForcedInclusion", l1Origin.IsForcedInclusion,
+		"l1OriginBlockHeight", l1Origin.L1BlockHeight.Uint64(),
+		"l1OriginSignature", common.Bytes2Hex(l1Origin.Signature[:]),
+	)
+
+	sig := l1Origin.Signature
+	if sig == [65]byte{} {
+		log.Warn(
+			"Empty L1 origin signature, unable to propagate block",
+			"peer", from,
+			"blockID", block.NumberU64(),
+			"hash", block.Hash().Hex(),
+			"parentHash", block.ParentHash().Hex(),
+			"l1OriginBlockID", l1Origin.BlockID.Uint64(),
+		)
+
+		return err
+	}
+
+	// we have the block, now wait a deterministic jitter before responding.
+	// this will reduce "response storms" when many nodes receive the request for the block.
+	wait := deterministicJitter(s.p2pNode.Host().ID(), hash, 1*time.Second)
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		// If any response for this hash was seen recently, skip ours.
+		if ts, ok := s.responseSeenCache.Get(hash); ok && time.Since(ts) < 10*time.Second {
+			log.Debug(
+				"Skip responding; recent response already seen",
+				"peer", from,
+				"hash", hash.Hex(),
+			)
+			return nil
+		}
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	endOfSequencing := false
+	for epoch := range s.sequencingEndedForEpochCache.Keys() {
+		if hash, ok := s.sequencingEndedForEpochCache.Get(uint64(epoch)); ok && hash == block.Hash() {
+			endOfSequencing = true
+			break
+		}
+	}
+
+	envelope, err := blockToEnvelope(block, &endOfSequencing, &l1Origin.IsForcedInclusion, &sig)
 	if err != nil {
 		return fmt.Errorf("failed to convert block to envelope: %w", err)
 	}
 
-	log.Info("Publish preconfirmation block response", "blockID", block.NumberU64(), "hash", hash.Hex())
+	log.Info(
+		"Publish preconfirmation block response",
+		"blockID", block.NumberU64(),
+		"hash", hash.Hex(),
+		"signature", common.Bytes2Hex(sig[:]),
+	)
 
 	if err := s.p2pNode.GossipOut().PublishL2RequestResponse(ctx, envelope, s.p2pSigner); err != nil {
 		log.Warn(
@@ -447,6 +567,10 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2Request(
 			"error", err,
 		)
 	}
+
+	s.tryPutEnvelopeIntoCache(envelope, from)
+
+	s.responseSeenCache.Add(hash, time.Now().UTC())
 
 	return nil
 }
@@ -459,6 +583,13 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2EndOfSequencingRequest(
 ) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	start := time.Now()
+	defer func() {
+		elapsedMs := time.Since(start).Milliseconds()
+		metrics.DriverPreconfOnEndOfSequencingRequestDuration.Observe(float64(elapsedMs) / 1_000)
+		log.Debug("OnUnsafeL2EndOfSequencingRequest completed", "elapsed", fmt.Sprintf("%dms", elapsedMs))
+	}()
 
 	// Ignore the message if it is from the current P2P node.
 	if from != "" && s.p2pNode.Host().ID() == from {
@@ -493,11 +624,25 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2EndOfSequencingRequest(
 			"hash", hash.Hex(),
 			"error", err,
 		)
-		return err
+		return fmt.Errorf("failed to fetch the end of sequencing block by hash: %w", err)
 	}
 
+	l1Origin, err := s.rpc.L2.L1OriginByID(ctx, block.Number())
+	if err != nil {
+		log.Warn(
+			"Failed to fetch L1 origin for the block",
+			"peer", from,
+			"blockID", block.NumberU64(),
+			"hash", block.Hash().Hex(),
+			"error", err,
+		)
+		return fmt.Errorf("failed to fetch L1 origin for the block: %w", err)
+	}
+
+	sig := l1Origin.Signature
+
 	endOfSequencing := true
-	envelope, err := blockToEnvelope(block, &endOfSequencing)
+	envelope, err := blockToEnvelope(block, &endOfSequencing, &l1Origin.IsForcedInclusion, &sig)
 	if err != nil {
 		return fmt.Errorf("failed to convert the end of sequencing block to envelope: %w", err)
 	}
@@ -521,14 +666,16 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2EndOfSequencingRequest(
 		)
 	}
 
+	s.tryPutEnvelopeIntoCache(envelope, from)
+
 	return nil
 }
 
-// ImportMissingAncientsFromCache tries to import cached payloads from the cached payload queue, if we can't
+// ImportMissingAncientsFromCache tries to import cached envelopes from the cached payload queue, if we can't
 // find all the missing ancients and import them, an error will be returned.
 func (s *PreconfBlockAPIServer) ImportMissingAncientsFromCache(
 	ctx context.Context,
-	currentPayload *eth.ExecutionPayload,
+	currentPayload *preconf.Envelope,
 	headL1Origin *rawdb.L1Origin,
 ) error {
 	var headL1OriginBlockId uint64
@@ -538,31 +685,32 @@ func (s *PreconfBlockAPIServer) ImportMissingAncientsFromCache(
 
 	log.Debug(
 		"Importing missing ancients from the cache",
-		"blockID", uint64(currentPayload.BlockNumber),
-		"hash", currentPayload.BlockHash.Hex(),
+		"blockID", uint64(currentPayload.Payload.BlockNumber),
+		"hash", currentPayload.Payload.BlockHash.Hex(),
 		"headL1OriginBlockID", headL1OriginBlockId,
 	)
 
 	// Try searching the missing ancients in the cache.
-	payloadsToImport := make([]*eth.ExecutionPayload, 0)
+	payloadsToImport := make([]*preconf.Envelope, 0)
 	for {
-		if headL1Origin != nil && currentPayload.ParentHash == headL1Origin.L2BlockHash {
+		if headL1Origin != nil && currentPayload.Payload.ParentHash == headL1Origin.L2BlockHash {
 			log.Debug(
 				"Reached canonical chain head, skip searching for ancients in cache",
-				"currentNumber", uint64(currentPayload.BlockNumber),
-				"currentHash", currentPayload.ParentHash.Hex(),
+				"currentNumber", uint64(currentPayload.Payload.BlockNumber),
+				"currentHash", currentPayload.Payload.ParentHash.Hex(),
 			)
 			break
 		}
 
-		parentPayload := s.payloadsCache.get(uint64(currentPayload.BlockNumber)-1, currentPayload.ParentHash)
+		parentNum := uint64(currentPayload.Payload.BlockNumber - 1)
+		parentPayload := s.envelopesCache.get(parentNum, currentPayload.Payload.ParentHash)
 		if parentPayload == nil {
 			// If the parent payload is not found in the cache and chain is not syncing,
 			// we publish a request to the P2P network.
-			if !s.blockRequestsCache.Contains(currentPayload.ParentHash) {
-				progress, err := s.rpc.L2ExecutionEngineSyncProgress(ctx)
+			if !s.blockRequestsCache.Contains(currentPayload.Payload.ParentHash) {
+				progress, err := s.rpc.L2ExecutionEngineSyncProgress(ctx, s.shastaIndexer.GetLastCoreState())
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to get L2 execution engine sync progress: %w", err)
 				}
 
 				if progress.IsSyncing() {
@@ -570,51 +718,67 @@ func (s *PreconfBlockAPIServer) ImportMissingAncientsFromCache(
 					return nil
 				}
 
-				log.Info(
-					"Publish preconfirmation block request",
-					"blockID", uint64(currentPayload.BlockNumber-1),
-					"hash", currentPayload.ParentHash.Hex(),
-				)
+				publishRequest := func() {
+					log.Info(
+						"Publishing preconfirmation block request",
+						"blockID", parentNum,
+						"hash", currentPayload.Payload.ParentHash.Hex(),
+					)
 
-				if err := s.p2pNode.GossipOut().PublishL2Request(ctx, currentPayload.ParentHash); err != nil {
-					log.Warn(
-						"Failed to publish preconfirmation block request",
-						"blockID", uint64(currentPayload.BlockNumber-1),
-						"hash", currentPayload.BlockHash.Hex(),
-						"error", err,
+					if err := s.p2pNode.GossipOut().PublishL2Request(ctx, currentPayload.Payload.ParentHash); err != nil {
+						log.Warn(
+							"Failed to publish preconfirmation block request",
+							"blockID", parentNum,
+							"hash", currentPayload.Payload.BlockHash.Hex(),
+							"error", err,
+						)
+					} else {
+						s.blockRequestsCache.Add(currentPayload.Payload.ParentHash, struct{}{})
+					}
+				}
+
+				tip := progress.HighestOriginBlockID.Uint64()
+
+				if tip >= requestSyncMargin && parentNum <= tip-requestSyncMargin {
+					log.Debug(
+						"Skipping request for very old block",
+						"tip", tip,
+						"margin", requestSyncMargin,
 					)
 				} else {
-					s.blockRequestsCache.Add(currentPayload.ParentHash, struct{}{})
+					publishRequest()
 				}
 			}
 
 			return fmt.Errorf(
 				"failed to find parent payload in the cache, number %d, hash %s",
-				currentPayload.BlockNumber-1,
-				currentPayload.ParentHash.Hex(),
+				currentPayload.Payload.BlockNumber-1,
+				currentPayload.Payload.ParentHash.Hex(),
 			)
 		}
 
-		payloadsToImport = append([]*eth.ExecutionPayload{parentPayload}, payloadsToImport...)
-		s.blockRequestsCache.Remove(parentPayload.BlockHash)
+		payloadsToImport = append([]*preconf.Envelope{
+			parentPayload,
+		}, payloadsToImport...)
+		s.blockRequestsCache.Remove(parentPayload.Payload.BlockHash)
 
 		// Check if the found parent payload is in the canonical chain,
 		// if it is not, continue to find the parent payload.
-		parentHeader, err := s.rpc.L2.HeaderByNumber(ctx, new(big.Int).SetUint64(uint64(parentPayload.BlockNumber)))
+		parentHeader, err := s.rpc.L2.HeaderByNumber(ctx, new(big.Int).SetUint64(uint64(parentPayload.Payload.BlockNumber)))
 		if err != nil && !errors.Is(err, ethereum.NotFound) {
 			return fmt.Errorf("failed to fetch parent header: %w", err)
 		}
 
-		if parentHeader == nil || parentHeader.Hash() != parentPayload.BlockHash {
+		if parentHeader == nil || parentHeader.Hash() != parentPayload.Payload.BlockHash {
 			log.Debug(
-				"Parent block not in L2 canonical chain, continue to search cached payloads",
-				"blockID", uint64(parentPayload.BlockNumber),
-				"hash", parentPayload.BlockHash.Hex(),
+				"Parent block not in L2 canonical chain, continue to search cached envelopes",
+				"blockID", uint64(parentPayload.Payload.BlockNumber),
+				"hash", parentPayload.Payload.BlockHash.Hex(),
 			)
-			if headL1Origin != nil && uint64(parentPayload.BlockNumber) <= headL1Origin.BlockID.Uint64() {
+			if headL1Origin != nil && uint64(parentPayload.Payload.BlockNumber) <= headL1Origin.BlockID.Uint64() {
 				return fmt.Errorf(
 					"missing parent block ID (%d) is less than or equal to the current head L1 origin block ID (%d)",
-					parentPayload.BlockNumber,
+					parentPayload.Payload.BlockNumber,
 					headL1Origin.BlockID,
 				)
 			}
@@ -626,16 +790,16 @@ func (s *PreconfBlockAPIServer) ImportMissingAncientsFromCache(
 	}
 
 	log.Info(
-		"Found all missing ancient payloads in the cache, start importing",
+		"Found all missing ancient envelopes in the cache, start importing",
 		"count", len(payloadsToImport),
-		"startBlockID", uint64(payloadsToImport[0].BlockNumber),
-		"startBlockHash", payloadsToImport[0].BlockHash.Hex(),
-		"endBlockID", uint64(payloadsToImport[len(payloadsToImport)-1].BlockNumber),
-		"endBlockHash", payloadsToImport[len(payloadsToImport)-1].BlockHash.Hex(),
+		"startBlockID", uint64(payloadsToImport[0].Payload.BlockNumber),
+		"startBlockHash", payloadsToImport[0].Payload.BlockHash.Hex(),
+		"endBlockID", uint64(payloadsToImport[len(payloadsToImport)-1].Payload.BlockNumber),
+		"endBlockHash", payloadsToImport[len(payloadsToImport)-1].Payload.BlockHash.Hex(),
 	)
 
-	// If all ancient payloads are found, try to import them.
-	if _, err := s.chainSyncer.InsertPreconfBlocksFromExecutionPayloads(ctx, payloadsToImport, true); err != nil {
+	// If all ancient envelopes are found, try to import them.
+	if _, err := s.insertPreconfBlocksFromEnvelopes(ctx, payloadsToImport, true); err != nil {
 		return fmt.Errorf("failed to insert ancient preconfirmation blocks from cache: %w", err)
 	}
 
@@ -644,29 +808,32 @@ func (s *PreconfBlockAPIServer) ImportMissingAncientsFromCache(
 	return nil
 }
 
-// ImportChildBlocksFromCache tries to import the longest cached child payloads from the cached payload queue.
+// ImportChildBlocksFromCache tries to import the longest cached child envelopes from the cached payload queue.
 func (s *PreconfBlockAPIServer) ImportChildBlocksFromCache(
 	ctx context.Context,
-	currentPayload *eth.ExecutionPayload,
+	currentPayload *preconf.Envelope,
 ) error {
 	// Try searching if there is any available child block in the cache.
-	childPayloads := s.payloadsCache.getChildren(uint64(currentPayload.BlockNumber), currentPayload.BlockHash)
+	childPayloads := s.envelopesCache.getChildren(
+		uint64(currentPayload.Payload.BlockNumber),
+		currentPayload.Payload.BlockHash,
+	)
 	if len(childPayloads) == 0 {
 		return nil
 	}
 
-	endBlockID := uint64(childPayloads[len(childPayloads)-1].BlockNumber)
+	endBlockID := uint64(childPayloads[len(childPayloads)-1].Payload.BlockNumber)
 	log.Info(
-		"Found available child payloads in the cache, start importing",
+		"Found available child envelopes in the cache, start importing",
 		"count", len(childPayloads),
-		"startBlockID", uint64(childPayloads[0].BlockNumber),
-		"startBlockHash", childPayloads[0].BlockHash.Hex(),
+		"startBlockID", uint64(childPayloads[0].Payload.BlockNumber),
+		"startBlockHash", childPayloads[0].Payload.BlockHash.Hex(),
 		"endBlockID", endBlockID,
-		"endBlockHash", childPayloads[len(childPayloads)-1].BlockHash.Hex(),
+		"endBlockHash", childPayloads[len(childPayloads)-1].Payload.BlockHash.Hex(),
 	)
 
-	// Try to import all available child payloads.
-	if _, err := s.chainSyncer.InsertPreconfBlocksFromExecutionPayloads(ctx, childPayloads, true); err != nil {
+	// Try to import all available child envelopes.
+	if _, err := s.insertPreconfBlocksFromEnvelopes(ctx, childPayloads, true); err != nil {
 		return fmt.Errorf("failed to insert child preconfirmation blocks from cache: %w", err)
 	}
 
@@ -695,7 +862,7 @@ func (s *PreconfBlockAPIServer) ValidateExecutionPayload(payload *eth.ExecutionP
 	if payload.GasLimit == 0 {
 		return errors.New("non-zero gas limit is required")
 	}
-	var u256BaseFee = uint256.Int(payload.BaseFeePerGas)
+	u256BaseFee := uint256.Int(payload.BaseFeePerGas)
 	if u256BaseFee.ToBig().Cmp(common.Big0) == 0 {
 		return errors.New("non-zero base fee per gas is required")
 	}
@@ -742,31 +909,35 @@ func (s *PreconfBlockAPIServer) ValidateExecutionPayload(payload *eth.ExecutionP
 // ImportPendingBlocksFromCache tries to insert pending blocks from the cache,
 // if there is no payload in the cache, it will skip the operation.
 func (s *PreconfBlockAPIServer) ImportPendingBlocksFromCache(ctx context.Context) error {
-	latestPayload := s.payloadsCache.getLatestPayload()
+	latestPayload := s.envelopesCache.getLatestEnvelope()
 	if latestPayload == nil {
-		log.Info("No payloads in cache, skip importing from cache")
+		log.Info("No envelopes in cache, skip importing from cache")
 		return nil
 	}
 
 	log.Info(
-		"Found pending payloads in the cache, try importing",
-		"latestPayloadNumber", uint64(latestPayload.BlockNumber),
-		"latestPayloadBlockHash", latestPayload.BlockHash.Hex(),
-		"latestPayloadParentHash", latestPayload.ParentHash.Hex(),
+		"Found pending envelopes in the cache, try importing",
+		"latestPayloadNumber", uint64(latestPayload.Payload.BlockNumber),
+		"latestPayloadBlockHash", latestPayload.Payload.BlockHash.Hex(),
+		"latestPayloadParentHash", latestPayload.Payload.ParentHash.Hex(),
 	)
 
-	return s.OnUnsafeL2Payload(ctx, "", &eth.ExecutionPayloadEnvelope{ExecutionPayload: latestPayload})
+	return s.OnUnsafeL2Payload(ctx, "", &eth.ExecutionPayloadEnvelope{
+		ExecutionPayload:  latestPayload.Payload,
+		Signature:         latestPayload.Signature,
+		IsForcedInclusion: &latestPayload.IsForcedInclusion,
+	})
 }
 
 // P2PSequencerAddress implements the p2p.GossipRuntimeConfig interface.
 func (s *PreconfBlockAPIServer) P2PSequencerAddress() common.Address {
 	operatorAddress, err := s.rpc.GetPreconfWhiteListOperator(nil)
 	if err != nil || operatorAddress == (common.Address{}) {
-		log.Warn("Failed to get current preconfirmation whitelist operator address", "error", err)
+		log.Debug("Failed to get current preconfirmation whitelist operator address", "error", err)
 		return common.Address{}
 	}
 
-	log.Info("Current operator address for epoch as P2P sequencer", "address", operatorAddress.Hex())
+	log.Debug("Current operator address for epoch as P2P sequencer", "address", operatorAddress.Hex())
 
 	return operatorAddress
 }
@@ -846,8 +1017,8 @@ func (s *PreconfBlockAPIServer) CheckLookaheadHandover(feeRecipient common.Addre
 }
 
 // PutPayloadsCache puts the given payload into the payload cache queue, should ONLY be used in testing.
-func (s *PreconfBlockAPIServer) PutPayloadsCache(id uint64, payload *eth.ExecutionPayload) {
-	s.payloadsCache.put(id, payload)
+func (s *PreconfBlockAPIServer) PutPayloadsCache(id uint64, payload *preconf.Envelope) {
+	s.envelopesCache.put(id, payload)
 }
 
 // GetSequencingEndedForEpoch returns the last block's hash for the given epoch.
@@ -857,39 +1028,210 @@ func (s *PreconfBlockAPIServer) GetSequencingEndedForEpoch(epoch uint64) (common
 
 // LatestSeenProposalEventLoop is a goroutine that listens for the latest seen proposal events
 func (s *PreconfBlockAPIServer) LatestSeenProposalEventLoop(ctx context.Context) {
+	ticker := time.NewTicker(monitorLatestProposalOnChainInterval)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			log.Info("Stopping latest batch seen event loop")
 			return
 		case proposal := <-s.latestSeenProposalCh:
-			s.recordLatestSeenProposal(proposal)
+			if proposal.IsPacaya() {
+				s.recordLatestSeenProposalPacaya(proposal)
+			} else {
+				s.recordLatestSeenProposalShasta(proposal)
+			}
+		case <-ticker.C:
+			s.monitorLatestProposalOnChain(ctx)
 		}
 	}
 }
 
-// recordLatestSeenProposal records the latest seen proposal.
-func (s *PreconfBlockAPIServer) recordLatestSeenProposal(proposal *encoding.LastSeenProposal) {
+// monitorLatestProposalOnChain refreshes the latest proposal from L1 if the cached proposal reorgs.
+func (s *PreconfBlockAPIServer) monitorLatestProposalOnChain(ctx context.Context) {
+	proposal := s.latestSeenProposal
+	if proposal == nil {
+		return
+	}
+
+	if proposal.IsPacaya() {
+		s.monitorPacayaProposalOnChain(ctx, proposal)
+	} else {
+		s.monitorShastaProposalOnChain(ctx, proposal)
+	}
+}
+
+// monitorPacayaProposalOnChain monitors Pacaya proposals for reorgs.
+func (s *PreconfBlockAPIServer) monitorPacayaProposalOnChain(ctx context.Context, proposal *encoding.LastSeenProposal) {
+	stateVars, err := s.rpc.GetProtocolStateVariablesPacaya(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		log.Error("Failed to get states from Pacaya Inbox", "error", err)
+		return
+	}
+
+	numBatches := stateVars.Stats2.NumBatches
+	if numBatches == 0 {
+		return
+	}
+
+	latestSeenBatchID := proposal.Pacaya().GetBatchID()
+	latestOnChainBatchID := new(big.Int).SetUint64(numBatches - 1)
+	if latestSeenBatchID.Cmp(latestOnChainBatchID) <= 0 {
+		return
+	}
+
+	iterPacaya, err := s.rpc.PacayaClients.TaikoInbox.FilterBatchProposed(
+		&bind.FilterOpts{Start: stateVars.Stats2.LastProposedIn.Uint64(), Context: ctx},
+	)
+	if err != nil {
+		log.Error("Failed to filter batch proposed event", "err", err)
+		return
+	}
+	defer iterPacaya.Close()
+
+	for iterPacaya.Next() {
+		if new(big.Int).SetUint64(iterPacaya.Event.Meta.BatchId).Cmp(s.latestSeenProposal.Pacaya().GetBatchID()) < 0 {
+			s.recordLatestSeenProposalPacaya(&encoding.LastSeenProposal{
+				TaikoProposalMetaData: metadata.NewTaikoDataBlockMetadataPacaya(iterPacaya.Event),
+				PreconfChainReorged:   true,
+				LastBlockID:           iterPacaya.Event.Info.LastBlockId,
+			})
+		}
+	}
+
+	if err := iterPacaya.Error(); err != nil {
+		log.Error("Failed to iterate batch proposed events", "err", err)
+	}
+}
+
+// monitorShastaProposalOnChain monitors Shasta proposals for reorgs.
+func (s *PreconfBlockAPIServer) monitorShastaProposalOnChain(ctx context.Context, proposal *encoding.LastSeenProposal) {
+	shastaProposal := proposal.Shasta()
+	latestSeenProposalID := shastaProposal.GetProposal().Id
+	currentProposal := shastaProposal.GetProposal()
+
+	proposalHash, err := s.rpc.HashProposalShasta(&bind.CallOpts{Context: ctx}, &currentProposal)
+	if err != nil {
+		log.Error("Failed to hash shasta proposal", "err", err)
+		return
+	}
+
+	onChainProposalHash, err := s.rpc.GetShastaProposalHash(&bind.CallOpts{Context: ctx}, latestSeenProposalID)
+	if err != nil {
+		log.Error("Failed to get shasta proposal on chain", "err", err)
+		return
+	}
+
+	// Check for reorg and handle it
+	if onChainProposalHash != proposalHash {
+		s.handleShastaProposalReorg(ctx, latestSeenProposalID)
+	}
+}
+
+// handleShastaProposalReorg handles reorg detection for Shasta proposals.
+func (s *PreconfBlockAPIServer) handleShastaProposalReorg(ctx context.Context, latestSeenProposalID *big.Int) {
+	log.Warn("Shasta proposal reorg detected", "latestSeenProposalID", latestSeenProposalID)
+
+	// Find the last valid proposal by searching backwards
+	maxIterations := latestSeenProposalID.Int64()
+	for i := int64(1); i <= maxIterations; i++ {
+		currentProposalID := new(big.Int).Sub(latestSeenProposalID, big.NewInt(i))
+
+		onChainHash, err := s.rpc.GetShastaProposalHash(&bind.CallOpts{Context: ctx}, currentProposalID)
+		if err != nil {
+			log.Error("Failed to get shasta proposal on chain", "proposalId", currentProposalID, "err", err)
+			return
+		}
+
+		recordedProposal, err := s.shastaIndexer.GetProposalByID(currentProposalID.Uint64())
+		if err != nil {
+			log.Error("Proposal not found in cache", "proposalId", currentProposalID, "err", err)
+			return
+		}
+
+		recordedProposalHash, err := s.rpc.HashProposalShasta(&bind.CallOpts{Context: ctx}, recordedProposal.Proposal)
+		if err != nil {
+			log.Error("Failed to hash recorded proposal", "proposalId", currentProposalID, "err", err)
+			return
+		}
+
+		// Found a valid proposal that matches on-chain state
+		if onChainHash == recordedProposalHash {
+			if currentProposalID.Cmp(s.latestSeenProposal.Shasta().GetProposal().Id) < 0 {
+				log.Info("Found valid proposal after reorg", "proposalId", currentProposalID)
+				s.recordLatestSeenProposalShasta(&encoding.LastSeenProposal{
+					TaikoProposalMetaData: metadata.NewTaikoProposalMetadataShasta(&shastaBindings.IInboxProposedEventPayload{
+						Proposal:   *recordedProposal.Proposal,
+						Derivation: *recordedProposal.Derivation,
+						CoreState:  *recordedProposal.CoreState,
+					}, *recordedProposal.Log),
+					PreconfChainReorged: true,
+					// we dont set LastBlockID here because we don't know it at this time,
+					// s.lastUnsafeL2PayloadBlockID will be reset to 0 after a reorg.
+				})
+			}
+			return
+		}
+	}
+
+	log.Error("Could not find valid proposal after reorg", "searchedUpTo", latestSeenProposalID)
+}
+
+// recordLatestSeenProposalPacaya records the latest seen proposal.
+func (s *PreconfBlockAPIServer) recordLatestSeenProposalPacaya(proposal *encoding.LastSeenProposal) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	log.Info(
-		"Received latest batch seen in event",
+		"Received latest pacaya proposal seen in event",
 		"batchID", proposal.Pacaya().GetBatchID(),
-		"lastBlockID", proposal.Pacaya().GetLastBlockID(),
+		"lastBlockID", proposal.LastBlockID,
 	)
+
 	s.latestSeenProposal = proposal
-	metrics.DriverLastSeenBlockInProposalGauge.Set(float64(proposal.Pacaya().GetLastBlockID()))
+	metrics.DriverLastSeenBlockInProposalGauge.Set(float64(proposal.LastBlockID))
 
 	// If the latest seen proposal is reorged, reset the highest unsafe L2 payload block ID.
 	if s.latestSeenProposal.PreconfChainReorged {
-		s.highestUnsafeL2PayloadBlockID = proposal.Pacaya().GetLastBlockID()
+		s.highestUnsafeL2PayloadBlockID = proposal.LastBlockID
 		log.Info(
 			"Latest block ID seen in event is reorged, reset the highest unsafe L2 payload block ID",
 			"batchID", proposal.Pacaya().GetBatchID(),
 			"lastBlockID", s.highestUnsafeL2PayloadBlockID,
 			"highestUnsafeL2PayloadBlockID", s.highestUnsafeL2PayloadBlockID,
 		)
+		metrics.DriverReorgsByProposalCounter.Inc()
+	}
+}
+
+// recordLatestSeenProposalShasta records the latest seen proposal.
+func (s *PreconfBlockAPIServer) recordLatestSeenProposalShasta(proposal *encoding.LastSeenProposal) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	log.Info(
+		"Received latest shasta proposal seen in event",
+		"proposalId", proposal.Shasta().GetProposal().Id,
+		"lastProposalBlockId", proposal.Shasta().GetCoreState().LastProposalBlockId.Uint64(),
+		"lastBlockId", proposal.LastBlockID,
+	)
+
+	s.latestSeenProposal = proposal
+
+	if proposal.LastBlockID != 0 {
+		metrics.DriverLastSeenBlockInProposalGauge.Set(float64(proposal.LastBlockID))
+	}
+
+	// If the latest seen proposal is reorged, reset the highest unsafe L2 payload block ID.
+	if s.latestSeenProposal.PreconfChainReorged {
+		s.highestUnsafeL2PayloadBlockID = proposal.LastBlockID
+		log.Info(
+			"Latest block ID seen in event is reorged, reset the highest unsafe L2 payload block ID",
+			"proposalId", proposal.Shasta().GetProposal().Id,
+			"highestUnsafeL2PayloadBlockID", s.highestUnsafeL2PayloadBlockID,
+		)
+
 		metrics.DriverReorgsByProposalCounter.Inc()
 	}
 }
@@ -913,11 +1255,84 @@ func (s *PreconfBlockAPIServer) TryImportingPayload(
 	if err != nil && !errors.Is(err, ethereum.NotFound) {
 		return false, fmt.Errorf("failed to fetch parent header by number: %w", err)
 	}
-	parentInFork, err := s.rpc.L2.HeaderByHash(ctx, msg.ExecutionPayload.ParentHash)
-	if err != nil && !errors.Is(err, ethereum.NotFound) {
-		return false, fmt.Errorf("failed to fetch parent header by hash: %w", err)
+	cachedParent := s.envelopesCache.get(
+		uint64(msg.ExecutionPayload.BlockNumber-1),
+		msg.ExecutionPayload.ParentHash,
+	)
+
+	isOrphan := parentInCanonical != nil &&
+		parentInCanonical.Hash() != msg.ExecutionPayload.ParentHash
+
+	if isOrphan {
+		log.Info(
+			"Block is building on an orphaned block",
+			"peer", from,
+			"blockID", uint64(msg.ExecutionPayload.BlockNumber),
+			"hash", msg.ExecutionPayload.BlockHash.Hex(),
+			"parentHash", msg.ExecutionPayload.ParentHash.Hex(),
+			"parentInCanonicalHash", parentInCanonical.Hash().Hex(),
+		)
+
+		// Update L1 Origin for the parent being reorged out using cached data.
+		var (
+			payloadID engine.PayloadID
+			parentID  *big.Int
+		)
+
+		if cachedParent != nil {
+			if len(cachedParent.Payload.Transactions) == 0 {
+				return false, fmt.Errorf("cached parent envelope has empty transactions: %s", msg.ExecutionPayload.ParentHash.Hex())
+			}
+			decompressedTxs, err := utils.Decompress(cachedParent.Payload.Transactions[0])
+			if err != nil {
+				return false, fmt.Errorf("failed to decompress cached parent tx list: %w", err)
+			}
+			txListHash := crypto.Keccak256Hash(decompressedTxs)
+			args := &miner.BuildPayloadArgs{
+				Parent:       cachedParent.Payload.ParentHash,
+				Timestamp:    uint64(cachedParent.Payload.Timestamp),
+				FeeRecipient: cachedParent.Payload.FeeRecipient,
+				Random:       common.Hash(cachedParent.Payload.PrevRandao),
+				Withdrawals:  make([]*types.Withdrawal, 0),
+				Version:      engine.PayloadV2,
+				TxListHash:   &txListHash,
+			}
+			payloadID = args.Id()
+			parentID = new(big.Int).SetUint64(uint64(cachedParent.Payload.BlockNumber))
+
+			var sig [65]byte
+			if cachedParent.Signature != nil {
+				sig = *cachedParent.Signature
+			}
+
+			// Update L1 Origin for the parent block via cached data.
+			if _, err := s.rpc.L2Engine.UpdateL1Origin(ctx, &rawdb.L1Origin{
+				BuildPayloadArgsID: payloadID,
+				BlockID:            parentID,
+				L2BlockHash:        msg.ExecutionPayload.ParentHash,
+				IsForcedInclusion:  cachedParent.IsForcedInclusion,
+				Signature:          sig,
+			}); err != nil {
+				return false, fmt.Errorf("failed to update L1 origin: %w", err)
+			}
+
+			log.Info("Updated L1 Origin for orphan parent via cache",
+				"peer", from,
+				"parentID", parentID,
+				"parentHash", msg.ExecutionPayload.ParentHash.Hex(),
+				"signature", common.Bytes2Hex(sig[:]),
+			)
+		} else {
+			log.Warn("Orphan parent detected but not found in cache; skipping L1Origin update",
+				"peer", from,
+				"blockID", uint64(msg.ExecutionPayload.BlockNumber),
+				"parentHash", msg.ExecutionPayload.ParentHash.Hex(),
+			)
+		}
 	}
-	if parentInFork == nil && (parentInCanonical == nil || parentInCanonical.Hash() != msg.ExecutionPayload.ParentHash) {
+
+	// If the parent is not in the canonical chain at N-1, try to import ancients from cache
+	if parentInCanonical == nil || parentInCanonical.Hash() != msg.ExecutionPayload.ParentHash {
 		log.Info(
 			"Parent block not in L2 canonical / fork chain",
 			"peer", from,
@@ -925,8 +1340,13 @@ func (s *PreconfBlockAPIServer) TryImportingPayload(
 			"hash", msg.ExecutionPayload.BlockHash.Hex(),
 			"parentHash", msg.ExecutionPayload.ParentHash,
 		)
+
 		// Try to find all the missing ancients from the cache and import them.
-		if err := s.ImportMissingAncientsFromCache(ctx, msg.ExecutionPayload, headL1Origin); err != nil {
+		if err := s.ImportMissingAncientsFromCache(ctx, &preconf.Envelope{
+			Payload:           msg.ExecutionPayload,
+			Signature:         msg.Signature,
+			IsForcedInclusion: msg.IsForcedInclusion != nil && *msg.IsForcedInclusion,
+		}, headL1Origin); err != nil {
 			log.Info(
 				"Unable to find all the missing ancients from the cache, cache the current payload",
 				"peer", from,
@@ -936,17 +1356,8 @@ func (s *PreconfBlockAPIServer) TryImportingPayload(
 				"reason", err,
 			)
 
-			if !s.payloadsCache.has(uint64(msg.ExecutionPayload.BlockNumber), msg.ExecutionPayload.BlockHash) {
-				log.Info(
-					"Payload is cached",
-					"peer", from,
-					"blockID", uint64(msg.ExecutionPayload.BlockNumber),
-					"blockHash", msg.ExecutionPayload.BlockHash.Hex(),
-					"parentHash", msg.ExecutionPayload.ParentHash.Hex(),
-				)
+			s.tryPutEnvelopeIntoCache(msg, from)
 
-				s.payloadsCache.put(uint64(msg.ExecutionPayload.BlockNumber), msg.ExecutionPayload)
-			}
 			return true, nil
 		}
 	}
@@ -981,9 +1392,15 @@ func (s *PreconfBlockAPIServer) TryImportingPayload(
 	}
 
 	// Insert the preconfirmation block into the L2 EE chain.
-	if _, err := s.chainSyncer.InsertPreconfBlocksFromExecutionPayloads(
+	if _, err := s.insertPreconfBlocksFromEnvelopes(
 		ctx,
-		[]*eth.ExecutionPayload{msg.ExecutionPayload},
+		[]*preconf.Envelope{
+			{
+				Payload:           msg.ExecutionPayload,
+				Signature:         msg.Signature,
+				IsForcedInclusion: msg.IsForcedInclusion != nil && *msg.IsForcedInclusion,
+			},
+		},
 		false,
 	); err != nil {
 		return false, fmt.Errorf("failed to insert preconfirmation block from P2P network: %w", err)
@@ -1010,7 +1427,11 @@ func (s *PreconfBlockAPIServer) TryImportingPayload(
 	}
 
 	// Try to import the child blocks from the cache, if any.
-	if err := s.ImportChildBlocksFromCache(ctx, msg.ExecutionPayload); err != nil {
+	if err := s.ImportChildBlocksFromCache(ctx, &preconf.Envelope{
+		Payload:           msg.ExecutionPayload,
+		Signature:         msg.Signature,
+		IsForcedInclusion: msg.IsForcedInclusion != nil && *msg.IsForcedInclusion,
+	}); err != nil {
 		return false, fmt.Errorf("failed to try importing child blocks from cache: %w", err)
 	}
 
@@ -1026,13 +1447,101 @@ func (s *PreconfBlockAPIServer) updateHighestUnsafeL2Payload(blockID uint64) {
 			"currentHighestUnsafeL2PayloadBlockID", s.highestUnsafeL2PayloadBlockID,
 		)
 	} else {
-		log.Info("Reorging highest unsafe L2 payload blockID",
+		log.Info(
+			"Reorging highest unsafe L2 payload blockID",
 			"blockID", blockID,
 			"currentHighestUnsafeL2PayloadBlockID", s.highestUnsafeL2PayloadBlockID,
 		)
 	}
 	s.highestUnsafeL2PayloadBlockID = blockID
 	metrics.DriverHighestPreconfUnsafePayloadGauge.Set(float64(blockID))
+}
+
+// tryPutEnvelopeIntoCache tries to put the given payload into the cache, if it is not already cached.
+func (s *PreconfBlockAPIServer) tryPutEnvelopeIntoCache(msg *eth.ExecutionPayloadEnvelope, from peer.ID) {
+	id := uint64(msg.ExecutionPayload.BlockNumber)
+	h := msg.ExecutionPayload.BlockHash
+	if s.envelopesCache.hasExact(id, h) {
+		return
+	}
+
+	log.Info(
+		"Envelope is cached",
+		"peer", from,
+		"blockID", id,
+		"blockHash", h.Hex(),
+		"parentHash", msg.ExecutionPayload.ParentHash.Hex(),
+	)
+
+	s.envelopesCache.put(id, &preconf.Envelope{
+		Payload:           msg.ExecutionPayload,
+		Signature:         msg.Signature,
+		IsForcedInclusion: msg.IsForcedInclusion != nil && *msg.IsForcedInclusion,
+	})
+}
+
+// insertPreconfBlocksFromEnvelopes inserts the given preconfirmation block envelopes into the L2 EE chain,
+// splitting them into Pacaya and Shasta batches based on the fork height.
+func (s *PreconfBlockAPIServer) insertPreconfBlocksFromEnvelopes(
+	ctx context.Context,
+	envelopes []*preconf.Envelope,
+	fromCache bool,
+) ([]*types.Header, error) {
+	if len(envelopes) == 0 {
+		return []*types.Header{}, nil
+	}
+
+	var (
+		pacayaBatch, shastaBatch = s.splitEnvelopesByFork(envelopes)
+		pacayaHeaders            = make([]*types.Header, 0)
+		shastaHeaders            = make([]*types.Header, 0)
+		result                   []*types.Header
+		err                      error
+	)
+
+	if len(pacayaBatch) != 0 {
+		if pacayaHeaders, err = s.pacayaChainSyncer.InsertPreconfBlocksFromEnvelopes(
+			ctx,
+			pacayaBatch,
+			fromCache,
+		); err != nil {
+			return nil, err
+		}
+	}
+
+	if len(shastaBatch) != 0 {
+		if shastaHeaders, err = s.shastaChainSyncer.InsertPreconfBlocksFromEnvelopes(
+			ctx,
+			shastaBatch,
+			fromCache,
+		); err != nil {
+			return nil, err
+		}
+	}
+
+	result = append(result, pacayaHeaders...)
+	result = append(result, shastaHeaders...)
+	return result, nil
+}
+
+// splitEnvelopesByFork splits the given envelopes into two batches, one for Pacaya and one for Shasta,
+// based on the fork height.
+func (s *PreconfBlockAPIServer) splitEnvelopesByFork(
+	envelopes []*preconf.Envelope,
+) (pacaya []*preconf.Envelope, shasta []*preconf.Envelope) {
+	pacaya = []*preconf.Envelope{}
+	shasta = []*preconf.Envelope{}
+
+	for _, envelope := range envelopes {
+		if uint64(envelope.Payload.Timestamp) < s.rpc.ShastaClients.ForkTime {
+			pacaya = append(pacaya, envelope)
+			continue
+		}
+
+		shasta = append(shasta, envelope)
+	}
+
+	return pacaya, shasta
 }
 
 // webSocketSever is a WebSocket server that handles incoming connections,
@@ -1050,7 +1559,7 @@ func (s *webSocketSever) handleWebSocket(c echo.Context) error {
 	// record the client connection for later publication.
 	conn, err := wsUpgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to upgrade WebSocket connection: %w", err)
 	}
 	s.recordClient(conn)
 

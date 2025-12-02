@@ -18,7 +18,7 @@ Thank you for exploring the opportunity to contribute to Taiko.xyz. Whether you'
 **Here are some ways you can contribute:**
 
 - Open a new issue [here](https://github.com/taikoxyz/taiko-mono/issues) (please check the issue does not already exist).
-- Work on an existing issue (check out the [good first issues list](https://github.com/orgs/taikoxyz/projects/9/views/31) on our public project board).
+- Work on an existing issue (check out the [issues list](https://github.com/taikoxyz/taiko-mono/issues)).
 
 Please comment on the issue that you're interested in working on. Also, check out the [coding standards](#coding-standards) and [documentation standards](#documentation-standards) before you start working on the pull request.
 
@@ -37,7 +37,7 @@ This section describes our coding standards at Taiko.
 Before we can consider your contributions, please have a look at the following requirements:
 
 - Any contribution must follow the standards documented in this file.
-- The scope must be larger than a simple rename, or typo fix. We kindly request that small, incremental updates be combined into more substantial pull requests. This approach will streamline our development and ensure focus on core improvements.
+- The scope must be larger than a simple rename or typo fix. We kindly request that small, incremental updates be combined into more substantial pull requests. This approach will streamline our development and ensure focus on core improvements.
 
 Specify the scope of your change with a [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/) in the PR title (for example, `feat(scope): description of feature`). This will be squashed and merged into the `main` branch. You can find the full list of allowed scopes [here](https://github.com/taikoxyz/taiko-mono/blob/main/.github/workflows/repo--validate-pr-title.yml#L23).
 

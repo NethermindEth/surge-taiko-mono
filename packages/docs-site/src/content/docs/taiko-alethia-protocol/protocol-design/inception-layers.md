@@ -26,14 +26,12 @@ Taiko Alethia is designed with **flexibility**, enabling:
 <br/>
 
 2. **Multiple Rollups Are the Future**
-
    - The Ethereum roadmap anticipates a **multi-rollup ecosystem**.
    - Inception layers allow for **seamless rollup interoperability**.
 
 <br/>
 
 3. **Unlocking Extensible Scalability**
-
    - Multiple **Taiko L2 instances** can scale horizontally.
    - Multiple **L3 instances on top of L2** scale **vertically** (stacked rollups).
    - L3s inherit the **same security model** as L2s, ensuring trustless execution.
@@ -58,7 +56,6 @@ Taiko Alethia is designed with **flexibility**, enabling:
    <br/>
 
 3. **Mitigating UX Fragmentation**
-
    - A major downside of a multi-rollup world is **liquidity fragmentation** and **complex cross-chain UX**.
    - **Taiko’s inception layers combat this** by using built-in **arbitrary message passing**.
    - One rollup can natively **read Merkle proofs** from another, avoiding fragmented liquidity.
@@ -73,7 +70,7 @@ Taiko Alethia is designed with **flexibility**, enabling:
 
 The following illustrates how **Ethereum, Taiko L2, and Taiko L3 layers interconnect**:
 
-![Inception layers diagram](~/assets/content/docs/core-concepts/inception-layers-diagram.png)
+![Inception layers diagram](../../../../assets/content/docs/core-concepts/inception-layers-diagram.png)
 
 - **Ethereum L1** serves as the base layer for settlement and data availability.
 - **Multiple Taiko L2s** operate in parallel, processing transactions independently.

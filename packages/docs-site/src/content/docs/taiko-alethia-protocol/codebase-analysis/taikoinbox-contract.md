@@ -1,9 +1,9 @@
 ---
-title: TaikoL1
-description: Taiko Alethia protocol page for "TaikoL1.sol".
+title: TaikoInbox
+description: Taiko Alethia protocol page for "TaikoInbox.sol".
 ---
 
-[TaikoL1](https://github.com/taikoxyz/taiko-mono/blob/taiko-alethia-protocol-v2.3.0/packages/protocol/contracts/layer1/based/TaikoInbox.sol) is the **core Layer 1 smart contract** in the Taiko Alethia protocol. It is responsible for **batch lifecycle management**, **state synchronization**, and **bond management**. TaikoL1 ensures seamless interaction between L1 and L2, enabling a secure and scalable rollup architecture.
+[TaikoInbox](https://github.com/taikoxyz/taiko-mono/blob/taiko-alethia-protocol-v2.3.0/packages/protocol/contracts/layer1/based/TaikoInbox.sol) is the **core Layer 1 smart contract** in the Taiko Alethia protocol. It is responsible for **batch lifecycle management**, **state synchronization**, and **bond management**. TaikoInbox ensures seamless interaction between L1 and L2, enabling a secure and scalable rollup architecture.
 
 ## Features
 
@@ -18,7 +18,7 @@ description: Taiko Alethia protocol page for "TaikoL1.sol".
 
 ### `proposeBatch`
 
-Proposes a batch of batchs.
+Proposes a batch of batches.
 
 | Input Parameter | Type    | Description                                                                                    |
 | --------------- | ------- | ---------------------------------------------------------------------------------------------- |
@@ -36,14 +36,14 @@ Proposes a batch of batchs.
 
 Proves **multiple batches** with a single aggregated proof.
 
-| Input Parameter | Type      | Description                                                         |
-| --------------- | --------- | ------------------------------------------------------------------- |
-| `_params`       | `bytes`   | ABI-encoded parameter containing metas and transitions.             |
-| `_proof`        | `bytes`   | The aggregated cryptographic proof proving the batches transitions. |
+| Input Parameter | Type    | Description                                                         |
+| --------------- | ------- | ------------------------------------------------------------------- |
+| `_params`       | `bytes` | ABI-encoded parameter containing metas and transitions.             |
+| `_proof`        | `bytes` | The aggregated cryptographic proof proving the batches transitions. |
 
 **Returns**:
 
-- `TaikoData.batchMetadataV2[]`: Array of metadata for all proposed batchs.
+- `TaikoData.batchMetadataV2[]`: Array of metadata for all proposed batches.
 
 ---
 
@@ -51,9 +51,9 @@ Proves **multiple batches** with a single aggregated proof.
 
 Verifies a **batch of blocks** after proofs are submitted.
 
-| Input Parameter      | Type      | Description                         |
-| -------------------- | --------- | ----------------------------------- |
-| `_length`            | `uint8`   | Maximum number of batches to verify. |
+| Input Parameter | Type    | Description                          |
+| --------------- | ------- | ------------------------------------ |
+| `_length`       | `uint8` | Maximum number of batches to verify. |
 
 ---
 
@@ -81,11 +81,11 @@ Withdraws a **bond deposit** after batch proposals are finalized.
 
 Retrieves the **most recent verified batch**.
 
-| Return Value  | Type              | Description                                  |
-| ------------- | ----------------- | -------------------------------------------- |
-| `batchId_`    | `uint64`          | ID of the last verified batch.               |
-| `batchId_`    | `uint64`          | ID of the last verified batch.               |
-| `ts_`         | `TransitionState` | The transition used for verifying the batch. |
+| Return Value | Type              | Description                                  |
+| ------------ | ----------------- | -------------------------------------------- |
+| `batchId_`   | `uint64`          | ID of the last verified batch.               |
+| `batchId_`   | `uint64`          | ID of the last verified batch.               |
+| `ts_`        | `TransitionState` | The transition used for verifying the batch. |
 
 ---
 
@@ -107,11 +107,11 @@ Triggered when a **new batch is proposed**.
 
 Triggered when a **validity proof is submitted** for a batch.
 
-| Event Parameter   | Type           | Description                  |
-| ----------------- | -------------- | ---------------------------- |
-| `verifier`        | `address`      | Address of the verifier.     |
-| `batchIds`        | `uint64[]`     | IDs of the proven batches.   |
-| `transitions`     | `Transition[]` | The transitions data.        |
+| Event Parameter | Type           | Description                |
+| --------------- | -------------- | -------------------------- |
+| `verifier`      | `address`      | Address of the verifier.   |
+| `batchIds`      | `uint64[]`     | IDs of the proven batches. |
+| `transitions`   | `Transition[]` | The transitions data.      |
 
 ---
 
@@ -119,41 +119,38 @@ Triggered when a **validity proof is submitted** for a batch.
 
 Emitted when a **batch is verified**.
 
-| Event Parameter | Type      | Description                       |
-| --------------- | --------- | --------------------------------- |
-| `batchId`       | `uint64`  | ID of the verified batch.         |
-| `batchHash`     | `bytes32` | The hash of the verified batch  . |
+| Event Parameter | Type      | Description                      |
+| --------------- | --------- | -------------------------------- |
+| `batchId`       | `uint64`  | ID of the verified batch.        |
+| `batchHash`     | `bytes32` | The hash of the verified batch . |
 
 ---
 
 ## Constants
 
-| Constant Name        | Value        | Description                                    |
-| -------------------- | ------------ | ---------------------------------------------- |
-| `livenessBondBase`   | 125          | Required bond for proposing a batch.           |
-| `maxBlocksPerBatch`  | 768          | Maximum number of blocks proposed in a batch.  |
-| `maxBatchesToVerify` | 16           | Maximum number of batches verified at once.    |
+| Constant Name        | Value | Description                                   |
+| -------------------- | ----- | --------------------------------------------- |
+| `livenessBondBase`   | 125   | Required bond for proposing a batch.          |
+| `maxBlocksPerBatch`  | 768   | Maximum number of blocks proposed in a batch. |
+| `maxBatchesToVerify` | 16    | Maximum number of batches verified at once.   |
 
 ---
 
 ## Design Considerations
 
 1. **Ethereum-Equivalent Execution**
-
    - The contract follows Ethereum’s rollup-centric roadmap, allowing **Ethereum-equivalent execution**.
    - No modifications to **EVM opcodes**, ensuring compatibility.
 
     </br>
 
 2. **Based Rollup Architecture**
-
-   - Batchess are proposed permissionlessly, following **Ethereum’s L1 sequencing** rules.
-   - No centralized sequencer; TaikoL1 ensures **censorship resistance**.
+   - Batches are proposed permissionlessly, following **Ethereum’s L1 sequencing** rules.
+   - No centralized sequencer; TaikoInbox ensures **censorship resistance**.
 
     </br>
 
 3. **Multiproving System**
-
    - Supports multiple proving mechanisms: **TEE + TEE, TEE + ZK**.
    - Ensures security **even if one proof system is compromised**.
 
