@@ -52,7 +52,8 @@ contract LibProposeInputDecoderFuzzTest is Test {
             checkpoint: ICheckpointStore.Checkpoint({
                 blockNumber: 0, blockHash: bytes32(0), stateRoot: bytes32(0)
             }),
-            numForcedInclusions: 0
+            numForcedInclusions: 0,
+            extra: bytes("")
         });
 
         bytes memory encoded = LibProposeInputDecoder.encode(input);
@@ -102,7 +103,8 @@ contract LibProposeInputDecoderFuzzTest is Test {
             checkpoint: ICheckpointStore.Checkpoint({
                 blockNumber: 0, blockHash: bytes32(0), stateRoot: bytes32(0)
             }),
-            numForcedInclusions: 0
+            numForcedInclusions: 0,
+            extra: bytes("")
         });
 
         // Encode and decode
@@ -158,7 +160,8 @@ contract LibProposeInputDecoderFuzzTest is Test {
             checkpoint: ICheckpointStore.Checkpoint({
                 blockNumber: 100, blockHash: keccak256("block"), stateRoot: keccak256("state")
             }),
-            numForcedInclusions: 0
+            numForcedInclusions: 0,
+            extra: bytes("")
         });
 
         bytes memory encoded = LibProposeInputDecoder.encode(input);
@@ -247,7 +250,8 @@ contract LibProposeInputDecoderFuzzTest is Test {
                 blockHash: keccak256("endBlock"),
                 stateRoot: keccak256("endState")
             }),
-            numForcedInclusions: 0
+            numForcedInclusions: 0,
+            extra: bytes("")
         });
 
         // Encode
@@ -419,6 +423,8 @@ contract LibProposeInputDecoderFuzzTest is Test {
             blockHash: keccak256("final_end_block"),
             stateRoot: keccak256("final_end_state")
         });
+
+        input.extra = bytes("");
     }
 
     /// @notice Fuzz test for lastCheckpointTimestamp field
@@ -449,7 +455,8 @@ contract LibProposeInputDecoderFuzzTest is Test {
             checkpoint: ICheckpointStore.Checkpoint({
                 blockNumber: 0, blockHash: bytes32(0), stateRoot: bytes32(0)
             }),
-            numForcedInclusions: 0
+            numForcedInclusions: 0,
+            extra: bytes("")
         });
 
         bytes memory encoded = LibProposeInputDecoder.encode(input);

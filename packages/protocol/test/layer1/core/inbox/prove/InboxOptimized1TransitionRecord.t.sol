@@ -132,7 +132,7 @@ contract InboxOptimized1TransitionRecord is InboxTestHelper {
         proposals[0] = proposal;
 
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            proposals: proposals, transitions: transitions, metadata: metadata, extra: bytes("")
         });
 
         bytes memory proveData2 = _codec().encodeProveInput(input);
@@ -484,7 +484,7 @@ contract InboxOptimized1TransitionRecord is InboxTestHelper {
         proposals[0] = _proposal;
 
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            proposals: proposals, transitions: transitions, metadata: metadata, extra: bytes("")
         });
 
         return _codec().encodeProveInput(input);
