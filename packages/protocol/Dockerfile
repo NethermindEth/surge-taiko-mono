@@ -37,6 +37,10 @@ RUN npm install -g pnpm@latest && \
 # Copy source code
 COPY . .
 
+# Initialize git repository for forge install (required by Foundry)
+# forge install uses git to manage dependencies as submodules
+RUN git init
+
 # Install Foundry dependencies
 RUN forge install
 
