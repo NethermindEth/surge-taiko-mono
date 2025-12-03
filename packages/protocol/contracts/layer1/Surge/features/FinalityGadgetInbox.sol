@@ -112,11 +112,10 @@ contract FinalityGadgetInbox is Inbox {
             uint256 currentTimestamp = block.timestamp;
             uint256 totalBondInstructionCount;
 
-            // TODO: move to optimised codec
             // Surge: Pull the pre-images of Surge transition records from the extra data
             // in the input.
             SurgeTransitionRecord[][] memory surgeTransitionRecords =
-                abi.decode(_input.extra, (SurgeTransitionRecord[][]));
+                _decodeProposeExtra(_input.extra);
 
             for (uint256 i; i < _maxFinalizationCount; ++i) {
                 // Check if there are more proposals to finalize
@@ -229,9 +228,7 @@ contract FinalityGadgetInbox is Inbox {
         bytes32 aggregatedProvingHash =
             _hashTransitionsWithMetadata(_input.transitions, _input.metadata);
 
-        // TODO: extract only the bitmap via optimised codec
-        (LibProofBitmap.ProofBitmap proofBitmapInput,) =
-            abi.decode(_input.extra, (LibProofBitmap.ProofBitmap, SurgeTransitionRecord[][]));
+        (LibProofBitmap.ProofBitmap proofBitmapInput,) = _decodeProveExtra(_input.extra);
 
         LibProofBitmap.ProofBitmap proofBitmapComputed =
             SurgeVerifier(_proofVerifier).verifyProof(proposalAge, aggregatedProvingHash, _proof);
@@ -341,11 +338,10 @@ contract FinalityGadgetInbox is Inbox {
             _input.proposals[0], _input.transitions[0], _input.metadata[0]
         );
 
-        // TODO: move to optimised codec
         (
             LibProofBitmap.ProofBitmap proofBitmap,
             SurgeTransitionRecord[][] memory surgeTransitionRecords
-        ) = abi.decode(_input.extra, (LibProofBitmap.ProofBitmap, SurgeTransitionRecord[][]));
+        ) = _decodeProveExtra(_input.extra);
 
         _setSurgeTransitionRecord(
             _input.proposals[0].id,
@@ -371,11 +367,10 @@ contract FinalityGadgetInbox is Inbox {
             uint48 currentGroupStartId = _input.proposals[0].id;
             uint256 firstIndex;
 
-            // TODO: move to optimised codec
             (
                 LibProofBitmap.ProofBitmap proofBitmap,
                 SurgeTransitionRecord[][] memory surgeTransitionRecords
-            ) = abi.decode(_input.extra, (LibProofBitmap.ProofBitmap, SurgeTransitionRecord[][]));
+            ) = _decodeProveExtra(_input.extra);
             uint256 surgeTransitionRecordsIndex;
 
             for (uint256 i = 1; i < _input.proposals.length; ++i) {
@@ -557,7 +552,13 @@ contract FinalityGadgetInbox is Inbox {
         );
     }
 
-    // TODO: Move to optimised hashing
+    // ---------------------------------------------------------------
+    // Transition record hashing
+    // ---------------------------------------------------------------
+
+    /// @notice Computes the keccak256 hash of a single SurgeTransitionRecord.
+    /// @param _record The SurgeTransitionRecord struct to hash.
+    /// @return The keccak256 hash of the encoded record.
     function _hashSurgeTransitionRecord(SurgeTransitionRecord memory _record)
         internal
         pure
@@ -566,13 +567,44 @@ contract FinalityGadgetInbox is Inbox {
         return keccak256(abi.encode(_record));
     }
 
-    // TODO: Move to optimised hashing
-    function _hashSurgeTransitionRecords(SurgeTransitionRecord[] memory _record)
+    /// @notice Computes the keccak256 hash of an array of SurgeTransitionRecords.
+    /// @param _records The array of SurgeTransitionRecord structs to hash.
+    /// @return The keccak256 hash of the encoded records.
+    function _hashSurgeTransitionRecords(SurgeTransitionRecord[] memory _records)
         internal
         pure
         returns (bytes32)
     {
-        return keccak256(abi.encode(_record));
+        return keccak256(abi.encode(_records));
+    }
+
+    // ---------------------------------------------------------------
+    // Extra Data Decoding Functions
+    // ---------------------------------------------------------------
+
+    /// @dev Decodes the extra data for FinalityGadgetInbox prove operations
+    /// @param _data The encoded extra data bytes
+    /// @return proofBitmap_ The proof bitmap indicating which proof variants were used
+    /// @return The array of Surge transition record arrays
+    function _decodeProveExtra(bytes memory _data)
+        internal
+        pure
+        virtual
+        returns (LibProofBitmap.ProofBitmap, SurgeTransitionRecord[][] memory)
+    {
+        return abi.decode(_data, (LibProofBitmap.ProofBitmap, SurgeTransitionRecord[][]));
+    }
+
+    /// @dev Decodes the extra data for FinalityGadgetInbox propose operations
+    /// @param _data The encoded extra data bytes
+    /// @return The array of Surge transition record arrays
+    function _decodeProposeExtra(bytes memory _data)
+        internal
+        pure
+        virtual
+        returns (SurgeTransitionRecord[][] memory)
+    {
+        return abi.decode(_data, (SurgeTransitionRecord[][]));
     }
 
     // ---------------------------------------------------------------
