@@ -42,11 +42,7 @@ abstract contract DeployCapability is Script {
         }
 
         console2.log("  msg.sender :", msg.sender);
-
-        vm.writeJson(
-            vm.serializeAddress("deployment", name, proxy),
-            string.concat(vm.projectRoot(), "/deployments/deploy_l1.json")
-        );
+        writeJson(name, proxy);
     }
 
     function deployProxy(
@@ -96,5 +92,11 @@ abstract contract DeployCapability is Script {
             addr: resolver.resolve(uint64(block.chainid), bytes32(bytes(name)), true),
             chainId: uint64(block.chainid)
         });
+    }
+
+    // Surge: extract json writing to this function
+    function writeJson(string memory name, address dest) internal {
+        string memory json = vm.serializeAddress("deployment", name, dest);
+        vm.writeJson(json, string.concat(vm.projectRoot(), "/deployments/deploy_l1.json"));
     }
 }
