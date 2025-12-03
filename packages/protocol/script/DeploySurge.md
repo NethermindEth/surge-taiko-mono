@@ -40,6 +40,10 @@ This document describes the deployment sequence for the Surge protocol on both L
 - **ERC1155Vault** - ERC1155 token bridging
 - **BridgedERC20/721/1155** - Bridged token implementations (clone pattern)
 
+#### Preconf Contracts
+
+- **PreconfWhitelist** - Whitelisted preconfirmation operators store
+
 #### Internal Verifiers (optional)
 
 - **Risc0Verifier** (if `DEPLOY_RISC0_RETH_VERIFIER=true`)
@@ -58,6 +62,7 @@ These contracts have their ownership set directly during deployment:
 - ERC20Vault
 - ERC721Vault
 - ERC1155Vault
+- PreconfWhitelist
 
 #### Contracts with pending ownership (`pendingOwner = CONTRACT_OWNER`)
 
@@ -68,7 +73,6 @@ These contracts use the 2-step ownership transfer pattern and require manual acc
 - **SharedResolver**
 - **Risc0Verifier** (if deployed)
 - **SP1Verifier** (if deployed)
-- **PreconfWhitelist**
 
 > ⚠️ The pending owner must explicitly accept ownership in **Step 3**.
 
@@ -156,7 +160,6 @@ From Step 1, the following contracts have `CONTRACT_OWNER` as their `pendingOwne
 - SharedResolver address
 - Risc0Verifier address (if deployed)
 - SP1Verifier address (if deployed)
-- PreconfWhitelist address
 
 ### Environment Variables
 

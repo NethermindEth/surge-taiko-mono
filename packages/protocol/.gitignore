@@ -38,6 +38,7 @@ simulation/out/
 test/genesis/data/genesis.json
 test/genesis/data/genesis_alloc.json
 test/genesis/data/genesis_storage_layout.json
+test/genesis/data/genesis_config.json
 
 # Serverless directories
 .serverless

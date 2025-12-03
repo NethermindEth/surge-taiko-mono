@@ -1,20 +1,22 @@
 "use strict";
 const ADDRESS_LENGTH = 40;
 
+// Surge: make owner configurable
+const ownerAddress =
+  process.env.CONTRACT_OWNER || "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39";
+
 module.exports = {
   // Owner address of the pre-deployed L2 contracts.
-  contractOwner: "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39",
-  // Chain ID of the Taiko L2 network.
-  chainId: 167,
+  contractOwner: ownerAddress,
+  // Chain ID of the Surge L2 network.
+  // Surge: make chainId configurable
+  chainId: parseInt(process.env.L2_CHAINID) || 167,
+  l1ChainId: parseInt(process.env.L1_CHAINID) || 31337,
   // Account address and pre-mint ETH amount as key-value pairs.
-  seedAccounts: [
-    { "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39": 1000 },
-    { "0x79fcdef22feed20eddacbb2587640e45491b757f": 1000 },
-  ],
+  seedAccounts: [{ [ownerAddress]: 1000 }],
   // Owner Chain ID, Security Council, and Timelock Controller
-  l1ChainId: 31337,
-  ownerSecurityCouncil: "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39",
-  ownerTimelockController: "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39",
+  ownerSecurityCouncil: ownerAddress,
+  ownerTimelockController: ownerAddress,
   get contractAddresses() {
     return {
       // ============ Implementations ============
@@ -53,14 +55,20 @@ module.exports = {
     gasExcess: 1,
   },
   // Option to pre-deploy an ERC-20 token.
-  predeployERC20: true,
-  livenessBond: "128000000000000000000",
-  provabilityBond: "128000000000000000000",
-  withdrawalDelay: 3600,
-  minBond: 0,
-  bondToken: "0x0000000000000000000000000000000000000000",
-  remoteSignalService: "0x0000000000000000000000000000000000000000",
-  pacayaTaikoAnchor: "0x0000000000000000000000000000000000000000",
+  predeployERC20: process.env.PREDEPLOY_ERC20 === "true" || true,
+  // Bond-related configurations
+  livenessBond: process.env.LIVENESS_BOND || "128000000000000000000",
+  provabilityBond: process.env.PROVABILITY_BOND || "128000000000000000000",
+  withdrawalDelay: parseInt(process.env.WITHDRAWAL_DELAY) || 3600,
+  minBond: parseInt(process.env.MIN_BOND) || 0,
+  bondToken:
+    process.env.BOND_TOKEN || "0x0000000000000000000000000000000000000000",
+  remoteSignalService:
+    process.env.REMOTE_SIGNAL_SERVICE ||
+    "0x0000000000000000000000000000000000000000",
+  pacayaTaikoAnchor:
+    process.env.PACAYA_TAIKO_ANCHOR ||
+    "0x0000000000000000000000000000000000000000",
 };
 
 function getConstantAddress(prefix, suffix) {
