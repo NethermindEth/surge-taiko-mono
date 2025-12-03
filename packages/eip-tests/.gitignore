@@ -1,17 +1,49 @@
+node_modules
+.env
+coverage
+coverage.json
+typechain
+abis
+abi
+deployments/*.json
+bin
+yarn.lock
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+npm-debug.log*
+typechain-types
+test/genesis/generate/data
+
+# Hardhat files
+cache
+artifacts
+cache
+cache_forge
+cache_hardhat
+out
+
 # Foundry
-out/
-cache/
-lib/
+broadcast
 
-# Test results
-test-results/
+# Editors
+.vscode
 
-# Node
-node_modules/
+#coverage
+lcov.info
 
-# IDE
-.vscode/
-.idea/
+simulation/out/
+test/genesis/data/genesis.json
+test/genesis/data/genesis_alloc.json
+test/genesis/data/genesis_storage_layout.json
 
-# OS
+# Serverless directories
+.serverless
+jspm_packages
+
+*.log
 .DS_Store
+
+secrets*.yml
+.defender
+.platform

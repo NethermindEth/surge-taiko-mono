@@ -8,7 +8,7 @@ cache_path = "cache"
 solc = "0.8.27"
 optimizer = false
 optimizer_runs = 0
-evm_version = "cancun"
+evm_version = "prague"
 
 [rpc_endpoints]
 nethermind = "http://localhost:8545"

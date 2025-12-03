@@ -5,7 +5,7 @@ import "forge-std/Script.sol";
 import "../src/Cancun.sol";
 
 /**
- * @title ExecuteEIPTests
+ * @title ExecuteCancunEIPTests
  * @notice Deploy and execute all Cancun EIP tests ON-CHAIN
  * @dev This will create real transactions and modify blockchain state
  */
