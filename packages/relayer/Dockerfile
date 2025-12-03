@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.6
 
-FROM golang:1.23.5-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 ARG PACKAGE=relayer
 ARG BUILDKIT_INLINE_CACHE=1

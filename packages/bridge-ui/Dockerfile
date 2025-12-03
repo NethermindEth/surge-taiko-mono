@@ -10,21 +10,26 @@ RUN npm install -g pnpm@latest
 
 WORKDIR /app
 
-# Copy dependency files first for better layer caching
-COPY package.json pnpm-lock.yaml* ./
-
-# Install dependencies
-RUN pnpm install
-
-# Copy source code
+# Copy all files (Docker will preserve node_modules if we install after)
 COPY . .
 
-# Copy and export config
-RUN cp .env.example .env && \
-    pnpm export:config
+# Install dependencies (will use existing node_modules if present, or create new)
+RUN pnpm install
 
-# Build the application
-RUN pnpm build
+# Install adapter-node for Docker builds (Vercel adapter outputs to different directory)
+RUN pnpm add -D @sveltejs/adapter-node@latest
+
+# Temporarily replace adapter in svelte.config.js for Docker build
+RUN sed -i "s/@sveltejs\/adapter-vercel/@sveltejs\/adapter-node/g" svelte.config.js && \
+    sed -i 's/adapter-vercel/adapter-node/g' svelte.config.js && \
+    sed -i 's/runtime: .nodejs20.x./isr: false/g' svelte.config.js
+
+# Copy and export config, then build
+# For Docker builds, skip env validation if config files don't exist
+# Config can be provided at runtime via environment variables
+RUN cp .env.example .env && \
+    (pnpm export:config || true) && \
+    SKIP_ENV_VALIDATION=true pnpm build
 
 # Step 2: Set up the final production environment
 FROM node:20-slim AS runtime
