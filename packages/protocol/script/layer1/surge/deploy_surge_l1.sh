@@ -23,6 +23,10 @@ export DEPLOY_SP1_RETH_VERIFIER=${DEPLOY_SP1_RETH_VERIFIER:-true}
 # Use dummy verifier for testing (default: false for production, set to true for devnet testing)
 export USE_DUMMY_VERIFIER=${USE_DUMMY_VERIFIER:-false}
 
+# Protocol mode: true for Taiko (InboxOptimized2, CodecOptimized, AnyTwoVerifier)
+#                false for Surge (SurgeInbox, SurgeCodecSimple, SurgeVerifier)
+export USE_TAIKO=${USE_TAIKO:-false}
+
 # Inbox configuration
 # ---------------------------------------------------------------
 # Bond token address (Use 0-address for ETH)

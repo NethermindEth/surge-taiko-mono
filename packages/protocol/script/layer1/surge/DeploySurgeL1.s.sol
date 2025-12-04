@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import { AnyTwoVerifierDummy } from "./common/AnyTwoVerifierDummy.sol";
 import { EmptyImpl } from "./common/EmptyImpl.sol";
 import { SurgeVerifierDummy } from "./common/SurgeVerifierDummy.sol";
 import {
@@ -23,9 +24,12 @@ import {
 } from "src/layer1/Surge/deployments/internal-devnet/SurgeCodecSimple.sol";
 import { SurgeInbox } from "src/layer1/Surge/deployments/internal-devnet/SurgeInbox.sol";
 import { IInbox } from "src/layer1/core/iface/IInbox.sol";
+import { CodecOptimized } from "src/layer1/core/impl/CodecOptimized.sol";
+import { InboxOptimized2 } from "src/layer1/core/impl/InboxOptimized2.sol";
 import { PreconfWhitelist } from "src/layer1/preconf/impl/PreconfWhitelist.sol";
 import { Risc0Verifier } from "src/layer1/verifiers/Risc0Verifier.sol";
 import { SP1Verifier } from "src/layer1/verifiers/SP1Verifier.sol";
+import { AnyTwoVerifier } from "src/layer1/verifiers/compose/AnyTwoVerifier.sol";
 import { Bridge } from "src/shared/bridge/Bridge.sol";
 import { DefaultResolver } from "src/shared/common/DefaultResolver.sol";
 import { SignalService } from "src/shared/signal/SignalService.sol";
@@ -55,6 +59,12 @@ contract DeploySurgeL1 is DeployCapability {
     // ---------------------------------------------------------------
     uint64 internal immutable l2ChainId = uint64(vm.envUint("L2_CHAIN_ID"));
     bytes32 internal immutable l2GenesisHash = vm.envBytes32("L2_GENESIS_HASH");
+
+    // Protocol mode configuration
+    // ---------------------------------------------------------------
+    /// @dev When true, deploys Taiko protocol (InboxOptimized2, CodecOptimized, AnyTwoVerifier)
+    /// When false, deploys Surge protocol (SurgeInbox, SurgeCodecSimple, SurgeVerifier)
+    bool internal immutable useTaiko = vm.envOr("USE_TAIKO", false);
 
     // Verifier Configuration
     // ---------------------------------------------------------------
@@ -121,31 +131,37 @@ contract DeploySurgeL1 is DeployCapability {
         require(contractOwner != address(0), "config: CONTRACT_OWNER");
 
         console2.log("** Contract owner: ", contractOwner);
+        console2.log("** Protocol mode: ", useTaiko ? "Taiko" : "Surge");
 
         // Empty implementation for temporary use
         address emptyImpl = address(new EmptyImpl());
 
-        // Deploy rollup contracts
+        // Deploy internal verifiers first (needed for Taiko's AnyTwoVerifier constructor)
         // ---------------------------------------------------------------
-        RollupContracts memory rollupContracts = deployRollupContracts(emptyImpl);
+        VerifierContracts memory verifierContracts = deployInternalVerifiers();
+
+        // Deploy rollup contracts (inbox proxy and proof verifier)
+        // For Taiko: AnyTwoVerifier needs verifier addresses at construction
+        // For Surge: SurgeVerifier needs verifiers set after construction
+        // ---------------------------------------------------------------
+        RollupContracts memory rollupContracts = deployRollupContracts(emptyImpl, verifierContracts);
 
         // Deploy shared contracts
         // ---------------------------------------------------------------
         SharedContracts memory sharedContracts =
             deploySharedContracts(contractOwner, rollupContracts);
 
-        // Deploy verifiers
-        // ---------------------------------------------------------------
-        VerifierContracts memory verifierContracts = deployInternalVerifiers();
-
         // Register L2 addresses in the resolver
         setupSharedResolver(sharedContracts, contractOwner);
 
-        // Setup proof verifier with internal verifiers
+        // Setup proof verifier with internal verifiers (Surge only)
+        // For Taiko, verifiers are already set via constructor
         // ---------------------------------------------------------------
-        setupProofVerifier(rollupContracts, verifierContracts, contractOwner);
+        if (!useTaiko) {
+            setupProofVerifier(rollupContracts, verifierContracts, contractOwner);
+        }
 
-        // Deploy inbox implementation based on network
+        // Deploy inbox implementation based on protocol mode
         // ---------------------------------------------------------------
         setupInbox(rollupContracts, sharedContracts, contractOwner);
 
@@ -154,7 +170,7 @@ contract DeploySurgeL1 is DeployCapability {
         verifyDeployment(sharedContracts, rollupContracts, verifierContracts, contractOwner);
 
         console2.log("=====================================");
-        console2.log("Surge L1 Deployment Complete");
+        console2.log(useTaiko ? "Taiko L1 Deployment Complete" : "Surge L1 Deployment Complete");
         console2.log("=====================================");
     }
 
@@ -236,26 +252,52 @@ contract DeploySurgeL1 is DeployCapability {
         );
     }
 
-    function deployRollupContracts(address _emptyImpl)
+    function deployRollupContracts(
+        address _emptyImpl,
+        VerifierContracts memory _verifierContracts
+    )
         internal
         returns (RollupContracts memory rollupContracts)
     {
         // Deploy inbox proxy
         // ---------------------------------------------------------------
-        rollupContracts.inbox = deployProxy({ name: "surge_inbox", impl: _emptyImpl, data: "" });
+        string memory inboxName = useTaiko ? "taiko_inbox" : "surge_inbox";
+        rollupContracts.inbox = deployProxy({ name: inboxName, impl: _emptyImpl, data: "" });
 
-        // Deploy proof verifier (SurgeVerifier or SurgeVerifierDummy)
+        // Deploy proof verifier
         // ---------------------------------------------------------------
-        // The deployer is the initial owner so that we can set the internal verifiers
-        // later on.
-        if (useDummyVerifier) {
-            rollupContracts.proofVerifier =
-                address(new SurgeVerifierDummy(rollupContracts.inbox, msg.sender));
-            console2.log("** Deployed DUMMY proof verifier:", rollupContracts.proofVerifier);
+        if (useTaiko) {
+            // Taiko: Deploy AnyTwoVerifier (verifiers are immutable, set at construction)
+            // SGX not needed, set to address(0)
+            if (useDummyVerifier) {
+                rollupContracts.proofVerifier = address(
+                    new AnyTwoVerifierDummy(
+                        _verifierContracts.risc0RethVerifier, _verifierContracts.sp1RethVerifier
+                    )
+                );
+                console2.log("** Deployed DUMMY AnyTwoVerifier:", rollupContracts.proofVerifier);
+            } else {
+                rollupContracts.proofVerifier = address(
+                    new AnyTwoVerifier(
+                        address(0), // SGX not needed
+                        _verifierContracts.risc0RethVerifier,
+                        _verifierContracts.sp1RethVerifier
+                    )
+                );
+                console2.log("** Deployed AnyTwoVerifier:", rollupContracts.proofVerifier);
+            }
         } else {
-            rollupContracts.proofVerifier =
-                address(new SurgeVerifier(rollupContracts.inbox, msg.sender));
-            console2.log("** Deployed proof verifier:", rollupContracts.proofVerifier);
+            // Surge: Deploy SurgeVerifier (verifiers set after construction via setVerifier)
+            // The deployer is the initial owner so that we can set the internal verifiers later on.
+            if (useDummyVerifier) {
+                rollupContracts.proofVerifier =
+                    address(new SurgeVerifierDummy(rollupContracts.inbox, msg.sender));
+                console2.log("** Deployed DUMMY SurgeVerifier:", rollupContracts.proofVerifier);
+            } else {
+                rollupContracts.proofVerifier =
+                    address(new SurgeVerifier(rollupContracts.inbox, msg.sender));
+                console2.log("** Deployed SurgeVerifier:", rollupContracts.proofVerifier);
+            }
         }
         writeJson("proof_verifier", rollupContracts.proofVerifier);
     }
@@ -376,10 +418,17 @@ contract DeploySurgeL1 is DeployCapability {
             data: abi.encodeCall(PreconfWhitelist.init, (contractOwner, 0, 2))
         });
 
-        address codec = address(new SurgeCodecSimple());
-        console2.log("** Deployed SurgeCodecSimple:", codec);
+        // Deploy codec based on protocol mode
+        address codec;
+        if (useTaiko) {
+            codec = address(new CodecOptimized());
+            console2.log("** Deployed CodecOptimized:", codec);
+        } else {
+            codec = address(new SurgeCodecSimple());
+            console2.log("** Deployed SurgeCodecSimple:", codec);
+        }
 
-        // Deploy SurgeInbox with configuration
+        // Build inbox configuration
         IInbox.Config memory config = IInbox.Config({
             codec: codec,
             bondToken: bondToken,
@@ -400,16 +449,31 @@ contract DeploySurgeL1 is DeployCapability {
             permissionlessInclusionMultiplier: permissionlessInclusionMultiplier,
             compositeKeyVersion: compositeKeyVersion
         });
-        address inboxImpl =
-            address(new SurgeInbox(config, optimisticFallbackDelay, finalisingProofCount));
-        console2.log("** Deployed SurgeInbox implementation: ", inboxImpl);
+
+        // Deploy inbox implementation based on protocol mode
+        address inboxImpl;
+        if (useTaiko) {
+            // Taiko: InboxOptimized2 (no finality gadget parameters)
+            inboxImpl = address(new InboxOptimized2(config));
+            console2.log("** Deployed InboxOptimized2 implementation: ", inboxImpl);
+        } else {
+            // Surge: SurgeInbox with finality gadget parameters
+            inboxImpl =
+                address(new SurgeInbox(config, optimisticFallbackDelay, finalisingProofCount));
+            console2.log("** Deployed SurgeInbox implementation: ", inboxImpl);
+        }
 
         // Upgrade inbox proxy to actual implementation
         UUPSUpgradeable(_rollupContracts.inbox).upgradeTo(inboxImpl);
 
-        // Initialize inbox
-        SurgeInbox(payable(_rollupContracts.inbox)).init(msg.sender, l2GenesisHash);
-        console2.log("** SurgeInbox initialized");
+        // Initialize inbox (same init function for both implementations)
+        if (useTaiko) {
+            InboxOptimized2(payable(_rollupContracts.inbox)).init(msg.sender, l2GenesisHash);
+            console2.log("** InboxOptimized2 initialized");
+        } else {
+            SurgeInbox(payable(_rollupContracts.inbox)).init(msg.sender, l2GenesisHash);
+            console2.log("** SurgeInbox initialized");
+        }
 
         // Requires ownership acceptance
         Ownable2StepUpgradeable(_rollupContracts.inbox).transferOwnership(contractOwner);
@@ -443,13 +507,25 @@ contract DeploySurgeL1 is DeployCapability {
         ownerContracts[4] = _sharedContracts.erc1155Vault;
 
         // Build list of contracts with pending ownership transfer
+        // For Taiko: AnyTwoVerifier doesn't have ownership (verifiers are immutable)
+        // For Surge: SurgeVerifier has ownership for setVerifier functionality
         // ---------------------------------------------------------------
-        address[] memory pendingOwnerContracts = new address[](5);
-        pendingOwnerContracts[0] = _rollupContracts.proofVerifier;
-        pendingOwnerContracts[1] = _rollupContracts.inbox;
-        pendingOwnerContracts[2] = _sharedContracts.sharedResolver;
-        pendingOwnerContracts[3] = _verifierContracts.risc0RethVerifier; // May be address(0)
-        pendingOwnerContracts[4] = _verifierContracts.sp1RethVerifier; // May be address(0)
+        address[] memory pendingOwnerContracts;
+        if (useTaiko) {
+            pendingOwnerContracts = new address[](4);
+            // AnyTwoVerifier has no ownership - excluded
+            pendingOwnerContracts[0] = _rollupContracts.inbox;
+            pendingOwnerContracts[1] = _sharedContracts.sharedResolver;
+            pendingOwnerContracts[2] = _verifierContracts.risc0RethVerifier; // May be address(0)
+            pendingOwnerContracts[3] = _verifierContracts.sp1RethVerifier; // May be address(0)
+        } else {
+            pendingOwnerContracts = new address[](5);
+            pendingOwnerContracts[0] = _rollupContracts.proofVerifier;
+            pendingOwnerContracts[1] = _rollupContracts.inbox;
+            pendingOwnerContracts[2] = _sharedContracts.sharedResolver;
+            pendingOwnerContracts[3] = _verifierContracts.risc0RethVerifier; // May be address(0)
+            pendingOwnerContracts[4] = _verifierContracts.sp1RethVerifier; // May be address(0)
+        }
 
         // Verify ownership
         // ---------------------------------------------------------------
