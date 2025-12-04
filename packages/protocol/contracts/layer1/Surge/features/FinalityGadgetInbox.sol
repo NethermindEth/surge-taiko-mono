@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import { IInbox } from "../../core/iface/IInbox.sol";
 import { Inbox } from "../../core/impl/Inbox.sol";
 import { LibBondInstruction } from "../../core/libs/LibBondInstruction.sol";
 import { LibProofBitmap } from "../LibProofBitmap.sol";
@@ -17,7 +16,7 @@ import { LibBonds } from "src/shared/libs/LibBonds.sol";
 /// - Except for _buildAndSaveTransitionRecords, no other internal function related to storing or
 /// managing a transition record is used.
 /// @custom:security-contact security@nethermind.io
-contract FinalityGadgetInbox is Inbox {
+abstract contract FinalityGadgetInbox is Inbox {
     using LibProofBitmap for LibProofBitmap.ProofBitmap;
 
     /// @dev Delay before which a single proof with no conflicts can be used for finalising
@@ -61,13 +60,7 @@ contract FinalityGadgetInbox is Inbox {
     // Constructor
     // ---------------------------------------------------------------
 
-    constructor(
-        IInbox.Config memory _config,
-        uint256 __optimisticFallbackDelay,
-        uint8 __finalisingProofCount
-    )
-        Inbox(_config)
-    {
+    constructor(uint256 __optimisticFallbackDelay, uint8 __finalisingProofCount) {
         _optimisticFallbackDelay = __optimisticFallbackDelay;
         _finalisingProofCount = __finalisingProofCount;
     }

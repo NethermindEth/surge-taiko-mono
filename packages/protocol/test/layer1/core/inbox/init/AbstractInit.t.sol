@@ -35,7 +35,7 @@ abstract contract AbstractInitTest is InboxTestHelper {
         Inbox inbox = _deployInboxProxy();
 
         vm.prank(owner);
-        inbox.init(owner);
+        inbox.init(owner, GENESIS_BLOCK_HASH);
 
         assertEq(inbox.owner(), owner, "owner mismatch");
     }
@@ -45,7 +45,7 @@ abstract contract AbstractInitTest is InboxTestHelper {
         address caller = Carol;
 
         vm.prank(caller);
-        inbox.init(address(0));
+        inbox.init(address(0), GENESIS_BLOCK_HASH);
 
         assertEq(inbox.owner(), caller, "owner should default to caller");
     }
@@ -54,22 +54,19 @@ abstract contract AbstractInitTest is InboxTestHelper {
         Inbox inbox = _deployInboxProxy();
 
         vm.prank(owner);
-        inbox.init(owner);
+        inbox.init(owner, GENESIS_BLOCK_HASH);
 
         vm.expectRevert("Initializable: contract is already initialized");
         vm.prank(owner);
-        inbox.init(owner);
+        inbox.init(owner, GENESIS_BLOCK_HASH);
     }
 
     function test_activate_succeeds() public {
         Inbox inbox = _deployInboxProxy();
 
-        vm.prank(owner);
-        inbox.init(owner);
-
         vm.recordLogs();
         vm.prank(owner);
-        inbox.activate(GENESIS_BLOCK_HASH);
+        inbox.init(owner, GENESIS_BLOCK_HASH);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         IInbox.ProposedEventPayload memory payload = _decodeProposedEvent(logs);
@@ -87,42 +84,6 @@ abstract contract AbstractInitTest is InboxTestHelper {
         assertEq(storedHash, _expectedProposalHash(payload.proposal), "stored genesis hash");
     }
 
-    function test_activate_RevertWhen_UnauthorizedCaller() public {
-        Inbox inbox = _deployInboxProxy();
-
-        vm.prank(owner);
-        inbox.init(owner);
-
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(David);
-        inbox.activate(GENESIS_BLOCK_HASH);
-    }
-
-    function test_activate_SucceedsWhenCalledTwice() public {
-        Inbox inbox = _deployInboxProxy();
-
-        vm.prank(owner);
-        inbox.init(owner);
-
-        vm.prank(owner);
-        inbox.activate(GENESIS_BLOCK_HASH);
-
-        // Should succeed when called again by same owner (for L1 reorgs)
-        vm.prank(owner);
-        inbox.activate(GENESIS_BLOCK_HASH);
-
-        // Verify state is still correct
-        bytes32 storedHash = inbox.getProposalHash(0);
-        assertTrue(storedHash != bytes32(0), "genesis proposal should exist");
-    }
-
-    function test_activate_RevertWhen_NotInitialized() public {
-        Inbox inbox = _deployInboxProxy();
-
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(owner);
-        inbox.activate(GENESIS_BLOCK_HASH);
-    }
 
     function _deployInboxProxy() internal returns (Inbox inbox) {
         Inbox implementation = _deployImplementation();

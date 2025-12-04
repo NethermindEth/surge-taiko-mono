@@ -35,10 +35,7 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     using LibMath for uint256;
     using SafeERC20 for IERC20;
 
-    // ---------------------------------------------------------------
-    // Constants
-    // ---------------------------------------------------------------
-    uint256 private constant ACTIVATION_WINDOW = 2 hours;
+    // Surge: Remove activation window
 
     // ---------------------------------------------------------------
     // Structs
@@ -57,11 +54,7 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
         bool allowsPermissionless;
     }
 
-    // ---------------------------------------------------------------
-    // Events
-    // ---------------------------------------------------------------
-
-    event InboxActivated(bytes32 lastPacayaBlockHash);
+    // Surge: remove activation event
 
     // ---------------------------------------------------------------
     // Immutable Variables
@@ -131,8 +124,7 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     // State Variables
     // ---------------------------------------------------------------
 
-    /// @notice The timestamp when the first activation occurred.
-    uint48 public activationTimestamp;
+    // Surge: remove activation state
 
     /// @notice Flag indicating whether a conflicting transition record has been detected
     bool public conflictingTransitionDetected;
@@ -194,30 +186,11 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
 
     /// @notice Initializes the owner of the inbox.
     /// @param _owner The owner of this contract
-    function init(address _owner) external initializer {
+    /// @param _genesisHash Genesis block hash
+    /// Surge: Use activation for genesis
+    function init(address _owner, bytes32 _genesisHash) external initializer {
+        _activateInbox(_genesisHash);
         __Essential_init(_owner);
-    }
-
-    /// @notice Activates the inbox so that it can start accepting proposals.
-    /// @dev The `propose` function implicitly checks that activation has occurred by verifying
-    ///      the genesis proposal (ID 0) exists in storage via `_verifyChainHead` →
-    ///      `_checkProposalHash`. If `activate` hasn't been called, the genesis proposal won't
-    ///      exist and `propose` will revert with `ProposalHashMismatch()`.
-    ///      This function can be called multiple times to handle L1 reorgs where the last Pacaya
-    ///      block may change after this function is called.
-    /// @param _lastPacayaBlockHash The hash of the last Pacaya block
-    function activate(bytes32 _lastPacayaBlockHash) external onlyOwner {
-        require(_lastPacayaBlockHash != 0, InvalidLastPacayaBlockHash());
-        if (activationTimestamp == 0) {
-            activationTimestamp = uint48(block.timestamp);
-        } else {
-            require(
-                block.timestamp <= ACTIVATION_WINDOW + activationTimestamp,
-                ActivationPeriodExpired()
-            );
-        }
-        _activateInbox(_lastPacayaBlockHash);
-        emit InboxActivated(_lastPacayaBlockHash);
     }
 
     /// @inheritdoc IInbox
@@ -413,14 +386,13 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
 
     /// @dev Activates the inbox with genesis state so that it can start accepting proposals.
     /// Sets up the initial proposal and core state with genesis block.
-    /// Can be called multiple times to handle L1 reorgs or correct incorrect values.
-    /// Resets state variables to allow fresh start.
-    /// @param _lastPacayaBlockHash The hash of the last Pacaya block
-    function _activateInbox(bytes32 _lastPacayaBlockHash) internal {
+    /// @param _genesisHash The hash of the genesis block
+    /// Surge: Use this for genesis init instead of activation
+    function _activateInbox(bytes32 _genesisHash) internal {
         conflictingTransitionDetected = false;
 
         Transition memory transition;
-        transition.checkpoint.blockHash = _lastPacayaBlockHash;
+        transition.checkpoint.blockHash = _genesisHash;
 
         CoreState memory coreState;
         coreState.nextProposalId = 1;

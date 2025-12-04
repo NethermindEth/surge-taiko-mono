@@ -1,20 +1,22 @@
 "use strict";
 const ADDRESS_LENGTH = 40;
 
+// Surge: make owner configurable
+const ownerAddress =
+  process.env.CONTRACT_OWNER || "0x661690Da28C8b78B0199019771771bAfb6A93969";
+
 module.exports = {
   // Owner address of the pre-deployed L2 contracts.
-  contractOwner: "0x661690Da28C8b78B0199019771771bAfb6A93969",
-  // Chain ID of the Taiko L2 network.
-  chainId: 167010,
+  contractOwner: ownerAddress,
+  // Chain ID of the Surge L2 network.
+  // Surge: make chainId configurable
+  chainId: parseInt(process.env.L2_CHAINID) || 167010,
+  l1ChainId: parseInt(process.env.L1_CHAINID) || 7014190335,
   // Account address and pre-mint ETH amount as key-value pairs.
-  seedAccounts: [
-    { "0x661690Da28C8b78B0199019771771bAfb6A93969": 1000 },
-    { "0x79fcdef22feed20eddacbb2587640e45491b757f": 1000 },
-  ],
+  seedAccounts: [{ [ownerAddress]: 1000 }],
   // Owner Chain ID, Security Council, and Timelock Controller
-  l1ChainId: 7014190335,
-  ownerSecurityCouncil: "0x661690Da28C8b78B0199019771771bAfb6A93969",
-  ownerTimelockController: "0x661690Da28C8b78B0199019771771bAfb6A93969",
+  ownerSecurityCouncil: ownerAddress,
+  ownerTimelockController: ownerAddress,
   get contractAddresses() {
     return {
       // ============ Implementations ============
@@ -30,7 +32,10 @@ module.exports = {
       BridgedERC1155Impl: getConstantAddress(`0${this.chainId}`, 10098),
       RegularERC20: getConstantAddress(`0${this.chainId}`, 10099),
       // Rollup Contracts
+      TaikoAnchorImpl: getConstantAddress(`0${this.chainId}`, 10001),
       RollupResolverImpl: getConstantAddress(`0${this.chainId}`, 10002),
+      BondManagerImpl: getConstantAddress(`0${this.chainId}`, 10003),
+      AnchorForkRouterImpl: getConstantAddress(`0${this.chainId}`, 10004),
       // ============ Proxies ============
       // Shared Contracts
       Bridge: getConstantAddress(this.chainId, 1),
@@ -42,6 +47,7 @@ module.exports = {
       // Rollup Contracts
       TaikoAnchor: getConstantAddress(this.chainId, 10001),
       RollupResolver: getConstantAddress(this.chainId, 10002),
+      BondManager: getConstantAddress(this.chainId, 10003),
     };
   },
   // L2 EIP-1559 baseFee calculation related fields.
@@ -49,7 +55,20 @@ module.exports = {
     gasExcess: 1,
   },
   // Option to pre-deploy an ERC-20 token.
-  predeployERC20: true,
+  predeployERC20: process.env.PREDEPLOY_ERC20 === "true" || true,
+  // Bond-related configurations
+  livenessBond: process.env.LIVENESS_BOND || "128000000000000000000",
+  provabilityBond: process.env.PROVABILITY_BOND || "128000000000000000000",
+  withdrawalDelay: parseInt(process.env.WITHDRAWAL_DELAY) || 3600,
+  minBond: parseInt(process.env.MIN_BOND) || 0,
+  bondToken:
+    process.env.BOND_TOKEN || "0x0000000000000000000000000000000000000000",
+  remoteSignalService:
+    process.env.REMOTE_SIGNAL_SERVICE ||
+    "0x0000000000000000000000000000000000000000",
+  pacayaTaikoAnchor:
+    process.env.PACAYA_TAIKO_ANCHOR ||
+    "0x0000000000000000000000000000000000000000",
 };
 
 function getConstantAddress(prefix, suffix) {

@@ -1,0 +1,692 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+import { AnyTwoVerifierDummy } from "./common/AnyTwoVerifierDummy.sol";
+import { EmptyImpl } from "./common/EmptyImpl.sol";
+import { SurgeVerifierDummy } from "./common/SurgeVerifierDummy.sol";
+import {
+    Ownable2StepUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {
+    UUPSUpgradeable
+} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
+import {
+    ControlID,
+    RiscZeroGroth16Verifier
+} from "@risc0/contracts/groth16/RiscZeroGroth16Verifier.sol";
+import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v5.0.0/SP1VerifierPlonk.sol";
+import { console2 } from "forge-std/src/console2.sol";
+import { LibProofBitmap } from "src/layer1/Surge/LibProofBitmap.sol";
+import { SurgeVerifier } from "src/layer1/Surge/SurgeVerifier.sol";
+import {
+    SurgeCodecSimple
+} from "src/layer1/Surge/deployments/internal-devnet/SurgeCodecSimple.sol";
+import { SurgeInbox } from "src/layer1/Surge/deployments/internal-devnet/SurgeInbox.sol";
+import { IInbox } from "src/layer1/core/iface/IInbox.sol";
+import { CodecOptimized } from "src/layer1/core/impl/CodecOptimized.sol";
+import { InboxOptimized2 } from "src/layer1/core/impl/InboxOptimized2.sol";
+import { PreconfWhitelist } from "src/layer1/preconf/impl/PreconfWhitelist.sol";
+import { Risc0Verifier } from "src/layer1/verifiers/Risc0Verifier.sol";
+import { SP1Verifier } from "src/layer1/verifiers/SP1Verifier.sol";
+import { AnyTwoVerifier } from "src/layer1/verifiers/compose/AnyTwoVerifier.sol";
+import { Bridge } from "src/shared/bridge/Bridge.sol";
+import { DefaultResolver } from "src/shared/common/DefaultResolver.sol";
+import { SignalService } from "src/shared/signal/SignalService.sol";
+import { BridgedERC1155 } from "src/shared/vault/BridgedERC1155.sol";
+import { BridgedERC20 } from "src/shared/vault/BridgedERC20.sol";
+import { BridgedERC721 } from "src/shared/vault/BridgedERC721.sol";
+import { ERC1155Vault } from "src/shared/vault/ERC1155Vault.sol";
+import { ERC20Vault } from "src/shared/vault/ERC20Vault.sol";
+import { ERC721Vault } from "src/shared/vault/ERC721Vault.sol";
+import { DeployCapability } from "test/shared/DeployCapability.sol";
+
+/// @title DeploySurgeL1
+/// @notice This script deploys the Surge protocol on L1.
+/// @custom:security-contact security@nethermind.io
+contract DeploySurgeL1 is DeployCapability {
+    uint256 internal constant ADDRESS_LENGTH = 40;
+
+    // Signer configuration
+    // ---------------------------------------------------------------
+    uint256 internal immutable privateKey = vm.envUint("PRIVATE_KEY");
+
+    // Owner configuration
+    // ---------------------------------------------------------------
+    address internal immutable contractOwner = vm.envAddress("CONTRACT_OWNER");
+
+    // L2 configuration
+    // ---------------------------------------------------------------
+    uint64 internal immutable l2ChainId = uint64(vm.envUint("L2_CHAIN_ID"));
+    bytes32 internal immutable l2GenesisHash = vm.envBytes32("L2_GENESIS_HASH");
+
+    // Protocol mode configuration
+    // ---------------------------------------------------------------
+    /// @dev When true, deploys Taiko protocol (InboxOptimized2, CodecOptimized, AnyTwoVerifier)
+    /// When false, deploys Surge protocol (SurgeInbox, SurgeCodecSimple, SurgeVerifier)
+    bool internal immutable useTaiko = vm.envOr("USE_TAIKO", false);
+
+    // Verifier Configuration
+    // ---------------------------------------------------------------
+    bool internal immutable useDummyVerifier = vm.envOr("USE_DUMMY_VERIFIER", false);
+    bool internal immutable deployRisc0RethVerifier = vm.envBool("DEPLOY_RISC0_RETH_VERIFIER");
+    bool internal immutable deploySp1RethVerifier = vm.envBool("DEPLOY_SP1_RETH_VERIFIER");
+
+    // Inbox configuration
+    // ---------------------------------------------------------------
+    address internal immutable bondToken = vm.envAddress("BOND_TOKEN");
+    uint48 internal immutable provingWindow = uint48(vm.envUint("PROVING_WINDOW"));
+    uint48 internal immutable extendedProvingWindow = uint48(vm.envUint("EXTENDED_PROVING_WINDOW"));
+    uint8 internal immutable maxFinalizationCount = uint8(vm.envUint("MAX_FINALIZATION_COUNT"));
+    uint48 internal immutable finalizationGracePeriod =
+        uint48(vm.envUint("FINALIZATION_GRACE_PERIOD"));
+    uint16 internal immutable ringBufferSize = uint16(vm.envUint("RING_BUFFER_SIZE"));
+    uint8 internal immutable basefeeSharingPctg = uint8(vm.envUint("BASEFEE_SHARING_PCTG"));
+    uint8 internal immutable minForcedInclusionCount =
+        uint8(vm.envUint("MIN_FORCED_INCLUSION_COUNT"));
+    uint48 internal immutable forcedInclusionDelay = uint48(vm.envUint("FORCED_INCLUSION_DELAY"));
+    uint64 internal immutable forcedInclusionFeeInGwei =
+        uint64(vm.envUint("FORCED_INCLUSION_FEE_IN_GWEI"));
+    uint8 internal immutable forcedInclusionFeeDoubleThreshold =
+        uint8(vm.envUint("FORCED_INCLUSION_FEE_DOUBLE_THRESHOLD"));
+    uint48 internal immutable minCheckpointDelay = uint48(vm.envUint("MIN_CHECKPOINT_DELAY"));
+    uint8 internal immutable permissionlessInclusionMultiplier =
+        uint8(vm.envUint("PERMISSIONLESS_INCLUSION_MULTIPLIER"));
+    uint8 internal immutable compositeKeyVersion = uint8(vm.envUint("COMPOSITE_KEY_VERSION"));
+
+    // Finality gadget configuration
+    // ---------------------------------------------------------------
+    uint256 internal immutable optimisticFallbackDelay = vm.envUint("OPTIMISTIC_FALLBACK_DELAY");
+    uint8 internal immutable finalisingProofCount = uint8(vm.envUint("FINALISING_PROOF_COUNT"));
+
+    struct SharedContracts {
+        address sharedResolver;
+        address signalService;
+        address bridge;
+        address erc20Vault;
+        address erc721Vault;
+        address erc1155Vault;
+    }
+
+    struct RollupContracts {
+        address proofVerifier;
+        address inbox;
+    }
+
+    struct VerifierContracts {
+        address risc0RethVerifier;
+        address sp1RethVerifier;
+    }
+
+    modifier broadcast() {
+        require(privateKey != 0, "invalid private key");
+        vm.startBroadcast(privateKey);
+        _;
+        vm.stopBroadcast();
+    }
+
+    function run() external broadcast {
+        require(l2ChainId != block.chainid || l2ChainId != 0, "config: L2_CHAIN_ID");
+        require(l2GenesisHash != bytes32(0), "config: L2_GENESIS_HASH");
+        require(contractOwner != address(0), "config: CONTRACT_OWNER");
+
+        console2.log("** Contract owner: ", contractOwner);
+        console2.log("** Protocol mode: ", useTaiko ? "Taiko" : "Surge");
+
+        // Empty implementation for temporary use
+        address emptyImpl = address(new EmptyImpl());
+
+        // Deploy internal verifiers first (needed for Taiko's AnyTwoVerifier constructor)
+        // ---------------------------------------------------------------
+        VerifierContracts memory verifierContracts = deployInternalVerifiers();
+
+        // Deploy rollup contracts (inbox proxy and proof verifier)
+        // For Taiko: AnyTwoVerifier needs verifier addresses at construction
+        // For Surge: SurgeVerifier needs verifiers set after construction
+        // ---------------------------------------------------------------
+        RollupContracts memory rollupContracts = deployRollupContracts(emptyImpl, verifierContracts);
+
+        // Deploy shared contracts
+        // ---------------------------------------------------------------
+        SharedContracts memory sharedContracts =
+            deploySharedContracts(contractOwner, rollupContracts);
+
+        // Register L2 addresses in the resolver
+        setupSharedResolver(sharedContracts, contractOwner);
+
+        // Setup proof verifier with internal verifiers (Surge only)
+        // For Taiko, verifiers are already set via constructor
+        // ---------------------------------------------------------------
+        if (!useTaiko) {
+            setupProofVerifier(rollupContracts, verifierContracts, contractOwner);
+        }
+
+        // Deploy inbox implementation based on protocol mode
+        // ---------------------------------------------------------------
+        setupInbox(rollupContracts, sharedContracts, contractOwner);
+
+        // Verify deployment
+        // ---------------------------------------------------------------
+        verifyDeployment(sharedContracts, rollupContracts, verifierContracts, contractOwner);
+
+        console2.log("=====================================");
+        console2.log(useTaiko ? "Taiko L1 Deployment Complete" : "Surge L1 Deployment Complete");
+        console2.log("=====================================");
+    }
+
+    function deploySharedContracts(
+        address _owner,
+        RollupContracts memory _rollupContracts
+    )
+        internal
+        returns (SharedContracts memory sharedContracts)
+    {
+        // Deploy shared resolver
+        // ---------------------------------------------------------------
+        sharedContracts.sharedResolver = deployProxy({
+            name: "shared_resolver",
+            impl: address(new DefaultResolver()),
+            // Owner is initially the deployer contract because we need to register the contracts
+            data: abi.encodeCall(DefaultResolver.init, (address(0)))
+        });
+
+        // Deploy signal service
+        // ---------------------------------------------------------------
+        sharedContracts.signalService = deployProxy({
+            name: "signal_service",
+            impl: address(new SignalService(_rollupContracts.inbox, getL2SignalServiceAddress())),
+            data: abi.encodeCall(SignalService.init, (_owner)),
+            registerTo: sharedContracts.sharedResolver
+        });
+
+        // Deploy bridge
+        // ---------------------------------------------------------------
+        sharedContracts.bridge = deployProxy({
+            name: "bridge",
+            impl: address(
+                new Bridge(address(sharedContracts.sharedResolver), sharedContracts.signalService)
+            ),
+            data: abi.encodeCall(Bridge.init, (_owner)),
+            registerTo: sharedContracts.sharedResolver
+        });
+
+        // Deploy Vaults
+        // ---------------------------------------------------------------
+        sharedContracts.erc20Vault = deployProxy({
+            name: "erc20_vault",
+            impl: address(new ERC20Vault(address(sharedContracts.sharedResolver))),
+            data: abi.encodeCall(ERC20Vault.init, (_owner)),
+            registerTo: sharedContracts.sharedResolver
+        });
+
+        sharedContracts.erc721Vault = deployProxy({
+            name: "erc721_vault",
+            impl: address(new ERC721Vault(address(sharedContracts.sharedResolver))),
+            data: abi.encodeCall(ERC721Vault.init, (_owner)),
+            registerTo: sharedContracts.sharedResolver
+        });
+
+        sharedContracts.erc1155Vault = deployProxy({
+            name: "erc1155_vault",
+            impl: address(new ERC1155Vault(address(sharedContracts.sharedResolver))),
+            data: abi.encodeCall(ERC1155Vault.init, (_owner)),
+            registerTo: sharedContracts.sharedResolver
+        });
+
+        // Deploy Bridged token implementations (clone pattern)
+        // ---------------------------------------------------------------
+        register(
+            sharedContracts.sharedResolver,
+            "bridged_erc20",
+            address(new BridgedERC20(sharedContracts.erc20Vault))
+        );
+        register(
+            sharedContracts.sharedResolver,
+            "bridged_erc721",
+            address(new BridgedERC721(address(sharedContracts.erc721Vault)))
+        );
+        register(
+            sharedContracts.sharedResolver,
+            "bridged_erc1155",
+            address(new BridgedERC1155(address(sharedContracts.erc1155Vault)))
+        );
+    }
+
+    function deployRollupContracts(
+        address _emptyImpl,
+        VerifierContracts memory _verifierContracts
+    )
+        internal
+        returns (RollupContracts memory rollupContracts)
+    {
+        // Deploy inbox proxy
+        // ---------------------------------------------------------------
+        string memory inboxName = useTaiko ? "taiko_inbox" : "surge_inbox";
+        rollupContracts.inbox = deployProxy({ name: inboxName, impl: _emptyImpl, data: "" });
+
+        // Deploy proof verifier
+        // ---------------------------------------------------------------
+        if (useTaiko) {
+            // Taiko: Deploy AnyTwoVerifier (verifiers are immutable, set at construction)
+            // SGX not needed, set to address(0)
+            if (useDummyVerifier) {
+                rollupContracts.proofVerifier = address(
+                    new AnyTwoVerifierDummy(
+                        _verifierContracts.risc0RethVerifier, _verifierContracts.sp1RethVerifier
+                    )
+                );
+                console2.log("** Deployed DUMMY AnyTwoVerifier:", rollupContracts.proofVerifier);
+            } else {
+                rollupContracts.proofVerifier = address(
+                    new AnyTwoVerifier(
+                        address(0), // SGX not needed
+                        _verifierContracts.risc0RethVerifier,
+                        _verifierContracts.sp1RethVerifier
+                    )
+                );
+                console2.log("** Deployed AnyTwoVerifier:", rollupContracts.proofVerifier);
+            }
+        } else {
+            // Surge: Deploy SurgeVerifier (verifiers set after construction via setVerifier)
+            // The deployer is the initial owner so that we can set the internal verifiers later on.
+            if (useDummyVerifier) {
+                rollupContracts.proofVerifier =
+                    address(new SurgeVerifierDummy(rollupContracts.inbox, msg.sender));
+                console2.log("** Deployed DUMMY SurgeVerifier:", rollupContracts.proofVerifier);
+            } else {
+                rollupContracts.proofVerifier =
+                    address(new SurgeVerifier(rollupContracts.inbox, msg.sender));
+                console2.log("** Deployed SurgeVerifier:", rollupContracts.proofVerifier);
+            }
+        }
+        writeJson("proof_verifier", rollupContracts.proofVerifier);
+    }
+
+    /// @dev The deployer is the initial owner of the internal verifiers
+    /// Ownership is transferred to the contract owner and must be accepted
+    function deployInternalVerifiers()
+        private
+        returns (VerifierContracts memory verifierContracts)
+    {
+        if (deployRisc0RethVerifier) {
+            RiscZeroGroth16Verifier verifier = new RiscZeroGroth16Verifier(
+                ControlID.CONTROL_ROOT, ControlID.BN254_CONTROL_ID
+            );
+            writeJson("risc0_groth16_verifier", address(verifier));
+            console2.log("** Deployed Risc0 groth16 verifier: ", address(verifier));
+
+            Risc0Verifier risc0Verifier =
+                new Risc0Verifier(l2ChainId, address(verifier), msg.sender);
+            verifierContracts.risc0RethVerifier = address(risc0Verifier);
+            writeJson("risc0_verifier", address(risc0Verifier));
+            console2.log("** Deployed Risc0 verifier: ", address(risc0Verifier));
+
+            // Transfer ownership to contract owner (requires acceptance)
+            risc0Verifier.transferOwnership(contractOwner);
+            console2.log("** Risc0 verifier ownership transfer initiated to:", contractOwner);
+        }
+
+        if (deploySp1RethVerifier) {
+            SuccinctVerifier succinctVerifier = new SuccinctVerifier();
+            writeJson("succinct_verifier", address(succinctVerifier));
+            console2.log("** Deployed Succint verifier: ", address(succinctVerifier));
+
+            SP1Verifier sp1Verifier =
+                new SP1Verifier(l2ChainId, address(succinctVerifier), msg.sender);
+            verifierContracts.sp1RethVerifier = address(sp1Verifier);
+            writeJson("sp1_verifier", address(sp1Verifier));
+            console2.log("** Deployed SP1 verifier: ", address(sp1Verifier));
+
+            // Transfer ownership to contract owner (requires acceptance)
+            sp1Verifier.transferOwnership(contractOwner);
+            console2.log("** SP1 verifier ownership transfer initiated to:", contractOwner);
+        }
+    }
+
+    function setupSharedResolver(
+        SharedContracts memory _sharedContracts,
+        address _owner
+    )
+        internal
+    {
+        // Register L2 addresses
+        // ---------------------------------------------------------------
+        register(
+            _sharedContracts.sharedResolver,
+            "signal_service",
+            getL2SignalServiceAddress(),
+            l2ChainId
+        );
+        register(_sharedContracts.sharedResolver, "bridge", getL2BridgeAddress(), l2ChainId);
+        register(
+            _sharedContracts.sharedResolver, "erc20_vault", getL2Erc20VaultAddress(), l2ChainId
+        );
+        register(
+            _sharedContracts.sharedResolver, "erc721_vault", getL2Erc721VaultAddress(), l2ChainId
+        );
+        register(
+            _sharedContracts.sharedResolver, "erc1155_vault", getL2Erc1155VaultAddress(), l2ChainId
+        );
+
+        // Requires ownership acceptance
+        DefaultResolver(_sharedContracts.sharedResolver).transferOwnership(_owner);
+        console2.log("** SharedResolver ownership transfer initiated to:", _owner);
+    }
+
+    function setupProofVerifier(
+        RollupContracts memory _rollupContracts,
+        VerifierContracts memory _verifierContracts,
+        address _owner
+    )
+        internal
+    {
+        SurgeVerifier proofVerifier = SurgeVerifier(_rollupContracts.proofVerifier);
+
+        // Set internal verifiers based on which were deployed
+        if (_verifierContracts.risc0RethVerifier != address(0)) {
+            proofVerifier.setVerifier(
+                LibProofBitmap.ProofBitmap.wrap(LibProofBitmap.RISC0_RETH),
+                _verifierContracts.risc0RethVerifier
+            );
+            console2.log("** Set RISC0 verifier:", _verifierContracts.risc0RethVerifier);
+        }
+
+        if (_verifierContracts.sp1RethVerifier != address(0)) {
+            proofVerifier.setVerifier(
+                LibProofBitmap.ProofBitmap.wrap(LibProofBitmap.SP1_RETH),
+                _verifierContracts.sp1RethVerifier
+            );
+            console2.log("** Set SP1 verifier:", _verifierContracts.sp1RethVerifier);
+        }
+
+        // Requires ownership acceptance
+        proofVerifier.transferOwnership(_owner);
+        console2.log("** Proof verifier ownership transfer initiated to:", _owner);
+    }
+
+    function setupInbox(
+        RollupContracts memory _rollupContracts,
+        SharedContracts memory _sharedContracts,
+        address _owner
+    )
+        internal
+    {
+        // Deploy whitelist
+        address whitelist = deployProxy({
+            name: "preconf_whitelist",
+            impl: address(new PreconfWhitelist()),
+            data: abi.encodeCall(PreconfWhitelist.init, (contractOwner, 0, 2))
+        });
+
+        // Deploy codec based on protocol mode
+        address codec;
+        if (useTaiko) {
+            codec = address(new CodecOptimized());
+            console2.log("** Deployed CodecOptimized:", codec);
+        } else {
+            codec = address(new SurgeCodecSimple());
+            console2.log("** Deployed SurgeCodecSimple:", codec);
+        }
+
+        // Build inbox configuration
+        IInbox.Config memory config = IInbox.Config({
+            codec: codec,
+            bondToken: bondToken,
+            checkpointStore: _sharedContracts.signalService,
+            proofVerifier: _rollupContracts.proofVerifier,
+            proposerChecker: whitelist,
+            provingWindow: provingWindow,
+            extendedProvingWindow: extendedProvingWindow,
+            maxFinalizationCount: maxFinalizationCount,
+            finalizationGracePeriod: finalizationGracePeriod,
+            ringBufferSize: ringBufferSize,
+            basefeeSharingPctg: basefeeSharingPctg,
+            minForcedInclusionCount: minForcedInclusionCount,
+            forcedInclusionDelay: uint16(forcedInclusionDelay),
+            forcedInclusionFeeInGwei: forcedInclusionFeeInGwei,
+            forcedInclusionFeeDoubleThreshold: forcedInclusionFeeDoubleThreshold,
+            minCheckpointDelay: uint16(minCheckpointDelay),
+            permissionlessInclusionMultiplier: permissionlessInclusionMultiplier,
+            compositeKeyVersion: compositeKeyVersion
+        });
+
+        // Deploy inbox implementation based on protocol mode
+        address inboxImpl;
+        if (useTaiko) {
+            // Taiko: InboxOptimized2 (no finality gadget parameters)
+            inboxImpl = address(new InboxOptimized2(config));
+            console2.log("** Deployed InboxOptimized2 implementation: ", inboxImpl);
+        } else {
+            // Surge: SurgeInbox with finality gadget parameters
+            inboxImpl =
+                address(new SurgeInbox(config, optimisticFallbackDelay, finalisingProofCount));
+            console2.log("** Deployed SurgeInbox implementation: ", inboxImpl);
+        }
+
+        // Upgrade inbox proxy to actual implementation
+        UUPSUpgradeable(_rollupContracts.inbox).upgradeTo(inboxImpl);
+
+        // Initialize inbox (same init function for both implementations)
+        if (useTaiko) {
+            InboxOptimized2(payable(_rollupContracts.inbox)).init(msg.sender, l2GenesisHash);
+            console2.log("** InboxOptimized2 initialized");
+        } else {
+            SurgeInbox(payable(_rollupContracts.inbox)).init(msg.sender, l2GenesisHash);
+            console2.log("** SurgeInbox initialized");
+        }
+
+        // Requires ownership acceptance
+        Ownable2StepUpgradeable(_rollupContracts.inbox).transferOwnership(contractOwner);
+        console2.log("** Inbox ownership transfer initiated to:", _owner);
+    }
+
+    function verifyDeployment(
+        SharedContracts memory _sharedContracts,
+        RollupContracts memory _rollupContracts,
+        VerifierContracts memory _verifierContracts,
+        address _expectedOwner
+    )
+        internal
+        view
+    {
+        // Verify L1 registrations
+        // ---------------------------------------------------------------
+        verifyL1Registrations(_sharedContracts.sharedResolver);
+
+        // Verify L2 registrations
+        // ---------------------------------------------------------------
+        verifyL2Registrations(_sharedContracts.sharedResolver);
+
+        // Build list of contracts where owner is already set
+        // ---------------------------------------------------------------
+        address[] memory ownerContracts = new address[](5);
+        ownerContracts[0] = _sharedContracts.signalService;
+        ownerContracts[1] = _sharedContracts.bridge;
+        ownerContracts[2] = _sharedContracts.erc20Vault;
+        ownerContracts[3] = _sharedContracts.erc721Vault;
+        ownerContracts[4] = _sharedContracts.erc1155Vault;
+
+        // Build list of contracts with pending ownership transfer
+        // For Taiko: AnyTwoVerifier doesn't have ownership (verifiers are immutable)
+        // For Surge: SurgeVerifier has ownership for setVerifier functionality
+        // ---------------------------------------------------------------
+        address[] memory pendingOwnerContracts;
+        if (useTaiko) {
+            pendingOwnerContracts = new address[](4);
+            // AnyTwoVerifier has no ownership - excluded
+            pendingOwnerContracts[0] = _rollupContracts.inbox;
+            pendingOwnerContracts[1] = _sharedContracts.sharedResolver;
+            pendingOwnerContracts[2] = _verifierContracts.risc0RethVerifier; // May be address(0)
+            pendingOwnerContracts[3] = _verifierContracts.sp1RethVerifier; // May be address(0)
+        } else {
+            pendingOwnerContracts = new address[](5);
+            pendingOwnerContracts[0] = _rollupContracts.proofVerifier;
+            pendingOwnerContracts[1] = _rollupContracts.inbox;
+            pendingOwnerContracts[2] = _sharedContracts.sharedResolver;
+            pendingOwnerContracts[3] = _verifierContracts.risc0RethVerifier; // May be address(0)
+            pendingOwnerContracts[4] = _verifierContracts.sp1RethVerifier; // May be address(0)
+        }
+
+        // Verify ownership
+        // ---------------------------------------------------------------
+        verifyOwnership(ownerContracts, pendingOwnerContracts, _expectedOwner);
+
+        console2.log("** Deployment verified **");
+    }
+
+    function verifyL1Registrations(address _sharedResolver) internal view {
+        bytes32[] memory sharedNames = new bytes32[](8);
+        sharedNames[0] = bytes32("signal_service");
+        sharedNames[1] = bytes32("bridge");
+        sharedNames[2] = bytes32("erc20_vault");
+        sharedNames[3] = bytes32("erc721_vault");
+        sharedNames[4] = bytes32("erc1155_vault");
+        sharedNames[5] = bytes32("bridged_erc20");
+        sharedNames[6] = bytes32("bridged_erc721");
+        sharedNames[7] = bytes32("bridged_erc1155");
+
+        // Get addresses from shared resolver
+        address[] memory sharedAddresses = new address[](sharedNames.length);
+        for (uint256 i = 0; i < sharedNames.length; i++) {
+            try DefaultResolver(_sharedResolver)
+                .resolve(block.chainid, sharedNames[i], false) returns (
+                address addr
+            ) {
+                sharedAddresses[i] = addr;
+            } catch {
+                revert(
+                    string.concat(
+                        "verifyL1Registrations: missing registration for ",
+                        Strings.toHexString(uint256(sharedNames[i]))
+                    )
+                );
+            }
+        }
+    }
+
+    function verifyL2Registrations(address _sharedResolver) internal view {
+        require(
+            DefaultResolver(_sharedResolver).resolve(l2ChainId, bytes32("signal_service"), false)
+                == getL2SignalServiceAddress(),
+            "verifyL2Registrations: signal_service mismatch"
+        );
+        require(
+            DefaultResolver(_sharedResolver).resolve(l2ChainId, bytes32("bridge"), false)
+                == getL2BridgeAddress(),
+            "verifyL2Registrations: bridge mismatch"
+        );
+        require(
+            DefaultResolver(_sharedResolver).resolve(l2ChainId, bytes32("erc20_vault"), false)
+                == getL2Erc20VaultAddress(),
+            "verifyL2Registrations: erc20_vault mismatch"
+        );
+        require(
+            DefaultResolver(_sharedResolver).resolve(l2ChainId, bytes32("erc721_vault"), false)
+                == getL2Erc721VaultAddress(),
+            "verifyL2Registrations: erc721_vault mismatch"
+        );
+        require(
+            DefaultResolver(_sharedResolver).resolve(l2ChainId, bytes32("erc1155_vault"), false)
+                == getL2Erc1155VaultAddress(),
+            "verifyL2Registrations: erc1155_vault mismatch"
+        );
+
+        console2.log("** L2 registrations verified **");
+    }
+
+    function verifyOwnership(
+        address[] memory _ownerContracts,
+        address[] memory _pendingOwnerContracts,
+        address _expectedOwner
+    )
+        internal
+        view
+    {
+        // Verify current ownership for contracts without pending ownership transfer
+        for (uint256 i; i < _ownerContracts.length; ++i) {
+            if (_ownerContracts[i] == address(0)) {
+                continue;
+            }
+
+            address currentOwner = Ownable2StepUpgradeable(_ownerContracts[i]).owner();
+            require(
+                currentOwner == _expectedOwner,
+                string.concat(
+                    "verifyOwnership: ", Strings.toHexString(uint160(_ownerContracts[i]), 20)
+                )
+            );
+        }
+
+        // Verify pending ownership for contracts with pending ownership transfer
+        for (uint256 i; i < _pendingOwnerContracts.length; ++i) {
+            if (_pendingOwnerContracts[i] == address(0)) {
+                continue;
+            }
+
+            address pendingOwner = Ownable2StepUpgradeable(_pendingOwnerContracts[i]).pendingOwner();
+            require(
+                pendingOwner == _expectedOwner,
+                string.concat(
+                    "verifyPendingOwnership: ",
+                    Strings.toHexString(uint160(_pendingOwnerContracts[i]), 20)
+                )
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // L2 Address Getters
+    // ---------------------------------------------------------------
+
+    function getL2BridgeAddress() internal view returns (address) {
+        return getConstantAddress(vm.toString(l2ChainId), "1");
+    }
+
+    function getL2Erc20VaultAddress() internal view returns (address) {
+        return getConstantAddress(vm.toString(l2ChainId), "2");
+    }
+
+    function getL2Erc721VaultAddress() internal view returns (address) {
+        return getConstantAddress(vm.toString(l2ChainId), "3");
+    }
+
+    function getL2Erc1155VaultAddress() internal view returns (address) {
+        return getConstantAddress(vm.toString(l2ChainId), "4");
+    }
+
+    function getL2SignalServiceAddress() internal view returns (address) {
+        return getConstantAddress(vm.toString(l2ChainId), "5");
+    }
+
+    // ---------------------------------------------------------------
+    // Utilities
+    // ---------------------------------------------------------------
+
+    function getConstantAddress(
+        string memory prefix,
+        string memory suffix
+    )
+        internal
+        pure
+        returns (address)
+    {
+        bytes memory prefixBytes = bytes(prefix);
+        bytes memory suffixBytes = bytes(suffix);
+
+        require(
+            prefixBytes.length + suffixBytes.length <= ADDRESS_LENGTH, "Prefix + suffix too long"
+        );
+
+        // Create the middle padding of zeros
+        uint256 paddingLength = ADDRESS_LENGTH - prefixBytes.length - suffixBytes.length;
+        bytes memory padding = new bytes(paddingLength);
+        for (uint256 i = 0; i < paddingLength; i++) {
+            padding[i] = "0";
+        }
+
+        // Concatenate the parts
+        string memory hexString = string(abi.encodePacked("0x", prefix, string(padding), suffix));
+
+        return vm.parseAddress(hexString);
+    }
+}
