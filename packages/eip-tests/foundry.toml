@@ -5,10 +5,10 @@ libs = ["lib"]
 test = "test"
 script = "script"
 cache_path = "cache"
-solc = "0.8.27"
+solc = "0.8.31"
 optimizer = false
 optimizer_runs = 0
-evm_version = "prague"
+evm_version = "osaka"
 
 [rpc_endpoints]
 nethermind = "http://localhost:8545"
