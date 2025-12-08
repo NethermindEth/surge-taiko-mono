@@ -5,7 +5,6 @@ import { IBondManager } from "./IBondManager.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import { EfficientHashLib } from "solady/src/utils/EfficientHashLib.sol";
 import { EssentialContract } from "src/shared/common/EssentialContract.sol";
 import { LibAddress } from "src/shared/libs/LibAddress.sol";
 import { LibBonds } from "src/shared/libs/LibBonds.sol";
@@ -16,8 +15,6 @@ import "./Anchor_Layout.sol"; // DO NOT DELETE
 /// @title Anchor
 /// @notice Implements the Shasta fork's anchoring mechanism with advanced bond management,
 /// prover designation and checkpoint management.
-/// @dev IMPORTANT: This contract will be deployed behind the `AnchorRouter` contract, and that's why
-/// it's not upgradable itself.
 /// @dev This contract implements:
 ///      - Bond-based economic security for proposals and proofs
 ///      - Prover designation with signature authentication
@@ -42,7 +39,10 @@ contract Anchor is EssentialContract {
     }
 
     /// @notice Proposal-level data that applies to the entire batch of blocks.
+    /// @dev For whitelist preconfirmations, `submissionWindowEnd` will not be used
+    /// and can be set to 0.
     struct ProposalParams {
+        uint48 submissionWindowEnd; // The end of the preconfirmation submission window
         uint48 proposalId; // Unique identifier of the proposal
         address proposer; // Address of the entity that proposed this batch
         bytes proverAuth; // Encoded ProverAuth for prover designation
@@ -51,10 +51,13 @@ contract Anchor is EssentialContract {
     }
 
     /// @notice Block-level data specific to a single block within a proposal.
+    /// @dev For whitelist preconfirmations, `rawTxListHash` will not be used
+    /// and can be set to 0-bytes
     struct BlockParams {
         uint48 anchorBlockNumber; // L1 block number to anchor (0 to skip)
         bytes32 anchorBlockHash; // L1 block hash at anchorBlockNumber
         bytes32 anchorStateRoot; // L1 state root at anchorBlockNumber
+        bytes32 rawTxListHash; // Keccak256 hash of the block's unprocessed transaction list
     }
 
     /// @notice Stored proposal-level state for the ongoing batch.
@@ -70,6 +73,15 @@ contract Anchor is EssentialContract {
     struct BlockState {
         uint48 anchorBlockNumber;
         bytes32 ancestorsHash;
+    }
+
+    /// @notice Metadata that will be required for slashing violations of permissionless preconfs.
+    struct PreconfMetadata {
+        uint48 anchorBlockNumber;
+        uint48 submissionWindowEnd;
+        uint48 parentSubmissionWindowEnd;
+        bytes32 rawTxListHash;
+        bytes32 parentRawTxListHash;
     }
 
     // ---------------------------------------------------------------
@@ -95,6 +107,15 @@ contract Anchor is EssentialContract {
 
     /// @dev Length of a standard ECDSA signature (r: 32 bytes, s: 32 bytes, v: 1 byte).
     uint256 private constant ECDSA_SIGNATURE_LENGTH = 65;
+
+    /// @dev EIP-712 domain/type hashes for prover authorization signatures.
+    bytes32 private constant PROVER_AUTH_DOMAIN_TYPEHASH = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
+    bytes32 private constant PROVER_AUTH_TYPEHASH =
+        keccak256("ProverAuth(uint48 proposalId,address proposer,uint256 provingFee)");
+    bytes32 private constant PROVER_AUTH_DOMAIN_NAME_HASH = keccak256("TaikoAnchorProverAuth");
+    bytes32 private constant PROVER_AUTH_DOMAIN_VERSION_HASH = keccak256("1");
 
     // ---------------------------------------------------------------
     // Immutables
@@ -134,8 +155,11 @@ contract Anchor is EssentialContract {
     /// @notice Latest block-level state, updated on every processed block.
     BlockState internal _blockState;
 
+    /// @notice Mapping from block number to preconfirmation metadata
+    mapping(uint256 blockNumber => PreconfMetadata metadata) internal _preconfMetadata;
+
     /// @notice Storage gap for upgrade safety.
-    uint256[41] private __gap;
+    uint256[40] private __gap;
 
     // ---------------------------------------------------------------
     // Events
@@ -145,6 +169,8 @@ contract Anchor is EssentialContract {
         bytes32 bondInstructionsHash,
         address designatedProver,
         bool isLowBondProposal,
+        bool isNewProposal,
+        uint48 prevAnchorBlockNumber,
         uint48 anchorBlockNumber,
         bytes32 ancestorsHash
     );
@@ -224,11 +250,15 @@ contract Anchor is EssentialContract {
             revert ProposalIdMismatch();
         }
 
+        bool isNewProposal = _proposalParams.proposalId > lastProposalId;
         // We do not need to account for proposalId = 0, since that's genesis
-        if (_proposalParams.proposalId > lastProposalId) {
+        if (isNewProposal) {
             _validateProposal(_proposalParams);
         }
+        uint48 prevAnchorBlockNumber = _blockState.anchorBlockNumber;
         _validateBlock(_blockParams);
+
+        _storePreconfMetadata(_proposalParams, _blockParams);
 
         uint256 parentNumber = block.number - 1;
         blockHashes[parentNumber] = blockhash(parentNumber);
@@ -237,6 +267,8 @@ contract Anchor is EssentialContract {
             _proposalState.bondInstructionsHash,
             _proposalState.designatedProver,
             _proposalState.isLowBondProposal,
+            isNewProposal,
+            prevAnchorBlockNumber,
             _blockState.anchorBlockNumber,
             _blockState.ancestorsHash
         );
@@ -313,6 +345,16 @@ contract Anchor is EssentialContract {
         return _blockState;
     }
 
+    function getPreconfMetadata(uint256 _blockNumber)
+        external
+        view
+        returns (PreconfMetadata memory)
+    {
+        PreconfMetadata memory preconfMetadata = _preconfMetadata[_blockNumber];
+        require(preconfMetadata.anchorBlockNumber != 0, InvalidBlockNumber());
+        return preconfMetadata;
+    }
+
     /// @dev Validates prover authentication and extracts signer.
     /// @param _proposalId The proposal ID to validate against.
     /// @param _proposer The proposer address to validate against.
@@ -325,7 +367,7 @@ contract Anchor is EssentialContract {
         bytes calldata _proverAuth
     )
         public
-        pure
+        view
         returns (address signer_, uint256 provingFee_)
     {
         if (_proverAuth.length < MIN_PROVER_AUTH_LENGTH) {
@@ -407,6 +449,26 @@ contract Anchor is EssentialContract {
             );
             _blockState.anchorBlockNumber = _blockParams.anchorBlockNumber;
         }
+    }
+
+    /// @dev Stores preconfirmation metadata for the given proposal and block.
+    /// This information is used for slashing on permissionless preconfs.
+    /// @param _proposalParams The proposal-level parameters.
+    /// @param _blockParams The block-level parameters.
+    function _storePreconfMetadata(
+        ProposalParams calldata _proposalParams,
+        BlockParams calldata _blockParams
+    )
+        private
+    {
+        PreconfMetadata storage parentPreconfMetadata = _preconfMetadata[block.number - 1];
+        _preconfMetadata[block.number] = PreconfMetadata({
+            anchorBlockNumber: _blockParams.anchorBlockNumber,
+            submissionWindowEnd: _proposalParams.submissionWindowEnd,
+            parentSubmissionWindowEnd: parentPreconfMetadata.submissionWindowEnd,
+            rawTxListHash: _blockParams.rawTxListHash,
+            parentRawTxListHash: parentPreconfMetadata.rawTxListHash
+        });
     }
 
     /// @dev Processes bond instructions with cumulative hash verification.
@@ -508,11 +570,30 @@ contract Anchor is EssentialContract {
     }
 
     /// @dev Hashes a `ProverAuth` payload into the message that must be signed by the prover.
-    function _hashProverAuthMessage(ProverAuth memory _auth) private pure returns (bytes32) {
-        return EfficientHashLib.hash(
-            bytes32(uint256(_auth.proposalId)),
-            bytes32(uint256(uint160(_auth.proposer))),
-            bytes32(uint256(_auth.provingFee))
+    /// @dev Uses EIP-712 structured data hashing for better security and wallet compatibility.
+    function _hashProverAuthMessage(ProverAuth memory _auth) private view returns (bytes32) {
+        bytes32 structHash = _hashProverAuthStruct(_auth);
+        return ECDSA.toTypedDataHash(_proverAuthDomainSeparator(), structHash);
+    }
+
+    /// @dev Returns the EIP-712 struct hash for a `ProverAuth` payload.
+    function _hashProverAuthStruct(ProverAuth memory _auth) private pure returns (bytes32) {
+        return keccak256(
+            abi.encode(PROVER_AUTH_TYPEHASH, _auth.proposalId, _auth.proposer, _auth.provingFee)
+        );
+    }
+
+    /// @dev Builds the EIP-712 domain separator for prover authorization signatures.
+    /// @dev Uses standard EIP-712 fields: name, version, chainId, and verifyingContract.
+    function _proverAuthDomainSeparator() private view returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                PROVER_AUTH_DOMAIN_TYPEHASH,
+                PROVER_AUTH_DOMAIN_NAME_HASH,
+                PROVER_AUTH_DOMAIN_VERSION_HASH,
+                block.chainid,
+                address(this)
+            )
         );
     }
 
@@ -525,6 +606,7 @@ contract Anchor is EssentialContract {
     error InvalidAddress();
     error InvalidAnchorBlockNumber();
     error InvalidBlockIndex();
+    error InvalidBlockNumber();
     error InvalidL1ChainId();
     error InvalidL2ChainId();
     error InvalidSender();

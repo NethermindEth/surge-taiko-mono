@@ -55,6 +55,7 @@ contract DeployProtocolOnL1 is DeployCapability {
         address proposerAddress;
         bool useDummyVerifiers;
         bool pauseBridge;
+        address preconfWhitelist;
     }
 
     modifier broadcast() {
@@ -105,6 +106,7 @@ contract DeployProtocolOnL1 is DeployCapability {
         config.proposerAddress = vm.envAddress("PROPOSER_ADDRESS");
         config.useDummyVerifiers = vm.envBool("DUMMY_VERIFIERS");
         config.pauseBridge = vm.envBool("PAUSE_BRIDGE");
+        config.preconfWhitelist = vm.envAddress("PRECONF_WHITELIST");
 
         require(config.contractOwner != address(0), "CONTRACT_OWNER not set");
         require(config.l2GenesisHash != bytes32(0), "L2_GENESIS_HASH not set");
@@ -166,11 +168,16 @@ contract DeployProtocolOnL1 is DeployCapability {
         returns (address shastaInbox)
     {
         // Deploy whitelist
-        address whitelist = deployProxy({
-            name: "preconf_whitelist",
-            impl: address(new PreconfWhitelist()),
-            data: abi.encodeCall(PreconfWhitelist.init, (config.contractOwner, 0, 2))
-        });
+        address whitelist = config.preconfWhitelist;
+        if (whitelist == address(0)) {
+            whitelist = deployProxy({
+                name: "preconf_whitelist",
+                impl: address(new PreconfWhitelist()),
+                data: abi.encodeCall(PreconfWhitelist.init, (config.contractOwner))
+            });
+        } else {
+            PreconfWhitelist(whitelist).upgradeTo(address(new PreconfWhitelist()));
+        }
 
         PreconfWhitelist(whitelist).addOperator(config.proposerAddress, config.proposerAddress);
 
@@ -178,18 +185,10 @@ contract DeployProtocolOnL1 is DeployCapability {
         address bondToken =
             IResolver(sharedResolver).resolve(uint64(block.chainid), "bond_token", false);
 
-        address signalService;
-        bool signalServiceExists = true;
-        try IResolver(sharedResolver)
-            .resolve(uint64(block.chainid), "signal_service", false) returns (
-            address existing
-        ) {
-            signalService = existing;
-        } catch {
-            signalServiceExists = false;
-        }
+        address signalService =
+            IResolver(sharedResolver).resolve(uint64(block.chainid), "signal_service", true);
 
-        if (!signalServiceExists) {
+        if (signalService == address(0)) {
             SignalService signalServiceImpl = new SignalService(msg.sender, config.remoteSigSvc);
             signalService = deployProxy({
                 name: "signal_service",
@@ -216,16 +215,13 @@ contract DeployProtocolOnL1 is DeployCapability {
         }
         console2.log("ShastaInbox deployed:", shastaInbox);
 
-        if (!signalServiceExists) {
-            SignalService upgradedSignalServiceImpl =
-                new SignalService(shastaInbox, config.remoteSigSvc);
-            SignalService(signalService).upgradeTo(address(upgradedSignalServiceImpl));
-            console2.log("SignalService upgraded with Shasta inbox authorized syncer");
+        SignalService(signalService)
+            .upgradeTo(address(new SignalService(shastaInbox, config.remoteSigSvc)));
+        console2.log("SignalService upgraded with Shasta inbox authorized syncer");
 
-            if (config.contractOwner != msg.sender) {
-                Ownable2StepUpgradeable(signalService).transferOwnership(config.contractOwner);
-                console2.log("SignalService ownership transfer initiated to:", config.contractOwner);
-            }
+        if (config.contractOwner != msg.sender) {
+            Ownable2StepUpgradeable(signalService).transferOwnership(config.contractOwner);
+            console2.log("SignalService ownership transfer initiated to:", config.contractOwner);
         }
     }
 

@@ -11,6 +11,7 @@
 ## Build, Test, and Development Commands
 - `cargo build --workspace` (add `--release` for production binaries).
 - `just fmt` installs toolchain `nightly-2025-09-27`, runs `cargo +nightly fmt`, then `cargo sort --workspace --grouped`. Use `just fmt-check` for CI parity.
+- Always use `just fmt` (never call `cargo fmt` directly) so the nightly toolchain and `cargo sort` stay in sync with CI.
 - `just clippy` maps to `cargo clippy --workspace --all-features --no-deps --exclude bindings -- -D warnings`; reserve `just clippy-fix` for mechanical cleanups.
 - `just gen_bindings` executes `script/gen_bindings.sh` to refresh contract bindings whenever ABIs change.
 - After every code change run `just fmt && just clippy-fix` locally so the workspace stays formatted and lint-clean.
@@ -21,8 +22,8 @@
 - Respect the shared `rustfmt.toml`; never bulk-format `crates/bindings/src`. Document intentional deviations with a brief comment.
 
 ## Testing Guidelines
-- Run `just test` before submitting changes; it launches the Dockerized L1/L2 stack and executes `cargo nextest` across the workspace.
-- For focused suites, use `cargo nextest run -p <crate> --all-features` after exporting required RPC endpoints.
+- Always run tests via `just test`; it launches the Dockerized L1/L2 stack and executes `cargo nextest`.
+- To scope to a single Rust crate, set `TEST_CRATE=<crate-name>` when invoking `just test`; leaving it unset runs the full workspace (default).
 - Name tests after observable behavior (e.g., `handles_invalid_proposal`) and capture container logs for any failing integration case.
 
 ## Event Scanner Integration
