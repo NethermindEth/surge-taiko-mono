@@ -811,7 +811,8 @@ abstract contract AbstractProposeTest is InboxTestHelper {
             blobReference: _createBlobRef(0, 1, 0),
             transitionRecords: records,
             checkpoint: checkpoint,
-            numForcedInclusions: 0
+            numForcedInclusions: 0,
+            extra: bytes("")
         });
     }
 

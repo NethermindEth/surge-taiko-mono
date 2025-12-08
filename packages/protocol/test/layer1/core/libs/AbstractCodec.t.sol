@@ -413,7 +413,7 @@ abstract contract AbstractCodecTest is Test {
         });
 
         IInbox.ProveInput memory proveInput = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            proposals: proposals, transitions: transitions, metadata: metadata, extra: bytes("")
         });
 
         bytes memory encoded = codec.encodeProveInput(proveInput);

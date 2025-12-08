@@ -159,6 +159,9 @@ interface IInbox {
         /// @dev This can be set to 0 if no forced inclusions are due, and there's none in the queue
         /// that he wants to include.
         uint8 numForcedInclusions;
+        /// @dev Extra data that may be needed by custom overrides
+        /// TODO: Add packed encoding in the codec
+        bytes extra;
     }
 
     /// @notice Input data for the prove function
@@ -170,6 +173,9 @@ interface IInbox {
         /// @notice Array of metadata for prover information.
         /// @dev Must have same length as transitions array.
         TransitionMetadata[] metadata;
+        /// @dev Extra data that may be needed by custom overrides
+        /// TODO: Add packed encoding in the codec
+        bytes extra;
     }
 
     /// @notice Payload data emitted in the Proposed event

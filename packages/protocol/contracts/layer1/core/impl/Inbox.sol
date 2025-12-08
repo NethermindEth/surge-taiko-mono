@@ -22,15 +22,13 @@ import "./Inbox_Layout.sol"; // DO NOT DELETE
 /// @title Inbox
 /// @notice Core contract for managing L2 proposals, proof verification, and forced inclusion in
 /// Taiko's based rollup architecture.
-/// @dev The Pacaya inbox contract is not being upgraded to the Shasta implementation;
-///      instead, Shasta uses a separate inbox address.
 /// @dev This contract implements the fundamental inbox logic including:
 ///      - Proposal submission with forced inclusion support
 ///      - Proof verification with transition record management
 ///      - Ring buffer storage for efficient state management
 ///      - Bond instruction calculation(but actual funds are managed on L2)
 ///      - Finalization of proven proposals with checkpoint rate limiting
-/// @custom:security-contact security@taiko.xyz
+/// @custom:security-contact security@nethermind.io
 contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     using LibAddress for address;
     using LibMath for uint48;
@@ -75,8 +73,10 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     /// @notice The token used for bonds.
     IERC20 internal immutable _bondToken;
 
+    /// Surge: This has been changed to `address` and it is up to the feature handler to manage
+    /// the interface
     /// @notice The proof verifier contract.
-    IProofVerifier internal immutable _proofVerifier;
+    address internal immutable _proofVerifier;
 
     /// @notice The proposer checker contract.
     IProposerChecker internal immutable _proposerChecker;
@@ -155,7 +155,8 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     /// @dev 2 slots used
     LibForcedInclusion.Storage private _forcedInclusionStorage;
 
-    uint256[37] private __gap;
+    /// Surge: We do not need the pacaya slots gap. Changed from 37 -> 45
+    uint256[45] private __gap;
 
     // ---------------------------------------------------------------
     // Constructor
@@ -169,7 +170,7 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
 
         _codec = _config.codec;
         _bondToken = IERC20(_config.bondToken);
-        _proofVerifier = IProofVerifier(_config.proofVerifier);
+        _proofVerifier = _config.proofVerifier;
         _proposerChecker = IProposerChecker(_config.proposerChecker);
         _checkpointStore = ICheckpointStore(_config.checkpointStore);
         _provingWindow = _config.provingWindow;
@@ -307,17 +308,8 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
         // Build transition records with validation and bond calculations
         _buildAndSaveTransitionRecords(input);
 
-        uint256 proposalAge;
-        if (input.proposals.length == 1) {
-            unchecked {
-                proposalAge = block.timestamp - input.proposals[0].timestamp;
-            }
-        }
-
-        bytes32 aggregatedProvingHash =
-            _hashTransitionsWithMetadata(input.transitions, input.metadata);
-
-        _proofVerifier.verifyProof(proposalAge, aggregatedProvingHash, _proof);
+        // Surge: Extract proof verification to a handler
+        _handleProofVerification(input, _proof);
     }
 
     /// @inheritdoc IForcedInclusionStore
@@ -449,6 +441,138 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
         _setProposalHash(0, _hashProposal(proposal));
 
         _emitProposedEvent(proposal, derivation, coreState, new LibBonds.BondInstruction[](0));
+    }
+
+    /// Surge: This is turned into an internal virtual function so it can be overridden
+    /// to implement custom extensions.
+    /// @dev Finalizes proven proposals and updates checkpoints with rate limiting.
+    /// Checkpoints are only saved if minCheckpointDelay seconds have passed since the last save,
+    /// reducing SSTORE operations but making L2 checkpoints less frequently available on L1.
+    /// Set minCheckpointDelay to 0 to disable rate limiting.
+    /// @param _input Contains transition records and the end block header.
+    /// @return coreState_ Updated core state with new finalization counters.
+    /// @return bondInstructions_ Array of bond instructions from finalized proposals.
+    function _finalize(ProposeInput memory _input)
+        internal
+        virtual
+        returns (CoreState memory coreState_, LibBonds.BondInstruction[] memory bondInstructions_)
+    {
+        unchecked {
+            CoreState memory coreState = _input.coreState;
+            uint48 proposalId = coreState.lastFinalizedProposalId + 1;
+            uint256 lastFinalizedRecordIdx;
+            uint256 finalizedCount;
+            uint256 transitionCount = _input.transitionRecords.length;
+            uint256 currentTimestamp = block.timestamp;
+            uint256 totalBondInstructionCount;
+
+            for (uint256 i; i < _maxFinalizationCount; ++i) {
+                // Check if there are more proposals to finalize
+                if (proposalId >= coreState.nextProposalId) break;
+
+                // Try to finalize the current proposal
+                (bytes26 recordHash, uint48 finalizationDeadline) = _getTransitionRecordHashAndDeadline(
+                    proposalId, coreState.lastFinalizedTransitionHash
+                );
+
+                if (i >= transitionCount) {
+                    if (recordHash == 0) break;
+
+                    if (currentTimestamp >= finalizationDeadline) {
+                        revert TransitionRecordNotProvided();
+                    }
+
+                    break;
+                }
+
+                if (recordHash == 0) break;
+
+                TransitionRecord memory transitionRecord = _input.transitionRecords[i];
+
+                require(
+                    _hashTransitionRecord(transitionRecord) == recordHash,
+                    TransitionRecordHashMismatchWithStorage()
+                );
+
+                coreState.lastFinalizedProposalId = proposalId;
+                coreState.lastFinalizedTransitionHash = transitionRecord.transitionHash;
+
+                uint256 bondInstructionLen = transitionRecord.bondInstructions.length;
+                for (uint256 j; j < bondInstructionLen; ++j) {
+                    coreState.bondInstructionsHash = LibBonds.aggregateBondInstruction(
+                        coreState.bondInstructionsHash, transitionRecord.bondInstructions[j]
+                    );
+                }
+
+                totalBondInstructionCount += bondInstructionLen;
+
+                require(transitionRecord.span > 0, InvalidSpan());
+
+                uint48 nextProposalId = proposalId + transitionRecord.span;
+                require(nextProposalId <= coreState.nextProposalId, SpanOutOfBounds());
+
+                proposalId = nextProposalId;
+
+                // Update state for successful finalization
+                lastFinalizedRecordIdx = i;
+                ++finalizedCount;
+            }
+
+            // Update checkpoint if any proposals were finalized and minimum delay has passed
+            if (finalizedCount > 0) {
+                _syncCheckpointIfNeeded(
+                    _input.checkpoint,
+                    _input.transitionRecords[lastFinalizedRecordIdx].checkpointHash,
+                    coreState
+                );
+            }
+
+            if (totalBondInstructionCount > 0) {
+                bondInstructions_ = new LibBonds.BondInstruction[](totalBondInstructionCount);
+                uint256 bondInstructionIndex;
+
+                for (uint256 i; i < finalizedCount; ++i) {
+                    LibBonds.BondInstruction[] memory instructions =
+                    _input.transitionRecords[i].bondInstructions;
+                    uint256 instructionsLen = instructions.length;
+
+                    for (uint256 j; j < instructionsLen; ++j) {
+                        bondInstructions_[bondInstructionIndex++] = instructions[j];
+                    }
+                }
+            }
+
+            return (coreState, bondInstructions_);
+        }
+    }
+
+    /// @dev Syncs checkpoint to storage when voluntary or forced sync conditions are met.
+    ///      Validates the checkpoint hash, persists it, and refreshes the timestamp in core state.
+    /// @param _checkpoint The checkpoint data to sync.
+    /// @param _expectedCheckpointHash The expected hash to validate against.
+    /// @param _coreState Core state to update with new checkpoint timestamp.
+    function _syncCheckpointIfNeeded(
+        ICheckpointStore.Checkpoint memory _checkpoint,
+        bytes32 _expectedCheckpointHash,
+        CoreState memory _coreState
+    )
+        internal
+    {
+        // Check if checkpoint sync should occur:
+        // 1. Voluntary: proposer provided a checkpoint (blockHash != 0)
+        // 2. Forced: minimum delay elapsed since last checkpoint
+        if (_checkpoint.blockHash != 0) {
+            bytes32 checkpointHash = _hashCheckpoint(_checkpoint);
+            require(checkpointHash == _expectedCheckpointHash, CheckpointMismatch());
+
+            _checkpointStore.saveCheckpoint(_checkpoint);
+            _coreState.lastCheckpointTimestamp = uint48(block.timestamp);
+        } else {
+            require(
+                block.timestamp < _coreState.lastCheckpointTimestamp + _minCheckpointDelay,
+                CheckpointNotProvided()
+            );
+        }
     }
 
     /// @dev Builds and persists transition records for batch proof submissions
@@ -945,134 +1069,7 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
         emit Proposed(_encodeProposedEventData(payload));
     }
 
-    /// @dev Finalizes proven proposals and updates checkpoints with rate limiting.
-    /// Checkpoints are only saved if minCheckpointDelay seconds have passed since the last save,
-    /// reducing SSTORE operations but making L2 checkpoints less frequently available on L1.
-    /// Set minCheckpointDelay to 0 to disable rate limiting.
-    /// @param _input Contains transition records and the end block header.
-    /// @return coreState_ Updated core state with new finalization counters.
-    /// @return bondInstructions_ Array of bond instructions from finalized proposals.
-    function _finalize(ProposeInput memory _input)
-        private
-        returns (CoreState memory coreState_, LibBonds.BondInstruction[] memory bondInstructions_)
-    {
-        unchecked {
-            CoreState memory coreState = _input.coreState;
-            uint48 proposalId = coreState.lastFinalizedProposalId + 1;
-            uint256 lastFinalizedRecordIdx;
-            uint256 finalizedCount;
-            uint256 transitionCount = _input.transitionRecords.length;
-            uint256 currentTimestamp = block.timestamp;
-            uint256 totalBondInstructionCount;
-
-            for (uint256 i; i < _maxFinalizationCount; ++i) {
-                // Check if there are more proposals to finalize
-                if (proposalId >= coreState.nextProposalId) break;
-
-                // Try to finalize the current proposal
-                (bytes26 recordHash, uint48 finalizationDeadline) = _getTransitionRecordHashAndDeadline(
-                    proposalId, coreState.lastFinalizedTransitionHash
-                );
-
-                if (i >= transitionCount) {
-                    if (recordHash == 0) break;
-
-                    if (currentTimestamp >= finalizationDeadline) {
-                        revert TransitionRecordNotProvided();
-                    }
-
-                    break;
-                }
-
-                if (recordHash == 0) break;
-
-                TransitionRecord memory transitionRecord = _input.transitionRecords[i];
-
-                require(
-                    _hashTransitionRecord(transitionRecord) == recordHash,
-                    TransitionRecordHashMismatchWithStorage()
-                );
-
-                coreState.lastFinalizedProposalId = proposalId;
-                coreState.lastFinalizedTransitionHash = transitionRecord.transitionHash;
-
-                uint256 bondInstructionLen = transitionRecord.bondInstructions.length;
-                for (uint256 j; j < bondInstructionLen; ++j) {
-                    coreState.bondInstructionsHash = LibBonds.aggregateBondInstruction(
-                        coreState.bondInstructionsHash, transitionRecord.bondInstructions[j]
-                    );
-                }
-
-                totalBondInstructionCount += bondInstructionLen;
-
-                require(transitionRecord.span > 0, InvalidSpan());
-
-                uint48 nextProposalId = proposalId + transitionRecord.span;
-                require(nextProposalId <= coreState.nextProposalId, SpanOutOfBounds());
-
-                proposalId = nextProposalId;
-
-                // Update state for successful finalization
-                lastFinalizedRecordIdx = i;
-                ++finalizedCount;
-            }
-
-            // Update checkpoint if any proposals were finalized and minimum delay has passed
-            if (finalizedCount > 0) {
-                _syncCheckpointIfNeeded(
-                    _input.checkpoint,
-                    _input.transitionRecords[lastFinalizedRecordIdx].checkpointHash,
-                    coreState
-                );
-            }
-
-            if (totalBondInstructionCount > 0) {
-                bondInstructions_ = new LibBonds.BondInstruction[](totalBondInstructionCount);
-                uint256 bondInstructionIndex;
-
-                for (uint256 i; i < finalizedCount; ++i) {
-                    LibBonds.BondInstruction[] memory instructions =
-                    _input.transitionRecords[i].bondInstructions;
-                    uint256 instructionsLen = instructions.length;
-
-                    for (uint256 j; j < instructionsLen; ++j) {
-                        bondInstructions_[bondInstructionIndex++] = instructions[j];
-                    }
-                }
-            }
-
-            return (coreState, bondInstructions_);
-        }
-    }
-
-    /// @dev Syncs checkpoint to storage when voluntary or forced sync conditions are met.
-    ///      Validates the checkpoint hash, persists it, and refreshes the timestamp in core state.
-    /// @param _checkpoint The checkpoint data to sync.
-    /// @param _expectedCheckpointHash The expected hash to validate against.
-    /// @param _coreState Core state to update with new checkpoint timestamp.
-    function _syncCheckpointIfNeeded(
-        ICheckpointStore.Checkpoint memory _checkpoint,
-        bytes32 _expectedCheckpointHash,
-        CoreState memory _coreState
-    )
-        private
-    {
-        // Check if checkpoint sync should occur:
-        // 1. Voluntary: proposer provided a checkpoint (blockHash != 0)
-        // 2. Forced: minimum delay elapsed since last checkpoint
-        if (_checkpoint.blockHash != 0) {
-            bytes32 checkpointHash = _hashCheckpoint(_checkpoint);
-            require(checkpointHash == _expectedCheckpointHash, CheckpointMismatch());
-
-            _checkpointStore.saveCheckpoint(_checkpoint);
-            _coreState.lastCheckpointTimestamp = uint48(block.timestamp);
-        } else {
-            require(
-                block.timestamp < _coreState.lastCheckpointTimestamp + _minCheckpointDelay,
-                CheckpointNotProvided()
-            );
-        }
-    }
+    // Surge: Finalization functions have been made internal
 
     /// @dev Calculates remaining capacity for new proposals
     /// Subtracts unfinalized proposals from total capacity
@@ -1125,6 +1122,34 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
                 );
             }
         }
+    }
+
+    // Surge: These may be overridden by the client inbox contracts
+    // ---------------------------------------------------------------
+    // Surge Handlers
+    // ---------------------------------------------------------------
+
+    /// @notice Handles proof verification logic
+    /// @dev Override this function in derived contracts to customize proof verification handling.
+    /// @param _input Structured prove input
+    function _handleProofVerification(
+        ProveInput memory _input,
+        bytes calldata _proof
+    )
+        internal
+        virtual
+    {
+        uint256 proposalAge;
+        if (_input.proposals.length == 1) {
+            unchecked {
+                proposalAge = block.timestamp - _input.proposals[0].timestamp;
+            }
+        }
+
+        bytes32 aggregatedProvingHash =
+            _hashTransitionsWithMetadata(_input.transitions, _input.metadata);
+
+        IProofVerifier(_proofVerifier).verifyProof(proposalAge, aggregatedProvingHash, _proof);
     }
 
     // ---------------------------------------------------------------

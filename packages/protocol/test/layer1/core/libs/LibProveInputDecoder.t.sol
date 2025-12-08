@@ -37,7 +37,7 @@ contract LibProveInputDecoderTest is Test {
 
         // Create ProveInput (no endBlockHeader field)
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            proposals: proposals, transitions: transitions, metadata: metadata, extra: bytes("")
         });
 
         // Test encoding
@@ -121,7 +121,7 @@ contract LibProveInputDecoderTest is Test {
         });
 
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            proposals: proposals, transitions: transitions, metadata: metadata, extra: bytes("")
         });
 
         // Test encoding/decoding
@@ -153,7 +153,8 @@ contract LibProveInputDecoderTest is Test {
         IInbox.ProveInput memory input = IInbox.ProveInput({
             proposals: new IInbox.Proposal[](0),
             transitions: new IInbox.Transition[](0),
-            metadata: new IInbox.TransitionMetadata[](0)
+            metadata: new IInbox.TransitionMetadata[](0),
+            extra: bytes("")
         });
 
         bytes memory encoded = LibProveInputDecoder.encode(input);
@@ -191,7 +192,7 @@ contract LibProveInputDecoderTest is Test {
         });
 
         IInbox.ProveInput memory input = IInbox.ProveInput({
-            proposals: proposals, transitions: transitions, metadata: metadata
+            proposals: proposals, transitions: transitions, metadata: metadata, extra: bytes("")
         });
 
         bytes memory optimized = LibProveInputDecoder.encode(input);
