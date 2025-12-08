@@ -157,6 +157,7 @@ func (s *State) eventLoop(ctx context.Context) {
 				"checkpointNumber", header.Number,
 				"checkpointHash", common.Hash(coreState.LastFinalizedBlockHash),
 			)
+			metrics.DriverL2VerifiedHeightGauge.Set(float64(payload.ProposalId.Int64()))
 		case e := <-batchesVerifiedPacayaCh:
 			log.Info(
 				"📈 Pacaya batches verified",
@@ -198,6 +199,8 @@ func (s *State) setL2Head(l2Head *types.Header) {
 	}
 
 	log.Trace("New L2 head", "blockID", l2Head.Number, "hash", l2Head.Hash(), "timestamp", l2Head.Time)
+
+	metrics.DriverL2HeadIDGauge.Set(float64(l2Head.Number.Int64()))
 
 	s.l2Head.Store(l2Head)
 }
