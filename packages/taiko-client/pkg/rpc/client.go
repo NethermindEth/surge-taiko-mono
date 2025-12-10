@@ -145,9 +145,9 @@ func NewClient(ctx context.Context, cfg *ClientConfig) (*Client, error) {
 	}
 
 	// Initialize all smart contract clients.
-	// if err := c.initPacayaClients(cfg); err != nil {
-	// 	return nil, fmt.Errorf("failed to initialize Pacaya clients: %w", err)
-	// }
+	if err := c.initPacayaClients(cfg); err != nil {
+		return nil, fmt.Errorf("failed to initialize Pacaya clients: %w", err)
+	}
 	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, DefaultRpcTimeout)
 	defer cancel()
 	// Initialize the fork height numbers.
