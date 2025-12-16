@@ -327,7 +327,7 @@ contract Inbox is IInbox, ICodec, IForcedInclusionStore, EssentialContract {
             // 7. Verify the proof
             // ---------------------------------------------------------
             // Surge: Extract logic to a virtual handler
-            _handleProofVerification(commitment, _proof);
+            _handleProofVerification(proposalAge, commitment, _proof);
         }
     }
 
@@ -766,6 +766,7 @@ contract Inbox is IInbox, ICodec, IForcedInclusionStore, EssentialContract {
     /// @param _commitment The commitment containing the batch transitions to verify.
     /// @param _proof The encoded proof data to verify against the commitment.
     function _handleProofVerification(
+        uint256 _proposalAge,
         Commitment memory _commitment,
         bytes calldata _proof
     )
@@ -773,12 +774,8 @@ contract Inbox is IInbox, ICodec, IForcedInclusionStore, EssentialContract {
         view
         virtual
     {
-        // Surge: We do not use `proposalAge`
-        // We count the proposalAge as the time since it became available for proving.
-        // uint256 proposalAge = block.timestamp
-        //     - _commitment.transitions[offset].timestamp.max(state.lastFinalizedTimestamp);
         IProofVerifier(_proofVerifier)
-            .verifyProof(0, LibHashOptimized.hashCommitment(_commitment), _proof);
+            .verifyProof(_proposalAge, LibHashOptimized.hashCommitment(_commitment), _proof);
     }
 
     // ---------------------------------------------------------------
