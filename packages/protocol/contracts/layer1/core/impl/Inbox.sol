@@ -61,7 +61,7 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     address internal immutable _codec;
 
     /// @notice The proof verifier contract.
-    IProofVerifier internal immutable _proofVerifier;
+    address internal immutable _proofVerifier;
 
     /// @notice The proposer checker contract.
     IProposerChecker internal immutable _proposerChecker;
@@ -135,7 +135,7 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
         LibInboxSetup.validateConfig(_config);
 
         _codec = _config.codec;
-        _proofVerifier = IProofVerifier(_config.proofVerifier);
+        _proofVerifier = _config.proofVerifier;
         _proposerChecker = IProposerChecker(_config.proposerChecker);
         _proverWhitelist = IProverWhitelist(_config.proverWhitelist);
         _signalService = ISignalService(_config.signalService);
@@ -313,12 +313,8 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
             // ---------------------------------------------------------
             // 6. Verify the proof
             // ---------------------------------------------------------
-            // We count the proposalAge as the time since it became available for proving.
-            uint256 proposalAge = block.timestamp
-                - commitment.transitions[offset].timestamp.max(state.lastFinalizedTimestamp);
-            _proofVerifier.verifyProof(
-                proposalAge, LibHashOptimized.hashCommitment(commitment), _proof
-            );
+            // Surge: Extract logic to a virtual handler
+            _handleProofVerification(commitment, _proof);
         }
     }
 
@@ -677,6 +673,29 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
             // The offset points to the first proposal that will be finalized.
             offset_ = uint48(firstUnfinalizedId - _commitment.firstProposalId);
         }
+    }
+
+    // ---------------------------------------------------------------
+    // Surge: Internal virtual functions
+    // ---------------------------------------------------------------
+
+    /// @dev Handles proof verification by delegating to the proof verifier contract.
+    /// @param _commitment The commitment containing the batch transitions to verify.
+    /// @param _proof The encoded proof data to verify against the commitment.
+    function _handleProofVerification(
+        Commitment memory _commitment,
+        bytes calldata _proof
+    )
+        internal
+        view
+        virtual
+    {
+        // Surge: We do not use `proposalAge`
+        // We count the proposalAge as the time since it became available for proving.
+        // uint256 proposalAge = block.timestamp
+        //     - _commitment.transitions[offset].timestamp.max(state.lastFinalizedTimestamp);
+        IProofVerifier(_proofVerifier)
+            .verifyProof(0, LibHashOptimized.hashCommitment(_commitment), _proof);
     }
 
     // ---------------------------------------------------------------
