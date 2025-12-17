@@ -190,7 +190,11 @@ contract Inbox is IInbox, ICodec, IForcedInclusionStore, EssentialContract {
         _beforePropose();
 
         unchecked {
+<<<<<<< HEAD
             ProposeInput memory input = LibCodec.decodeProposeInput(_data);
+=======
+            ProposeInput memory input = LibProposeInputCodec.decode(_data);
+>>>>>>> 69162a293 (feat: improvements)
             _validateProposeInput(input);
 
             uint48 nextProposalId = _coreState.nextProposalId;
@@ -352,6 +356,7 @@ contract Inbox is IInbox, ICodec, IForcedInclusionStore, EssentialContract {
         }
     }
 
+<<<<<<< HEAD
     /// @inheritdoc ICodec
     function encodeProposeInput(IInbox.ProposeInput calldata _input)
         external
@@ -411,6 +416,8 @@ contract Inbox is IInbox, ICodec, IForcedInclusionStore, EssentialContract {
         return LibHashOptimized.hashCommitment(_commitment);
     }
 
+=======
+>>>>>>> 69162a293 (feat: improvements)
     // ---------------------------------------------------------------
     // External and Public View Functions
     // ---------------------------------------------------------------
@@ -774,8 +781,17 @@ contract Inbox is IInbox, ICodec, IForcedInclusionStore, EssentialContract {
         view
         virtual
     {
+<<<<<<< HEAD
         IProofVerifier(_proofVerifier)
             .verifyProof(_proposalAge, LibHashOptimized.hashCommitment(_commitment), _proof);
+=======
+        // Surge: We do not use `proposalAge`
+        // We count the proposalAge as the time since it became available for proving.
+        uint256 proposalAge = block.timestamp
+            - _commitment.transitions[offset].timestamp.max(state.lastFinalizedTimestamp);
+        IProofVerifier(_proofVerifier)
+            .verifyProof(proposalAge, LibHashOptimized.hashCommitment(_commitment), _proof);
+>>>>>>> 69162a293 (feat: improvements)
     }
 
     // ---------------------------------------------------------------
