@@ -14,24 +14,24 @@ abstract contract RollbackInbox is Inbox {
     event LimpModeSet(bool enabled);
 
     /// @dev Maximum grace period after which the chain can be rollbacked to the last finalized proposal.
-    uint48 public immutable maxFinalizationWindow;
+    uint48 public immutable maxFinalizationDelayBeforeRollback;
 
     /// @dev When set to `true`, proposals must be accompanied with the associated proof
     bool public inLimpMode;
 
     uint256[49] private __gap;
 
-    constructor(uint48 _maxFinalizationWindow) {
-        maxFinalizationWindow = _maxFinalizationWindow;
+    constructor(uint48 _maxFinalizationDelayBeforeRollback) {
+        maxFinalizationDelayBeforeRollback = _maxFinalizationDelayBeforeRollback;
     }
 
     /// @notice Rolls back unfinalized proposals if the finalization window has been exceeded.
     /// @dev This allows recovery when the chain has stalled without finalization for too long,
     /// for instance when a prover killer block has been published.
     function rollback() external {
-        // Check if the last finalization exceeds the maxFinalizationWindow
+        // Check if the last finalization exceeds the maxFinalizationDelayBeforeRollback
         require(
-            block.timestamp > _coreState.lastFinalizedTimestamp + maxFinalizationWindow,
+            block.timestamp > _coreState.lastFinalizedTimestamp + maxFinalizationDelayBeforeRollback,
             Surge_RollbackNotAllowed()
         );
 
