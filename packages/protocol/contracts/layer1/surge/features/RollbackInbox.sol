@@ -103,7 +103,7 @@ abstract contract RollbackInbox is Inbox {
         if (block.timestamp - _coreState.lastFinalizedTimestamp > maxFinalizationDelay) {
             return 0;
         } else {
-            return _finalizationStreakStartedAt;
+            return uint48(block.timestamp) - _finalizationStreakStartedAt;
         }
     }
 
