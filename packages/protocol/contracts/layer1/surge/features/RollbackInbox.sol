@@ -3,7 +3,7 @@ pragma solidity ^0.8.26;
 
 import { Inbox } from "../../core/impl/Inbox.sol";
 
-abstract contract FinalityGadgetInbox is Inbox {
+abstract contract RollbackInbox is Inbox {
     /// @notice Emitted when a rollback operation is performed over a range of proposals.
     /// @param firstProposalId The ID of the first proposal reverted in the rollback.
     /// @param lastProposalId The ID of the last proposal reverted in the rollback.
