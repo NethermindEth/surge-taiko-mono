@@ -6,7 +6,6 @@ import { LibProofBitmap } from "./libs/LibProofBitmap.sol";
 import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 /// @title SurgeVerifier
-/// @dev
 /// @notice Routes proof verification to internal verifiers
 /// @custom:security-contact security@nethermind.io
 contract SurgeVerifier is Ownable2Step {
