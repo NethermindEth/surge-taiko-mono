@@ -190,11 +190,29 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     /// @param _data The encoded proposal input data.
     /// NOTE: This function can only be called once per block to prevent spams that can fill the
     /// ring buffer.
-    function propose(bytes calldata _lookahead, bytes calldata _data) external nonReentrant {
+    function propose(bytes calldata _lookahead, bytes calldata _data) public nonReentrant {
         // Surge: Add a pre proposal hook
-        _handleOnPropose();
-        // Surge: Extract proposal logic to an internal function
-        _propose(_lookahead, _data);
+        _beforePropose();
+
+        unchecked {
+            ProposeInput memory input = LibProposeInputCodec.decode(_data);
+            _validateProposeInput(input);
+
+            uint48 nextProposalId = _coreState.nextProposalId;
+            uint48 lastProposalBlockId = _coreState.lastProposalBlockId;
+            uint48 lastFinalizedProposalId = _coreState.lastFinalizedProposalId;
+            require(nextProposalId > 0, ActivationRequired());
+
+            Proposal memory proposal = _buildProposal(
+                input, _lookahead, nextProposalId, lastProposalBlockId, lastFinalizedProposalId
+            );
+
+            _coreState.nextProposalId = nextProposalId + 1;
+            _coreState.lastProposalBlockId = uint48(block.number);
+            _setProposalHash(proposal.id, LibHashOptimized.hashProposal(proposal));
+
+            _emitProposedEvent(proposal);
+        }
     }
 
     /// @inheritdoc IInbox
@@ -225,65 +243,10 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     ///
     /// @param _data Encoded ProveInput struct
     /// @param _proof Validity proof for the batch of proposals
-    function prove(bytes calldata _data, bytes calldata _proof) external {
+    function prove(bytes calldata _data, bytes calldata _proof) public {
         // Surge: Add a pre proving hook
-        _handleOnProve();
-        // Surge: Extract proving logic to an internal function
-        _prove(_data, _proof);
-    }
+        _beforeProve();
 
-    /// @inheritdoc IForcedInclusionStore
-    /// @dev This function will revert if called before the first non-activation proposal is
-    /// submitted to make sure blocks have been produced already and the derivation can use the
-    /// parent's block timestamp.
-    function saveForcedInclusion(LibBlobs.BlobReference memory _blobReference) external payable {
-        bytes32 proposalHash = _proposalHashes[1];
-        require(proposalHash != bytes32(0), IncorrectProposalCount());
-
-        uint256 refund = LibForcedInclusion.saveForcedInclusion(
-            _forcedInclusionStorage,
-            _forcedInclusionFeeInGwei,
-            _forcedInclusionFeeDoubleThreshold,
-            _blobReference
-        );
-
-        // Refund excess payment to the sender
-        if (refund > 0) {
-            msg.sender.sendEtherAndVerify(refund);
-        }
-    }
-
-    // ---------------------------------------------------------------
-    // Surge: Internal functions for proposing and proving
-    // ---------------------------------------------------------------
-
-    /// @param _lookahead Additional data used for lookahead operations.
-    /// @param _data The encoded proposal input data.
-    function _propose(bytes calldata _lookahead, bytes calldata _data) internal {
-        unchecked {
-            ProposeInput memory input = LibProposeInputCodec.decode(_data);
-            _validateProposeInput(input);
-
-            uint48 nextProposalId = _coreState.nextProposalId;
-            uint48 lastProposalBlockId = _coreState.lastProposalBlockId;
-            uint48 lastFinalizedProposalId = _coreState.lastFinalizedProposalId;
-            require(nextProposalId > 0, ActivationRequired());
-
-            Proposal memory proposal = _buildProposal(
-                input, _lookahead, nextProposalId, lastProposalBlockId, lastFinalizedProposalId
-            );
-
-            _coreState.nextProposalId = nextProposalId + 1;
-            _coreState.lastProposalBlockId = uint48(block.number);
-            _setProposalHash(proposal.id, LibHashOptimized.hashProposal(proposal));
-
-            _emitProposedEvent(proposal);
-        }
-    }
-
-    /// @param _data Encoded ProveInput struct
-    /// @param _proof Validity proof for the batch of proposals
-    function _prove(bytes calldata _data, bytes calldata _proof) internal {
         unchecked {
 
             bool isWhitelistEnabled = _checkProver(msg.sender);
@@ -360,6 +323,27 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
             // ---------------------------------------------------------
             // Surge: Extract logic to a virtual handler
             _handleProofVerification(commitment, _proof);
+        }
+    }
+
+    /// @inheritdoc IForcedInclusionStore
+    /// @dev This function will revert if called before the first non-activation proposal is
+    /// submitted to make sure blocks have been produced already and the derivation can use the
+    /// parent's block timestamp.
+    function saveForcedInclusion(LibBlobs.BlobReference memory _blobReference) external payable {
+        bytes32 proposalHash = _proposalHashes[1];
+        require(proposalHash != bytes32(0), IncorrectProposalCount());
+
+        uint256 refund = LibForcedInclusion.saveForcedInclusion(
+            _forcedInclusionStorage,
+            _forcedInclusionFeeInGwei,
+            _forcedInclusionFeeDoubleThreshold,
+            _blobReference
+        );
+
+        // Refund excess payment to the sender
+        if (refund > 0) {
+            msg.sender.sendEtherAndVerify(refund);
         }
     }
 
@@ -704,10 +688,10 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     // ---------------------------------------------------------------
 
     /// @dev A pre proposal hook to execute extra logic before making a proposal
-    function _handleOnPropose() internal virtual { }
+    function _beforePropose() internal virtual { }
 
     /// @dev A pre proving hook to execute extra logic before proving a proposal
-    function _handleOnProve() internal virtual { }
+    function _beforeProve() internal virtual { }
 
     /// @dev Handles proof verification by delegating to the proof verifier contract.
     /// @param _commitment The commitment containing the batch transitions to verify.
@@ -722,10 +706,10 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     {
         // Surge: We do not use `proposalAge`
         // We count the proposalAge as the time since it became available for proving.
-        // uint256 proposalAge = block.timestamp
-        //     - _commitment.transitions[offset].timestamp.max(state.lastFinalizedTimestamp);
+        uint256 proposalAge = block.timestamp
+            - _commitment.transitions[offset].timestamp.max(state.lastFinalizedTimestamp);
         IProofVerifier(_proofVerifier)
-            .verifyProof(0, LibHashOptimized.hashCommitment(_commitment), _proof);
+            .verifyProof(proposalAge, LibHashOptimized.hashCommitment(_commitment), _proof);
     }
 
     // ---------------------------------------------------------------
