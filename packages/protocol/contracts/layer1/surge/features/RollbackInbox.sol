@@ -94,13 +94,13 @@ abstract contract RollbackInbox is Inbox {
     // ---------------------------------------------------------------
 
     /// @dev Disable calling the `propose(..)` function externally when in limp mode.
-    function _beforePropose() internal override {
+    function _beforePropose() internal virtual override {
         require(!inLimpMode || msg.sender == address(this), Surge_CannotProposeDirectlyInLimpMode());
         super._beforePropose();
     }
 
     /// @dev Disable calling the `prove(..)` function externally when in limp mode.
-    function _beforeProve() internal override {
+    function _beforeProve() internal virtual override {
         require(!inLimpMode || msg.sender == address(this), Surge_CannotProveDirectlyInLimpMode());
         super._beforeProve();
     }

@@ -3,7 +3,6 @@ pragma solidity ^0.8.26;
 
 import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import { LibProofBitmap } from "src/layer1/surge/libs/LibProofBitmap.sol";
-import { IProofVerifier } from "src/layer1/verifiers/IProofVerifier.sol";
 
 /// @title SurgeVerifierDummy
 /// @dev Dummy verifier that does not require proof data
