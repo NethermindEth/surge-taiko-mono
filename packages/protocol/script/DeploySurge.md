@@ -27,7 +27,7 @@ This document describes the deployment sequence for the Surge protocol on both L
 
 #### Rollup Contracts
 
-- **Inbox** (proxy) - Main rollup contract for propose, prove, and finalization (SurgeInbox with RollbackInbox and FinalityGadgetInbox features)
+- **Inbox** (proxy) - Main rollup contract for proposing and proving batches
 - **Proof Verifier** (`SurgeVerifier` or `SurgeVerifierDummy` if `USE_DUMMY_VERIFIER=true`)
 - **Codec** (`SurgeCodec` - it is only used by offchain components) - Encoding/decoding for inputs
 
