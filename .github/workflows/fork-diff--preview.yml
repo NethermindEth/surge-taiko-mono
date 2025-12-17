@@ -19,7 +19,7 @@ concurrency:
 jobs:
   deploy-fork-diff-preview:
     if: ${{ github.event.pull_request.draft == false  && !startsWith(github.head_ref, 'release-please') && github.actor != 'dependabot[bot]' }}
-    runs-on: [arc-runner-set]
+    runs-on: ubuntu-latest
     steps:
       - name: Install Git
         run: sudo apt-get update && sudo apt-get install -y git

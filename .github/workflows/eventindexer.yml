@@ -20,7 +20,7 @@ jobs:
   lint-eventindexer:
     name: lint-eventindexer
     if: ${{ github.event.pull_request.draft == false  && !startsWith(github.head_ref, 'release-please' && !startsWith(github.head_ref, 'refs/heads/dependabot/')) }}
-    runs-on: [arc-runner-set]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-go@v5
         with:
@@ -37,7 +37,7 @@ jobs:
           args: --config=.golangci.yml --timeout=10m
 
   test-eventindexer:
-    runs-on: [arc-runner-set]
+    runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.draft == false  && !startsWith(github.head_ref, 'release-please' && !startsWith(github.head_ref, 'refs/heads/dependabot/')) }}
     needs: lint-eventindexer
     steps:
@@ -70,7 +70,7 @@ jobs:
     # Skip dependabot PRs
     if: ${{ github.event_name == 'pull_request' && ! startsWith(github.head_ref, 'refs/heads/dependabot/') && !startsWith(github.head_ref, 'release-please') && github.event.pull_request.head.repo.fork == false }}
     name: Build and push docker image
-    runs-on: [arc-runner-set]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Install Git
