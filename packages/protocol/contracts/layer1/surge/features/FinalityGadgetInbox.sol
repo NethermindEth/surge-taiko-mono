@@ -164,6 +164,7 @@ abstract contract FinalityGadgetInbox is Inbox {
     )
         internal
         view
+        virtual
         override
     {
         SurgeVerifier(_proofVerifier)
