@@ -3,6 +3,13 @@ pragma solidity ^0.8.26;
 
 import { Inbox } from "../../core/impl/Inbox.sol";
 
+/// @title RollbackInbox
+/// @notice A feature-contract that implements chain rollback feature
+/// @dev A chain rollback will be required if a prover killer has been proposed, and finalization
+/// has stalled.
+/// @dev A rollback forces the Inbox into limp mode, wherein every proposal must be accompanied by the
+/// associated proof so that the head is always finalized.
+/// @custom:security-contact security@nethermind.io
 abstract contract RollbackInbox is Inbox {
     /// @notice Emitted when a rollback operation is performed over a range of proposals.
     /// @param firstProposalId The ID of the first proposal reverted in the rollback.
