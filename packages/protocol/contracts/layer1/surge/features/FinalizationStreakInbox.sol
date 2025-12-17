@@ -43,7 +43,7 @@ abstract contract FinalizationStreakInbox is Inbox {
             block.timestamp - _coreState.lastFinalizedTimestamp
                 > maxFinalizationDelayBeforeStreakReset
         ) {
-            _finalizationStreakStartedAt = block.timestamp;
+            _finalizationStreakStartedAt = uint48(block.timestamp);
         }
         super._beforeProve();
     }
