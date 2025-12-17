@@ -14,24 +14,29 @@ abstract contract RollbackInbox is Inbox {
     event LimpModeSet(bool enabled);
 
     /// @dev Maximum grace period after which the chain can be rollbacked to the last finalized proposal.
-    uint48 public immutable maxFinalizationDelayBeforeRollback;
+    uint48 public immutable maxFinalizationDelay;
 
     /// @dev When set to `true`, proposals must be accompanied with the associated proof
+    /// @dev Slot 0
     bool public inLimpMode;
+
+    /// @dev Timestamp at which an undisrupted finalization streak started
+    /// @dev Slot 0
+    uint48 internal _finalizationStreakStartedAt;
 
     uint256[49] private __gap;
 
-    constructor(uint48 _maxFinalizationDelayBeforeRollback) {
-        maxFinalizationDelayBeforeRollback = _maxFinalizationDelayBeforeRollback;
+    constructor(uint48 _maxFinalizationDelay) {
+        maxFinalizationDelay = _maxFinalizationDelay;
     }
 
     /// @notice Rolls back unfinalized proposals if the finalization window has been exceeded.
     /// @dev This allows recovery when the chain has stalled without finalization for too long,
     /// for instance when a prover killer block has been published.
     function rollback() external {
-        // Check if the last finalization exceeds the maxFinalizationDelayBeforeRollback
+        // Check if the last finalization exceeds the maxFinalizationDelay
         require(
-            block.timestamp > _coreState.lastFinalizedTimestamp + maxFinalizationDelayBeforeRollback,
+            block.timestamp > _coreState.lastFinalizedTimestamp + maxFinalizationDelay,
             Surge_RollbackNotAllowed()
         );
 
@@ -69,6 +74,7 @@ abstract contract RollbackInbox is Inbox {
     )
         external
     {
+        _handleOnProposeAndProve();
         _propose(_lookahead, _proposeData);
         _prove(_proveData, _proof);
 
@@ -77,6 +83,20 @@ abstract contract RollbackInbox is Inbox {
             _coreState.lastFinalizedProposalId == _coreState.nextProposalId - 1,
             Surge_HeadMustBeFinalizedInLimpMode()
         );
+    }
+
+    // ---------------------------------------------------------------
+    // External views
+    // ---------------------------------------------------------------
+
+    /// @notice Returns the number of seconds the current verification streak has lasted.
+    /// @return The number of seconds the current verification streak has lasted.
+    function getFinalizationStreak() external view returns (uint48) {
+        if (block.timestamp - _coreState.lastFinalizedTimestamp > maxFinalizationDelay) {
+            return 0;
+        } else {
+            return _finalizationStreakStartedAt;
+        }
     }
 
     // ---------------------------------------------------------------
@@ -93,6 +113,22 @@ abstract contract RollbackInbox is Inbox {
     /// Proposals and proofs must be jointly submitted.
     function _handleOnProve() internal view override {
         require(!inLimpMode, Surge_CannotProveDirectlyInLimpMode());
+    }
+
+    // ---------------------------------------------------------------
+    // Internal virtuals
+    // ---------------------------------------------------------------
+
+    /// @dev A pre proposal+prove hook to execute extra logic before making and proving a proposal
+    function _handleOnProposeAndProve() internal virtual {
+        _handleFinalizationStreakReset();
+    }
+
+    /// @dev Handles logic for reseting the finalization streak
+    function _handleFinalizationStreakReset() internal virtual {
+        if (block.timestamp - _coreState.lastFinalizedTimestamp > maxFinalizationDelay) {
+            _finalizationStreakStartedAt = uint48(block.timestamp);
+        }
     }
 
     // ---------------------------------------------------------------
