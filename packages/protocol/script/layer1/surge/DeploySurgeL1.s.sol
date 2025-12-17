@@ -76,9 +76,15 @@ contract DeploySurgeL1 is DeployCapability {
     uint8 internal immutable permissionlessInclusionMultiplier =
         uint8(vm.envUint("PERMISSIONLESS_INCLUSION_MULTIPLIER"));
 
+    // Finalization streak configuration
+    // ---------------------------------------------------------------
+    uint48 internal immutable maxFinalizationDelayBeforeStreakReset =
+        uint48(vm.envUint("MAX_FINALIZATION_DELAY_BEFORE_STREAK_RESET"));
+
     // Rollback configuration
     // ---------------------------------------------------------------
-    uint48 internal immutable maxFinalizationDelay = uint48(vm.envUint("MAX_FINALIZATION_DELAY"));
+    uint48 internal immutable maxFinalizationDelayBeforeRollback =
+        uint48(vm.envUint("MAX_FINALIZATION_DELAY_BEFORE_ROLLBACK"));
 
     // SurgeVerifier configuration
     // ---------------------------------------------------------------
@@ -394,8 +400,12 @@ contract DeploySurgeL1 is DeployCapability {
             permissionlessInclusionMultiplier: permissionlessInclusionMultiplier
         });
 
-        // Deploy inbox implementation (SurgeInbox with rollback feature)
-        address inboxImpl = address(new SurgeInbox(config, maxFinalizationDelay));
+        // Deploy inbox implementation (SurgeInbox with rollback and finalization streak features)
+        address inboxImpl = address(
+            new SurgeInbox(
+                config, maxFinalizationDelayBeforeStreakReset, maxFinalizationDelayBeforeRollback
+            )
+        );
         console2.log("** Deployed SurgeInbox implementation: ", inboxImpl);
         writeJson("surge_inbox_impl", inboxImpl);
 

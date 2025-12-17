@@ -54,11 +54,17 @@ export MIN_CHECKPOINT_DELAY=${MIN_CHECKPOINT_DELAY:-384}
 # Multiplier for permissionless inclusion window
 export PERMISSIONLESS_INCLUSION_MULTIPLIER=${PERMISSIONLESS_INCLUSION_MULTIPLIER:-5}
 
+# Finalization streak configuration
+# ---------------------------------------------------------------
+# Maximum grace period after which the finalization streak is reset
+# Default: 1 hour (3600 seconds)
+export MAX_FINALIZATION_DELAY_BEFORE_STREAK_RESET=${MAX_FINALIZATION_DELAY_BEFORE_STREAK_RESET:-3600}
+
 # Rollback configuration
 # ---------------------------------------------------------------
 # Maximum grace period after which the chain can be rollbacked to the last finalized proposal
 # Default: 7 days (604800 seconds)
-export MAX_FINALIZATION_DELAY=${MAX_FINALIZATION_DELAY:-604800}
+export MAX_FINALIZATION_DELAY_BEFORE_ROLLBACK=${MAX_FINALIZATION_DELAY_BEFORE_ROLLBACK:-604800}
 
 # SurgeVerifier configuration
 # ---------------------------------------------------------------
