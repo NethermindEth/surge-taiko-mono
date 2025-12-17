@@ -27,10 +27,6 @@ abstract contract RollbackInbox is Inbox {
     /// @dev Slot 0
     bool public inLimpMode;
 
-    /// @dev Timestamp at which an undisrupted finalization streak started
-    /// @dev Slot 0
-    uint48 internal _finalizationStreakStartedAt;
-
     uint256[49] private __gap;
 
     constructor(uint48 _maxFinalizationDelay) {
@@ -82,9 +78,8 @@ abstract contract RollbackInbox is Inbox {
         external
         nonReentrant
     {
-        _handleOnProposeAndProve();
-        _propose(_lookahead, _proposeData);
-        _prove(_proveData, _proof);
+        propose(_lookahead, _proposeData);
+        prove(_proveData, _proof);
 
         // Verify that the head of the chain is finalized
         require(
@@ -94,51 +89,19 @@ abstract contract RollbackInbox is Inbox {
     }
 
     // ---------------------------------------------------------------
-    // External views
-    // ---------------------------------------------------------------
-
-    /// @notice Returns the number of seconds the current verification streak has lasted.
-    /// @return The number of seconds the current verification streak has lasted.
-    function getFinalizationStreak() external view returns (uint48) {
-        if (block.timestamp - _coreState.lastFinalizedTimestamp > maxFinalizationDelay) {
-            return 0;
-        } else {
-            return uint48(block.timestamp) - _finalizationStreakStartedAt;
-        }
-    }
-
-    // ---------------------------------------------------------------
     // Overrides
     // ---------------------------------------------------------------
 
-    /// @dev Disable calling the `propose(..)` function directly when in limp mode.
-    /// Proposals must be accompanied by the associated proof.
-    function _handleOnPropose() internal override {
-        super._handleOnPropose();
-        require(!inLimpMode, Surge_CannotProposeDirectlyInLimpMode());
+    /// @dev Disable calling the `propose(..)` function externally when in limp mode.
+    function _beforePropose() internal override {
+        require(!inLimpMode || msg.sender == address(this), Surge_CannotProposeDirectlyInLimpMode());
+        super._beforePropose();
     }
 
-    /// @dev Disable calling the `prove(..)` function directly when in limp mode.
-    /// Proposals and proofs must be jointly submitted.
-    function _handleOnProve() internal override {
-        super._handleOnProve();
-        require(!inLimpMode, Surge_CannotProveDirectlyInLimpMode());
-    }
-
-    // ---------------------------------------------------------------
-    // Internal virtuals
-    // ---------------------------------------------------------------
-
-    /// @dev A pre proposal+prove hook to execute extra logic before making and proving a proposal
-    function _handleOnProposeAndProve() internal virtual {
-        _handleFinalizationStreakReset();
-    }
-
-    /// @dev Handles logic for reseting the finalization streak
-    function _handleFinalizationStreakReset() internal virtual {
-        if (block.timestamp - _coreState.lastFinalizedTimestamp > maxFinalizationDelay) {
-            _finalizationStreakStartedAt = uint48(block.timestamp);
-        }
+    /// @dev Disable calling the `prove(..)` function externally when in limp mode.
+    function _beforeProve() internal override {
+        require(!inLimpMode || msg.sender == address(this), Surge_CannotProveDirectlyInLimpMode());
+        super._beforeProve();
     }
 
     // ---------------------------------------------------------------
