@@ -706,8 +706,8 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     {
         // Surge: We do not use `proposalAge`
         // We count the proposalAge as the time since it became available for proving.
-        uint256 proposalAge = block.timestamp
-            - _commitment.transitions[offset].timestamp.max(state.lastFinalizedTimestamp);
+        // uint256 proposalAge = block.timestamp
+        //     - _commitment.transitions[offset].timestamp.max(state.lastFinalizedTimestamp);
         IProofVerifier(_proofVerifier)
             .verifyProof(proposalAge, LibHashOptimized.hashCommitment(_commitment), _proof);
     }
