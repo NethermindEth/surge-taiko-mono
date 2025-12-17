@@ -709,7 +709,7 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
         // uint256 proposalAge = block.timestamp
         //     - _commitment.transitions[offset].timestamp.max(state.lastFinalizedTimestamp);
         IProofVerifier(_proofVerifier)
-            .verifyProof(proposalAge, LibHashOptimized.hashCommitment(_commitment), _proof);
+            .verifyProof(0, LibHashOptimized.hashCommitment(_commitment), _proof);
     }
 
     // ---------------------------------------------------------------
