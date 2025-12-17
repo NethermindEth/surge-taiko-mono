@@ -6,6 +6,9 @@ import { LibHashOptimized } from "../../core/libs/LibHashOptimized.sol";
 import { SurgeVerifier } from "../SurgeVerifier.sol";
 import { LibProofBitmap } from "../libs/LibProofBitmap.sol";
 
+/// @title FinalityGadgetInbox
+/// @notice A feature-contract that implements the Surge finality gadget
+/// @custom:security-contact security@nethermind.io
 abstract contract FinalityGadgetInbox is Inbox {
     using LibProofBitmap for LibProofBitmap.ProofBitmap;
 
@@ -16,19 +19,26 @@ abstract contract FinalityGadgetInbox is Inbox {
         uint48 indexed firstProposalId, LibProofBitmap.ProofBitmap conflictingProofBitmap
     );
 
+    /// @notice Proves that conflicting commitments exist for the same proposal, allowing
+    /// the conflicting verifiers to be marked as upgradeable
+    /// @dev The first commitment must be a finalising commitment (meeting the proof threshold),
+    /// while subsequent commitments must conflict with it (same proposal metadata but different
+    /// block hashes). All commitments must contain exactly one transition for simplicity.
+    /// @param _commitments ABI-encoded array of Commitment structs to prove conflicts between
+    /// @param _proofs Array of proofs corresponding to each commitment (index 0 for finalising,
+    /// rest for conflicting)
     function proveConflicts(
         bytes calldata _commitments,
         bytes[] calldata _proofs
     )
         external
     {
-        // TODO: move to optimised decoding
-        Commitment[] memory commitments = abi.decode(_commitments, (Commitment[]));
-
-        LibProofBitmap.ProofBitmap conflictingProofBitmap;
+        Commitment[] memory commitments = _decodeCommitments(_commitments);
 
         // Multiple conflicting commitments should be provided
-        require(commitments.length > 0, Surge_OnlyOneCommitmentProvided());
+        require(commitments.length > 1, Surge_InsufficientCommitmentsProvided());
+
+        LibProofBitmap.ProofBitmap conflictingProofBitmap;
 
         for (uint256 i; i < commitments.length; ++i) {
             // Conflict checks are restricted to a single proposal for simplicity
@@ -40,7 +50,14 @@ abstract contract FinalityGadgetInbox is Inbox {
                 // Ensure consistency between the provided commitments
                 _validateCommitmentConsistency(commitments[i - 1], commitments[i]);
 
-                // Verify proof validity and merge the flag with the bitmap
+                // Validate that subsequent transitions conflict with the finalizing transition
+                require(
+                    commitments[i].transitions[0].blockHash
+                        != commitments[0].transitions[0].blockHash,
+                    Surge_TransitionBlockhashMustDiffer()
+                );
+
+                // Verify proof validity and merge the flag with the conflicting proofs bitmap
                 LibProofBitmap.ProofBitmap proofBitmap = SurgeVerifier(_proofVerifier)
                     .verifyProof(false, LibHashOptimized.hashCommitment(commitments[i]), _proofs[i]);
                 conflictingProofBitmap = conflictingProofBitmap.merge(proofBitmap);
@@ -69,10 +86,6 @@ abstract contract FinalityGadgetInbox is Inbox {
         internal
         pure
     {
-        // ---------------------------------------------------------
-        // Fields expected to be same between commitments
-        // ---------------------------------------------------------
-
         require(
             _currentCommitment.firstProposalId == _previousCommitment.firstProposalId,
             Surge_FirstProposalIdMustNotDiffer()
@@ -95,17 +108,17 @@ abstract contract FinalityGadgetInbox is Inbox {
             Surge_EndStateRootMustNotDiffer()
         );
 
-        // ---------------------------------------------------------
-        // Fields expected to be different between commitments
-        // ---------------------------------------------------------
-
-        require(
-            _currentCommitment.transitions[0].blockHash
-                != _previousCommitment.transitions[0].blockHash,
-            Surge_TransitionBlockhashMustDiffer()
-        );
-
         // `actualProver` may or may not be different between commitments
+    }
+
+    // ---------------------------------------------------------------
+    // Internals
+    // ---------------------------------------------------------------
+
+    /// @dev Given that this will only be called during a proof conflict (a rare event)
+    /// we may go ahead with simple encoding/decoding
+    function _decodeCommitments(bytes calldata _data) internal pure returns (Commitment[] memory) {
+        return abi.decode(_data, (Commitment[]));
     }
 
     // ---------------------------------------------------------------
@@ -132,11 +145,10 @@ abstract contract FinalityGadgetInbox is Inbox {
 
     error Surge_EndBlockNumberMustNotDiffer();
     error Surge_EndStateRootMustNotDiffer();
-    error Surge_FirstCommitmentMustBeFinalising();
     error Surge_FirstProposalIdMustNotDiffer();
     error Surge_FirstProposalParentBlockHashMustNotDiffer();
     error Surge_LastProposalHashMustNotDiffer();
     error Surge_MoreThanOneTransitionProvided();
-    error Surge_OnlyOneCommitmentProvided();
+    error Surge_InsufficientCommitmentsProvided();
     error Surge_TransitionBlockhashMustDiffer();
 }
