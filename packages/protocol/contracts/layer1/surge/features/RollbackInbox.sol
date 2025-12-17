@@ -80,6 +80,7 @@ abstract contract RollbackInbox is Inbox {
         bytes calldata _proof
     )
         external
+        nonReentrant
     {
         _handleOnProposeAndProve();
         _propose(_lookahead, _proposeData);
@@ -102,7 +103,7 @@ abstract contract RollbackInbox is Inbox {
         if (block.timestamp - _coreState.lastFinalizedTimestamp > maxFinalizationDelay) {
             return 0;
         } else {
-            return _finalizationStreakStartedAt;
+            return uint48(block.timestamp) - _finalizationStreakStartedAt;
         }
     }
 
