@@ -39,7 +39,8 @@ abstract contract RollbackInbox is Inbox {
     function rollback() external {
         // Check if the last finalization exceeds the maxFinalizationDelayBeforeRollback
         require(
-            block.timestamp > _coreState.lastFinalizedTimestamp + maxFinalizationDelayBeforeRollback,
+            block.timestamp
+                > _coreState.lastFinalizedTimestamp + maxFinalizationDelayBeforeRollback,
             Surge_RollbackNotAllowed()
         );
 
