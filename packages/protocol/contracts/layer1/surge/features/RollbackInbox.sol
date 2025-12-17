@@ -113,14 +113,14 @@ abstract contract RollbackInbox is Inbox {
 
     /// @dev Disable calling the `propose(..)` function directly when in limp mode.
     /// Proposals must be accompanied by the associated proof.
-    function _handleOnPropose() internal view override {
+    function _handleOnPropose() internal override {
         super._handleOnPropose();
         require(!inLimpMode, Surge_CannotProposeDirectlyInLimpMode());
     }
 
     /// @dev Disable calling the `prove(..)` function directly when in limp mode.
     /// Proposals and proofs must be jointly submitted.
-    function _handleOnProve() internal view override {
+    function _handleOnProve() internal override {
         super._handleOnProve();
         require(!inLimpMode, Surge_CannotProveDirectlyInLimpMode());
     }
