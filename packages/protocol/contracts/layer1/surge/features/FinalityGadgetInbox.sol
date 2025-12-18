@@ -21,11 +21,11 @@ abstract contract FinalityGadgetInbox is Inbox {
 
     /// @notice Proves that conflicting commitments exist for the same proposal, allowing
     /// the conflicting verifiers to be marked as upgradeable
-    /// @dev The first commitment must be a finalising commitment (meeting the proof threshold),
+    /// @dev The first commitment must be a finalizing commitment (meeting the proof threshold),
     /// while subsequent commitments must conflict with it (same proposal metadata but different
     /// block hashes). All commitments must contain exactly one transition for simplicity.
     /// @param _commitments ABI-encoded array of Commitment structs to prove conflicts between
-    /// @param _proofs Array of proofs corresponding to each commitment (index 0 for finalising,
+    /// @param _proofs Array of proofs corresponding to each commitment (index 0 for finalizing,
     /// rest for conflicting)
     function proveConflicts(
         bytes calldata _commitments,
@@ -44,7 +44,7 @@ abstract contract FinalityGadgetInbox is Inbox {
             // Conflict checks are restricted to a single proposal for simplicity
             require(commitments[i].transitions.length == 1, Surge_MoreThanOneTransitionProvided());
 
-            // The first commitment is expected to be the finalising commitment, while
+            // The first commitment is expected to be the finalizing commitment, while
             // the rest are expected to be conflicting
             if (i > 0) {
                 // Ensure consistency between the provided commitments
@@ -62,7 +62,7 @@ abstract contract FinalityGadgetInbox is Inbox {
                     .verifyProof(false, LibHashOptimized.hashCommitment(commitments[i]), _proofs[i]);
                 conflictingProofBitmap = conflictingProofBitmap.merge(proofBitmap);
             } else {
-                // Set `_requireThreshold` to true to ensure this is a finalising commitment
+                // Set `_requireThreshold` to true to ensure this is a finalizing commitment
                 SurgeVerifier(_proofVerifier)
                     .verifyProof(true, LibHashOptimized.hashCommitment(commitments[i]), _proofs[i]);
             }

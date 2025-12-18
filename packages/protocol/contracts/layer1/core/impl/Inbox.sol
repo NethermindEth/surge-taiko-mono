@@ -186,9 +186,14 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     ///      2. Process `input.numForcedInclusions` forced inclusions. The proposer is forced to
     ///         process at least `config.minForcedInclusionCount` if they are due.
     ///      3. Updates core state and emits `Proposed` event
+    /// @param _lookahead Additional data used for lookahead operations.
+    /// @param _data The encoded proposal input data.
     /// NOTE: This function can only be called once per block to prevent spams that can fill the
     /// ring buffer.
-    function propose(bytes calldata _lookahead, bytes calldata _data) external nonReentrant {
+    function propose(bytes calldata _lookahead, bytes calldata _data) public nonReentrant {
+        // Surge: Add a pre proposal hook
+        _beforePropose();
+
         unchecked {
             ProposeInput memory input = LibProposeInputCodec.decode(_data);
             _validateProposeInput(input);
@@ -238,7 +243,10 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     ///
     /// @param _data Encoded ProveInput struct
     /// @param _proof Validity proof for the batch of proposals
-    function prove(bytes calldata _data, bytes calldata _proof) external {
+    function prove(bytes calldata _data, bytes calldata _proof) public {
+        // Surge: Add a pre proving hook
+        _beforeProve();
+
         unchecked {
 
             bool isWhitelistEnabled = _checkProver(msg.sender);
@@ -678,6 +686,12 @@ contract Inbox is IInbox, IForcedInclusionStore, EssentialContract {
     // ---------------------------------------------------------------
     // Surge: Internal virtual functions
     // ---------------------------------------------------------------
+
+    /// @dev A pre proposal hook to execute extra logic before making a proposal
+    function _beforePropose() internal virtual { }
+
+    /// @dev A pre proving hook to execute extra logic before proving a proposal
+    function _beforeProve() internal virtual { }
 
     /// @dev Handles proof verification by delegating to the proof verifier contract.
     /// @param _commitment The commitment containing the batch transitions to verify.
