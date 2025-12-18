@@ -130,7 +130,8 @@ contract Inbox is IInbox, ICodec, IForcedInclusionStore, EssentialContract {
     constructor(Config memory _config) {
         LibInboxSetup.validateConfig(_config);
 
-        _proofVerifier = _config.proofVerifier;
+        _codec = _config.codec;
+        _proofVerifier = IProofVerifier(_config.proofVerifier);
         _proposerChecker = IProposerChecker(_config.proposerChecker);
         _proverWhitelist = IProverWhitelist(_config.proverWhitelist);
         _signalService = ISignalService(_config.signalService);
@@ -763,6 +764,7 @@ contract Inbox is IInbox, ICodec, IForcedInclusionStore, EssentialContract {
     function _beforeProve() internal virtual { }
 
     /// @dev Handles proof verification by delegating to the proof verifier contract.
+    /// @param _proposalAge Seconds passed since the proposal was submitted
     /// @param _commitment The commitment containing the batch transitions to verify.
     /// @param _proof The encoded proof data to verify against the commitment.
     function _handleProofVerification(
@@ -774,21 +776,8 @@ contract Inbox is IInbox, ICodec, IForcedInclusionStore, EssentialContract {
         view
         virtual
     {
-<<<<<<< HEAD
         IProofVerifier(_proofVerifier)
             .verifyProof(_proposalAge, LibHashOptimized.hashCommitment(_commitment), _proof);
-=======
-        // Surge: We do not use `proposalAge`
-        // We count the proposalAge as the time since it became available for proving.
-        // uint256 proposalAge = block.timestamp
-        //     - _commitment.transitions[offset].timestamp.max(state.lastFinalizedTimestamp);
-        IProofVerifier(_proofVerifier)
-<<<<<<< HEAD
-            .verifyProof(proposalAge, LibHashOptimized.hashCommitment(_commitment), _proof);
->>>>>>> 69162a293 (feat: improvements)
-=======
-            .verifyProof(0, LibHashOptimized.hashCommitment(_commitment), _proof);
->>>>>>> 77af3415e (fix: nits)
     }
 
     // ---------------------------------------------------------------
