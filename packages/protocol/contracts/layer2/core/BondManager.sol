@@ -16,7 +16,7 @@ import "./BondManager_Layout.sol"; // DO NOT DELETE
 /// @dev Combines bond accounting and signal verification so bond movements happen in one place:
 ///      - Standard deposit/withdraw logic with optional minimum bond and withdrawal delay.
 ///      - Processes proved L1 bond signals (provability/liveness) with best-effort debits/credits.
-/// @custom:security-contact security@taiko.xyz
+/// @custom:security-contact security@nethermind.io
 contract BondManager is EssentialContract, IBondManager, IBondProcessor {
     using SafeERC20 for IERC20;
 
@@ -27,8 +27,8 @@ contract BondManager is EssentialContract, IBondManager, IBondProcessor {
     /// @notice Address allowed to call debitBond and creditBond.
     address public immutable bondOperator;
 
-    /// @notice ERC20 token used as bond.
-    IERC20 public immutable bondToken;
+    // Surge: Use a generic address instead of ERC20 interface
+    address public immutable bondToken;
 
     /// @notice Minimum bond required
     uint256 public immutable minBond;
@@ -84,12 +84,12 @@ contract BondManager is EssentialContract, IBondManager, IBondProcessor {
         uint64 _l1ChainId,
         uint256 _livenessBond
     ) {
-        require(_bondToken != address(0), InvalidAddress());
+        // Surge: bond token address may be 0 (for ETH)
         require(_bondOperator != address(0), InvalidAddress());
         require(address(_signalService) != address(0) && _l1Inbox != address(0), InvalidAddress());
         require(_l1ChainId != 0, InvalidL1ChainId());
 
-        bondToken = IERC20(_bondToken);
+        bondToken = _bondToken;
         minBond = _minBond;
         withdrawalDelay = _withdrawalDelay;
         bondOperator = _bondOperator;
@@ -127,12 +127,12 @@ contract BondManager is EssentialContract, IBondManager, IBondProcessor {
     }
 
     /// @inheritdoc IBondManager
-    function deposit(uint256 _amount) external nonReentrant {
+    function deposit(uint256 _amount) external payable nonReentrant {
         _deposit(msg.sender, msg.sender, _amount);
     }
 
     /// @inheritdoc IBondManager
-    function depositTo(address _recipient, uint256 _amount) external nonReentrant {
+    function depositTo(address _recipient, uint256 _amount) external payable nonReentrant {
         require(_recipient != address(0), InvalidAddress());
         _deposit(msg.sender, _recipient, _amount);
     }
@@ -249,7 +249,11 @@ contract BondManager is EssentialContract, IBondManager, IBondProcessor {
     /// @param _recipient The address receiving the bond credit.
     /// @param _amount The amount to deposit.
     function _deposit(address _depositor, address _recipient, uint256 _amount) internal {
-        bondToken.safeTransferFrom(_depositor, address(this), _amount);
+        if (bondToken == address(0)) {
+            require(msg.value == _amount, InsufficientEthValue());
+        } else {
+            IERC20(bondToken).safeTransferFrom(_depositor, address(this), _amount);
+        }
         _creditBond(_recipient, _amount);
         emit BondDeposited(_depositor, _recipient, _amount);
     }
@@ -295,7 +299,12 @@ contract BondManager is EssentialContract, IBondManager, IBondProcessor {
     /// @param _amount The amount to withdraw
     function _withdraw(address _from, address _to, uint256 _amount) internal {
         uint256 debited = _debitBond(_from, _amount);
-        bondToken.safeTransfer(_to, debited);
+        if (bondToken == address(0)) {
+            (bool success,) = _to.call{ value: debited }("");
+            require(success, EthTransferFailed());
+        } else {
+            IERC20(bondToken).safeTransfer(_to, debited);
+        }
         emit BondWithdrawn(_from, debited);
     }
 
@@ -329,9 +338,11 @@ contract BondManager is EssentialContract, IBondManager, IBondProcessor {
     // Errors
     // ---------------------------------------------------------------
 
+    error EthTransferFailed();
     error InvalidAddress();
     error InvalidBondType();
     error InvalidL1ChainId();
+    error InsufficientEthValue();
     error MustMaintainMinBond();
     error NoBondInstruction();
     error NoBondToWithdraw();
