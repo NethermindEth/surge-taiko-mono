@@ -72,14 +72,16 @@ interface IBondManager {
     /// @dev Does not cancel the caller's pending withdrawal; the caller must call
     /// `cancelWithdrawal` to reactivate their bond status.
     /// @param _amount The amount to deposit.
-    function deposit(uint256 _amount) external;
+    /// Surge: Make this payable
+    function deposit(uint256 _amount) external payable;
 
     /// @notice Deposit ERC20 bond tokens for a recipient.
     /// @dev Recipient must be non-zero. Does not cancel the recipient's pending withdrawal; the
     /// recipient must call `cancelWithdrawal` to reactivate their bond status.
     /// @param _recipient The address to credit the bond to.
     /// @param _amount The amount to deposit.
-    function depositTo(address _recipient, uint256 _amount) external;
+    /// Surge: Make this payable
+    function depositTo(address _recipient, uint256 _amount) external payable;
 
     /// @notice Withdraw bond to a recipient.
     /// @dev Withdrawals are subject to a delay so that bond operations can be resolved properly.
