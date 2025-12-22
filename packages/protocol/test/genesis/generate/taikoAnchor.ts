@@ -46,7 +46,6 @@ export async function deployTaikoAnchor(
         config.contractAddresses,
         config.param1559,
         config.livenessBond,
-        config.provabilityBond,
         config.withdrawalDelay,
         config.minBond,
         config.bondToken,
@@ -141,7 +140,6 @@ async function generateContractConfigs(
     hardCodedAddresses: any,
     param1559: any,
     livenessBond: string | number,
-    provabilityBond: string | number,
     withdrawalDelay: number,
     minBond: number,
     bondToken: string,
@@ -244,7 +242,6 @@ async function generateContractConfigs(
         getImmutableReference("Anchor", [
             "checkpointStore",
             "livenessBond",
-            "provabilityBond",
             "bondManager",
             "l1ChainId",
         ]),
@@ -254,10 +251,14 @@ async function generateContractConfigs(
         ["oldFork", "newFork"],
     );
     const bondManagerReferencesMap: any = getImmutableReference("BondManager", [
-        "authorized",
+        "bondOperator",
         "bondToken",
         "minBond",
         "withdrawalDelay",
+        "signalService",
+        "l1Inbox",
+        "l1ChainId",
+        "livenessBond",
     ]);
     const bridgeReferencesMap: any = getImmutableReference("Bridge", [
         "signalService",
@@ -447,7 +448,7 @@ async function generateContractConfigs(
             variables: {
                 // EssentialContract
                 __reentry: 1, // _FALSE
-                // Surge: do not pause the vault
+                // Surge: Do not pause the vault
                 __paused: 1, // _FALSE
                 // EssentialContract => UUPSUpgradeable => Initializable
                 _initialized: 1,
@@ -689,7 +690,14 @@ async function generateContractConfigs(
                         ),
                     },
                     {
-                        id: bondManagerReferencesMap.authorized.id,
+                        id: bondManagerReferencesMap.signalService.id,
+                        value: ethers.utils.hexZeroPad(
+                            addressMap.SignalService,
+                            32,
+                        ),
+                    },
+                    {
+                        id: bondManagerReferencesMap.bondOperator.id,
                         value: ethers.utils.hexZeroPad(
                             addressMap.TaikoAnchor,
                             32,
@@ -781,15 +789,6 @@ async function generateContractConfigs(
                         id: taikoAnchorReferencesMap.livenessBond.id,
                         value: ethers.utils.hexZeroPad(
                             ethers.BigNumber.from(livenessBond).toHexString(),
-                            32,
-                        ),
-                    },
-                    {
-                        id: taikoAnchorReferencesMap.provabilityBond.id,
-                        value: ethers.utils.hexZeroPad(
-                            ethers.BigNumber.from(
-                                provabilityBond,
-                            ).toHexString(),
                             32,
                         ),
                     },

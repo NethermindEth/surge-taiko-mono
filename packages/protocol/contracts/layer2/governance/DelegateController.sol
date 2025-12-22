@@ -50,4 +50,13 @@ contract DelegateController is Controller, IMessageInvocable {
 
         _executeActions(_data[8:]);
     }
+
+    /// @param _contracts The 2-step ownable contracts for which the delegate controller
+    /// is the pending owner.
+    /// Surge: Add this to bypass the bridge
+    function acceptOwnership(address[] memory _contracts) external {
+        for (uint256 i; i < _contracts.length; ++i) {
+            Ownable2StepUpgradeable(_contracts[i]).acceptOwnership();
+        }
+    }
 }

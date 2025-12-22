@@ -71,6 +71,23 @@ export MAX_FINALIZATION_DELAY_BEFORE_ROLLBACK=${MAX_FINALIZATION_DELAY_BEFORE_RO
 # Minimum number of distinct proofs required for a transition to finalize
 export NUM_PROOFS_THRESHOLD=${NUM_PROOFS_THRESHOLD:-2}
 
+# Timelock configuration (optional)
+# ---------------------------------------------------------------
+# Set to true to deploy SurgeTimelockController as the owner of all contracts
+export USE_TIMELOCK=${USE_TIMELOCK:-false}
+
+# Minimum delay for timelock proposals in seconds (default: 1 day)
+export TIMELOCK_MIN_DELAY=${TIMELOCK_MIN_DELAY:-86400}
+
+# Minimum finalization streak required before timelock execution is allowed (default: 7 days)
+export TIMELOCK_MIN_FINALIZATION_STREAK=${TIMELOCK_MIN_FINALIZATION_STREAK:-604800}
+
+# Comma-separated list of proposer addresses
+export TIMELOCK_PROPOSERS=${TIMELOCK_PROPOSERS:-""}
+
+# Comma-separated list of executor addresses
+export TIMELOCK_EXECUTORS=${TIMELOCK_EXECUTORS:-""}
+
 # Deploy Surge protocol
 export FOUNDRY_PROFILE=${FOUNDRY_PROFILE:-"layer1"}
 

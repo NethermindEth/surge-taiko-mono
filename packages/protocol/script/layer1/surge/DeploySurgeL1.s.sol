@@ -18,6 +18,7 @@ import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v5.0.0/SP1Ve
 import { console2 } from "forge-std/src/console2.sol";
 import { IInbox } from "src/layer1/core/iface/IInbox.sol";
 import { PreconfWhitelist } from "src/layer1/preconf/impl/PreconfWhitelist.sol";
+import { SurgeTimelockController } from "src/layer1/surge/SurgeTimelockController.sol";
 import { SurgeVerifier } from "src/layer1/surge/SurgeVerifier.sol";
 import { SurgeCodec } from "src/layer1/surge/deployments/internal-devnet/SurgeCodec.sol";
 import { SurgeInbox } from "src/layer1/surge/deployments/internal-devnet/SurgeInbox.sol";
@@ -90,6 +91,15 @@ contract DeploySurgeL1 is DeployCapability {
     // ---------------------------------------------------------------
     uint8 internal immutable numProofsThreshold = uint8(vm.envUint("NUM_PROOFS_THRESHOLD"));
 
+    // Timelock configuration
+    // ---------------------------------------------------------------
+    bool internal immutable useTimelock = vm.envOr("USE_TIMELOCK", false);
+    uint256 internal immutable timelockMinDelay = vm.envOr("TIMELOCK_MIN_DELAY", uint256(0));
+    uint48 internal immutable timelockMinFinalizationStreak =
+        uint48(vm.envOr("TIMELOCK_MIN_FINALIZATION_STREAK", uint256(0)));
+    address[] internal timelockProposers = vm.envOr("TIMELOCK_PROPOSERS", ",", new address[](0));
+    address[] internal timelockExecutors = vm.envOr("TIMELOCK_EXECUTORS", ",", new address[](0));
+
     struct SharedContracts {
         address sharedResolver;
         address signalService;
@@ -126,34 +136,43 @@ contract DeploySurgeL1 is DeployCapability {
         address emptyImpl = address(new EmptyImpl());
         writeJson("empty_impl", emptyImpl);
 
-        // Deploy internal verifiers first (needed for SurgeVerifier)
-        // ---------------------------------------------------------------
-        VerifierContracts memory verifierContracts = deployInternalVerifiers();
-
         // Deploy rollup contracts (inbox proxy and proof verifier)
         // SurgeVerifier needs verifiers set after construction
         // ---------------------------------------------------------------
         RollupContracts memory rollupContracts = deployRollupContracts(emptyImpl);
 
+        // Deploy timelock controller if enabled
+        // The timelock becomes the effective owner of all contracts
+        // ---------------------------------------------------------------
+        address effectiveOwner = contractOwner;
+        if (useTimelock) {
+            effectiveOwner = deployTimelock(rollupContracts);
+            console2.log("** Effective owner (timelock):", effectiveOwner);
+        }
+
+        // Deploy internal verifiers (needed for SurgeVerifier)
+        // ---------------------------------------------------------------
+        VerifierContracts memory verifierContracts = deployInternalVerifiers(effectiveOwner);
+
         // Deploy shared contracts
         // ---------------------------------------------------------------
         SharedContracts memory sharedContracts =
-            deploySharedContracts(contractOwner, rollupContracts);
+            deploySharedContracts(effectiveOwner, rollupContracts);
 
         // Register L2 addresses in the resolver
-        setupSharedResolver(sharedContracts, contractOwner);
+        setupSharedResolver(sharedContracts, effectiveOwner);
 
         // Setup proof verifier with internal verifiers
         // ---------------------------------------------------------------
-        setupProofVerifier(rollupContracts, verifierContracts, contractOwner);
+        setupProofVerifier(rollupContracts, verifierContracts, effectiveOwner);
 
         // Deploy inbox implementation
         // ---------------------------------------------------------------
-        setupInbox(rollupContracts, sharedContracts, contractOwner);
+        setupInbox(rollupContracts, sharedContracts, effectiveOwner);
 
         // Verify deployment
         // ---------------------------------------------------------------
-        verifyDeployment(sharedContracts, rollupContracts, verifierContracts, contractOwner);
+        verifyDeployment(sharedContracts, rollupContracts, verifierContracts, effectiveOwner);
 
         console2.log("=====================================");
         console2.log("Surge L1 Deployment Complete");
@@ -259,9 +278,32 @@ contract DeploySurgeL1 is DeployCapability {
         writeJson("surge_verifier", rollupContracts.proofVerifier);
     }
 
+    function deployTimelock(RollupContracts memory _rollupContracts)
+        internal
+        returns (address timelock)
+    {
+        require(timelockMinDelay > 0, "config: TIMELOCK_MIN_DELAY");
+        require(timelockMinFinalizationStreak > 0, "config: TIMELOCK_MIN_FINALIZATION_STREAK");
+        require(timelockProposers.length > 0, "config: TIMELOCK_PROPOSERS");
+        require(timelockExecutors.length > 0, "config: TIMELOCK_EXECUTORS");
+
+        timelock = address(
+            new SurgeTimelockController(
+                _rollupContracts.inbox,
+                _rollupContracts.proofVerifier,
+                timelockMinFinalizationStreak,
+                timelockMinDelay,
+                timelockProposers,
+                timelockExecutors
+            )
+        );
+        writeJson("surge_timelock", timelock);
+        console2.log("** Deployed SurgeTimelockController:", timelock);
+    }
+
     /// @dev The deployer is the initial owner of the internal verifiers
-    /// Ownership is transferred to the contract owner and must be accepted
-    function deployInternalVerifiers()
+    /// Ownership is transferred to the effective owner and must be accepted
+    function deployInternalVerifiers(address _owner)
         private
         returns (VerifierContracts memory verifierContracts)
     {
@@ -278,9 +320,9 @@ contract DeploySurgeL1 is DeployCapability {
             writeJson("risc0_verifier", address(risc0Verifier));
             console2.log("** Deployed Risc0 verifier: ", address(risc0Verifier));
 
-            // Transfer ownership to contract owner (requires acceptance)
-            risc0Verifier.transferOwnership(contractOwner);
-            console2.log("** Risc0 verifier ownership transfer initiated to:", contractOwner);
+            // Transfer ownership (requires acceptance)
+            risc0Verifier.transferOwnership(_owner);
+            console2.log("** Risc0 verifier ownership transfer initiated to:", _owner);
         }
 
         if (deploySp1RethVerifier) {
@@ -294,9 +336,9 @@ contract DeploySurgeL1 is DeployCapability {
             writeJson("sp1_verifier", address(sp1Verifier));
             console2.log("** Deployed SP1 verifier: ", address(sp1Verifier));
 
-            // Transfer ownership to contract owner (requires acceptance)
-            sp1Verifier.transferOwnership(contractOwner);
-            console2.log("** SP1 verifier ownership transfer initiated to:", contractOwner);
+            // Transfer ownership (requires acceptance)
+            sp1Verifier.transferOwnership(_owner);
+            console2.log("** SP1 verifier ownership transfer initiated to:", _owner);
         }
     }
 
@@ -373,7 +415,7 @@ contract DeploySurgeL1 is DeployCapability {
         address whitelist = deployProxy({
             name: "preconf_whitelist",
             impl: address(new PreconfWhitelist()),
-            data: abi.encodeCall(PreconfWhitelist.init, (contractOwner))
+            data: abi.encodeCall(PreconfWhitelist.init, (_owner))
         });
 
         // Deploy codec
@@ -417,7 +459,7 @@ contract DeploySurgeL1 is DeployCapability {
         console2.log("** SurgeInbox initialized");
 
         // Requires ownership acceptance
-        Ownable2StepUpgradeable(_rollupContracts.inbox).transferOwnership(contractOwner);
+        Ownable2StepUpgradeable(_rollupContracts.inbox).transferOwnership(_owner);
         console2.log("** Inbox ownership transfer initiated to:", _owner);
     }
 

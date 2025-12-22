@@ -8,13 +8,13 @@ This document describes the deployment sequence for the Surge protocol on both L
 
 ## Deployment Overview
 
-| Step | Script                            | Network | Description                                         |
-| ---- | --------------------------------- | ------- | --------------------------------------------------- |
-| 1    | `DeploySurgeL1.s.sol`             | L1      | Deploy all L1 contracts                             |
-| 2    | Verifier setup scripts            | L1      | Configure prover image IDs                          |
-| 3    | `AcceptOwnership.s.sol`           | L1      | Accept pending ownership transfers                  |
-| 4    | `SetupSurgeL2.s.sol`              | L2      | Register L1 contracts and setup delegate controller |
-| 5    | Bridge-based ownership acceptance | L1→L2   | Accept L2 ownership via delegate controller         |
+| Step | Script                  | Network | Description                                         |
+| ---- | ----------------------- | ------- | --------------------------------------------------- |
+| 1    | `DeploySurgeL1.s.sol`   | L1      | Deploy all L1 contracts                             |
+| 2    | Verifier setup scripts  | L1      | Configure prover image IDs                          |
+| 3    | `AcceptOwnership.s.sol` | L1      | Accept pending L1 ownership transfers               |
+| 4    | `SetupSurgeL2.s.sol`    | L2      | Register L1 contracts and setup delegate controller |
+| 5    | `AcceptOwnership.s.sol` | L2      | Accept pending L2 ownership transfers               |
 
 ---
 
@@ -30,6 +30,7 @@ This document describes the deployment sequence for the Surge protocol on both L
 - **Inbox** (proxy) - Main rollup contract for proposing and proving batches
 - **Proof Verifier** (`SurgeVerifier` or `SurgeVerifierDummy` if `USE_DUMMY_VERIFIER=true`)
 - **Codec** (`SurgeCodec` - it is only used by offchain components) - Encoding/decoding for inputs
+- **SurgeTimelockController** (if `USE_TIMELOCK=true`) - Timelocked admin for protocol contracts
 
 #### Shared Contracts
 
@@ -52,9 +53,13 @@ This document describes the deployment sequence for the Surge protocol on both L
 
 ### Ownership Configuration
 
-The `CONTRACT_OWNER` environment variable specifies the intended owner of all contracts (typically a timelocked Security Council, DAO, or an EOA on devnet).
+The `CONTRACT_OWNER` environment variable specifies the intended owner of all contracts.
 
-#### Contracts with immediate ownership (`owner = CONTRACT_OWNER`)
+When `USE_TIMELOCK=true`, a `SurgeTimelockController` is deployed and becomes the effective owner of all contracts. The timelock's proposers/executors are configured via environment variables.
+
+When `USE_TIMELOCK=false`, `CONTRACT_OWNER` is used directly (typically an EOA for devnet or external DAO/multisig for production).
+
+#### Contracts with immediate ownership (`owner = effective owner`)
 
 These contracts have their ownership set directly during deployment:
 
@@ -65,7 +70,7 @@ These contracts have their ownership set directly during deployment:
 - ERC1155Vault
 - PreconfWhitelist
 
-#### Contracts with pending ownership (`pendingOwner = CONTRACT_OWNER`)
+#### Contracts with pending ownership (`pendingOwner = effective owner`)
 
 These contracts use the 2-step ownership transfer pattern and require manual acceptance:
 
@@ -75,7 +80,7 @@ These contracts use the 2-step ownership transfer pattern and require manual acc
 - **Risc0Verifier** (if deployed)
 - **SP1Verifier** (if deployed)
 
-> ⚠️ The pending owner must explicitly accept ownership in **Step 3**.
+> ⚠️ The pending owner must explicitly accept ownership in **Step 3**. When using timelock, the `SurgeTimelockController.acceptOwnership(address[])` function can be called permissionlessly.
 
 ### Environment Variables
 
@@ -102,11 +107,21 @@ FORCED_INCLUSION_FEE_DOUBLE_THRESHOLD=50  # Queue size for fee doubling
 MIN_CHECKPOINT_DELAY=384           # Min checkpoint delay (1 epoch)
 PERMISSIONLESS_INCLUSION_MULTIPLIER=5
 
+# Finalization Streak Configuration
+MAX_FINALIZATION_DELAY_BEFORE_STREAK_RESET=14400  # Max delay before streak resets (4 hours)
+
 # Rollback Configuration
-MAX_FINALIZATION_DELAY=604800      # Max grace period before rollback allowed (7 days)
+MAX_FINALIZATION_DELAY_BEFORE_ROLLBACK=604800     # Max delay before rollback allowed (7 days)
 
 # SurgeVerifier Configuration
 NUM_PROOFS_THRESHOLD=2             # Min distinct proofs for finalization
+
+# Timelock Configuration (if USE_TIMELOCK=true)
+USE_TIMELOCK=false                       # Deploy SurgeTimelockController as owner
+TIMELOCK_MIN_DELAY=86400                 # Min delay for timelock proposals (1 day)
+TIMELOCK_MIN_FINALIZATION_STREAK=604800  # Min streak before execution allowed (7 days)
+TIMELOCK_PROPOSERS=0x...,0x...           # Comma-separated proposer addresses
+TIMELOCK_EXECUTORS=0x...,0x...           # Comma-separated executor addresses
 ```
 
 ### Running the deployment
@@ -133,6 +148,7 @@ Deployment addresses are written to `deployments/deploy_l1.json`. The following 
 - `surge_inbox_impl` - SurgeInbox implementation address
 - `surge_verifier` - SurgeVerifier address
 - `surge_codec` - SurgeCodec address
+- `surge_timelock` - SurgeTimelockController address (if `USE_TIMELOCK=true`)
 - `shared_resolver` - SharedResolver proxy address
 - `signal_service` - SignalService proxy address
 - `bridge` - Bridge proxy address
@@ -179,22 +195,27 @@ From Step 1, the following contracts have `CONTRACT_OWNER` as their `pendingOwne
 - Risc0Verifier address (if deployed)
 - SP1Verifier address (if deployed)
 
+### Ownership Acceptance Methods
+
+The script supports two modes:
+
+1. **Direct Acceptance**: When `CONTRACT_OWNER` is an EOA, calls `acceptOwnership()` directly on each contract
+2. **Intermediate Contract**: When `CONTRACT_OWNER` is a `SurgeTimelockController`, use it as the intermediate contract to accept ownership of all contracts in one call (permissionless)
+
 ### Environment Variables
 
 ```bash
-PRIVATE_KEY          # Private key of CONTRACT_OWNER from Step 1
-CONTRACT_ADDRESSES   # Comma-separated list of contract addresses
-FORK_URL             # L1 RPC URL
-BROADCAST            # Set to "true" to execute transactions
+PRIVATE_KEY            # Private key (must be pending owner for direct, any EOA for intermediate)
+CONTRACT_ADDRESSES     # Comma-separated list of contract addresses
+INTERMEDIATE_CONTRACT  # (Optional) SurgeTimelockController address for batch acceptance
+FORK_URL               # L1 RPC URL
+BROADCAST              # Set to "true" to execute transactions
 ```
 
 ### Running the script
 
 ```bash
 cd packages/protocol
-
-# Get addresses from deployment output and set them
-export CONTRACT_ADDRESSES="0x...,0x...,0x..."  # Comma-separated
 
 # Simulation
 ./script/layer1/surge/accept_ownership.sh
@@ -229,7 +250,7 @@ BROADCAST=true ./script/layer1/surge/accept_ownership.sh
    - TaikoAnchor
    - SharedResolver
 
-> ⚠️ These ownership transfers are **initiated only**. The DelegateController must accept ownership via a bridge message from L1.
+> ⚠️ These ownership transfers are **initiated only**. The DelegateController must accept ownership in **Step 5**.
 
 ### Environment Variables
 
@@ -275,19 +296,18 @@ The DelegateController address is written to `deployments/setup_l2.json`.
 
 ---
 
-## Step 5: Accept L2 Ownership via Bridge
+## Step 5: Accept L2 Ownership
+
+**Script**: `script/layer1/surge/AcceptOwnership.s.sol`  
+**Shell wrapper**: `script/layer1/surge/accept_ownership.sh`
 
 ### Purpose
 
-The DelegateController deployed in Step 4 needs to accept ownership of the L2 contracts. Since the DelegateController is controlled by the `L1_OWNER` (DAO/Security Council/EOA), this requires initiating the acceptance via a cross-chain message through the Bridge.
-
-### How it works
-
-1. The `L1_OWNER` sends a message through the L1 Bridge
-2. The message targets the DelegateController on L2
-3. The DelegateController executes `acceptOwnership()` on each L2 contract
+Accept pending ownership for L2 contracts via the DelegateController. The DelegateController has an `acceptOwnership(address[])` function that can be called permissionlessly.
 
 ### Contracts requiring ownership acceptance on L2
+
+From Step 4, the following contracts have the DelegateController as their `pendingOwner`:
 
 - Bridge
 - ERC20Vault
@@ -297,7 +317,27 @@ The DelegateController deployed in Step 4 needs to accept ownership of the L2 co
 - TaikoAnchor
 - SharedResolver
 
-> ⚠️ **Note**: This step involves cross-chain messaging and is more complex. It is **not required for devnet deployments** where simpler ownership patterns may be used.
+### Environment Variables
+
+```bash
+PRIVATE_KEY            # Private key of any funded L2 account (permissionless call)
+CONTRACT_ADDRESSES     # Comma-separated list of L2 contract addresses (from genesis/chainspec)
+INTERMEDIATE_CONTRACT  # DelegateController address (from Step 4 output)
+FORK_URL               # L2 RPC URL
+BROADCAST              # Set to "true" to execute transactions
+```
+
+### Running the script
+
+```bash
+cd packages/protocol
+
+# Simulation
+./script/layer1/surge/accept_ownership.sh
+
+# Broadcast
+BROADCAST=true ./script/layer1/surge/accept_ownership.sh
+```
 
 ---
 
@@ -308,6 +348,6 @@ The DelegateController deployed in Step 4 needs to accept ownership of the L2 co
 - [ ] **Step 2**: Verifier image IDs configured
 - [ ] **Step 3**: L1 ownership accepted (`AcceptOwnership.s.sol`)
 - [ ] **Step 4**: L2 contracts configured (`SetupSurgeL2.s.sol`)
-- [ ] **Step 5**: L2 ownership accepted via bridge (production only)
+- [ ] **Step 5**: L2 ownership accepted (`AcceptOwnership.s.sol` via DelegateController)
 
 ---
