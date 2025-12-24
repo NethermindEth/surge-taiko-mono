@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"os"
 
 	"go.uber.org/zap"
 )
@@ -137,6 +138,49 @@ func (c *Client) GetGuestDataFromNethermind(ctx context.Context) (GuestData, err
 	}
 
 	c.log.Debugw("successfully fetched guest data from Nethermind", "keys", getKeys(rpcResponse.Result))
+	return rpcResponse.Result, nil
+}
+
+// GetGuestDataFromFile reads guest data from a local JSON file.
+// The file should contain the JSON-RPC response format from Nethermind.
+func (c *Client) GetGuestDataFromFile(filePath string) (GuestData, error) {
+	c.log.Debugw("reading guest data from file", "path", filePath)
+
+	fileContent, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("read file: %w", err)
+	}
+
+	// Parse as JSON-RPC response (same format as Nethermind returns)
+	var rpcResponse struct {
+		JSONRPC string    `json:"jsonrpc"`
+		ID      int       `json:"id"`
+		Result  GuestData `json:"result"`
+		Error   *struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+
+	if err := json.Unmarshal(fileContent, &rpcResponse); err != nil {
+		// Try parsing as raw GuestData (without JSON-RPC envelope)
+		var data GuestData
+		if rawErr := json.Unmarshal(fileContent, &data); rawErr != nil {
+			return nil, fmt.Errorf("decode file as JSON-RPC or raw JSON: %w", err)
+		}
+		c.log.Debugw("successfully read guest data from file (raw format)", "keys", getKeys(data))
+		return data, nil
+	}
+
+	if rpcResponse.Error != nil {
+		return nil, fmt.Errorf("JSON-RPC error in file %d: %s", rpcResponse.Error.Code, rpcResponse.Error.Message)
+	}
+
+	if rpcResponse.Result == nil {
+		return nil, fmt.Errorf("received null result in file")
+	}
+
+	c.log.Debugw("successfully read guest data from file", "keys", getKeys(rpcResponse.Result))
 	return rpcResponse.Result, nil
 }
 
