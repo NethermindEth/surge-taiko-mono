@@ -1,6 +1,7 @@
 package prover
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -35,6 +36,7 @@ func NewClient(baseURL string, log *zap.SugaredLogger) *Client {
 	}
 }
 
+// GetGuestData fetches guest data from the original REST endpoint.
 func (c *Client) GetGuestData(ctx context.Context) (GuestData, error) {
 	url := fmt.Sprintf("%s/guest_data", c.baseURL)
 	c.log.Debugw("fetching guest data", "url", url)
@@ -77,6 +79,65 @@ func (c *Client) GetGuestData(ctx context.Context) (GuestData, error) {
 
 	c.log.Debugw("successfully fetched guest data", "keys", getKeys(data))
 	return data, nil
+}
+
+// GetGuestDataFromNethermind fetches guest data from Nethermind's JSON-RPC endpoint.
+func (c *Client) GetGuestDataFromNethermind(ctx context.Context) (GuestData, error) {
+	c.log.Debugw("fetching guest data from Nethermind via JSON-RPC", "url", c.baseURL)
+
+	rpcRequest := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "taiko_getTdxGuestInfo",
+		"params":  []interface{}{},
+		"id":      1,
+	}
+
+	requestBody, err := json.Marshal(rpcRequest)
+	if err != nil {
+		return nil, fmt.Errorf("marshal JSON-RPC request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL, bytes.NewReader(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	var rpcResponse struct {
+		JSONRPC string    `json:"jsonrpc"`
+		ID      int       `json:"id"`
+		Result  GuestData `json:"result"`
+		Error   *struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&rpcResponse); err != nil {
+		return nil, fmt.Errorf("decode JSON-RPC response: %w", err)
+	}
+
+	if rpcResponse.Error != nil {
+		return nil, fmt.Errorf("JSON-RPC error %d: %s", rpcResponse.Error.Code, rpcResponse.Error.Message)
+	}
+
+	if rpcResponse.Result == nil {
+		return nil, fmt.Errorf("received null result from JSON-RPC")
+	}
+
+	c.log.Debugw("successfully fetched guest data from Nethermind", "keys", getKeys(rpcResponse.Result))
+	return rpcResponse.Result, nil
 }
 
 func getKeys(m map[string]interface{}) []string {
