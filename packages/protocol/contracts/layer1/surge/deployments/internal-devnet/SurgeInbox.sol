@@ -28,6 +28,7 @@ contract SurgeInbox is FinalityGadgetInbox, FinalizationStreakInbox, RollbackInb
 
     /// @dev Resolves diamond inheritance conflict for _handleProofVerification
     function _handleProofVerification(
+        uint256 _proposalAge,
         Commitment memory _commitment,
         bytes calldata _proof
     )
@@ -35,7 +36,7 @@ contract SurgeInbox is FinalityGadgetInbox, FinalizationStreakInbox, RollbackInb
         view
         override(Inbox, FinalityGadgetInbox)
     {
-        super._handleProofVerification(_commitment, _proof);
+        super._handleProofVerification(_proposalAge, _commitment, _proof);
     }
 
     /// @dev Resolves diamond inheritance conflict for _beforePropose

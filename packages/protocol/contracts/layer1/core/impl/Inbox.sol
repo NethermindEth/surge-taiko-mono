@@ -130,8 +130,7 @@ contract Inbox is IInbox, ICodec, IForcedInclusionStore, EssentialContract {
     constructor(Config memory _config) {
         LibInboxSetup.validateConfig(_config);
 
-        _codec = _config.codec;
-        _proofVerifier = IProofVerifier(_config.proofVerifier);
+        _proofVerifier = _config.proofVerifier;
         _proposerChecker = IProposerChecker(_config.proposerChecker);
         _proverWhitelist = IProverWhitelist(_config.proverWhitelist);
         _signalService = ISignalService(_config.signalService);

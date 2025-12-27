@@ -19,7 +19,6 @@ abstract contract FinalityGadgetInbox is Inbox {
         uint48 indexed firstProposalId, LibProofBitmap.ProofBitmap conflictingProofBitmap
     );
 
-<<<<<<< HEAD
     // ---------------------------------------------------------------
     // Codec
     // ---------------------------------------------------------------
@@ -38,11 +37,7 @@ abstract contract FinalityGadgetInbox is Inbox {
     /// @notice Decodes bytes into an array of commitments
     /// @param _data The ABI-encoded commitments data
     /// @return The decoded array of commitments
-    function decodeCommitments(bytes calldata _data)
-        external
-        pure
-        returns (Commitment[] memory)
-    {
+    function decodeCommitments(bytes calldata _data) external pure returns (Commitment[] memory) {
         return _decodeCommitments(_data);
     }
 
@@ -50,8 +45,6 @@ abstract contract FinalityGadgetInbox is Inbox {
     // Feature specific functions
     // ---------------------------------------------------------------
 
-=======
->>>>>>> f99f2cd94 (feat(protocol): add finality gadget (#236))
     /// @notice Proves that conflicting commitments exist for the same proposal, allowing
     /// the conflicting verifiers to be marked as upgradeable
     /// @dev The first commitment must be a finalizing commitment (meeting the proof threshold),
@@ -161,19 +154,13 @@ abstract contract FinalityGadgetInbox is Inbox {
     /// @dev Override the handler to call the SurgeVerifier that requires a proof threshold for the
     /// verification to pass.
     function _handleProofVerification(
-<<<<<<< HEAD
         uint256, /* _proposalAge */
-=======
->>>>>>> f99f2cd94 (feat(protocol): add finality gadget (#236))
         Commitment memory _commitment,
         bytes calldata _proof
     )
         internal
         view
-<<<<<<< HEAD
         virtual
-=======
->>>>>>> f99f2cd94 (feat(protocol): add finality gadget (#236))
         override
     {
         SurgeVerifier(_proofVerifier)

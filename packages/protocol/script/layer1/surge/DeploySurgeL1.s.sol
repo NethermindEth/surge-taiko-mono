@@ -20,7 +20,6 @@ import { IInbox } from "src/layer1/core/iface/IInbox.sol";
 import { PreconfWhitelist } from "src/layer1/preconf/impl/PreconfWhitelist.sol";
 import { SurgeTimelockController } from "src/layer1/surge/SurgeTimelockController.sol";
 import { SurgeVerifier } from "src/layer1/surge/SurgeVerifier.sol";
-import { SurgeCodec } from "src/layer1/surge/deployments/internal-devnet/SurgeCodec.sol";
 import { SurgeInbox } from "src/layer1/surge/deployments/internal-devnet/SurgeInbox.sol";
 import { LibProofBitmap } from "src/layer1/surge/libs/LibProofBitmap.sol";
 import { Risc0Verifier } from "src/layer1/verifiers/Risc0Verifier.sol";
@@ -418,14 +417,8 @@ contract DeploySurgeL1 is DeployCapability {
             data: abi.encodeCall(PreconfWhitelist.init, (_owner))
         });
 
-        // Deploy codec
-        address codec = address(new SurgeCodec());
-        console2.log("** Deployed SurgeCodec:", codec);
-        writeJson("surge_codec", codec);
-
         // Build inbox configuration
         IInbox.Config memory config = IInbox.Config({
-            codec: codec,
             proofVerifier: _rollupContracts.proofVerifier,
             proposerChecker: whitelist,
             proverWhitelist: address(0), // No prover whitelist

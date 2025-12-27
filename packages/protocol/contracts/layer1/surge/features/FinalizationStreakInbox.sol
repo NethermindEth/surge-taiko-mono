@@ -16,13 +16,10 @@ abstract contract FinalizationStreakInbox is Inbox {
     /// @dev Slot 0
     uint48 internal _finalizationStreakStartedAt;
 
-<<<<<<< HEAD
     constructor(uint48 _maxFinalizationDelayBeforeStreakReset) {
         maxFinalizationDelayBeforeStreakReset = _maxFinalizationDelayBeforeStreakReset;
     }
 
-=======
->>>>>>> f99f2cd94 (feat(protocol): add finality gadget (#236))
     // ---------------------------------------------------------------
     // External views
     // ---------------------------------------------------------------
