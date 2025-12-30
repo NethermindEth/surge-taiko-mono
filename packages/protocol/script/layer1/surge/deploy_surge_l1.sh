@@ -22,6 +22,10 @@ export DEPLOY_SP1_RETH_VERIFIER=${DEPLOY_SP1_RETH_VERIFIER:-true}
 # Use dummy verifier for testing (default: false for production, set to true for devnet testing)
 export USE_DUMMY_VERIFIER=${USE_DUMMY_VERIFIER:-false}
 
+# Signer address for ProofVerifierDummy (required if USE_DUMMY_VERIFIER=true)
+# This is wallet address of the key that is used to sign commitments
+export DUMMY_VERIFIER_SIGNER=${DUMMY_VERIFIER_SIGNER:-"0x0000000000000000000000000000000000000000"}
+
 # Inbox configuration
 # ---------------------------------------------------------------
 # Proving window in seconds (default: 2 hours)

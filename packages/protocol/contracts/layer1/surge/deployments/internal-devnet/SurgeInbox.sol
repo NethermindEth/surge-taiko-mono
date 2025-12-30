@@ -26,6 +26,31 @@ contract SurgeInbox is FinalityGadgetInbox, FinalizationStreakInbox, RollbackInb
         RollbackInbox(_maxFinalizationDelayBeforeRollback)
     { }
 
+    /// @dev Resolves diamond inheritance conflict for _afterActivate
+    function _afterActivate() internal override(Inbox, FinalizationStreakInbox) {
+        super._afterActivate();
+    }
+
+    /// @dev Resolves diamond inheritance conflict for _beforePropose
+    function _beforePropose() internal override(Inbox, RollbackInbox) {
+        super._beforePropose();
+    }
+
+    /// @dev Resolves diamond inheritance conflict for _beforeProve
+    function _beforeProve() internal override(Inbox, FinalizationStreakInbox, RollbackInbox) {
+        super._beforeProve();
+    }
+
+    /// @dev Resolves diamond inheritance conflict for _buildConsumptionResult
+    function _buildConsumptionResult(ProposeInput memory _input)
+        internal
+        virtual
+        override(Inbox, RollbackInbox)
+        returns (ConsumptionResult memory result_)
+    {
+        result_ = super._buildConsumptionResult(_input);
+    }
+
     /// @dev Resolves diamond inheritance conflict for _handleProofVerification
     function _handleProofVerification(
         uint256 _proposalAge,
@@ -37,15 +62,5 @@ contract SurgeInbox is FinalityGadgetInbox, FinalizationStreakInbox, RollbackInb
         override(Inbox, FinalityGadgetInbox)
     {
         super._handleProofVerification(_proposalAge, _commitment, _proof);
-    }
-
-    /// @dev Resolves diamond inheritance conflict for _beforePropose
-    function _beforePropose() internal override(Inbox, RollbackInbox) {
-        super._beforePropose();
-    }
-
-    /// @dev Resolves diamond inheritance conflict for _beforeProve
-    function _beforeProve() internal override(Inbox, FinalizationStreakInbox, RollbackInbox) {
-        super._beforeProve();
     }
 }

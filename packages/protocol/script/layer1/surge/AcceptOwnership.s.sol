@@ -13,7 +13,7 @@ import { console2 } from "forge-std/src/console2.sol";
 contract AcceptOwnership is Script {
     uint256 internal immutable privateKey = vm.envUint("PRIVATE_KEY");
     address[] internal contracts = vm.envAddress("CONTRACT_ADDRESSES", ",");
-    address internal intermediateContract = vm.envOr("INTERMEDIATE_CONTRACT", address(0));
+    address internal intermediateContract = vm.envAddress("INTERMEDIATE_CONTRACT");
 
     modifier broadcast() {
         require(privateKey != 0, "invalid private key");

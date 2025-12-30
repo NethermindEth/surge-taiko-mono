@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 import { EmptyImpl } from "./common/EmptyImpl.sol";
-import { SurgeVerifierDummy } from "./common/SurgeVerifierDummy.sol";
+import { ProofVerifierDummy } from "./common/ProofVerifierDummy.sol";
 import {
     Ownable2StepUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
@@ -55,7 +55,8 @@ contract DeploySurgeL1 is DeployCapability {
 
     // Verifier Configuration
     // ---------------------------------------------------------------
-    bool internal immutable useDummyVerifier = vm.envOr("USE_DUMMY_VERIFIER", false);
+    bool internal immutable useDummyVerifier = vm.envBool("USE_DUMMY_VERIFIER");
+    address internal immutable dummyVerifierSigner = vm.envAddress("DUMMY_VERIFIER_SIGNER");
     bool internal immutable deployRisc0RethVerifier = vm.envBool("DEPLOY_RISC0_RETH_VERIFIER");
     bool internal immutable deploySp1RethVerifier = vm.envBool("DEPLOY_SP1_RETH_VERIFIER");
 
@@ -92,12 +93,12 @@ contract DeploySurgeL1 is DeployCapability {
 
     // Timelock configuration
     // ---------------------------------------------------------------
-    bool internal immutable useTimelock = vm.envOr("USE_TIMELOCK", false);
-    uint256 internal immutable timelockMinDelay = vm.envOr("TIMELOCK_MIN_DELAY", uint256(0));
+    bool internal immutable useTimelock = vm.envBool("USE_TIMELOCK");
+    uint256 internal immutable timelockMinDelay = vm.envUint("TIMELOCK_MIN_DELAY");
     uint48 internal immutable timelockMinFinalizationStreak =
-        uint48(vm.envOr("TIMELOCK_MIN_FINALIZATION_STREAK", uint256(0)));
-    address[] internal timelockProposers = vm.envOr("TIMELOCK_PROPOSERS", ",", new address[](0));
-    address[] internal timelockExecutors = vm.envOr("TIMELOCK_EXECUTORS", ",", new address[](0));
+        uint48(vm.envUint("TIMELOCK_MIN_FINALIZATION_STREAK"));
+    address[] internal timelockProposers = vm.envAddress("TIMELOCK_PROPOSERS", ",");
+    address[] internal timelockExecutors = vm.envAddress("TIMELOCK_EXECUTORS", ",");
 
     struct SharedContracts {
         address sharedResolver;
@@ -264,16 +265,9 @@ contract DeploySurgeL1 is DeployCapability {
         // Verifiers are set after construction via setVerifier
         // The deployer is the initial owner so that we can set the internal verifiers later on.
         // ---------------------------------------------------------------
-        if (useDummyVerifier) {
-            rollupContracts.proofVerifier = address(
-                new SurgeVerifierDummy(rollupContracts.inbox, numProofsThreshold, msg.sender)
-            );
-            console2.log("** Deployed DUMMY SurgeVerifier:", rollupContracts.proofVerifier);
-        } else {
-            rollupContracts.proofVerifier =
-                address(new SurgeVerifier(rollupContracts.inbox, numProofsThreshold, msg.sender));
-            console2.log("** Deployed SurgeVerifier:", rollupContracts.proofVerifier);
-        }
+        rollupContracts.proofVerifier =
+            address(new SurgeVerifier(rollupContracts.inbox, numProofsThreshold, msg.sender));
+        console2.log("** Deployed SurgeVerifier:", rollupContracts.proofVerifier);
         writeJson("surge_verifier", rollupContracts.proofVerifier);
     }
 
@@ -306,38 +300,59 @@ contract DeploySurgeL1 is DeployCapability {
         private
         returns (VerifierContracts memory verifierContracts)
     {
-        if (deployRisc0RethVerifier) {
-            RiscZeroGroth16Verifier verifier = new RiscZeroGroth16Verifier(
-                ControlID.CONTROL_ROOT, ControlID.BN254_CONTROL_ID
-            );
-            writeJson("risc0_groth16_verifier", address(verifier));
-            console2.log("** Deployed Risc0 groth16 verifier: ", address(verifier));
+        // When using dummy verifier, deploy a single ProofVerifierDummy for all internal verifiers
+        if (useDummyVerifier) {
+            require(dummyVerifierSigner != address(0), "config: DUMMY_VERIFIER_SIGNER");
 
-            Risc0Verifier risc0Verifier =
-                new Risc0Verifier(l2ChainId, address(verifier), msg.sender);
-            verifierContracts.risc0RethVerifier = address(risc0Verifier);
-            writeJson("risc0_verifier", address(risc0Verifier));
-            console2.log("** Deployed Risc0 verifier: ", address(risc0Verifier));
+            ProofVerifierDummy dummyVerifier = new ProofVerifierDummy(dummyVerifierSigner);
+            address dummyAddr = address(dummyVerifier);
+            writeJson("proof_verifier_dummy", dummyAddr);
+            console2.log("** Deployed ProofVerifierDummy:", dummyAddr);
+            console2.log("** ProofVerifierDummy signer:", dummyVerifierSigner);
 
-            // Transfer ownership (requires acceptance)
-            risc0Verifier.transferOwnership(_owner);
-            console2.log("** Risc0 verifier ownership transfer initiated to:", _owner);
-        }
+            // Use the same dummy for all enabled verifiers
+            if (deployRisc0RethVerifier) {
+                verifierContracts.risc0RethVerifier = dummyAddr;
+                console2.log("** Using ProofVerifierDummy for RISC0");
+            }
+            if (deploySp1RethVerifier) {
+                verifierContracts.sp1RethVerifier = dummyAddr;
+                console2.log("** Using ProofVerifierDummy for SP1");
+            }
+        } else {
+            // Deploy actual verifiers when not using dummy
+            if (deployRisc0RethVerifier) {
+                RiscZeroGroth16Verifier verifier =
+                    new RiscZeroGroth16Verifier(ControlID.CONTROL_ROOT, ControlID.BN254_CONTROL_ID);
+                writeJson("risc0_groth16_verifier", address(verifier));
+                console2.log("** Deployed Risc0 groth16 verifier: ", address(verifier));
 
-        if (deploySp1RethVerifier) {
-            SuccinctVerifier succinctVerifier = new SuccinctVerifier();
-            writeJson("succinct_verifier", address(succinctVerifier));
-            console2.log("** Deployed Succint verifier: ", address(succinctVerifier));
+                Risc0Verifier risc0Verifier =
+                    new Risc0Verifier(l2ChainId, address(verifier), msg.sender);
+                verifierContracts.risc0RethVerifier = address(risc0Verifier);
+                writeJson("risc0_verifier", address(risc0Verifier));
+                console2.log("** Deployed Risc0 verifier: ", address(risc0Verifier));
 
-            SP1Verifier sp1Verifier =
-                new SP1Verifier(l2ChainId, address(succinctVerifier), msg.sender);
-            verifierContracts.sp1RethVerifier = address(sp1Verifier);
-            writeJson("sp1_verifier", address(sp1Verifier));
-            console2.log("** Deployed SP1 verifier: ", address(sp1Verifier));
+                // Transfer ownership (requires acceptance)
+                risc0Verifier.transferOwnership(_owner);
+                console2.log("** Risc0 verifier ownership transfer initiated to:", _owner);
+            }
 
-            // Transfer ownership (requires acceptance)
-            sp1Verifier.transferOwnership(_owner);
-            console2.log("** SP1 verifier ownership transfer initiated to:", _owner);
+            if (deploySp1RethVerifier) {
+                SuccinctVerifier succinctVerifier = new SuccinctVerifier();
+                writeJson("succinct_verifier", address(succinctVerifier));
+                console2.log("** Deployed Succint verifier: ", address(succinctVerifier));
+
+                SP1Verifier sp1Verifier =
+                    new SP1Verifier(l2ChainId, address(succinctVerifier), msg.sender);
+                verifierContracts.sp1RethVerifier = address(sp1Verifier);
+                writeJson("sp1_verifier", address(sp1Verifier));
+                console2.log("** Deployed SP1 verifier: ", address(sp1Verifier));
+
+                // Transfer ownership (requires acceptance)
+                sp1Verifier.transferOwnership(_owner);
+                console2.log("** SP1 verifier ownership transfer initiated to:", _owner);
+            }
         }
     }
 
@@ -484,13 +499,23 @@ contract DeploySurgeL1 is DeployCapability {
 
         // Build list of contracts with pending ownership transfer
         // SurgeVerifier has ownership for setVerifier functionality
+        // Note: Internal verifiers (risc0, sp1) are only added when not using dummy
+        // as ProofVerifierDummy doesn't have Ownable2Step
         // ---------------------------------------------------------------
-        address[] memory pendingOwnerContracts = new address[](5);
-        pendingOwnerContracts[0] = _rollupContracts.proofVerifier;
-        pendingOwnerContracts[1] = _rollupContracts.inbox;
-        pendingOwnerContracts[2] = _sharedContracts.sharedResolver;
-        pendingOwnerContracts[3] = _verifierContracts.risc0RethVerifier; // May be address(0)
-        pendingOwnerContracts[4] = _verifierContracts.sp1RethVerifier; // May be address(0)
+        address[] memory pendingOwnerContracts;
+        if (useDummyVerifier) {
+            pendingOwnerContracts = new address[](3);
+            pendingOwnerContracts[0] = _rollupContracts.proofVerifier;
+            pendingOwnerContracts[1] = _rollupContracts.inbox;
+            pendingOwnerContracts[2] = _sharedContracts.sharedResolver;
+        } else {
+            pendingOwnerContracts = new address[](5);
+            pendingOwnerContracts[0] = _rollupContracts.proofVerifier;
+            pendingOwnerContracts[1] = _rollupContracts.inbox;
+            pendingOwnerContracts[2] = _sharedContracts.sharedResolver;
+            pendingOwnerContracts[3] = _verifierContracts.risc0RethVerifier; // May be address(0)
+            pendingOwnerContracts[4] = _verifierContracts.sp1RethVerifier; // May be address(0)
+        }
 
         // Verify ownership
         // ---------------------------------------------------------------

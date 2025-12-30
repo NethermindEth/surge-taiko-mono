@@ -28,7 +28,7 @@ This document describes the deployment sequence for the Surge protocol on both L
 #### Rollup Contracts
 
 - **Inbox** (proxy) - Main rollup contract for proposing and proving batches
-- **Proof Verifier** (`SurgeVerifier` or `SurgeVerifierDummy` if `USE_DUMMY_VERIFIER=true`)
+- **Proof Verifier** (`SurgeVerifier`) - Routes proofs to internal verifiers
 - **Codec** (`SurgeCodec` - it is only used by offchain components) - Encoding/decoding for inputs
 - **SurgeTimelockController** (if `USE_TIMELOCK=true`) - Timelocked admin for protocol contracts
 
@@ -50,6 +50,7 @@ This document describes the deployment sequence for the Surge protocol on both L
 
 - **Risc0Verifier** (if `DEPLOY_RISC0_RETH_VERIFIER=true`)
 - **SP1Verifier** (if `DEPLOY_SP1_RETH_VERIFIER=true`)
+- **ProofVerifierDummy** (if `USE_DUMMY_VERIFIER=true`) - A single dummy verifier that accepts ECDSA signatures from a trusted signer, used in place of real internal verifiers for devnet testing
 
 ### Ownership Configuration
 
@@ -74,11 +75,13 @@ These contracts have their ownership set directly during deployment:
 
 These contracts use the 2-step ownership transfer pattern and require manual acceptance:
 
-- **Proof Verifier** (`SurgeVerifier` / `SurgeVerifierDummy`)
+- **Proof Verifier** (`SurgeVerifier`)
 - **Inbox** (SurgeInbox proxy)
 - **SharedResolver**
-- **Risc0Verifier** (if deployed)
-- **SP1Verifier** (if deployed)
+- **Risc0Verifier** (if deployed and `USE_DUMMY_VERIFIER=false`)
+- **SP1Verifier** (if deployed and `USE_DUMMY_VERIFIER=false`)
+
+> **Note**: When `USE_DUMMY_VERIFIER=true`, the `ProofVerifierDummy` is used as the internal verifier and does not require ownership acceptance (it has no owner).
 
 > ⚠️ The pending owner must explicitly accept ownership in **Step 3**. When using timelock, the `SurgeTimelockController.acceptOwnership(address[])` function can be called permissionlessly.
 
@@ -91,9 +94,10 @@ CONTRACT_OWNER       # Address that will own all contracts
 L2_CHAIN_ID          # Chain ID of the L2 network
 
 # Verifier Configuration
-USE_DUMMY_VERIFIER=false           # Set true for devnet testing
-DEPLOY_RISC0_RETH_VERIFIER=true    # Deploy RISC0 verifier
-DEPLOY_SP1_RETH_VERIFIER=true      # Deploy SP1 verifier
+USE_DUMMY_VERIFIER=false           # Use ProofVerifierDummy for internal verifiers (devnet testing)
+DUMMY_VERIFIER_SIGNER=0x...        # Signer address for ProofVerifierDummy (required if USE_DUMMY_VERIFIER=true)
+DEPLOY_RISC0_RETH_VERIFIER=true    # Deploy/enable RISC0 verifier
+DEPLOY_SP1_RETH_VERIFIER=true      # Deploy/enable SP1 verifier
 
 # Inbox Configuration
 PROVING_WINDOW=7200                # Proving window in seconds (2 hours)
@@ -159,10 +163,11 @@ Deployment addresses are written to `deployments/deploy_l1.json`. The following 
 - `bridged_erc721` - BridgedERC721 implementation address
 - `bridged_erc1155` - BridgedERC1155 implementation address
 - `preconf_whitelist` - PreconfWhitelist proxy address
-- `risc0_groth16_verifier` - Risc0 Groth16 verifier (if deployed)
-- `risc0_verifier` - Risc0Verifier address (if deployed)
-- `succinct_verifier` - Succinct verifier (if deployed)
-- `sp1_verifier` - SP1Verifier address (if deployed)
+- `proof_verifier_dummy` - ProofVerifierDummy address (if `USE_DUMMY_VERIFIER=true`)
+- `risc0_groth16_verifier` - Risc0 Groth16 verifier (if deployed and `USE_DUMMY_VERIFIER=false`)
+- `risc0_verifier` - Risc0Verifier address (if deployed and `USE_DUMMY_VERIFIER=false`)
+- `succinct_verifier` - Succinct verifier (if deployed and `USE_DUMMY_VERIFIER=false`)
+- `sp1_verifier` - SP1Verifier address (if deployed and `USE_DUMMY_VERIFIER=false`)
 
 ---
 
@@ -189,11 +194,13 @@ Accept pending ownership for contracts that use the 2-step ownership transfer pa
 
 From Step 1, the following contracts have `CONTRACT_OWNER` as their `pendingOwner`:
 
-- Proof Verifier address
+- Proof Verifier (`SurgeVerifier`) address
 - Inbox proxy address
 - SharedResolver address
-- Risc0Verifier address (if deployed)
-- SP1Verifier address (if deployed)
+- Risc0Verifier address (if deployed and `USE_DUMMY_VERIFIER=false`)
+- SP1Verifier address (if deployed and `USE_DUMMY_VERIFIER=false`)
+
+> **Note**: When `USE_DUMMY_VERIFIER=true`, the `ProofVerifierDummy` is used and does not require ownership acceptance.
 
 ### Ownership Acceptance Methods
 
