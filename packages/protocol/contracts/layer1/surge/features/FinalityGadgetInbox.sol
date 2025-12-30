@@ -12,6 +12,8 @@ import { LibProofBitmap } from "../libs/LibProofBitmap.sol";
 abstract contract FinalityGadgetInbox is Inbox {
     using LibProofBitmap for LibProofBitmap.ProofBitmap;
 
+    uint256[50] private __gap;
+
     /// @dev Emitted when conflicting proofs are detected for a proposal
     /// @param firstProposalId The ID of the first proposal in the conflict
     /// @param conflictingProofBitmap Bitmap representing the conflicting proofs
@@ -82,6 +84,10 @@ abstract contract FinalityGadgetInbox is Inbox {
                         != commitments[0].transitions[0].blockHash,
                     Surge_TransitionBlockhashMustDiffer()
                 );
+                require(
+                    commitments[i].endStateRoot != commitments[0].endStateRoot,
+                    Surge_CommitmentStateRootsMustDiffer()
+                );
 
                 // Verify proof validity and merge the flag with the conflicting proofs bitmap
                 LibProofBitmap.ProofBitmap proofBitmap = SurgeVerifier(_proofVerifier)
@@ -129,10 +135,6 @@ abstract contract FinalityGadgetInbox is Inbox {
             _currentCommitment.endBlockNumber == _previousCommitment.endBlockNumber,
             Surge_EndBlockNumberMustNotDiffer()
         );
-        require(
-            _currentCommitment.endStateRoot == _previousCommitment.endStateRoot,
-            Surge_EndStateRootMustNotDiffer()
-        );
 
         // `actualProver` may or may not be different between commitments
     }
@@ -171,6 +173,7 @@ abstract contract FinalityGadgetInbox is Inbox {
     // Custom errors
     // ---------------------------------------------------------------
 
+    error Surge_CommitmentStateRootsMustDiffer();
     error Surge_EndBlockNumberMustNotDiffer();
     error Surge_EndStateRootMustNotDiffer();
     error Surge_FirstProposalIdMustNotDiffer();
