@@ -15,10 +15,10 @@ contract CCIPStateStore is AzureTDXVerifier, ICCIPStateStore {
     uint256 public constant MIN_SYNC_DELAY = 384;
 
     /// @dev The latest synced state
-    /// Slot 1
+    /// 3 Slots
     SyncedState private _syncedState;
 
-    uint256[49] private __gap;
+    uint256[47] private __gap;
 
     /// @notice Emitted when L2 state is synced
     /// @param blockHash The hash of the synced block

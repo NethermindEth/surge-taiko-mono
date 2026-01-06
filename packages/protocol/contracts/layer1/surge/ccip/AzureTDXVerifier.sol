@@ -30,15 +30,15 @@ contract AzureTDXVerifier is EssentialContract {
     address public immutable automataDcapAttestation;
 
     /// @dev Mapping of registered TDX instance addresses.
-    /// Slot 1.
+    /// Slot 0.
     mapping(address instanceAddress => bool isRegistered) public instances;
 
     /// @dev Indicates whether a quote nonce hash has been used or not.
-    /// Slot 2.
+    /// Slot 1.
     mapping(bytes32 nonceHash => bool isUsed) public nonceUsed;
 
     /// @dev The trusted parameters for trusted TDX instances
-    /// Slot 3.
+    /// Slot 2.
     mapping(uint256 index => TrustedParams trustedParams) public trustedParams;
 
     uint256[47] private __gap;
