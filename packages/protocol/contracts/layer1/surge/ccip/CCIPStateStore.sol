@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-
 import { AzureTDXVerifier } from "./AzureTDXVerifier.sol";
 import { ICCIPStateStore } from "./ICCIPStateStore.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import { EfficientHashLib } from "solady/src/utils/EfficientHashLib.sol";
 
 /// @title CCIPStateStore
 /// @notice Contract for syncing and storing L2 chain state for CCIP integration.
@@ -46,7 +46,7 @@ contract CCIPStateStore is AzureTDXVerifier, ICCIPStateStore {
         bytes memory signature = _proof[64:];
 
         // Recover signer from signature over (blockhash || stateroot) and verify it's a registered instance
-        bytes32 message = keccak256(abi.encodePacked(blockHash, stateRoot));
+        bytes32 message = EfficientHashLib.hash(blockHash, stateRoot);
         address signer = ECDSA.recover(message, signature);
         require(instances[signer], SurgeCCIP_InvalidSigner());
 
