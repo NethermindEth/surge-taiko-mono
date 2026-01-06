@@ -323,8 +323,7 @@ func (s *ChainSyncerTestSuite) TestShastaProposalWithMultipleBlocks() {
 	head1, err := s.RPCClient.L2.BlockByNumber(context.Background(), nil)
 	s.Nil(err)
 
-	// Use PendingNonceAt to account for transactions that may be pending in the mempool
-	nonce, err := s.RPCClient.L2.PendingNonceAt(context.Background(), s.TestAddr)
+	nonce, err := s.RPCClient.L2.NonceAt(context.Background(), s.TestAddr, nil)
 	s.Nil(err)
 
 	testTx1, err := testutils.AssembleAndSendTestTx(
@@ -374,8 +373,7 @@ func (s *ChainSyncerTestSuite) TestShastaProposalWithOneBlobAndMultipleBlocks() 
 	head1, err := s.RPCClient.L2.BlockByNumber(context.Background(), nil)
 	s.Nil(err)
 
-	// Use PendingNonceAt to account for transactions that may be pending in the mempool
-	nonce, err := s.RPCClient.L2.PendingNonceAt(context.Background(), s.TestAddr)
+	nonce, err := s.RPCClient.L2.NonceAt(context.Background(), s.TestAddr, nil)
 	s.Nil(err)
 
 	batches := 100
@@ -429,8 +427,7 @@ func (s *ChainSyncerTestSuite) TestShastaProposalWithTooMuchBlocks() {
 	head1, err := s.RPCClient.L2.BlockByNumber(context.Background(), nil)
 	s.Nil(err)
 
-	// Use PendingNonceAt to account for transactions that may be pending in the mempool
-	nonce, err := s.RPCClient.L2.PendingNonceAt(context.Background(), s.TestAddr)
+	nonce, err := s.RPCClient.L2.NonceAt(context.Background(), s.TestAddr, nil)
 	s.Nil(err)
 
 	txBatch := make([]types.Transactions, manifest.ProposalMaxBlocks+1)
@@ -471,8 +468,7 @@ func (s *ChainSyncerTestSuite) TestShastaProposalsWithInvalidForcedInclusion() {
 	head, err := s.RPCClient.L2.BlockByNumber(context.Background(), nil)
 	s.Nil(err)
 
-	// Use PendingNonceAt to account for transactions that may be pending in the mempool
-	nonce, err := s.RPCClient.L2.PendingNonceAt(context.Background(), s.TestAddr)
+	nonce, err := s.RPCClient.L2.NonceAt(context.Background(), s.TestAddr, nil)
 	s.Nil(err)
 
 	testTx, err := testutils.AssembleAndSendTestTx(
@@ -570,8 +566,7 @@ func (s *ChainSyncerTestSuite) TestShastaProposalsWithForcedInclusion() {
 	head, err := s.RPCClient.L2.BlockByNumber(context.Background(), nil)
 	s.Nil(err)
 
-	// Use PendingNonceAt to account for transactions that may be pending in the mempool
-	nonce, err := s.RPCClient.L2.PendingNonceAt(context.Background(), s.TestAddr)
+	nonce, err := s.RPCClient.L2.NonceAt(context.Background(), s.TestAddr, nil)
 	s.Nil(err)
 
 	testTx, err := testutils.AssembleAndSendTestTx(
