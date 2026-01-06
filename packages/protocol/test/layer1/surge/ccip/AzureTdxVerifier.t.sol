@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import { AzureTdxTestData } from "./helpers/AzureTdxTestData.sol";
-import { AzureTdxTestUtils } from "./helpers/AzureTdxTestUtils.sol";
+import { AzureTDXTestData } from "./helpers/AzureTDXTestData.sol";
+import { AzureTDXTestUtils } from "./helpers/AzureTDXTestUtils.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { AzureTDX } from "azure-tdx-verifier/AzureTDX.sol";
 import { Test } from "forge-std/src/Test.sol";
 import { AzureTDXVerifier } from "src/layer1/surge/ccip/AzureTDXVerifier.sol";
 
-/// @title AzureTdxVerifierTest
-/// @notice Fork test for Azure TDX Verifier contract
-contract AzureTdxVerifierTest is Test {
-    using AzureTdxTestData for *;
-    using AzureTdxTestUtils for *;
+contract AzureTDXVerifierTest is Test {
+    using AzureTDXTestData for *;
+    using AzureTDXTestUtils for *;
 
     /// @notice Automata DCAP Attestation contract on mainnet
     address internal constant AUTOMATA_DCAP_ATTESTATION =
@@ -30,7 +28,7 @@ contract AzureTdxVerifierTest is Test {
         vm.createSelectFork(vm.envOr("MAINNET_FORK_URL", defaultRpc), FORK_BLOCK);
 
         // Set up Automata mainnet collaterals
-        AzureTdxTestUtils.setUpAutomataMainnetCollaterals();
+        AzureTDXTestUtils.setUpAutomataMainnetCollaterals();
 
         // Deploy implementation
         AzureTDXVerifier impl = new AzureTDXVerifier(AUTOMATA_DCAP_ATTESTATION);
@@ -48,7 +46,7 @@ contract AzureTdxVerifierTest is Test {
         (
             AzureTDX.VerifyParams memory verifyParams,
             AzureTDXVerifier.TrustedParams memory trustedParams
-        ) = AzureTdxTestData.getTestData();
+        ) = AzureTDXTestData.getTestData();
 
         // Set trusted params
         vm.prank(owner);

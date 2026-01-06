@@ -10,9 +10,9 @@ import {
     TcbInfoJsonObj
 } from "./AutomataInterfaces.sol";
 
-/// @title AzureTdxTestUtils
+/// @title AzureTDXTestUtils
 /// @notice Helper library for setting up Azure TDX test environment
-library AzureTdxTestUtils {
+library AzureTDXTestUtils {
     /// @notice Sets up Automata mainnet collaterals for TDX verification
     function setUpAutomataMainnetCollaterals() internal {
         // solhint-disable-next-line max-line-length

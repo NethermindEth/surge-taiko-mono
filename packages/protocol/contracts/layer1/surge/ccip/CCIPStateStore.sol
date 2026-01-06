@@ -35,7 +35,7 @@ contract CCIPStateStore is AzureTDXVerifier, ICCIPStateStore {
     /// @inheritdoc ICCIPStateStore
     function syncState(bytes calldata _proof) external {
         require(
-            block.timestamp >= _syncedState.syncedAt + MIN_SYNC_DELAY, SurgeCCIP_SyncTooFrequent()
+            block.timestamp > _syncedState.syncedAt + MIN_SYNC_DELAY, SurgeCCIP_SyncTooFrequent()
         );
 
         // Decode proof: blockhash (32 bytes) || stateroot (32 bytes) || signature (65 bytes)
