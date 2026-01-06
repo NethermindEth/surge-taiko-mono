@@ -73,7 +73,7 @@ services:
 
   l2_nmc:
     container_name: l2_nmc
-    image: nethermindeth/nethermind:taiko-shasta-12-26-2025 # TODO(@jmadibekov): Change to the latest stable release
+    image: nethermindeth/nethermind:master-5f11732
     restart: unless-stopped
     pull_policy: always
     volumes:
