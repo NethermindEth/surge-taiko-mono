@@ -16,6 +16,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/manifest"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
 	anchorTxConstructor "github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/anchor_tx_constructor"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/chain_syncer/beaconsync"
 	blocksInserter "github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/chain_syncer/event/blocks_inserter"
@@ -26,6 +27,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 	eventIterator "github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/chain_iterator/event_iterator"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
+	typesShasta "github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/types"
 )
 
 // Syncer responsible for letting the L2 execution engine catching up with protocol's latest
@@ -41,8 +43,9 @@ type Syncer struct {
 	blocksInserterPacaya blocksInserter.Inserter // Pacaya blocks inserter
 	blocksInserterShasta blocksInserter.Inserter // Shasta blocks inserter
 
-	lastInsertedBatchID *big.Int
-	reorgDetectedFlag   bool
+	lastInsertedBatchID       *big.Int
+	reorgDetectedFlag         bool
+	proposalsRollbackedRanges typesShasta.ProposalsRollbackedRanges
 
 	// Shasta derivation source fetcher
 	derivationSourceFetcher *shastaManifest.ShastaDerivationSourceFetcher
@@ -137,6 +140,26 @@ func (s *Syncer) processL1Blocks(ctx context.Context) error {
 
 		s.state.SetL1Current(newL1Current)
 		s.lastInsertedBatchID = nil
+		s.proposalsRollbackedRanges = nil
+	}
+
+	// Fetch all the rollbacked batches before processing the new batches.
+	rollbackedProposalsIterator, err := eventIterator.NewProposalsRollbackedIterator(
+		ctx, &eventIterator.ProposalsRollbackedIteratorConfig{
+			Client:                     s.rpc.L1,
+			RollbackInbox:              s.rpc.ShastaClients.RollbackInbox,
+			StartHeight:                s.state.GetL1Current().Number,
+			EndHeight:                  l1End.Number,
+			OnProposalsRollbackedEvent: s.onProposalsRollbacked,
+		})
+	if err != nil {
+		log.Error("Failed to create Rollbacked iterator", "error", err)
+		return err
+	}
+
+	if err := rollbackedProposalsIterator.Iter(); err != nil {
+		log.Error("ProposalsRollbacked iterator failed", "error", err)
+		return err
 	}
 
 	iter, err := eventIterator.NewBatchProposedIterator(ctx, &eventIterator.BatchProposedIteratorConfig{
@@ -159,6 +182,37 @@ func (s *Syncer) processL1Blocks(ctx context.Context) error {
 		metrics.DriverL1CurrentHeightGauge.Set(float64(s.state.GetL1Current().Number.Uint64()))
 	}
 
+	return nil
+}
+
+// onProposalsRollbacked is a `ProposalsRollbacked` event callback which is responsible for
+// updating the proposals rollbacked ranges.
+func (s *Syncer) onProposalsRollbacked(
+	ctx context.Context,
+	event *shasta.RollbackInboxRollbacked,
+	endIter eventIterator.EndProposalsRollbackedEventIterFunc,
+) error {
+	totalRollbacked := new(big.Int).Add(
+		new(big.Int).Sub(event.LastProposalId, event.FirstProposalId),
+		common.Big1,
+	)
+
+	log.Info("ProposalsRollbacked event received",
+		"firstProposalID", event.FirstProposalId,
+		"lastProposalID", event.LastProposalId,
+		"l1BlockHeight", event.Raw.BlockNumber,
+		"totalProposalsRollBacked", totalRollbacked,
+	)
+
+	if event.LastProposalId.Cmp(event.FirstProposalId) < 0 {
+		return fmt.Errorf("invalid rollback range: last %v < first %v",
+			event.LastProposalId, event.FirstProposalId)
+	}
+
+	s.proposalsRollbackedRanges = append(s.proposalsRollbackedRanges, typesShasta.ProposalsRollbacked{
+		FirstProposalId: event.FirstProposalId,
+		LastProposalId:  event.LastProposalId,
+	})
 	return nil
 }
 
@@ -193,6 +247,16 @@ func (s *Syncer) processShastaProposal(
 		// Reset the lastInsertedBatchID when processing the genesis Shasta proposal.
 		s.lastInsertedBatchID = common.Big0
 		log.Debug("Ignore genesis Shasta proposal event", "proposalID", meta.GetEventData().Id)
+		return nil
+	}
+
+	// If the proposal ID is in the rollbacked ranges, we skip the proposal insertion.
+	if s.proposalsRollbackedRanges != nil && s.proposalsRollbackedRanges.Contains(meta.GetEventData().Id) {
+		log.Info(
+			"Skip proposal since it is present in the rollbacked range (ProposalsRollbacked)",
+			"proposalID", meta.GetEventData().Id,
+			"lastInsertedBatchID", s.lastInsertedBatchID,
+		)
 		return nil
 	}
 

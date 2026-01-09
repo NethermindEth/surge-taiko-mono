@@ -40,6 +40,7 @@ type ShastaClients struct {
 	Inbox           *shastaBindings.ShastaInboxClient
 	Anchor          *shastaBindings.ShastaAnchor
 	ComposeVerifier *shastaBindings.ComposeVerifier
+	RollbackInbox   *shastaBindings.RollbackInbox
 	InboxAddress    common.Address
 	// ForkTime is the Shasta hardfork activation timestamp (unix seconds). Optional.
 	ForkTime uint64
@@ -70,6 +71,7 @@ type ClientConfig struct {
 	L2CheckPoint                string
 	PacayaInboxAddress          common.Address
 	ShastaInboxAddress          common.Address
+	RollbackInboxAddress        common.Address
 	TaikoWrapperAddress         common.Address
 	TaikoAnchorAddress          common.Address
 	TaikoTokenAddress           common.Address
@@ -290,6 +292,15 @@ func (c *Client) initShastaClients(ctx context.Context, cfg *ClientConfig) error
 	if err != nil {
 		return fmt.Errorf("failed to create new instance of ComposeVerifier: %w", err)
 	}
+
+	if cfg.RollbackInboxAddress == (common.Address{}) {
+		return fmt.Errorf("rollback inbox address is not set")
+	}
+	rollbackInbox, err := shastaBindings.NewRollbackInbox(cfg.RollbackInboxAddress, c.L1)
+	if err != nil {
+		return fmt.Errorf("failed to create new instance of RollbackInbox: %w", err)
+	}
+
 	// Initialize Shasta clients with a fork-time value determined by precedence:
 	// 1) CLI flag (cfg.ShastaForkTime)
 	// 2) Env var TAIKO_INTERNAL_SHASTA_TIME
@@ -307,6 +318,7 @@ func (c *Client) initShastaClients(ctx context.Context, cfg *ClientConfig) error
 		Anchor:          shastaAnchor,
 		ComposeVerifier: composeVerifier,
 		InboxAddress:    cfg.ShastaInboxAddress,
+		RollbackInbox:   rollbackInbox,
 		ForkTime:        forkTime,
 	}
 
