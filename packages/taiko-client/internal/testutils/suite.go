@@ -369,4 +369,19 @@ func (s *ClientTestSuite) forkTo(attributes *engine.PayloadAttributes, parentHas
 	s.Nil(err)
 
 	s.Equal(attributes.L1Origin.BlockID.Uint64(), head.Number.Uint64())
+
+	// For Nethermind: wait for txpool to synchronize after chain head change
+	// This addresses the async txpool processing race condition
+	if os.Getenv("L2_NODE") == "l2_nmc" {
+		var synced bool
+		err := s.RPCClient.L2Engine.CallContext(
+			context.Background(),
+			&synced,
+			"taikoAuth_waitForTxPoolSync",
+			head.Number.Int64(),
+			5000, // 5 second timeout
+		)
+		s.Nil(err)
+		s.True(synced, "TxPool sync failed after forkTo")
+	}
 }
