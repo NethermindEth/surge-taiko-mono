@@ -73,7 +73,7 @@ services:
 
   l2_nmc:
     container_name: l2_nmc
-    image: nethermindeth/nethermind:master-32dc74a
+    image: nethermindeth/nethermind:taiko-shasta-13-01-2026
     restart: unless-stopped
     pull_policy: always
     volumes:
