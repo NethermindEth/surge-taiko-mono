@@ -238,6 +238,7 @@ func (s *ClientTestSuite) TearDownSuite() {
 	s.RevertL1Snapshot(s.testnetL1SnapshotID)
 }
 
+// xxx
 func (s *ClientTestSuite) SetHead(headNum *big.Int) {
 	// For geth node, we can set the head directly.
 	if os.Getenv("L2_NODE") == "l2_geth" {
@@ -371,13 +372,14 @@ func (s *ClientTestSuite) forkTo(attributes *engine.PayloadAttributes, parentHas
 	s.Equal(attributes.L1Origin.BlockID.Uint64(), head.Number.Uint64())
 
 	// For Nethermind: wait for txpool to synchronize after chain head change
-	// This addresses the async txpool processing race condition
+	// This addresses the async txpool processing race condition.
+	// Uses the debug RPC method specifically designed for integration tests.
 	if os.Getenv("L2_NODE") == "l2_nmc" {
 		var synced bool
 		err := s.RPCClient.L2Engine.CallContext(
 			context.Background(),
 			&synced,
-			"taikoAuth_waitForTxPoolSync",
+			"taikoDebug_waitForTxPoolSync",
 			head.Number.Int64(),
 			5000, // 5 second timeout
 		)
