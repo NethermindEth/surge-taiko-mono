@@ -238,7 +238,6 @@ func (s *ClientTestSuite) TearDownSuite() {
 	s.RevertL1Snapshot(s.testnetL1SnapshotID)
 }
 
-// xxx
 func (s *ClientTestSuite) SetHead(headNum *big.Int) {
 	// For geth node, we can set the head directly.
 	if os.Getenv("L2_NODE") == "l2_geth" {
