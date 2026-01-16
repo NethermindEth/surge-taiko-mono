@@ -370,19 +370,19 @@ func (s *ClientTestSuite) forkTo(attributes *engine.PayloadAttributes, parentHas
 
 	s.Equal(attributes.L1Origin.BlockID.Uint64(), head.Number.Uint64())
 
-	// For Nethermind: wait for txpool to synchronize after chain head change
-	// This addresses the async txpool processing race condition.
-	// Uses the debug RPC method specifically designed for integration tests.
+	// For Nethermind: clear txpool state after chain reorg
+	// After a reorg, stale txpool caches would reject transaction resubmissions
+	// with "already known" or "nonce too low". This clears hash cache, account cache, and pending txs.
+	// Pending txs must be cleared because tests resubmit transactions with the same hash/nonce,
+	// which would be rejected as "ReplacementNotAllowed" if they remain in the pool.
 	if os.Getenv("L2_NODE") == "l2_nmc" {
-		var synced bool
+		var cleared bool
 		err := s.RPCClient.L2Engine.CallContext(
 			context.Background(),
-			&synced,
-			"taikoDebug_waitForTxPoolSync",
-			head.Number.Int64(),
-			5000, // 5 second timeout
+			&cleared,
+			"taikoDebug_clearTxPoolForReorg",
 		)
 		s.Nil(err)
-		s.True(synced, "TxPool sync failed after forkTo")
+		s.True(cleared, "TxPool clear failed after forkTo")
 	}
 }
