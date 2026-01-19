@@ -16,6 +16,7 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/cmd/flags"
 	pkgFlags "github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/flags"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/jwt"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
 
@@ -51,6 +52,9 @@ type Config struct {
 	ForceBatchProvingInterval time.Duration
 	ProofPollingInterval      time.Duration
 	Dummy                     bool
+	ProverAPIPort             uint64
+	ProverAPICORSOrigins      string
+	ProverAPIJWTSecret        []byte
 }
 
 // NewConfigFromCliContext creates a new config instance from command line flags.
@@ -96,6 +100,15 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 	}
 	log.Info("Local proposer addresses", "addresses", localProposerAddresses)
 
+	var proverAPIJWTSecret []byte
+	if c.String(flags.ProverAPIJWTSecret.Name) != "" {
+		if proverAPIJWTSecret, err = jwt.ParseSecretFromFile(
+			c.String(flags.ProverAPIJWTSecret.Name),
+		); err != nil {
+			return nil, fmt.Errorf("invalid prover API JWT secret file: %w", err)
+		}
+	}
+
 	return &Config{
 		L1WsEndpoint:           c.String(flags.L1WSEndpoint.Name),
 		L2WsEndpoint:           c.String(flags.L2WSEndpoint.Name),
@@ -131,5 +144,8 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		ZKVMProofBufferSize:       c.Uint64(flags.ZKVMBatchSize.Name),
 		ForceBatchProvingInterval: c.Duration(flags.ForceBatchProvingInterval.Name),
 		ProofPollingInterval:      c.Duration(flags.ProofPollingInterval.Name),
+		ProverAPIPort:             c.Uint64(flags.ProverAPIPort.Name),
+		ProverAPICORSOrigins:      c.String(flags.ProverAPICORSOrigins.Name),
+		ProverAPIJWTSecret:        proverAPIJWTSecret,
 	}, nil
 }

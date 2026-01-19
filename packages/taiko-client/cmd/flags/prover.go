@@ -121,6 +121,27 @@ var (
 		Category: proverCategory,
 		EnvVars:  []string{"PROVER_ZKVM_BATCH_SIZE"},
 	}
+	// Prover API server flags
+	ProverAPIPort = &cli.Uint64Flag{
+		Name:     "prover.api.port",
+		Usage:    "Port for the prover API server (enables server when set to non-zero)",
+		Value:    0,
+		Category: proverCategory,
+		EnvVars:  []string{"PROVER_API_PORT"},
+	}
+	ProverAPICORSOrigins = &cli.StringFlag{
+		Name:     "prover.api.corsOrigins",
+		Usage:    "CORS origins for the prover API server",
+		Value:    "*",
+		Category: proverCategory,
+		EnvVars:  []string{"PROVER_API_CORS_ORIGINS"},
+	}
+	ProverAPIJWTSecret = &cli.StringFlag{
+		Name:     "prover.api.jwtSecret",
+		Usage:    "Path to JWT secret file for the prover API server authentication",
+		Category: proverCategory,
+		EnvVars:  []string{"PROVER_API_JWT_SECRET"},
+	}
 )
 
 // ProverFlags All prover flags.
@@ -143,4 +164,7 @@ var ProverFlags = MergeFlags(CommonFlags, []cli.Flag{
 	SGXBatchSize,
 	ZKVMBatchSize,
 	ForceBatchProvingInterval,
+	ProverAPIPort,
+	ProverAPICORSOrigins,
+	ProverAPIJWTSecret,
 }, opsigner.CLIFlags("PROVER", proverCategory), TxmgrFlags)

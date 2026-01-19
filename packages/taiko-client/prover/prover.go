@@ -73,6 +73,9 @@ type Prover struct {
 	txmgr        txmgr.TxManager
 	privateTxmgr txmgr.TxManager
 
+	// Prover API server
+	proverAPIServer *ProverAPIServer
+
 	ctx context.Context
 	wg  sync.WaitGroup
 }
@@ -193,7 +196,17 @@ func (p *Prover) Start() error {
 		}
 	}
 
-	// 2. Start the main event loop of the prover.
+	// 2. Start prover API server if enabled.
+	if p.proverAPIServer != nil {
+		go func() {
+			if err := p.proverAPIServer.Start(p.cfg.ProverAPIPort); err != nil {
+				log.Error("Prover API server error", "error", err)
+			}
+		}()
+		log.Info("Prover API server started", "port", p.cfg.ProverAPIPort)
+	}
+
+	// 3. Start the main event loop of the prover.
 	go p.eventLoop()
 
 	return nil
@@ -281,7 +294,12 @@ func (p *Prover) eventLoop() {
 }
 
 // Close closes the prover instance.
-func (p *Prover) Close(_ context.Context) {
+func (p *Prover) Close(ctx context.Context) {
+	if p.proverAPIServer != nil {
+		if err := p.proverAPIServer.Shutdown(ctx); err != nil {
+			log.Error("Failed to shutdown prover API server", "error", err)
+		}
+	}
 	p.wg.Wait()
 }
 

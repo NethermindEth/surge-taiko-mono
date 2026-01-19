@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/prysmaticlabs/prysm/v5/api/server/structs"
 )
 
 // ProofType represents the type of the given proof.
@@ -119,6 +120,40 @@ type ProofRequestOptionsShasta struct {
 	DesignatedProver              common.Address
 	Checkpoint                    *Checkpoint
 	LastAnchorBlockNumber         *big.Int
+	// L1LimpData is optional limp mode data for proof requests.
+	// When provided, Raiko will use this data instead of fetching from L1.
+	L1LimpData *L1LimpData
+}
+
+// L1LimpData contains the limp mode data structure.
+type L1LimpData struct {
+	ExpectedProposeEvent LimpModeExpectedProposeEvent `json:"expected_propose_event"`
+	Blobs                struct {
+		Data []*structs.Sidecar `json:"data"`
+	} `json:"blobs"`
+}
+
+// LimpModeBlobSlice represents a blob slice for limp mode.
+type LimpModeBlobSlice struct {
+	BlobHashes []string `json:"blobHashes"`
+	Offset     string   `json:"offset"`
+	Timestamp  string   `json:"timestamp"`
+}
+
+// LimpModeDerivationSource represents a derivation source for limp mode.
+type LimpModeDerivationSource struct {
+	IsForcedInclusion bool              `json:"isForcedInclusion"`
+	BlobSlice         LimpModeBlobSlice `json:"blobSlice"`
+}
+
+// LimpModeExpectedProposeEvent contains only the fields from Proposed event.
+type LimpModeExpectedProposeEvent struct {
+	Id                             string                     `json:"id"`
+	Proposer                       string                     `json:"proposer"`
+	ParentProposalHash             string                     `json:"parentProposalHash"`
+	EndOfSubmissionWindowTimestamp string                     `json:"endOfSubmissionWindowTimestamp"`
+	BasefeeSharingPctg             uint8                      `json:"basefeeSharingPctg"`
+	Sources                        []LimpModeDerivationSource `json:"sources"`
 }
 
 // IsPacaya implemenwts the ProofRequestOptions interface.

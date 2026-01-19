@@ -38,7 +38,8 @@ type RaikoCheckpoint struct {
 // RaikoProposals represents the JSON body of RaikoRequestProofBodyV3Shasta's `Proposals` field.
 type RaikoProposals struct {
 	ProposalId             *big.Int         `json:"proposal_id"`
-	L1InclusionBlockNumber *big.Int         `json:"l1_inclusion_block_number"`
+	L1InclusionBlockNumber *big.Int         `json:"l1_inclusion_block_number,omitempty"` // Normal mode
+	L1LimpData             *L1LimpData      `json:"l1_limp_data,omitempty"`              // Limp mode (mutually exclusive with L1InclusionBlockNumber)
 	L2BlockNumbers         []*big.Int       `json:"l2_block_numbers"`
 	DesignatedProver       string           `json:"designated_prover"`
 	Checkpoint             *RaikoCheckpoint `json:"checkpoint"`
@@ -287,19 +288,31 @@ func (s *ComposeProofProducer) requestBatchProof(
 	)
 
 	if metas[0].IsShasta() {
+		// Check if limp mode data is provided - only supported for single proposal.
+		l1LimpData := opts[0].ShastaOptions().L1LimpData
+		if l1LimpData != nil && len(metas) > 1 {
+			return nil, fmt.Errorf("limp mode data provided but multiple proposals (%d) not supported", len(metas))
+		}
+
 		for i, meta := range metas {
-			proposals = append(proposals, &RaikoProposals{
-				ProposalId:             meta.Shasta().GetEventData().Id,
-				L1InclusionBlockNumber: meta.GetRawBlockHeight(),
-				L2BlockNumbers:         opts[i].ShastaOptions().L2BlockNums,
-				DesignatedProver:       opts[i].ShastaOptions().DesignatedProver.Hex()[2:],
+			proposal := &RaikoProposals{
+				ProposalId:       meta.Shasta().GetEventData().Id,
+				L2BlockNumbers:   opts[i].ShastaOptions().L2BlockNums,
+				DesignatedProver: opts[i].ShastaOptions().DesignatedProver.Hex()[2:],
 				Checkpoint: &RaikoCheckpoint{
 					BlockNum:  opts[i].ShastaOptions().Checkpoint.BlockNumber,
 					BlockHash: common.BytesToHash(opts[i].ShastaOptions().Checkpoint.BlockHash[:]).Hex()[2:],
 					StateRoot: common.BytesToHash(opts[i].ShastaOptions().Checkpoint.StateRoot[:]).Hex()[2:],
 				},
 				LastAnchorBlockNumber: opts[i].ShastaOptions().LastAnchorBlockNumber,
-			})
+			}
+			// Set either L1InclusionBlockNumber (normal mode) or L1LimpData (limp mode), but not both.
+			if l1LimpData != nil {
+				proposal.L1LimpData = l1LimpData
+			} else {
+				proposal.L1InclusionBlockNumber = meta.GetRawBlockHeight()
+			}
+			proposals = append(proposals, proposal)
 		}
 		output, err = requestHTTPProof[RaikoRequestProofBodyV3Shasta, RaikoRequestProofBodyResponseV2](
 			ctx,

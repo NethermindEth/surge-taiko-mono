@@ -66,6 +66,7 @@ func (s *ChainSyncerTestSuite) SetupTest() {
 			JwtSecret:                   string(jwtSecret),
 			PacayaInboxAddress:          common.HexToAddress(os.Getenv("PACAYA_INBOX")),
 			ShastaInboxAddress:          common.HexToAddress(os.Getenv("SHASTA_INBOX")),
+			RollbackInboxAddress:        common.HexToAddress(os.Getenv("ROLLBACK_INBOX")),
 			ProverSetAddress:            common.HexToAddress(os.Getenv("PROVER_SET")),
 			TaikoWrapperAddress:         common.HexToAddress(os.Getenv("TAIKO_WRAPPER")),
 			ForcedInclusionStoreAddress: common.HexToAddress(os.Getenv("FORCED_INCLUSION_STORE")),
@@ -555,6 +556,114 @@ func (s *ChainSyncerTestSuite) TestShastaProposalsWithForcedInclusion() {
 	s.Equal(crypto.PubkeyToAddress(s.KeyFromEnv("L1_PROPOSER_PRIVATE_KEY").PublicKey), forcedIncludedHeader1.Coinbase())
 	s.NotEqual(s.TestAddr, forcedIncludedHeader1.Coinbase())
 	s.Greater(head2.Header().Time, forcedIncludedHeader1.Header().Time)
+}
+
+func (s *ChainSyncerTestSuite) TestShastaRollback() {
+	s.ForkIntoShasta(s.p, s.s.EventSyncer())
+
+	// Get initial L2 head
+	initialL2Head, err := s.RPCClient.L2.BlockByNumber(context.Background(), nil)
+	s.Nil(err)
+
+	// Propose first block (proposal ID 1)
+	txCandidate1, err := s.shastaProposalBuilder.BuildShasta(
+		context.Background(),
+		[]types.Transactions{{}},
+		common.Big1,
+		common.Address{},
+	)
+	s.Nil(err)
+	s.Nil(s.p.SendTx(context.Background(), txCandidate1))
+	s.Nil(s.s.EventSyncer().ProcessL1Blocks(context.Background()))
+
+	// Propose second block (proposal ID 2)
+	txCandidate2, err := s.shastaProposalBuilder.BuildShasta(
+		context.Background(),
+		[]types.Transactions{{}},
+		common.Big1,
+		common.Address{},
+	)
+	s.Nil(err)
+	s.Nil(s.p.SendTx(context.Background(), txCandidate2))
+	s.Nil(s.s.EventSyncer().ProcessL1Blocks(context.Background()))
+
+	// Check the L2 head after proposals
+	headAfterProposals, err := s.RPCClient.L2.BlockByNumber(context.Background(), nil)
+	s.Nil(err)
+	s.Greater(headAfterProposals.NumberU64(), initialL2Head.NumberU64())
+
+	// Get rollback delay from contract
+	maxDelay, err := s.RPCClient.ShastaClients.RollbackInbox.MaxFinalizationDelayBeforeRollback(nil)
+	s.Nil(err)
+	s.NotZero(maxDelay.Uint64())
+
+	// Get current core state to check lastFinalizedTimestamp
+	coreState, err := s.RPCClient.ShastaClients.Inbox.GetCoreState(nil)
+	s.Nil(err)
+
+	// Fast forward time past the rollback threshold
+	rollbackTime := coreState.LastFinalizedTimestamp.Uint64() + maxDelay.Uint64() + 1
+	s.SetNextBlockTimestamp(rollbackTime)
+	s.L1Mine()
+
+	// Trigger rollback
+	rollbackTxMgr := s.TxMgr("rollback", s.KeyFromEnv("L1_PROPOSER_PRIVATE_KEY"))
+	rollbackABI, err := shastaBindings.RollbackInboxMetaData.GetAbi()
+	s.Nil(err)
+	rollbackData, err := rollbackABI.Pack("rollback")
+	s.Nil(err)
+
+	// RollbackInbox functions are on the ShastaInbox contract (RollbackInbox is inherited)
+	shastaInboxAddr := common.HexToAddress(os.Getenv("SHASTA_INBOX"))
+	_, err = rollbackTxMgr.Send(context.Background(), txmgr.TxCandidate{
+		TxData: rollbackData,
+		To:     &shastaInboxAddr,
+	})
+	s.Nil(err)
+
+	// Reset L2 chain to simulate the state after rollback
+	// The driver should handle this by detecting the rollback event and skipping
+	// the rolled-back proposals when re-syncing
+	s.SetHead(initialL2Head.Number())
+
+	// Process L1 blocks - this should now:
+	// 1. Detect the Rollbacked event and add proposals 1-2 to rollbackedRanges
+	// 2. Skip processing proposals 1-2 since they're in the rollback range
+	s.Nil(s.s.EventSyncer().ProcessL1Blocks(context.Background()))
+
+	// Verify that the rolled-back proposals were skipped (L2 head should not advance
+	// beyond the initial head since the proposals were rolled back)
+	headAfterRollback, err := s.RPCClient.L2.BlockByNumber(context.Background(), nil)
+	s.Nil(err)
+	s.Equal(initialL2Head.NumberU64(), headAfterRollback.NumberU64())
+
+	// Propose a new block after rollback (should succeed and chain continues)
+	txCandidate3, err := s.shastaProposalBuilder.BuildShasta(
+		context.Background(),
+		[]types.Transactions{{}},
+		common.Big1,
+		common.Address{},
+	)
+	s.Nil(err)
+
+	// In limp mode, we need to use proposeAndProve, but for test simplicity
+	// let's disable limp mode first (owner can do this)
+	ownerTxMgr := s.TxMgr("setLimpMode", s.KeyFromEnv("L1_CONTRACT_OWNER_PRIVATE_KEY"))
+	setLimpModeData, err := rollbackABI.Pack("setLimpMode", false)
+	s.Nil(err)
+	_, err = ownerTxMgr.Send(context.Background(), txmgr.TxCandidate{
+		TxData: setLimpModeData,
+		To:     &shastaInboxAddr,
+	})
+	s.Nil(err)
+
+	s.Nil(s.p.SendTx(context.Background(), txCandidate3))
+	s.Nil(s.s.EventSyncer().ProcessL1Blocks(context.Background()))
+
+	// Verify chain continued - L2 head should have advanced
+	finalL2Head, err := s.RPCClient.L2.BlockByNumber(context.Background(), nil)
+	s.Nil(err)
+	s.Greater(finalL2Head.NumberU64(), initialL2Head.NumberU64())
 }
 
 func TestChainSyncerTestSuite(t *testing.T) {

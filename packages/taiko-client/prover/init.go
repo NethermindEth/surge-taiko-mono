@@ -175,6 +175,18 @@ func (p *Prover) initShastaProofSubmitter(ctx context.Context, txBuilder *transa
 		return fmt.Errorf("failed to initialize Shasta proof submitter: %w", err)
 	}
 
+	// Initialize prover API server if port is configured.
+	if p.cfg.ProverAPIPort > 0 {
+		p.proverAPIServer = NewProverAPIServer(
+			p.cfg.ProverAPICORSOrigins,
+			p.cfg.ProverAPIJWTSecret,
+			sgxRethProducer,
+			zkvmProducer,
+			p.txmgr.From(),
+		)
+		log.Info("Prover API server initialized", "port", p.cfg.ProverAPIPort)
+	}
+
 	return nil
 }
 
