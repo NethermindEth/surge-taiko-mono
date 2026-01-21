@@ -43,6 +43,14 @@ cat ../protocol/out/layer1/ComposeVerifier.sol/ComposeVerifier.json |
   jq .abi |
   ${ABIGEN_BIN} --abi - --type ComposeVerifier --pkg ${FORK} --out $DIR/../bindings/${FORK}/gen_compose_verifier.go
 
+cat ../protocol/out/layer1/SurgeVerifier.sol/SurgeVerifier.json |
+  jq .abi |
+  ${ABIGEN_BIN} --abi - --type SurgeVerifier --pkg ${FORK} --out $DIR/../bindings/${FORK}/gen_surge_verifier.go
+
+cat ../protocol/out/layer1/LibProofBitmap.sol/LibProofBitmap.json |
+  jq .abi |
+  ${ABIGEN_BIN} --abi - --type LibProofBitmap --pkg ${FORK} --out $DIR/../bindings/${FORK}/gen_lib_proof_bitmap.go
+
 git -C ../../ log --format="%H" -n 1 >./bindings/${FORK}/.githead
 
 echo "🍻 Go contract bindings generated!"

@@ -37,10 +37,14 @@ type PacayaClients struct {
 
 // ShastaClients contains all smart contract clients for ShastaClients fork.
 type ShastaClients struct {
-	Inbox           *shastaBindings.ShastaInboxClient
-	Anchor          *shastaBindings.ShastaAnchor
-	ComposeVerifier *shastaBindings.ComposeVerifier
-	InboxAddress    common.Address
+	Inbox  *shastaBindings.ShastaInboxClient
+	Anchor *shastaBindings.ShastaAnchor
+
+	// Surge
+	LibProofBitmap *shastaBindings.LibProofBitmap
+	SurgeVerifier  *shastaBindings.SurgeVerifier
+
+	InboxAddress common.Address
 	// ForkTime is the Shasta hardfork activation timestamp (unix seconds). Optional.
 	ForkTime uint64
 }
@@ -286,10 +290,16 @@ func (c *Client) initShastaClients(ctx context.Context, cfg *ClientConfig) error
 	if err != nil {
 		return fmt.Errorf("failed to get shasta inbox config: %w", err)
 	}
-	composeVerifier, err := shastaBindings.NewComposeVerifier(config.ProofVerifier, c.L1)
+
+	libProofBitmap, err := shastaBindings.NewLibProofBitmap(config.ProofVerifier, c.L1)
 	if err != nil {
-		return fmt.Errorf("failed to create new instance of ComposeVerifier: %w", err)
+		return fmt.Errorf("failed to create new instance of LibProofBitmap: %w", err)
 	}
+	surgeVerifier, err := shastaBindings.NewSurgeVerifier(config.ProofVerifier, c.L1)
+	if err != nil {
+		return fmt.Errorf("failed to create new instance of SurgeVerifier: %w", err)
+	}
+
 	// Initialize Shasta clients with a fork-time value determined by precedence:
 	// 1) CLI flag (cfg.ShastaForkTime)
 	// 2) Env var TAIKO_INTERNAL_SHASTA_TIME
@@ -303,11 +313,12 @@ func (c *Client) initShastaClients(ctx context.Context, cfg *ClientConfig) error
 	}
 
 	c.ShastaClients = &ShastaClients{
-		Inbox:           shastaInbox,
-		Anchor:          shastaAnchor,
-		ComposeVerifier: composeVerifier,
-		InboxAddress:    cfg.ShastaInboxAddress,
-		ForkTime:        forkTime,
+		Inbox:          shastaInbox,
+		Anchor:         shastaAnchor,
+		LibProofBitmap: libProofBitmap,
+		SurgeVerifier:  surgeVerifier,
+		InboxAddress:   cfg.ShastaInboxAddress,
+		ForkTime:       forkTime,
 	}
 
 	return nil

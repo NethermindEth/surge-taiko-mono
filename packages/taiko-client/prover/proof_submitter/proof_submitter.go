@@ -22,7 +22,7 @@ import (
 
 var (
 	MaxNumSupportedZkTypes    = 2
-	MaxNumSupportedProofTypes = 3
+	MaxNumSupportedProofTypes = 4
 	ErrCacheNotFound          = errors.New("cache not found")
 )
 
@@ -287,7 +287,13 @@ func (s *ProofSubmitterPacaya) TryAggregate(buffer *proofProducer.ProofBuffer, p
 // StartProofBufferMonitors monitors proof buffers and enforces forced aggregation,
 // only be called once during initialization.
 func (s *ProofSubmitterPacaya) startProofBufferMonitors(ctx context.Context) {
-	startProofBufferMonitors(ctx, s.proofBuffers, s.TryAggregate)
+	for proofType, buffer := range s.proofBuffers {
+		// Create a closure that captures the proofType for the monitor
+		tryAggregate := func(buffer *proofProducer.ProofBuffer) bool {
+			return s.TryAggregate(buffer, proofType)
+		}
+		startProofBufferMonitors(ctx, buffer, tryAggregate)
+	}
 }
 
 // BatchSubmitProofs implements the Submitter interface to submit proof aggregation.
@@ -507,4 +513,10 @@ func (s *ProofSubmitterPacaya) validateBatchProofs(
 }
 func (s *ProofSubmitterPacaya) FlushCache(_ context.Context, _ proofProducer.ProofType) error {
 	return errors.New("FlushCache is not supported in Pacaya fork")
+}
+
+// AggregateProofs is not used by Pacaya (only for Shasta dual proofs).
+func (s *ProofSubmitterPacaya) AggregateProofs(ctx context.Context) error {
+	// Pacaya uses AggregateProofsByType instead
+	return nil
 }

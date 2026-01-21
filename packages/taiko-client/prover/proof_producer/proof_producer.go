@@ -25,20 +25,32 @@ type ProofRequestBody struct {
 	Meta metadata.TaikoProposalMetaData
 }
 
-// ProofResponse represents a response of a proof request.
+// ProofResponse represents a response of a dual proof request.
 type ProofResponse struct {
-	BatchID   *big.Int
-	Meta      metadata.TaikoProposalMetaData
+	BatchID    *big.Int
+	Meta       metadata.TaikoProposalMetaData
+	Proof1     []byte
+	ProofType1 ProofType
+	Proof2     []byte
+	ProofType2 ProofType
+	Opts       ProofRequestOptions
+	// Legacy fields (for Pacaya compatibility)
 	Proof     []byte
-	Opts      ProofRequestOptions
 	ProofType ProofType
 }
 
-// BatchProofs represents a response of a batch proof request.
+// BatchProofs represents a response of a dual batch proof request.
 type BatchProofs struct {
-	ProofResponses       []*ProofResponse
+	ProofResponses []*ProofResponse
+	BatchProof1    []byte
+	ProofType1     ProofType
+	VerifierID1    uint8
+	BatchProof2    []byte
+	ProofType2     ProofType
+	VerifierID2    uint8
+	BatchIDs       []*big.Int
+	// Legacy fields (kept for compilation, not used)
 	BatchProof           []byte
-	BatchIDs             []*big.Int
 	ProofType            ProofType
 	Verifier             common.Address
 	VerifierID           uint8
