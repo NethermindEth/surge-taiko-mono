@@ -14,6 +14,7 @@ import (
 
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 )
 
 const (
@@ -37,14 +38,10 @@ type PacayaClients struct {
 
 // ShastaClients contains all smart contract clients for ShastaClients fork.
 type ShastaClients struct {
-	Inbox  *shastaBindings.ShastaInboxClient
-	Anchor *shastaBindings.ShastaAnchor
-
-	// Surge
-	LibProofBitmap *shastaBindings.LibProofBitmap
-	SurgeVerifier  *shastaBindings.SurgeVerifier
-
-	InboxAddress common.Address
+	Inbox         *shastaBindings.ShastaInboxClient
+	Anchor        *shastaBindings.ShastaAnchor
+	SurgeVerifier *surgeBindings.SurgeVerifier // Surge
+	InboxAddress  common.Address
 	// ForkTime is the Shasta hardfork activation timestamp (unix seconds). Optional.
 	ForkTime uint64
 }
@@ -290,12 +287,7 @@ func (c *Client) initShastaClients(ctx context.Context, cfg *ClientConfig) error
 	if err != nil {
 		return fmt.Errorf("failed to get shasta inbox config: %w", err)
 	}
-
-	libProofBitmap, err := shastaBindings.NewLibProofBitmap(config.ProofVerifier, c.L1)
-	if err != nil {
-		return fmt.Errorf("failed to create new instance of LibProofBitmap: %w", err)
-	}
-	surgeVerifier, err := shastaBindings.NewSurgeVerifier(config.ProofVerifier, c.L1)
+	surgeVerifier, err := surgeBindings.NewSurgeVerifier(config.ProofVerifier, c.L1)
 	if err != nil {
 		return fmt.Errorf("failed to create new instance of SurgeVerifier: %w", err)
 	}
@@ -313,12 +305,11 @@ func (c *Client) initShastaClients(ctx context.Context, cfg *ClientConfig) error
 	}
 
 	c.ShastaClients = &ShastaClients{
-		Inbox:          shastaInbox,
-		Anchor:         shastaAnchor,
-		LibProofBitmap: libProofBitmap,
-		SurgeVerifier:  surgeVerifier,
-		InboxAddress:   cfg.ShastaInboxAddress,
-		ForkTime:       forkTime,
+		Inbox:         shastaInbox,
+		Anchor:        shastaAnchor,
+		SurgeVerifier: surgeVerifier,
+		InboxAddress:  cfg.ShastaInboxAddress,
+		ForkTime:      forkTime,
 	}
 
 	return nil

@@ -50,6 +50,16 @@ func (m *TaikoProposalMetadataShasta) IsShasta() bool {
 	return true
 }
 
+// Surge implements TaikoProposalMetaData interface.
+func (m *TaikoProposalMetadataShasta) Surge() TaikoProposalMetaDataSurge {
+	return nil
+}
+
+// IsSurge implements TaikoProposalMetaData interface.
+func (m *TaikoProposalMetadataShasta) IsSurge() bool {
+	return false
+}
+
 // GetRawBlockHeight returns the raw L1 block height.
 func (m *TaikoProposalMetadataShasta) GetRawBlockHeight() *big.Int {
 	return new(big.Int).SetUint64(m.Raw.BlockNumber)

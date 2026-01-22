@@ -34,7 +34,11 @@ dev_net:
 
 gen_bindings:
 	@TAIKO_GETH_DIR=${TAIKO_GETH_DIR} \
-		./scripts/gen_bindings.sh
+		./scripts/gen_bindings.sh shasta
+
+gen_surge_bindings:
+	@TAIKO_GETH_DIR=${TAIKO_GETH_DIR} \
+		./scripts/gen_bindings.sh surge
 
 .PHONY: build \
 				clean \
@@ -42,4 +46,5 @@ gen_bindings:
 				test \
 				hive_tests \
 				dev_net \
-				gen_bindings
+				gen_bindings \
+				gen_surge_bindings
