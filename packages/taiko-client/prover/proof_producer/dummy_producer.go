@@ -29,10 +29,10 @@ func (o *DummyProofProducer) Aggregate(
 	items []*ProofResponse,
 	requestAt time.Time,
 ) (*BatchProofs, error) {
-	return &BatchProofs{ProofResponses: items, BatchProof: bytes.Repeat([]byte{0xff}, 100), ProofType: ProofTypeOp}, nil
+	return &BatchProofs{ProofResponses: items, BatchProof1: bytes.Repeat([]byte{0xff}, 100), ProofType1: ProofTypeOp}, nil
 }
 
 // RequestBatchProofs returns a dummy proof aggregation to the result channel.
 func (o *DummyProofProducer) RequestBatchProofs(proofs []*ProofResponse, proofType ProofType) (*BatchProofs, error) {
-	return &BatchProofs{ProofResponses: proofs, BatchProof: bytes.Repeat([]byte{0xbb}, 100), ProofType: proofType}, nil
+	return &BatchProofs{ProofResponses: proofs, BatchProof1: bytes.Repeat([]byte{0xbb}, 100), ProofType1: proofType}, nil
 }

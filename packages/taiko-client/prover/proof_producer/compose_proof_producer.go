@@ -59,12 +59,7 @@ type ComposeProofProducer struct {
 	// We use VerifierIDs for Shasta proof
 	VerifierIDs map[ProofType]uint8
 
-	// Pacaya legacy fields (kept for compilation, not used)
-	RaikoHostEndpoint string                // No-op: kept for Pacaya compatibility
-	SgxGethProducer   *SgxGethProofProducer // No-op: kept for Pacaya compatibility
-	ProofType         ProofType             // No-op: kept for Pacaya compatibility
-
-	// Dual ZKVM configuration (active)
+	// Dual ZKVM configuration
 	RaikoZKVMEndpoint1 string
 	RaikoZKVMEndpoint2 string
 	ZKVMProofType1     ProofType
@@ -86,91 +81,130 @@ func (s *ComposeProofProducer) RequestProof(
 	requestAt time.Time,
 ) (*ProofResponse, error) {
 	log.Info(
-		"Requesting dual ZKVM proofs",
+		"Request dual ZKVM proofs from raiko-host service",
 		"proposalID", proposalID,
+		"zkvm1Endpoint", s.RaikoZKVMEndpoint1,
 		"zkvm1Type", s.ZKVMProofType1,
+		"zkvm2Endpoint", s.RaikoZKVMEndpoint2,
 		"zkvm2Type", s.ZKVMProofType2,
 		"time", time.Since(requestAt),
 		"dummy", s.Dummy,
 	)
 
 	var (
-		g             = new(errgroup.Group)
-		zkvm1Response *RaikoRequestProofBodyResponseV2
-		zkvm2Response *RaikoRequestProofBodyResponseV2
-		zkvm1Err      error
-		zkvm2Err      error
+		zkvm1Proof []byte
+		zkvm2Proof []byte
+		g          = new(errgroup.Group)
+		zkvm1Err   error
+		zkvm2Err   error
 	)
 
 	// Request first ZKVM proof in parallel
 	g.Go(func() error {
-		resp, err := s.requestBatchProof(
-			ctx,
-			[]ProofRequestOptions{opts},
-			[]metadata.TaikoProposalMetaData{meta},
-			false,
-			s.ZKVMProofType1,
-			s.RaikoZKVMEndpoint1,
-			requestAt,
-			false,
-		)
-		if err != nil {
-			zkvm1Err = fmt.Errorf("zkvm1 (%s): %w", s.ZKVMProofType1, err)
-			return zkvm1Err
+		if s.Dummy {
+			if resp, err := s.DummyProofProducer.RequestProof(ctx, opts, proposalID, meta, requestAt); err != nil {
+				zkvm1Err = fmt.Errorf("zkvm1 (%s): %w", s.ZKVMProofType1, err)
+				return zkvm1Err
+			} else {
+				zkvm1Proof = resp.Proof
+			}
+		} else {
+			resp, err := s.requestBatchProof(
+				ctx,
+				[]ProofRequestOptions{opts},
+				[]metadata.TaikoProposalMetaData{meta},
+				false,
+				s.ZKVMProofType1,
+				s.RaikoZKVMEndpoint1,
+				requestAt,
+				opts.IsZKVMProof1Generated(),
+			)
+			if err != nil {
+				zkvm1Err = fmt.Errorf("zkvm1 (%s): %w", s.ZKVMProofType1, err)
+				return zkvm1Err
+			} else {
+				if resp.ProofType != s.ZKVMProofType1 {
+					log.Error(
+						"ZKVM1 proof type mismatch",
+						"expected", s.ZKVMProofType1,
+						"got", resp.ProofType,
+					)
+				}
+
+				// Note: we mark the `IsZKVMProof1Generated` with true to record if it is first time generated
+				if opts.IsShasta() {
+					opts.ShastaOptions().ZKVMProof1Generated = true
+				} else {
+					opts.PacayaOptions().ZKVMProof1Generated = true
+				}
+				// Note: Since the single sp1 proof from raiko is null, we need to ignore the case.
+				if ProofTypeZKSP1 != resp.ProofType {
+					zkvm1Proof = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
+				}
+			}
 		}
-		zkvm1Response = resp
 		return nil
 	})
 
 	// Request second ZKVM proof in parallel
 	g.Go(func() error {
-		resp, err := s.requestBatchProof(
-			ctx,
-			[]ProofRequestOptions{opts},
-			[]metadata.TaikoProposalMetaData{meta},
-			false,
-			s.ZKVMProofType2,
-			s.RaikoZKVMEndpoint2,
-			requestAt,
-			false,
-		)
-		if err != nil {
-			zkvm2Err = fmt.Errorf("zkvm2 (%s): %w", s.ZKVMProofType2, err)
-			return zkvm2Err
+		if s.Dummy {
+			if resp, err := s.DummyProofProducer.RequestProof(ctx, opts, proposalID, meta, requestAt); err != nil {
+				zkvm2Err = fmt.Errorf("zkvm2 (%s): %w", s.ZKVMProofType2, err)
+				return zkvm2Err
+			} else {
+				zkvm2Proof = resp.Proof
+			}
+		} else {
+			resp, err := s.requestBatchProof(
+				ctx,
+				[]ProofRequestOptions{opts},
+				[]metadata.TaikoProposalMetaData{meta},
+				false,
+				s.ZKVMProofType2,
+				s.RaikoZKVMEndpoint2,
+				requestAt,
+				opts.IsZKVMProof2Generated(),
+			)
+			if err != nil {
+				zkvm2Err = fmt.Errorf("zkvm2 (%s): %w", s.ZKVMProofType2, err)
+				return zkvm2Err
+			} else {
+				if resp.ProofType != s.ZKVMProofType2 {
+					log.Error(
+						"ZKVM2 proof type mismatch",
+						"expected", s.ZKVMProofType2,
+						"got", resp.ProofType,
+					)
+				}
+
+				// Note: we mark the `IsZKVMProof2Generated` with true to record if it is first time generated
+				if opts.IsShasta() {
+					opts.ShastaOptions().ZKVMProof2Generated = true
+				} else {
+					opts.PacayaOptions().ZKVMProof2Generated = true
+				}
+				// Note: Since the single sp1 proof from raiko is null, we need to ignore the case.
+				if ProofTypeZKSP1 != resp.ProofType {
+					zkvm2Proof = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
+				}
+			}
 		}
-		zkvm2Response = resp
 		return nil
 	})
 
 	// Wait for both proofs to complete
 	if err := g.Wait(); err != nil {
-		return nil, fmt.Errorf("failed to get dual ZKVM proofs: %w", err)
-	}
-
-	log.Info(
-		"Both ZKVM proofs generated successfully",
-		"proposalID", proposalID,
-		"zkvm1Type", zkvm1Response.ProofType,
-		"zkvm2Type", zkvm2Response.ProofType,
-		"time", time.Since(requestAt),
-	)
-
-	// Note: Since the single sp1 proof from raiko is null, we need to ignore the case.
-	var proof1, proof2 []byte
-	if ProofTypeZKSP1 != zkvm1Response.ProofType {
-		proof1 = common.Hex2Bytes(zkvm1Response.Data.Proof.Proof[2:])
-	}
-	if ProofTypeZKSP1 != zkvm2Response.ProofType {
-		proof2 = common.Hex2Bytes(zkvm2Response.Data.Proof.Proof[2:])
+		return nil, fmt.Errorf("failed to get dual ZKVM proofs: %w and %w and %w", err, zkvm1Err, zkvm2Err)
 	}
 
 	return &ProofResponse{
 		BatchID:    proposalID,
 		Meta:       meta,
-		Proof1:     proof1,
-		ProofType1: zkvm1Response.ProofType,
-		Proof2:     proof2,
-		ProofType2: zkvm2Response.ProofType,
+		Proof1:     zkvm1Proof,
+		ProofType1: s.ZKVMProofType1,
+		Proof2:     zkvm2Proof,
+		ProofType2: s.ZKVMProofType2,
 		Opts:       opts,
 	}, nil
 }
@@ -185,18 +219,30 @@ func (s *ComposeProofProducer) Aggregate(
 	if len(items) == 0 {
 		return nil, ErrInvalidLength
 	}
-
 	proofType1 := items[0].ProofType1
 	proofType2 := items[0].ProofType2
-
-	// Get verifier IDs for both proof types
-	verifierID1, exist1 := s.VerifierIDs[proofType1]
-	if !exist1 {
-		return nil, fmt.Errorf("unknown proof type 1 from raiko: %s", proofType1)
-	}
-	verifierID2, exist2 := s.VerifierIDs[proofType2]
-	if !exist2 {
-		return nil, fmt.Errorf("unknown proof type 2 from raiko: %s", proofType2)
+	isShasta := items[0].Meta.IsShasta()
+	var (
+		verifierID1 uint8
+		verifierID2 uint8
+		verifier1   common.Address
+		verifier2   common.Address
+		exist       bool
+	)
+	if isShasta {
+		if verifierID1, exist = s.VerifierIDs[proofType1]; !exist {
+			return nil, fmt.Errorf("unknown proof type from raiko %s", proofType1)
+		}
+		if verifierID2, exist = s.VerifierIDs[proofType2]; !exist {
+			return nil, fmt.Errorf("unknown proof type from raiko %s", proofType2)
+		}
+	} else {
+		if verifier1, exist = s.Verifiers[proofType1]; !exist {
+			return nil, fmt.Errorf("unknown proof type from raiko %s", proofType1)
+		}
+		if verifier2, exist = s.Verifiers[proofType2]; !exist {
+			return nil, fmt.Errorf("unknown proof type from raiko %s", proofType2)
+		}
 	}
 
 	log.Info(
@@ -210,9 +256,12 @@ func (s *ComposeProofProducer) Aggregate(
 	)
 
 	var (
-		batchIDs = make([]*big.Int, 0, len(items))
-		opts     = make([]ProofRequestOptions, 0, len(items))
-		metas    = make([]metadata.TaikoProposalMetaData, 0, len(items))
+		batchProofs1 []byte
+		batchProofs2 []byte
+		batchIDs     = make([]*big.Int, 0, len(items))
+		opts         = make([]ProofRequestOptions, 0, len(items))
+		metas        = make([]metadata.TaikoProposalMetaData, 0, len(items))
+		g            = new(errgroup.Group)
 	)
 	for _, item := range items {
 		opts = append(opts, item.Opts)
@@ -220,47 +269,65 @@ func (s *ComposeProofProducer) Aggregate(
 		batchIDs = append(batchIDs, item.Meta.GetProposalID())
 	}
 
-	var (
-		g              = new(errgroup.Group)
-		batchProof1Res *RaikoRequestProofBodyResponseV2
-		batchProof2Res *RaikoRequestProofBodyResponseV2
-	)
-
 	// Request first batch proof aggregation in parallel
 	g.Go(func() error {
-		resp, err := s.requestBatchProof(
-			ctx,
-			opts,
-			metas,
-			true,
-			proofType1,
-			s.RaikoZKVMEndpoint1,
-			requestAt,
-			false,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to aggregate proof type 1 (%s): %w", proofType1, err)
+		if s.Dummy {
+			resp, _ := s.DummyProofProducer.RequestBatchProofs(items, proofType1)
+			batchProofs1 = resp.BatchProof1
+		} else {
+			if resp, err := s.requestBatchProof(
+				ctx,
+				opts,
+				metas,
+				true,
+				proofType1,
+				s.RaikoZKVMEndpoint1,
+				requestAt,
+				items[0].Opts.IsZKVMProof1AggregationGenerated(),
+			); err != nil {
+				return fmt.Errorf("failed to aggregate proof type 1 (%s): %w", proofType1, err)
+			} else {
+				// Note: we mark the `IsZKVMProof1AggregationGenerated` in the first item with true
+				// to record if it is first time generated
+				if items[0].Opts.IsShasta() {
+					items[0].Opts.ShastaOptions().ZKVMProof1AggregationGenerated = true
+				} else {
+					items[0].Opts.PacayaOptions().ZKVMProof1AggregationGenerated = true
+				}
+				batchProofs1 = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
+			}
 		}
-		batchProof1Res = resp
 		return nil
 	})
 
 	// Request second batch proof aggregation in parallel
 	g.Go(func() error {
-		resp, err := s.requestBatchProof(
-			ctx,
-			opts,
-			metas,
-			true,
-			proofType2,
-			s.RaikoZKVMEndpoint2,
-			requestAt,
-			false,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to aggregate proof type 2 (%s): %w", proofType2, err)
+		if s.Dummy {
+			resp, _ := s.DummyProofProducer.RequestBatchProofs(items, proofType2)
+			batchProofs2 = resp.BatchProof1
+		} else {
+			if resp, err := s.requestBatchProof(
+				ctx,
+				opts,
+				metas,
+				true,
+				proofType2,
+				s.RaikoZKVMEndpoint2,
+				requestAt,
+				items[0].Opts.IsZKVMProof2AggregationGenerated(),
+			); err != nil {
+				return fmt.Errorf("failed to aggregate proof type 2 (%s): %w", proofType2, err)
+			} else {
+				// Note: we mark the `IsZKVMProof2AggregationGenerated` in the first item with true
+				// to record if it is first time generated
+				if items[0].Opts.IsShasta() {
+					items[0].Opts.ShastaOptions().ZKVMProof2AggregationGenerated = true
+				} else {
+					items[0].Opts.PacayaOptions().ZKVMProof2AggregationGenerated = true
+				}
+				batchProofs2 = common.Hex2Bytes(resp.Data.Proof.Proof[2:])
+			}
 		}
-		batchProof2Res = resp
 		return nil
 	})
 
@@ -269,26 +336,19 @@ func (s *ComposeProofProducer) Aggregate(
 		return nil, fmt.Errorf("failed to aggregate batch proofs: %w", err)
 	}
 
-	log.Info(
-		"Both batch proofs aggregated successfully",
-		"proofType1", batchProof1Res.ProofType,
-		"proofType2", batchProof2Res.ProofType,
-		"batchSize", len(items),
-		"time", time.Since(requestAt),
-	)
-
-	batchProof1 := common.Hex2Bytes(batchProof1Res.Data.Proof.Proof[2:])
-	batchProof2 := common.Hex2Bytes(batchProof2Res.Data.Proof.Proof[2:])
-
 	return &BatchProofs{
 		ProofResponses: items,
-		BatchProof1:    batchProof1,
-		ProofType1:     proofType1,
-		VerifierID1:    verifierID1,
-		BatchProof2:    batchProof2,
-		ProofType2:     proofType2,
-		VerifierID2:    verifierID2,
 		BatchIDs:       batchIDs,
+
+		BatchProof1: batchProofs1,
+		ProofType1:  proofType1,
+		Verifier1:   verifier1,
+		VerifierID1: verifierID1,
+
+		BatchProof2: batchProofs2,
+		ProofType2:  proofType2,
+		Verifier2:   verifier2,
+		VerifierID2: verifierID2,
 	}, nil
 }
 

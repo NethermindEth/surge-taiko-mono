@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 )
 
@@ -42,21 +41,17 @@ type ProofResponse struct {
 // BatchProofs represents a response of a dual batch proof request.
 type BatchProofs struct {
 	ProofResponses []*ProofResponse
-	BatchProof1    []byte
-	ProofType1     ProofType
-	VerifierID1    uint8
-	BatchProof2    []byte
-	ProofType2     ProofType
-	VerifierID2    uint8
 	BatchIDs       []*big.Int
-	// Legacy fields (kept for compilation, not used)
-	BatchProof           []byte
-	ProofType            ProofType
-	Verifier             common.Address
-	VerifierID           uint8
-	SgxGethBatchProof    []byte
-	SgxGethProofVerifier common.Address
-	SgxGethVerifierID    uint8
+
+	BatchProof1 []byte
+	ProofType1  ProofType
+	Verifier1   common.Address
+	VerifierID1 uint8
+
+	BatchProof2 []byte
+	ProofType2  ProofType
+	Verifier2   common.Address
+	VerifierID2 uint8
 }
 
 // ProofProducer is an interface that contains all methods to generate a proof.

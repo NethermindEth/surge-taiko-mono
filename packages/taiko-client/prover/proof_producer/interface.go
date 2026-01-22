@@ -35,6 +35,10 @@ type ProofRequestOptions interface {
 	IsGethProofAggregationGenerated() bool
 	IsRethProofGenerated() bool
 	IsRethProofAggregationGenerated() bool
+	IsZKVMProof1Generated() bool
+	IsZKVMProof1AggregationGenerated() bool
+	IsZKVMProof2Generated() bool
+	IsZKVMProof2AggregationGenerated() bool
 }
 
 // ProofRequestOptionsPacaya contains all options that need to be passed to a backend proof producer service.
@@ -47,6 +51,11 @@ type ProofRequestOptionsPacaya struct {
 	GethProofAggregationGenerated bool
 	RethProofGenerated            bool
 	RethProofAggregationGenerated bool
+
+	ZKVMProof1Generated            bool
+	ZKVMProof1AggregationGenerated bool
+	ZKVMProof2Generated            bool
+	ZKVMProof2AggregationGenerated bool
 }
 
 // Checkpoint represents a checkpoint for the proposal in protocol.
@@ -106,6 +115,26 @@ func (p *ProofRequestOptionsPacaya) IsRethProofAggregationGenerated() bool {
 	return p.RethProofAggregationGenerated
 }
 
+// IsZKVMProof1Generated implements the ProofRequestOptions interface.
+func (p *ProofRequestOptionsPacaya) IsZKVMProof1Generated() bool {
+	return p.ZKVMProof1Generated
+}
+
+// IsZKVMProof1AggregationGenerated implements the ProofRequestOptions interface.
+func (p *ProofRequestOptionsPacaya) IsZKVMProof1AggregationGenerated() bool {
+	return p.ZKVMProof1AggregationGenerated
+}
+
+// IsZKVMProof2Generated implements the ProofRequestOptions interface.
+func (p *ProofRequestOptionsPacaya) IsZKVMProof2Generated() bool {
+	return p.ZKVMProof2Generated
+}
+
+// IsZKVMProof2AggregationGenerated implements the ProofRequestOptions interface.
+func (p *ProofRequestOptionsPacaya) IsZKVMProof2AggregationGenerated() bool {
+	return p.ZKVMProof2AggregationGenerated
+}
+
 // ProofRequestOptionsShasta contains all options that need to be passed to a backend proof producer service.
 type ProofRequestOptionsShasta struct {
 	ProposalID                    *big.Int
@@ -120,6 +149,11 @@ type ProofRequestOptionsShasta struct {
 	DesignatedProver              common.Address
 	Checkpoint                    *Checkpoint
 	LastAnchorBlockNumber         *big.Int
+
+	ZKVMProof1Generated            bool
+	ZKVMProof1AggregationGenerated bool
+	ZKVMProof2Generated            bool
+	ZKVMProof2AggregationGenerated bool
 }
 
 // IsPacaya implemenwts the ProofRequestOptions interface.
@@ -170,4 +204,24 @@ func (s *ProofRequestOptionsShasta) IsRethProofGenerated() bool {
 // IsRethProofAggregationGenerated implements the ProofRequestOptions interface.
 func (s *ProofRequestOptionsShasta) IsRethProofAggregationGenerated() bool {
 	return s.RethProofAggregationGenerated
+}
+
+// IsZKVMProof1Generated implements the ProofRequestOptions interface.
+func (s *ProofRequestOptionsShasta) IsZKVMProof1Generated() bool {
+	return s.ZKVMProof1Generated
+}
+
+// IsZKVMProof1AggregationGenerated implements the ProofRequestOptions interface.
+func (s *ProofRequestOptionsShasta) IsZKVMProof1AggregationGenerated() bool {
+	return s.ZKVMProof1AggregationGenerated
+}
+
+// IsZKVMProof2Generated implements the ProofRequestOptions interface.
+func (s *ProofRequestOptionsShasta) IsZKVMProof2Generated() bool {
+	return s.ZKVMProof2Generated
+}
+
+// IsZKVMProof2AggregationGenerated implements the ProofRequestOptions interface.
+func (s *ProofRequestOptionsShasta) IsZKVMProof2AggregationGenerated() bool {
+	return s.ZKVMProof2AggregationGenerated
 }
