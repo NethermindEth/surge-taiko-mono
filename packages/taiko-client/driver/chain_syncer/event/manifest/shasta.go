@@ -14,7 +14,7 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/manifest"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
@@ -232,7 +232,7 @@ func ExtractSize(data []byte, offset int) (uint64, error) {
 func ValidateMetadata(
 	rpc *rpc.Client,
 	sourcePayload *ShastaDerivationSourcePayload,
-	event *shastaBindings.ShastaInboxClientProposed,
+	event *surgeBindings.ShastaInboxClientProposed,
 	proposalTimestamp uint64,
 	originBlockNumber uint64,
 	parentAnchorBlockNumber uint64,
@@ -270,7 +270,7 @@ func ValidateMetadata(
 // validateMetadataTimestamp ensures each block's timestamp is within valid bounds.
 func validateMetadataTimestamp(
 	sourcePayload *ShastaDerivationSourcePayload,
-	event *shastaBindings.ShastaInboxClientProposed,
+	event *surgeBindings.ShastaInboxClientProposed,
 	proposalTimestamp uint64,
 	forkTime uint64,
 ) bool {
@@ -331,7 +331,7 @@ func validateAnchorBlockNumber(
 	sourcePayload *ShastaDerivationSourcePayload,
 	originBlockNumber uint64,
 	parentAnchorBlockNumber uint64,
-	event *shastaBindings.ShastaInboxClientProposed,
+	event *surgeBindings.ShastaInboxClientProposed,
 	isForcedInclusion bool,
 ) bool {
 	var (
@@ -446,7 +446,7 @@ func validateGasLimit(
 // from the parent block metadata.
 func ApplyInheritedMetadata(
 	sourcePayload *ShastaDerivationSourcePayload,
-	event *shastaBindings.ShastaInboxClientProposed,
+	event *surgeBindings.ShastaInboxClientProposed,
 	timestamp uint64,
 	anchorBlockNumber uint64,
 	forkTime uint64,

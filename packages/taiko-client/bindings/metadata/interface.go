@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
 	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 )
 
@@ -17,8 +16,6 @@ type TaikoProposalMetaData interface {
 	IsPacaya() bool
 	Shasta() TaikoProposalMetaDataShasta
 	IsShasta() bool
-	Surge() TaikoProposalMetaDataSurge
-	IsSurge() bool
 	GetRawBlockHeight() *big.Int
 	GetRawBlockHash() common.Hash
 	GetTxIndex() uint
@@ -55,16 +52,6 @@ type TaikoBatchMetaDataPacaya interface {
 }
 
 type TaikoProposalMetaDataShasta interface {
-	GetEventData() *shastaBindings.ShastaInboxClientProposed
-	GetBlobHashes(int) []common.Hash
-	GetBlobTimestamp(int) uint64
-	GetTimestamp() uint64
-	GetRawBlockHeight() *big.Int
-	GetRawBlockHash() common.Hash
-	GetLog() *types.Log
-}
-
-type TaikoProposalMetaDataSurge interface {
 	GetEventData() *surgeBindings.SurgeInboxClientProposed
 	GetBlobHashes(int) []common.Hash
 	GetBlobTimestamp(int) uint64

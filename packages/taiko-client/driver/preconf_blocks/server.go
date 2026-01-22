@@ -32,7 +32,7 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/preconf"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
@@ -1174,7 +1174,7 @@ func (s *PreconfBlockAPIServer) handleShastaProposalReorg(ctx context.Context, l
 
 	s.recordLatestSeenProposalShasta(&encoding.LastSeenProposal{
 		TaikoProposalMetaData: metadata.NewTaikoProposalMetadataShasta(
-			&shastaBindings.ShastaInboxClientProposed{
+			&surgeBindings.SurgeInboxClientProposed{
 				Id:                             recordedProposal.Id,
 				Proposer:                       recordedProposal.Proposer,
 				EndOfSubmissionWindowTimestamp: recordedProposal.EndOfSubmissionWindowTimestamp,

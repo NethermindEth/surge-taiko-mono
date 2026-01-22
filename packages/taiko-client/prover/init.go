@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
+	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
@@ -82,64 +83,60 @@ func (p *Prover) setApprovalAmount(ctx context.Context, contract common.Address)
 
 // initShastaProofSubmitter initializes the proof submitter from the non-zero verifier addresses set in protocol.
 func (p *Prover) initShastaProofSubmitter(ctx context.Context, txBuilder *transaction.ProveBatchesTxBuilder) error {
-	var err error
+	var (
+		// ZKVM proof producers.
+		zkvmProducer producer.ProofProducer
 
-	// Get verifier IDs for RISC0, SP1, and ZISK
-	risc0RethVerifierID, err := p.rpc.ShastaClients.LibProofBitmap.RISC0RETH(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return err
+		// VerifierIDs (same as in protocol SurgeVerifier.sol)
+		risc0RethVerifierID uint8 = 1
+		sp1RethVerifierID   uint8 = 2
+		ziskRethVerifierID  uint8 = 4
+
+		err error
+	)
+
+	// Initialize the zk verifiers and zkvm proof producers.
+	zkVerifierIDs := map[producer.ProofType]uint8{
+		producer.ProofTypeZKR0:   risc0RethVerifierID,
+		producer.ProofTypeZKSP1:  sp1RethVerifierID,
+		producer.ProofTypeZKZisk: ziskRethVerifierID,
 	}
-	sp1RethVerifierID, err := p.rpc.ShastaClients.LibProofBitmap.SP1RETH(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return err
-	}
-	ziskRethVerifierID, err := p.rpc.ShastaClients.LibProofBitmap.ZISKRETH(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return err
-	}
-
-	// Map proof type strings to ProofType constants
-	proofTypeMap := map[string]producer.ProofType{
-		string(producer.ProofTypeZKR0):   producer.ProofTypeZKR0,
-		string(producer.ProofTypeZKSP1):  producer.ProofTypeZKSP1,
-		string(producer.ProofTypeZKZisk): producer.ProofTypeZKZisk,
-	}
-
-	zkvm1ProofType := proofTypeMap[p.cfg.ZKVMProofType1]
-	zkvm2ProofType := proofTypeMap[p.cfg.ZKVMProofType2]
-
-	// Create verifier ID map for both ZKVM proof types
-	verifierIDs := make(map[producer.ProofType]uint8)
-	verifierIDs[producer.ProofTypeZKR0] = risc0RethVerifierID
-	verifierIDs[producer.ProofTypeZKSP1] = sp1RethVerifierID
-	verifierIDs[producer.ProofTypeZKZisk] = ziskRethVerifierID
-
-	// Create single ComposeProofProducer with dual ZKVM endpoints
-	composeProducer := &producer.ComposeProofProducer{
-		VerifierIDs:         verifierIDs,
+	zkvmProducer = &producer.ComposeProofProducer{
+		VerifierIDs:         zkVerifierIDs,
 		RaikoZKVMEndpoint1:  p.cfg.RaikoZKVMHostEndpoint1,
 		RaikoZKVMEndpoint2:  p.cfg.RaikoZKVMHostEndpoint2,
-		ZKVMProofType1:      zkvm1ProofType,
-		ZKVMProofType2:      zkvm2ProofType,
+		ZKVMProofType1:      producer.ProofType(p.cfg.ZKVMProofType1),
+		ZKVMProofType2:      producer.ProofType(p.cfg.ZKVMProofType2),
 		ApiKey:              p.cfg.RaikoApiKey,
 		RaikoRequestTimeout: p.cfg.RaikoRequestTimeout,
 		Dummy:               p.cfg.Dummy,
 	}
 
-	log.Info(
-		"Initialized dual ZKVM proof producer",
-		"zkvm1Type", zkvm1ProofType,
-		"zkvm2Type", zkvm2ProofType,
-		"zkvm1Endpoint", p.cfg.RaikoZKVMHostEndpoint1,
-		"zkvm2Endpoint", p.cfg.RaikoZKVMHostEndpoint2,
+	// Init proof buffers.
+	var (
+		proofBuffers = make(map[producer.ProofType]*producer.ProofBuffer, proofSubmitter.MaxNumSupportedProofTypes)
+		cacheMaps    = make(
+			map[producer.ProofType]cmap.ConcurrentMap[string, *producer.ProofResponse],
+			proofSubmitter.MaxNumSupportedProofTypes,
+		)
 	)
-
-	// Init single proof buffer for dual ZKVM proofs
-	proofBuffer := producer.NewProofBuffer(p.cfg.ZKVMProofBufferSize)
+	// nolint:exhaustive
+	// We deliberately handle only known proof types and catch others in default case
+	for _, proofType := range []producer.ProofType{producer.ProofType(p.cfg.ZKVMProofType1), producer.ProofType(p.cfg.ZKVMProofType2)} {
+		cacheMaps[proofType] = cmap.New[*producer.ProofResponse]()
+		switch proofType {
+		case producer.ProofTypeOp, producer.ProofTypeSgx:
+			proofBuffers[proofType] = producer.NewProofBuffer(p.cfg.SGXProofBufferSize)
+		case producer.ProofTypeZKR0, producer.ProofTypeZKSP1, producer.ProofTypeZKZisk:
+			proofBuffers[proofType] = producer.NewProofBuffer(p.cfg.ZKVMProofBufferSize)
+		default:
+			return fmt.Errorf("unexpected proof type: %s", proofType)
+		}
+	}
 
 	if p.proofSubmitterShasta, err = proofSubmitter.NewProofSubmitterShasta(
 		p.ctx,
-		composeProducer,
+		zkvmProducer,
 		p.batchProofGenerationCh,
 		p.batchesAggregationNotifyShasta,
 		p.proofSubmissionCh,
@@ -152,7 +149,7 @@ func (p *Prover) initShastaProofSubmitter(ctx context.Context, txBuilder *transa
 		},
 		txBuilder,
 		p.cfg.ProofPollingInterval,
-		proofBuffer,
+		proofBuffers,
 		p.cfg.ForceBatchProvingInterval,
 		cacheMaps,
 		p.flushCacheNotify,

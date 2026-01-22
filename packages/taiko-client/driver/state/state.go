@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 )
@@ -109,8 +109,8 @@ func (s *State) eventLoop(ctx context.Context) {
 		l2HeadCh                = make(chan *types.Header, 10)
 		batchesProvedPacayaCh   = make(chan *pacayaBindings.TaikoInboxClientBatchesProved, 10)
 		batchesVerifiedPacayaCh = make(chan *pacayaBindings.TaikoInboxClientBatchesVerified, 10)
-		proposedShastaCh        = make(chan *shastaBindings.ShastaInboxClientProposed, 10)
-		provedShastaCh          = make(chan *shastaBindings.ShastaInboxClientProved, 10)
+		proposedShastaCh        = make(chan *surgeBindings.SurgeInboxClientProposed, 10)
+		provedShastaCh          = make(chan *surgeBindings.SurgeInboxClientProved, 10)
 
 		// Subscriptions.
 		l1HeadSub                  = rpc.SubscribeChainHead(s.rpc.L1, l1HeadCh)

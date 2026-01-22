@@ -49,16 +49,6 @@ func (m *TaikoDataBlockMetadataPacaya) IsShasta() bool {
 	return false
 }
 
-// Surge implements TaikoProposalMetaData interface.
-func (m *TaikoDataBlockMetadataPacaya) Surge() TaikoProposalMetaDataSurge {
-	return nil
-}
-
-// IsSurge implements TaikoProposalMetaData interface.
-func (m *TaikoDataBlockMetadataPacaya) IsSurge() bool {
-	return false
-}
-
 // GetTxListHash returns the hash of calldata txlist.
 func (m *TaikoDataBlockMetadataPacaya) GetTxListHash() common.Hash {
 	return m.TxsHash

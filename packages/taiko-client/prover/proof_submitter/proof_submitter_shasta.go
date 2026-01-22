@@ -26,11 +26,11 @@ import (
 // blocks, and submitting the generated proofs to the TaikoInbox smart contract.
 type ProofSubmitterShasta struct {
 	rpc *rpc.Client
-	// Single proof producer that handles dual ZKVM proof generation
+	// Proof producer
 	proofProducer proofProducer.ProofProducer
 	// Channels
 	batchResultCh          chan *proofProducer.BatchProofs
-	batchAggregationNotify chan bool
+	batchAggregationNotify chan proofProducer.ProofType
 	proofSubmissionCh      chan *proofProducer.ProofRequestBody
 	flushCacheNotify       chan proofProducer.ProofType
 	// Utilities
@@ -51,12 +51,12 @@ func NewProofSubmitterShasta(
 	ctx context.Context,
 	proofProducer proofProducer.ProofProducer,
 	batchResultCh chan *proofProducer.BatchProofs,
-	batchAggregationNotify chan bool,
+	batchAggregationNotify chan proofProducer.ProofType,
 	proofSubmissionCh chan *proofProducer.ProofRequestBody,
 	senderOpts *SenderOptions,
 	builder *transaction.ProveBatchesTxBuilder,
 	proofPollingInterval time.Duration,
-	proofBuffer *proofProducer.ProofBuffer,
+	proofBuffers map[proofProducer.ProofType]*proofProducer.ProofBuffer,
 	forceBatchProvingInterval time.Duration,
 	proofCacheMaps map[proofProducer.ProofType]cmap.ConcurrentMap[string, *proofProducer.ProofResponse],
 	flushCacheNotify chan proofProducer.ProofType,
@@ -77,7 +77,7 @@ func NewProofSubmitterShasta(
 		),
 		proverAddress:             senderOpts.Txmgr.From(),
 		proofPollingInterval:      proofPollingInterval,
-		proofBuffer:               proofBuffer,
+		proofBuffers:              proofBuffers,
 		forceBatchProvingInterval: forceBatchProvingInterval,
 		proofCacheMaps:            proofCacheMaps,
 		flushCacheNotify:          flushCacheNotify,

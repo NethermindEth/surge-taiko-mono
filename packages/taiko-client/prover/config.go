@@ -39,8 +39,6 @@ type Config struct {
 	RPCTimeout                time.Duration
 	ProveBatchesGasLimit      uint64
 	Allowance                 *big.Int
-	RaikoHostEndpoint         string // Pacaya (not set from flags, kept for compatibility)
-	RaikoZKVMHostEndpoint     string // Pacaya (not set from flags, kept for compatibility)
 	RaikoZKVMHostEndpoint1    string
 	RaikoZKVMHostEndpoint2    string
 	ZKVMProofType1            string
