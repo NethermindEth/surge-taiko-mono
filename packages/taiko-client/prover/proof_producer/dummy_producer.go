@@ -20,7 +20,7 @@ func (o *DummyProofProducer) RequestProof(
 	meta metadata.TaikoProposalMetaData,
 	requestAt time.Time,
 ) (*ProofResponse, error) {
-	return &ProofResponse{BatchID: batchID, Meta: meta, Proof: bytes.Repeat([]byte{0xff}, 100), Opts: opts}, nil
+	return &ProofResponse{BatchID: batchID, Meta: meta, Proof1: bytes.Repeat([]byte{0xff}, 100), Opts: opts}, nil
 }
 
 // Aggregate returns a dummy proof aggregation to the result channel.

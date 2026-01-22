@@ -106,7 +106,7 @@ func (s *ComposeProofProducer) RequestProof(
 				zkvm1Err = fmt.Errorf("zkvm1 (%s): %w", s.ZKVMProofType1, err)
 				return zkvm1Err
 			} else {
-				zkvm1Proof = resp.Proof
+				zkvm1Proof = resp.Proof1
 			}
 		} else {
 			resp, err := s.requestBatchProof(
@@ -153,7 +153,7 @@ func (s *ComposeProofProducer) RequestProof(
 				zkvm2Err = fmt.Errorf("zkvm2 (%s): %w", s.ZKVMProofType2, err)
 				return zkvm2Err
 			} else {
-				zkvm2Proof = resp.Proof
+				zkvm2Proof = resp.Proof1
 			}
 		} else {
 			resp, err := s.requestBatchProof(

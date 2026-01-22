@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 )
 
@@ -33,9 +34,6 @@ type ProofResponse struct {
 	Proof2     []byte
 	ProofType2 ProofType
 	Opts       ProofRequestOptions
-	// Legacy fields (for Pacaya compatibility)
-	Proof     []byte
-	ProofType ProofType
 }
 
 // BatchProofs represents a response of a dual batch proof request.
