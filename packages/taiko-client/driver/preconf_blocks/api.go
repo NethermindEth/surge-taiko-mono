@@ -1,7 +1,6 @@
 package preconfblocks
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -14,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/consensus/taiko"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -129,7 +127,7 @@ func (s *PreconfBlockAPIServer) BuildPreconfBlock(c echo.Context) error {
 
 	if s.latestSeenProposal != nil {
 		if s.latestSeenProposal.IsShasta() {
-			if bytes.HasPrefix(parent.Transactions()[0].Data(), taiko.AnchorV4Selector) {
+			if isShastaAnchorTx(parent.Transactions()[0]) {
 				parentProposalID, err := core.DecodeShastaProposalID(parent.Extra())
 				if err != nil {
 					return s.returnError(c, http.StatusBadRequest, fmt.Errorf("failed to get parent block proposal ID: %w", err))
@@ -434,4 +432,17 @@ func (s *PreconfBlockAPIServer) returnError(c echo.Context, statusCode int, err 
 	log.Error("Preconfirmation block request error", "status", statusCode, "error", err.Error())
 
 	return c.JSON(statusCode, map[string]string{"error": err.Error()})
+}
+
+// isShastaAnchorTx checks if the given transaction is a Shasta anchor transaction
+// (anchorV4 or anchorV4WithSignalSlots).
+func isShastaAnchorTx(tx *types.Transaction) bool {
+	if len(tx.Data()) < 4 {
+		return false
+	}
+	method, err := encoding.ShastaAnchorABI.MethodById(tx.Data())
+	if err != nil {
+		return false
+	}
+	return method.Name == "anchorV4" || method.Name == "anchorV4WithSignalSlots"
 }

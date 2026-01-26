@@ -985,7 +985,7 @@ func (c *Client) GetSyncedL1SnippetFromAnchor(tx *types.Transaction) (
 				0,
 				errors.New("failed to parse parentGasUsed from anchorV2 / anchorV3 transaction calldata")
 		}
-	case "anchorV4":
+	case "anchorV4", "anchorV4WithSignalSlots":
 		args := map[string]interface{}{}
 
 		if err := method.Inputs.UnpackIntoMap(args, tx.Data()[4:]); err != nil {
@@ -1043,7 +1043,7 @@ func (c *Client) GetSyncedL1SnippetFromAnchor(tx *types.Transaction) (
 		l1StateRoot = root
 	default:
 		return common.Hash{}, 0, 0, fmt.Errorf(
-			"invalid method name for anchor / anchorV2 / anchorV3 / anchorV4 transaction: %s",
+			"invalid method name for anchor / anchorV2 / anchorV3 / anchorV4 / anchorV4WithSignalSlots transaction: %s",
 			method.Name,
 		)
 	}
@@ -1597,4 +1597,38 @@ func (c *Client) DecodeProposeInput(opts *bind.CallOpts, data []byte) (*surgeBin
 	}
 
 	return &input, nil
+}
+
+// GetSignalSlotsFromProposeTx decodes the signal slots from a Shasta propose transaction.
+// Returns the signal slots if the transaction is a proposeWithProof call, otherwise returns an empty slice.
+func (c *Client) GetSignalSlotsFromProposeTx(ctx context.Context, txHash common.Hash) ([][32]byte, error) {
+	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, DefaultRpcTimeout)
+	defer cancel()
+
+	tx, _, err := c.L1.TransactionByHash(ctxWithTimeout, txHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transaction by hash: %w", err)
+	}
+
+	method, err := encoding.ShastaInboxABI.MethodById(tx.Data())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get method by ID: %w", err)
+	}
+
+	// If it's not proposeWithProof, return empty signal slots
+	if method.Name != "proposeWithProof" {
+		return [][32]byte{}, nil
+	}
+
+	args := map[string]interface{}{}
+	if err := method.Inputs.UnpackIntoMap(args, tx.Data()[4:]); err != nil {
+		return nil, fmt.Errorf("failed to unpack proposeWithProof inputs: %w", err)
+	}
+
+	signalSlots, ok := args["_signalSlots"].([][32]byte)
+	if !ok {
+		return nil, errors.New("failed to parse signal slots from proposeWithProof transaction")
+	}
+
+	return signalSlots, nil
 }

@@ -116,6 +116,47 @@ func (c *AnchorTxConstructor) AssembleAnchorV4Tx(
 	)
 }
 
+// AssembleAnchorV4WithSignalSlotsTx assembles a signed ShastaAnchor.anchorV4WithSignalSlots transaction.
+func (c *AnchorTxConstructor) AssembleAnchorV4WithSignalSlotsTx(
+	ctx context.Context,
+	// Parameters of the ShastaAnchor.anchorV4WithSignalSlots transaction.
+	parent *types.Header,
+	anchorBlockNumber *big.Int,
+	anchorBlockHash common.Hash,
+	anchorStateRoot common.Hash,
+	endOfSubmissionWindowTimestamp *big.Int,
+	signalSlots [][32]byte,
+	// Height of the L2 block which including the ShastaAnchor.anchorV4WithSignalSlots transaction.
+	l2Height *big.Int,
+	baseFee *big.Int,
+) (*types.Transaction, error) {
+	opts, err := c.transactOpts(ctx, l2Height, baseFee, parent.Hash())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Info(
+		"AnchorV4WithSignalSlots arguments",
+		"l2Height", l2Height,
+		"anchorBlockId", anchorBlockNumber,
+		"anchorStateRoot", anchorStateRoot,
+		"parentGasUsed", parent.GasUsed,
+		"parentHash", parent.Hash(),
+		"endOfSubmissionWindowTimestamp", endOfSubmissionWindowTimestamp,
+		"signalSlots", len(signalSlots),
+	)
+
+	return c.rpc.ShastaClients.Anchor.AnchorV4WithSignalSlots(
+		opts,
+		surgeBindings.ICheckpointStoreCheckpoint{
+			BlockNumber: anchorBlockNumber,
+			BlockHash:   anchorBlockHash,
+			StateRoot:   anchorStateRoot,
+		},
+		signalSlots,
+	)
+}
+
 // transactOpts is a utility method to create some transact options of the anchor transaction in given L2 block with
 // golden touch account's private key.
 func (c *AnchorTxConstructor) transactOpts(

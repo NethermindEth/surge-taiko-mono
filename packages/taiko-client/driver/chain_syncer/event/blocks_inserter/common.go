@@ -655,18 +655,25 @@ func assembleCreateExecutionPayloadMetaShasta(
 		"root", anchorBlockHeaderRoot,
 	)
 
-	anchorTx, err := anchorConstructor.AssembleAnchorV4Tx(
+	// Fetch signal slots from the L1 propose transaction
+	signalSlots, err := rpc.GetSignalSlotsFromProposeTx(ctx, metadata.GetTxHash())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get signal slots from propose transaction: %w", err)
+	}
+
+	anchorTx, err := anchorConstructor.AssembleAnchorV4WithSignalSlotsTx(
 		ctx,
 		parent,
 		anchorBlockID,
 		anchorBlockHeaderHash,
 		anchorBlockHeaderRoot,
 		meta.GetEventData().EndOfSubmissionWindowTimestamp,
+		signalSlots,
 		blockID,
 		baseFee,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create ShastaAnchor.anchorV4 transaction: %w", err)
+		return nil, nil, fmt.Errorf("failed to create ShastaAnchor.anchorV4WithSignalSlots transaction: %w", err)
 	}
 
 	// Encode extraData with basefeeSharingPctg and proposal ID.
