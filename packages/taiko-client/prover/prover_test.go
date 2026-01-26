@@ -213,16 +213,20 @@ func (s *ProverTestSuite) TestSubmitProofAggregationOp() {
 			return s.p.submitProofAggregationOp(&proofProducer.BatchProofs{
 				ProofResponses: []*proofProducer.ProofResponse{
 					{
-						BatchID: common.Big1,
-						Meta:    &metadata.TaikoDataBlockMetadataPacaya{},
-						Proof:   []byte{},
-						Opts:    &proofProducer.ProofRequestOptionsPacaya{},
+						BatchID:    common.Big1,
+						Meta:       &metadata.TaikoDataBlockMetadataPacaya{},
+						Proof1:     []byte{},
+						ProofType1: proofProducer.ProofTypeZKR0,
+						Proof2:     []byte{},
+						ProofType2: proofProducer.ProofTypeZKSP1,
+						Opts:       &proofProducer.ProofRequestOptionsPacaya{},
 					},
 				},
-				BatchProof:        []byte{},
-				BatchIDs:          []*big.Int{common.Big1},
-				ProofType:         proofProducer.ProofTypeOp,
-				SgxGethBatchProof: []byte{},
+				BatchProof1: []byte{},
+				ProofType1:  proofProducer.ProofTypeZKR0,
+				BatchProof2: []byte{},
+				ProofType2:  proofProducer.ProofTypeZKSP1,
+				BatchIDs:    []*big.Int{common.Big1},
 			})
 		})
 	})

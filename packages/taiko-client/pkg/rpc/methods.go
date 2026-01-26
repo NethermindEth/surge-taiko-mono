@@ -1511,7 +1511,7 @@ func (c *Client) GetCoreStateShasta(opts *bind.CallOpts) (*surgeBindings.IInboxC
 func (c *Client) GetProposalByIDShasta(
 	ctx context.Context,
 	proposalID *big.Int,
-) (*surgeBindings.ShastaInboxClientProposed, *types.Log, error) {
+) (*surgeBindings.SurgeInboxClientProposed, *types.Log, error) {
 	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, DefaultRpcTimeout)
 	defer cancel()
 
@@ -1541,7 +1541,7 @@ func (c *Client) GetProposalByIDShasta(
 	}
 
 	var (
-		event *surgeBindings.ShastaInboxClientProposed
+		event *surgeBindings.SurgeInboxClientProposed
 		log   *types.Log
 	)
 	for iter.Next() {

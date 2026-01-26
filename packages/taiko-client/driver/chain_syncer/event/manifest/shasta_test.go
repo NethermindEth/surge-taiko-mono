@@ -10,7 +10,7 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/manifest"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	builder "github.com/taikoxyz/taiko-mono/packages/taiko-client/proposer/transaction_builder"
@@ -38,18 +38,19 @@ func (s *ShastaManifestFetcherTestSuite) TestManifestEncodeDecode() {
 	s.Nil(err)
 	s.NotEmpty(b)
 
-	meta := &metadata.TaikoProposalMetadataShasta{
-		ShastaInboxClientProposed: &shastaBindings.ShastaInboxClientProposed{
-			Sources: []shastaBindings.IInboxDerivationSource{
+	meta := metadata.NewTaikoProposalMetadataShasta(
+		&surgeBindings.SurgeInboxClientProposed{
+			Sources: []surgeBindings.IInboxDerivationSource{
 				{
-					BlobSlice: shastaBindings.LibBlobsBlobSlice{
+					BlobSlice: surgeBindings.LibBlobsBlobSlice{
 						Offset:    big.NewInt(0),
 						Timestamp: big.NewInt(0),
 					},
 				},
 			},
 		},
-	}
+		0,
+	)
 	decoded, err := new(ShastaDerivationSourceFetcher).manifestFromBlobBytes(b, meta, 0)
 	s.Nil(err)
 	s.False(decoded.Default)
@@ -91,7 +92,7 @@ func (s *ShastaManifestFetcherTestSuite) TestValidateMetadataTimestamp() {
 	parentTime := uint64(1_000)
 	proposalTimestamp := parentTime + manifest.TimestampMaxOffset + 100
 	forkTime := proposalTimestamp - 50
-	proposal := &shastaBindings.ShastaInboxClientProposed{}
+	proposal := &surgeBindings.SurgeInboxClientProposed{}
 
 	// Timestamp above proposal timestamp should fail.
 	sourcePayload := &ShastaDerivationSourcePayload{
@@ -141,7 +142,7 @@ func (s *ShastaManifestFetcherTestSuite) TestValidateAnchorBlockNumber() {
 		},
 	}
 
-	proposal := &shastaBindings.ShastaInboxClientProposed{Id: proposalID, Proposer: proposer}
+	proposal := &surgeBindings.SurgeInboxClientProposed{Id: proposalID, Proposer: proposer}
 	result := validateAnchorBlockNumber(sourcePayload, originBlockNumber, parentAnchorBlockNumber, proposal, false)
 	s.False(result)
 
@@ -233,7 +234,7 @@ func (s *ShastaManifestFetcherTestSuite) TestApplyInheritedMetadata() {
 	parentBlock := types.NewBlockWithHeader(parentHeader)
 	proposer := common.BytesToAddress(testutils.RandomBytes(20))
 
-	proposal := shastaBindings.IInboxProposal{
+	proposal := surgeBindings.IInboxProposal{
 		Timestamp: big.NewInt(int64(parentTime + 20)),
 		Proposer:  proposer,
 	}
@@ -249,7 +250,7 @@ func (s *ShastaManifestFetcherTestSuite) TestApplyInheritedMetadata() {
 	expectedLowerBound := max(parentTime+1, proposal.Timestamp.Uint64()-manifest.TimestampMaxOffset)
 	ApplyInheritedMetadata(
 		sourcePayload,
-		&shastaBindings.ShastaInboxClientProposed{Proposer: proposal.Proposer},
+		&surgeBindings.SurgeInboxClientProposed{Proposer: proposal.Proposer},
 		proposal.Timestamp.Uint64(),
 		900,
 		parentTime-10,
@@ -271,7 +272,7 @@ func (s *ShastaManifestFetcherTestSuite) TestApplyInheritedMetadata() {
 	exceedingFork := proposal.Timestamp.Uint64() + 1
 	ApplyInheritedMetadata(
 		sourcePayload,
-		&shastaBindings.ShastaInboxClientProposed{Proposer: proposal.Proposer},
+		&surgeBindings.SurgeInboxClientProposed{Proposer: proposal.Proposer},
 		proposal.Timestamp.Uint64(),
 		900,
 		exceedingFork,
@@ -405,12 +406,12 @@ func (s *ShastaManifestFetcherTestSuite) TestValidateMetadata() {
 		},
 	}
 
-	proposal := shastaBindings.IInboxProposal{
+	proposal := surgeBindings.IInboxProposal{
 		Id:        big.NewInt(1),
 		Timestamp: big.NewInt(int64(parentTime + 20)),
 		Proposer:  common.BytesToAddress(testutils.RandomBytes(20)),
 	}
-	proposalEvent := &shastaBindings.ShastaInboxClientProposed{Id: proposal.Id, Proposer: proposal.Proposer}
+	proposalEvent := &surgeBindings.SurgeInboxClientProposed{Id: proposal.Id, Proposer: proposal.Proposer}
 	proposalTimestamp := proposal.Timestamp.Uint64()
 
 	rpcClient := &rpc.Client{

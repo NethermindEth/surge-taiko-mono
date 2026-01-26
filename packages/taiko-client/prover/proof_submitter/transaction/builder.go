@@ -53,7 +53,7 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesPacaya(batchProof *proofProduce
 			err         error
 			metas       = make([]metadata.TaikoProposalMetaData, len(batchProof.ProofResponses))
 			transitions = make([]pacayaBindings.ITaikoInboxTransition, len(batchProof.ProofResponses))
-			subProofs   = make([]encoding.SubProofPacaya, 2)
+			subProofs   []encoding.SubProofPacaya
 			batchIDs    = make([]uint64, len(batchProof.ProofResponses))
 		)
 		for i, proof := range batchProof.ProofResponses {
