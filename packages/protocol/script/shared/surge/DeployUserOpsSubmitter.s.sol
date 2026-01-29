@@ -38,7 +38,7 @@ contract DeployUserOpsSubmitter is Script {
             console2.log("Creating UserOpsSubmitter for owner:", owner);
             submitter_ = factory.createSubmitter(owner);
             console2.log("UserOpsSubmitter created at:", submitter_);
-            writeJson("UserOpsSubmitter", submitter_);
+            writeJson("userops_submitter", submitter_);
         } else {
             console2.log("");
             console2.log("No OWNER_ADDRESS set, skipping submitter creation");
