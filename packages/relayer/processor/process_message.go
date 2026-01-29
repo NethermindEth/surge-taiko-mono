@@ -245,8 +245,17 @@ func (p *Processor) processMessage(
 		return false, msgBody.TimesRetried, errors.Wrap(err, "p.destBridge.GetMessageStatus")
 	}
 
+	// internal will only be set if it's an actual queue message, not a targeted
+	// transaction hash set via config flag.
+	if msg.Internal != nil {
+		// update message status
+		if err := p.eventRepo.UpdateStatus(ctx, msgBody.ID, relayer.EventStatus(messageStatus)); err != nil {
+			return false, msgBody.TimesRetried, err
+		}
+	}
+
 	slog.Info(
-		"updating message status",
+		"message status updated",
 		"status", relayer.EventStatus(messageStatus).String(),
 		"occurredTxHash", msgBody.Event.Raw.TxHash.Hex(),
 	)
@@ -255,15 +264,6 @@ func (p *Processor) processMessage(
 		relayer.RetriableEvents.Inc()
 	} else if messageStatus == uint8(relayer.EventStatusDone) {
 		relayer.DoneEvents.Inc()
-	}
-
-	// internal will only be set if it's an actual queue message, not a targeted
-	// transaction hash set via config flag.
-	if msg.Internal != nil {
-		// update message status
-		if err := p.eventRepo.UpdateStatus(ctx, msgBody.ID, relayer.EventStatus(messageStatus)); err != nil {
-			return false, msgBody.TimesRetried, err
-		}
 	}
 
 	return false, msgBody.TimesRetried, nil
@@ -443,10 +443,13 @@ func (p *Processor) signalServiceForBlock(
 	ctx context.Context,
 	blockNumber uint64,
 ) (relayer.SignalService, common.Address, error) {
-	if p.shastaForkTimestamp == 0 ||
-		p.shastaOldForkSignalService == nil ||
+	if p.shastaOldForkSignalService == nil ||
 		p.shastaNewForkSignalService == nil {
 		return p.srcSignalService, p.srcSignalServiceAddress, nil
+	}
+
+	if p.shastaForkTimestamp == 0 {
+		return p.shastaNewForkSignalService, p.srcSignalServiceAddress, nil
 	}
 
 	callCtx, cancel := context.WithTimeout(ctx, p.ethClientTimeout)
@@ -459,10 +462,10 @@ func (p *Processor) signalServiceForBlock(
 	}
 
 	if header.Time < p.shastaForkTimestamp {
-		return p.shastaOldForkSignalService, p.shastaOldForkAddress, nil
+		return p.shastaOldForkSignalService, p.srcSignalServiceAddress, nil
 	}
 
-	return p.shastaNewForkSignalService, p.shastaNewForkAddress, nil
+	return p.shastaNewForkSignalService, p.srcSignalServiceAddress, nil
 }
 
 // sendProcessMessageCall calls `bridge.processMessage` with latest nonce
