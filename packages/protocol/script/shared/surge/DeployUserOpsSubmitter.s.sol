@@ -31,7 +31,7 @@ contract DeployUserOpsSubmitter is Script {
         factory_ = address(factory);
 
         console2.log("Factory deployed at:", factory_);
-        writeJson("UserOpsSubmitterFactory", factory_);
+        writeJson("userops_submitter_factory", factory_);
 
         if (owner != address(0)) {
             console2.log("");
