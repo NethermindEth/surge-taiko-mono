@@ -88,5 +88,11 @@ func (h *BatchesProvedEventHandler) HandleShasta(
 		"checkpointBlockHash", coreState.LastFinalizedBlockHash,
 	)
 
+	log.Debug(
+		"Updating prover_latestVerified_id metric",
+		"proposalId", e.LastProposalId,
+	)
+	metrics.ProverLatestVerifiedIDGauge.Set(float64(e.LastProposalId.Int64()))
+
 	return nil
 }
