@@ -1600,6 +1600,7 @@ func (c *Client) DecodeProposeInput(opts *bind.CallOpts, data []byte) (*surgeBin
 }
 
 // GetSignalSlotsFromProposeTx decodes the signal slots from a Shasta propose transaction.
+// It handles both direct proposeWithProof calls and proposeWithProof calls wrapped in a Multicall.
 // Returns the signal slots if the transaction is a proposeWithProof call, otherwise returns an empty slice.
 func (c *Client) GetSignalSlotsFromProposeTx(ctx context.Context, txHash common.Hash) ([][32]byte, error) {
 	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, DefaultRpcTimeout)
@@ -1610,18 +1611,95 @@ func (c *Client) GetSignalSlotsFromProposeTx(ctx context.Context, txHash common.
 		return nil, fmt.Errorf("failed to get transaction by hash: %w", err)
 	}
 
-	method, err := encoding.ShastaInboxABI.MethodById(tx.Data())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get method by ID: %w", err)
+	return c.extractSignalSlotsFromTxData(tx.Data())
+}
+
+// extractSignalSlotsFromTxData extracts signal slots from transaction data.
+// It handles both direct proposeWithProof calls and proposeWithProof calls wrapped in a Multicall.
+func (c *Client) extractSignalSlotsFromTxData(data []byte) ([][32]byte, error) {
+	if len(data) < 4 {
+		return nil, errors.New("transaction data too short")
 	}
 
+	// Try to parse as direct ShastaInbox call first
+	method, err := encoding.ShastaInboxABI.MethodById(data)
+	if err == nil {
+		return c.extractSignalSlotsFromProposeWithProof(method, data)
+	}
+
+	// Try to parse as Multicall
+	multicallMethod, err := encoding.MulticallABI.MethodById(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get method by ID (not ShastaInbox or Multicall): %w", err)
+	}
+
+	if multicallMethod.Name != "multicall" {
+		return [][32]byte{}, nil
+	}
+
+	// Unpack the multicall arguments
+	args := map[string]interface{}{}
+	if err := multicallMethod.Inputs.UnpackIntoMap(args, data[4:]); err != nil {
+		return nil, fmt.Errorf("failed to unpack multicall inputs: %w", err)
+	}
+
+	// The calls argument is an array of Call structs
+	calls, ok := args["calls"].([]struct {
+		Target common.Address `json:"target"`
+		Value  *big.Int       `json:"value"`
+		Data   []byte         `json:"data"`
+	})
+	if !ok {
+		return nil, errors.New("failed to parse calls from multicall transaction")
+	}
+
+	// Find the call to ShastaInbox and extract signal slots
+	shastaInboxAddr := c.ShastaClients.InboxAddress
+	for _, call := range calls {
+		if call.Target != shastaInboxAddr {
+			log.Debug("Multicall target is not ShastaInbox, skipping", "target", call.Target, "shastaInbox", shastaInboxAddr)
+			continue
+		}
+
+		// Try to parse this call's data as proposeWithProof
+		if len(call.Data) < 4 {
+			log.Warn("Multicall call to ShastaInbox has insufficient data", "dataLen", len(call.Data))
+			continue
+		}
+
+		innerMethod, err := encoding.ShastaInboxABI.MethodById(call.Data)
+		if err != nil {
+			log.Warn("Failed to parse ShastaInbox method from multicall", "error", err)
+			continue
+		}
+
+		signalSlots, err := c.extractSignalSlotsFromProposeWithProof(innerMethod, call.Data)
+		if err != nil {
+			log.Warn("Failed to extract signal slots from proposeWithProof", "method", innerMethod.Name, "error", err)
+			continue
+		}
+
+		return signalSlots, nil
+	}
+
+	// No proposeWithProof call found to ShastaInbox
+	log.Warn(
+		"No proposeWithProof call found to ShastaInbox in multicall",
+		"shastaInboxAddr", shastaInboxAddr,
+		"numCalls", len(calls),
+	)
+	return [][32]byte{}, nil
+}
+
+// extractSignalSlotsFromProposeWithProof extracts signal slots from a proposeWithProof call.
+func (c *Client) extractSignalSlotsFromProposeWithProof(method *abi.Method, data []byte) ([][32]byte, error) {
 	// If it's not proposeWithProof, return empty signal slots
 	if method.Name != "proposeWithProof" {
 		return [][32]byte{}, nil
 	}
 
 	args := map[string]interface{}{}
-	if err := method.Inputs.UnpackIntoMap(args, tx.Data()[4:]); err != nil {
+	if err := method.Inputs.UnpackIntoMap(args, data[4:]); err != nil {
 		return nil, fmt.Errorf("failed to unpack proposeWithProof inputs: %w", err)
 	}
 

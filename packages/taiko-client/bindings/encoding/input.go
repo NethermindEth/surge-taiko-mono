@@ -3,6 +3,7 @@ package encoding
 import (
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -135,8 +136,24 @@ var (
 	ShastaProposedEventTopic common.Hash
 	ShastaProvedEventTopic   common.Hash
 
+	// Utility contracts
+	MulticallABI *abi.ABI
+
 	customErrorMaps []map[string]abi.Error
 )
+
+// MulticallCall represents a single call in a Multicall.multicall transaction.
+type MulticallCall struct {
+	Target common.Address
+	Value  *big.Int
+	Data   []byte
+}
+
+// MulticallABIJSON is the ABI for the Multicall contract (contracts/shared/common/Multicall.sol).
+// This should match exactly the output of:
+//
+//	cd packages/protocol && cat out/shared/Multicall.sol/Multicall.json | jq -c .abi
+const MulticallABIJSON = `[{"type":"receive","stateMutability":"payable"},{"type":"function","name":"multicall","inputs":[{"name":"calls","type":"tuple[]","internalType":"struct Multicall.Call[]","components":[{"name":"target","type":"address","internalType":"address"},{"name":"value","type":"uint256","internalType":"uint256"},{"name":"data","type":"bytes","internalType":"bytes"}]}],"outputs":[{"name":"results","type":"bytes[]","internalType":"bytes[]"}],"stateMutability":"payable"}]`
 
 func init() {
 	var err error
@@ -240,6 +257,12 @@ func init() {
 	if BondManagerABI, err = surgeBindings.BondManagerMetaData.GetAbi(); err != nil {
 		log.Crit("Get BondManager ABI error", "error", err)
 	}
+
+	var multicallABI abi.ABI
+	if multicallABI, err = abi.JSON(strings.NewReader(MulticallABIJSON)); err != nil {
+		log.Crit("Get Multicall ABI error", "error", err)
+	}
+	MulticallABI = &multicallABI
 
 	customErrorMaps = []map[string]abi.Error{
 		TaikoL1ABI.Errors,
