@@ -144,6 +144,21 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesShasta(
 			return nil, fmt.Errorf("no proof responses in batch proof")
 		}
 
+		// Query contract state - needed for genesis Shasta case where we use lastFinalizedBlockHash
+		// as the firstProposalParentBlockHash when there are no previous Pacaya blocks.
+		var coreState *surgeBindings.IInboxCoreState
+		coreState, coreStateErr := a.rpc.GetCoreStateShasta(&bind.CallOpts{Context: ctx})
+		if coreStateErr != nil {
+			log.Warn("Failed to get Shasta core state", "error", coreStateErr)
+		} else {
+			log.Debug(
+				"Contract CoreState before proof submission",
+				"nextProposalId", coreState.NextProposalId,
+				"lastFinalizedProposalId", coreState.LastFinalizedProposalId,
+				"lastFinalizedBlockHash", common.Bytes2Hex(coreState.LastFinalizedBlockHash[:]),
+			)
+		}
+
 		for i, proofResponse := range batchProof.ProofResponses {
 			if len(proofResponse.Opts.ShastaOptions().Headers) == 0 {
 				return nil, fmt.Errorf(
@@ -163,7 +178,12 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesShasta(
 			if i == 0 {
 				input.Commitment.FirstProposalId = proposals[i].Id
 				if proposals[i].Id.Cmp(common.Big1) == 0 {
-					input.Commitment.FirstProposalParentBlockHash = proofResponse.Opts.ShastaOptions().Headers[0].ParentHash
+					if coreState == nil {
+						return nil, fmt.Errorf(
+							"cannot determine firstProposalParentBlockHash for proposalId=1: coreState is nil",
+						)
+					}
+					input.Commitment.FirstProposalParentBlockHash = coreState.LastFinalizedBlockHash
 				} else {
 					lastOriginInLastProposal, err := a.rpc.LastL1OriginInBatchShasta(
 						ctx,
