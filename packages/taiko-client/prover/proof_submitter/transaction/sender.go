@@ -52,40 +52,6 @@ func (s *Sender) SendBatchProof(ctx context.Context, buildTx TxBuilder, batchPro
 		return err
 	}
 
-	// TODO(@jmadibekov): Remove this after debugging.
-	// Debug logging for prove tx and ProofVerifierDummy.InvalidSignature:
-	// verifier does recoveredSigner = commitmentHash.recover(proof); if (recoveredSigner != signer) revert InvalidSignature().
-	// Log tx context, calldata, and subproofs so commitment/signer/proof can be cross-checked.
-	from := txMgr.From()
-	value := txCandidate.Value
-	if value == nil {
-		value = big.NewInt(0)
-	}
-	log.Debug(
-		"[DEBUG] prove tx — SC send",
-		"to", txCandidate.To,
-		"from", from,
-		"gasLimit", txCandidate.GasLimit,
-		"value", value,
-		"calldataLen", len(txCandidate.TxData),
-		"calldataHex", common.Bytes2Hex(txCandidate.TxData),
-	)
-	// for ProofVerifierDummy: proof = ECDSA sig; contract checks commitmentHash.recover(proof) == signer
-	log.Debug(
-		"[DEBUG] prove tx — batch IDs and subproofs",
-		"batchIDs", batchProof.BatchIDs,
-		"proofType1", batchProof.ProofType1,
-		"verifierID1", batchProof.VerifierID1,
-		"verifier1", batchProof.Verifier1,
-		"proof1Len", len(batchProof.BatchProof1),
-		"proof1Hex", common.Bytes2Hex(batchProof.BatchProof1),
-		"proofType2", batchProof.ProofType2,
-		"verifierID2", batchProof.VerifierID2,
-		"verifier2", batchProof.Verifier2,
-		"proof2Len", len(batchProof.BatchProof2),
-		"proof2Hex", common.Bytes2Hex(batchProof.BatchProof2),
-	)
-
 	// Send the transaction.
 	receipt, err := txMgr.Send(ctx, *txCandidate)
 	if err != nil {
