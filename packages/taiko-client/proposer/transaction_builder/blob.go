@@ -19,7 +19,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/manifest"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
@@ -236,15 +236,15 @@ func (b *BlobTransactionBuilder) BuildShasta(
 	// ABI encode the ShastaInbox.propose parameters.
 	inputData, err := b.rpc.EncodeProposeInput(
 		&bind.CallOpts{Context: ctx},
-		&shastaBindings.IInboxProposeInput{
+		&surgeBindings.IInboxProposeInput{
 			Deadline: common.Big0,
-			BlobReference: shastaBindings.LibBlobsBlobReference{
+			BlobReference: surgeBindings.LibBlobsBlobReference{
 				BlobStartIndex: 0,
 				NumBlobs:       uint16(len(blobs)),
 				Offset:         common.Big0,
 			},
 			// We try to include all the forced inclusions in the source manifest.
-			NumForcedInclusions: math.MaxUint16,
+			NumForcedInclusions: math.MaxUint8, // TODO(@jmadibekov): check with Anshu
 		},
 	)
 	if err != nil {

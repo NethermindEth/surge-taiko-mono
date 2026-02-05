@@ -29,7 +29,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/manifest"
 	ontakeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/ontake"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
 )
 
@@ -58,7 +58,7 @@ func (c *Client) GetProtocolConfigs(opts *bind.CallOpts) (config.ProtocolConfigs
 }
 
 // GetProtocolConfigsShasta gets the protocol configs from Shasta Inbox contract.
-func (c *Client) GetProtocolConfigsShasta(opts *bind.CallOpts) (*shastaBindings.IInboxConfig, error) {
+func (c *Client) GetProtocolConfigsShasta(opts *bind.CallOpts) (*surgeBindings.IInboxConfig, error) {
 	var cancel context.CancelFunc
 	if opts == nil {
 		opts = &bind.CallOpts{Context: context.Background()}
@@ -1465,7 +1465,7 @@ func (c *Client) GetShastaProposalHash(opts *bind.CallOpts, proposalID *big.Int)
 
 // GetShastaAnchorState gets the anchor state from Shasta Anchor contract.
 func (c *Client) GetShastaAnchorState(opts *bind.CallOpts) (
-	*shastaBindings.AnchorBlockState,
+	*surgeBindings.AnchorBlockState,
 	error,
 ) {
 	var cancel context.CancelFunc
@@ -1484,7 +1484,7 @@ func (c *Client) GetShastaAnchorState(opts *bind.CallOpts) (
 }
 
 // GetShastaInboxConfigs gets the Shasta Inbox contract configurations.
-func (c *Client) GetShastaInboxConfigs(opts *bind.CallOpts) (*shastaBindings.IInboxConfig, error) {
+func (c *Client) GetShastaInboxConfigs(opts *bind.CallOpts) (*surgeBindings.IInboxConfig, error) {
 	var cancel context.CancelFunc
 	if opts == nil {
 		opts = &bind.CallOpts{Context: context.Background()}
@@ -1501,7 +1501,7 @@ func (c *Client) GetShastaInboxConfigs(opts *bind.CallOpts) (*shastaBindings.IIn
 }
 
 // GetCoreStateShasta gets the core state from Shasta Inbox contract.
-func (c *Client) GetCoreStateShasta(opts *bind.CallOpts) (*shastaBindings.IInboxCoreState, error) {
+func (c *Client) GetCoreStateShasta(opts *bind.CallOpts) (*surgeBindings.IInboxCoreState, error) {
 	var cancel context.CancelFunc
 	if opts == nil {
 		opts = &bind.CallOpts{Context: context.Background()}
@@ -1521,7 +1521,7 @@ func (c *Client) GetCoreStateShasta(opts *bind.CallOpts) (*shastaBindings.IInbox
 func (c *Client) GetProposalByIDShasta(
 	ctx context.Context,
 	proposalID *big.Int,
-) (*shastaBindings.ShastaInboxClientProposed, *types.Log, error) {
+) (*surgeBindings.SurgeInboxClientProposed, *types.Log, error) {
 	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, DefaultRpcTimeout)
 	defer cancel()
 
@@ -1551,7 +1551,7 @@ func (c *Client) GetProposalByIDShasta(
 	}
 
 	var (
-		event *shastaBindings.ShastaInboxClientProposed
+		event *surgeBindings.SurgeInboxClientProposed
 		log   *types.Log
 	)
 	for iter.Next() {
@@ -1569,7 +1569,7 @@ func (c *Client) GetProposalByIDShasta(
 }
 
 // EncodeProveInput encodes the prove method input using the Shasta Inbox contract.
-func (c *Client) EncodeProveInput(opts *bind.CallOpts, input *shastaBindings.IInboxProveInput) ([]byte, error) {
+func (c *Client) EncodeProveInput(opts *bind.CallOpts, input *surgeBindings.IInboxProveInput) ([]byte, error) {
 	var cancel context.CancelFunc
 	if opts == nil {
 		opts = &bind.CallOpts{Context: context.Background()}
@@ -1581,7 +1581,7 @@ func (c *Client) EncodeProveInput(opts *bind.CallOpts, input *shastaBindings.IIn
 }
 
 // EncodeProposeInput encodes the propose method input using the Shasta Inbox contract.
-func (c *Client) EncodeProposeInput(opts *bind.CallOpts, input *shastaBindings.IInboxProposeInput) ([]byte, error) {
+func (c *Client) EncodeProposeInput(opts *bind.CallOpts, input *surgeBindings.IInboxProposeInput) ([]byte, error) {
 	var cancel context.CancelFunc
 	if opts == nil {
 		opts = &bind.CallOpts{Context: context.Background()}
@@ -1593,7 +1593,7 @@ func (c *Client) EncodeProposeInput(opts *bind.CallOpts, input *shastaBindings.I
 }
 
 // DecodeProposeInput decodes the propose method input using the Shasta Inbox contract.
-func (c *Client) DecodeProposeInput(opts *bind.CallOpts, data []byte) (*shastaBindings.IInboxProposeInput, error) {
+func (c *Client) DecodeProposeInput(opts *bind.CallOpts, data []byte) (*surgeBindings.IInboxProposeInput, error) {
 	var cancel context.CancelFunc
 	if opts == nil {
 		opts = &bind.CallOpts{Context: context.Background()}

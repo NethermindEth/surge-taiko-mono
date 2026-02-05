@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/chain_syncer/beaconsync"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/chain_syncer/event"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/state"
@@ -376,7 +376,7 @@ func (s *ProposerTestSuite) TestProposeOp() {
 	s.ForkIntoShasta(s.p, s.s)
 
 	// Propose txs in L2 execution engine's mempool
-	sink1 := make(chan *shastaBindings.ShastaInboxClientProposed)
+	sink1 := make(chan *surgeBindings.SurgeInboxClientProposed)
 	sub1, err := s.RPCClient.ShastaClients.Inbox.WatchProposed(nil, sink1, nil, nil)
 	s.Nil(err)
 

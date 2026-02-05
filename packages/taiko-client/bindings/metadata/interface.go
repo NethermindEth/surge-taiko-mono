@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 )
 
 // TaikoProposalMetaData defines all the metadata of a Taiko block.
@@ -52,7 +52,7 @@ type TaikoBatchMetaDataPacaya interface {
 }
 
 type TaikoProposalMetaDataShasta interface {
-	GetEventData() *shastaBindings.ShastaInboxClientProposed
+	GetEventData() *surgeBindings.SurgeInboxClientProposed
 	GetBlobHashes(int) []common.Hash
 	GetBlobTimestamp(int) uint64
 	GetTimestamp() uint64

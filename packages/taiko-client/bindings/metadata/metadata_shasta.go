@@ -6,7 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 )
 
 // Ensure TaikoProposalMetadataShasta implements TaikoBlockMetaData.
@@ -14,19 +14,19 @@ var _ TaikoProposalMetaData = (*TaikoProposalMetadataShasta)(nil)
 
 // TaikoProposalMetadataShasta is the metadata of a Shasta Taiko blocks batch.
 type TaikoProposalMetadataShasta struct {
-	*shastaBindings.ShastaInboxClientProposed
+	*surgeBindings.SurgeInboxClientProposed
 	timestamp uint64
 }
 
 // NewTaikoProposalMetadataShasta creates a new instance of TaikoProposalMetadataShasta
-// from the ShastaTaikoInbox.Proposed event.
+// from the SurgeInboxClient.Proposed event.
 func NewTaikoProposalMetadataShasta(
-	e *shastaBindings.ShastaInboxClientProposed,
+	e *surgeBindings.SurgeInboxClientProposed,
 	timestamp uint64,
 ) *TaikoProposalMetadataShasta {
 	return &TaikoProposalMetadataShasta{
-		ShastaInboxClientProposed: e,
-		timestamp:                 timestamp,
+		SurgeInboxClientProposed: e,
+		timestamp:                timestamp,
 	}
 }
 
@@ -110,8 +110,8 @@ func (m *TaikoProposalMetadataShasta) GetProposalID() *big.Int {
 }
 
 // GetEventData returns the underlying event data.
-func (m *TaikoProposalMetadataShasta) GetEventData() *shastaBindings.ShastaInboxClientProposed {
-	return m.ShastaInboxClientProposed
+func (m *TaikoProposalMetadataShasta) GetEventData() *surgeBindings.SurgeInboxClientProposed {
+	return m.SurgeInboxClientProposed
 }
 
 // GetTimestamp returns the timestamp of the proposal.

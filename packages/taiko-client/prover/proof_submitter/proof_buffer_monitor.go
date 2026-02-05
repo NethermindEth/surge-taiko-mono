@@ -162,7 +162,8 @@ func flushProofCacheRange(
 				log.Info(
 					"Buffer overflow during cache flush, stop flushing",
 					"proposalID", currentID,
-					"proofType", cachedProof.ProofType,
+					"proofType1", cachedProof.ProofType1,
+					"proofType2", cachedProof.ProofType2,
 				)
 				return nil
 			}
