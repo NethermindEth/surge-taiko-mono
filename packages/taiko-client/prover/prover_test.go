@@ -396,6 +396,8 @@ func (s *ProverTestSuite) TestAggregateProofsAlreadyProved() {
 		BackOffMaxRetries:     12,
 		SGXProofBufferSize:    uint64(batchSize),
 		ZKVMProofBufferSize:   uint64(batchSize),
+		ZKVMProofType1:        string(proofProducer.ProofTypeZKR0),
+		ZKVMProofType2:        string(proofProducer.ProofTypeZKSP1),
 	}, s.txmgr, s.txmgr))
 
 	for i := 0; i < batchSize; i++ {
@@ -459,6 +461,8 @@ func (s *ProverTestSuite) TestAggregateProofs() {
 		BackOffMaxRetries:     12,
 		SGXProofBufferSize:    uint64(batchSize),
 		ZKVMProofBufferSize:   uint64(batchSize),
+		ZKVMProofType1:        string(proofProducer.ProofTypeZKR0),
+		ZKVMProofType2:        string(proofProducer.ProofTypeZKSP1),
 	}, s.txmgr, s.txmgr))
 
 	for i := 0; i < batchSize; i++ {
@@ -701,6 +705,8 @@ func (s *ProverTestSuite) TestForceAggregate() {
 		BackOffMaxRetries:         12,
 		SGXProofBufferSize:        uint64(batchSize),
 		ZKVMProofBufferSize:       uint64(batchSize),
+		ZKVMProofType1:            string(proofProducer.ProofTypeZKR0),
+		ZKVMProofType2:            string(proofProducer.ProofTypeZKSP1),
 		ForceBatchProvingInterval: 500 * time.Millisecond,
 	}, s.txmgr, s.txmgr))
 
@@ -768,6 +774,8 @@ func (s *ProverTestSuite) initProver(ctx context.Context, key *ecdsa.PrivateKey)
 		BackOffMaxRetries:      12,
 		SGXProofBufferSize:     1,
 		ZKVMProofBufferSize:    1,
+		ZKVMProofType1:         string(proofProducer.ProofTypeZKR0),
+		ZKVMProofType2:         string(proofProducer.ProofTypeZKSP1),
 		BlockConfirmations:     0,
 	}, s.txmgr, s.txmgr))
 	s.p = p
