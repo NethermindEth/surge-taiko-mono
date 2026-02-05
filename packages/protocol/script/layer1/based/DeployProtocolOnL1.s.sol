@@ -88,6 +88,13 @@ contract DeployProtocolOnL1 is DeployCapability {
             contractOwner, rollupResolver, proofVerifier, taikoInboxAddr, address(opImpl)
         );
         if (vm.envBool("DUMMY_VERIFIERS")) {
+            // When using dummy verifiers, route ALL proof types to OpVerifier
+            // which accepts any proof with length > 0. This allows dummy proofs
+            // (like 0xbbbb...) to pass verification in test environments.
+            // NOTE: We must use DIFFERENT OpVerifier proxy addresses for risc0 and sp1
+            // because ComposeVerifier requires verifiers to be in strictly ascending order
+            // (CV_INVALID_SUB_VERIFIER_ORDER check). Using opGethVerifier for risc0 and
+            // opRethVerifier for sp1 ensures they have distinct addresses.
             UUPSUpgradeable(proofVerifier).upgradeTo({
                 newImplementation: address(
                     new DevnetVerifier(
@@ -95,8 +102,8 @@ contract DeployProtocolOnL1 is DeployCapability {
                         verifiers.opGethVerifier,
                         verifiers.opRethVerifier,
                         address(0),
-                        verifiers.risc0RethVerifier,
-                        verifiers.sp1RethVerifier
+                        verifiers.opGethVerifier,  // Use opGethVerifier for risc0 (accepts dummy proofs)
+                        verifiers.opRethVerifier   // Use opRethVerifier for sp1 (accepts dummy proofs)
                     )
                 )
             });
