@@ -127,8 +127,9 @@ jobs:
       - name: Determine event type and set tags
         id: event
         run: |
-          SHORT_SHA="${GITHUB_SHA:0:8}"
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            SHORT_SHA="${{ github.event.pull_request.head.sha }}"
+            SHORT_SHA="${SHORT_SHA:0:8}"
             echo "is_branch=false" >> $GITHUB_OUTPUT
             {
               echo "tag_list<<EOF"
@@ -136,6 +137,7 @@ jobs:
               echo "EOF"
             } >> $GITHUB_OUTPUT
           elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/surge-shasta" ]]; then
+            SHORT_SHA="${GITHUB_SHA:0:8}"
             echo "is_branch=true" >> $GITHUB_OUTPUT
             {
               echo "tag_list<<EOF"
