@@ -63,6 +63,10 @@ func (h *BatchProposedEventHandler) HandleShasta(
 		"derivationSources", len(meta.Shasta().GetEventData().Sources),
 	)
 
+	log.Debug(
+		"Updating prover_proposed_received metric",
+		"proposalId", meta.Shasta().GetEventData().Id,
+	)
 	metrics.ProverReceivedProposedBlockGauge.Set(float64(meta.Shasta().GetEventData().Id.Uint64()))
 
 	// Move l1Current cursor.

@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/params"
@@ -453,13 +454,20 @@ func (c *Client) WaitShastaHeader(ctx context.Context, batchID *big.Int) (*types
 			return nil, ctxWithTimeout.Err()
 		}
 
-		l1Origin, err := c.L2.LastL1OriginByBatchID(ctxWithTimeout, batchID)
+		l1Origin, err := c.L2Engine.LastL1OriginByBatchID(ctxWithTimeout, batchID)
 		if err != nil {
-			log.Debug(
-				"Fetch Shasta block header from L2 execution engine not found, keep retrying",
-				"batchID", batchID,
-				"error", err,
-			)
+			if err.Error() == eth.ErrProposalLastBlockUncertain.Error() {
+				log.Warn(
+					"Proposal last block uncertain, keep retrying",
+					"batchID", batchID,
+				)
+			} else {
+				log.Debug(
+					"Fetch Shasta block header from L2 execution engine not found, keep retrying",
+					"batchID", batchID,
+					"error", err,
+				)
+			}
 			continue
 		}
 
@@ -589,11 +597,13 @@ func (c *Client) L2ExecutionEngineSyncProgress(ctx context.Context) (*L2SyncProg
 
 		// If the next proposal ID is 1, it means there is no Shasta proposal has been made on L2 yet.
 		if coreState.NextProposalId.Cmp(common.Big1) > 0 {
-			l1Origin, err := c.L2.LastL1OriginByBatchID(
+			l1Origin, err := c.L2Engine.LastL1OriginByBatchID(
 				ctx,
 				new(big.Int).Sub(coreState.NextProposalId, common.Big1),
 			)
-			if err != nil && err.Error() != ethereum.NotFound.Error() {
+			if err != nil &&
+				err.Error() != ethereum.NotFound.Error() &&
+				err.Error() != eth.ErrProposalLastBlockUncertain.Error() {
 				return err
 			}
 			// If the L1Origin is not found, it means the L2 execution engine has not synced yet,
@@ -775,10 +785,10 @@ func (c *Client) CheckL1Reorg(ctx context.Context, batchID *big.Int, isShastaBat
 		// 1. Check whether the last L2 block's corresponding L1 block which in L1Origin has been reorged.
 		var l1Origin *rawdb.L1Origin
 		if isShastaBatch {
-			if l1Origin, err = c.L2.LastL1OriginByBatchID(ctxWithTimeout, batchID); err != nil {
+			if l1Origin, err = c.L2Engine.LastL1OriginByBatchID(ctxWithTimeout, batchID); err != nil {
 				// If the L2 EE is just synced through P2P, so there is no L1Origin information recorded in
 				// its local database, we skip this check.
-				if err.Error() == ethereum.NotFound.Error() {
+				if err.Error() == ethereum.NotFound.Error() || err.Error() == eth.ErrProposalLastBlockUncertain.Error() {
 					log.Info("L1Origin not found, the L2 execution engine has just synced from P2P network", "batchID", batchID)
 					return result, nil
 				}
@@ -933,7 +943,7 @@ func (c *Client) LastL1OriginInBatchShasta(ctx context.Context, batchID *big.Int
 		return l1Origin, nil
 	}
 
-	l1Origin, err := c.L2.LastL1OriginByBatchID(ctxWithTimeout, batchID)
+	l1Origin, err := c.L2Engine.LastL1OriginByBatchID(ctxWithTimeout, batchID)
 	if err != nil {
 		return nil, fmt.Errorf("L1Origin not found for batch ID %d: %w", batchID, err)
 	}
@@ -1111,14 +1121,14 @@ func (c *Client) CalculateBaseFeePacaya(
 func (c *Client) getGenesisHeight(ctx context.Context) (*big.Int, error) {
 	stateVars, err := c.GetProtocolStateVariablesPacaya(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return c.getShastaActivationBlockNumber(ctx)
+		return c.GetShastaActivationBlockNumber(ctx)
 	}
 
 	return new(big.Int).SetUint64(stateVars.Stats1.GenesisHeight), nil
 }
 
-// getShastaActivationBlockNumber resolves the L1 block number when the Shasta inbox was activated.
-func (c *Client) getShastaActivationBlockNumber(ctx context.Context) (*big.Int, error) {
+// GetShastaActivationBlockNumber resolves the L1 block number when the Shasta inbox was activated.
+func (c *Client) GetShastaActivationBlockNumber(ctx context.Context) (*big.Int, error) {
 	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, DefaultRpcTimeout)
 	defer cancel()
 
@@ -1515,7 +1525,7 @@ func (c *Client) GetProposalByIDShasta(
 	ctxWithTimeout, cancel := CtxWithTimeoutOrDefault(ctx, DefaultRpcTimeout)
 	defer cancel()
 
-	blockID, err := c.L2.LastBlockIDByBatchID(ctxWithTimeout, proposalID)
+	blockID, err := c.L2Engine.LastBlockIDByBatchID(ctxWithTimeout, proposalID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get last block ID by batch ID %d: %w", proposalID, err)
 	}
