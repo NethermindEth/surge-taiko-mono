@@ -73,7 +73,7 @@ func (s *Sender) SendBatchProof(ctx context.Context, buildTx TxBuilder, batchPro
 	}
 
 	log.Info(
-		fmt.Sprintf("🚚 Your %s batch proofs have been accepted", batchProof.ProofType),
+		fmt.Sprintf("🚚 Your %s/%s batch proofs have been accepted", batchProof.ProofType1, batchProof.ProofType2),
 		"txHash", receipt.TxHash,
 		"blockIDs", batchProof.BatchIDs,
 	)

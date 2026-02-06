@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	proofProducer "github.com/taikoxyz/taiko-mono/packages/taiko-client/prover/proof_producer"
@@ -73,7 +73,7 @@ func (h *BatchesProvedEventHandler) HandlePacaya(
 // HandleShasta implements the BatchesProvedHandler interface.
 func (h *BatchesProvedEventHandler) HandleShasta(
 	ctx context.Context,
-	e *shastaBindings.ShastaInboxClientProved,
+	e *surgeBindings.SurgeInboxClientProved,
 ) error {
 	coreState, err := h.rpc.GetCoreStateShasta(&bind.CallOpts{Context: ctx})
 	if err != nil {
@@ -87,6 +87,12 @@ func (h *BatchesProvedEventHandler) HandleShasta(
 		"actualProver", e.ActualProver,
 		"checkpointBlockHash", coreState.LastFinalizedBlockHash,
 	)
+
+	log.Debug(
+		"Updating prover_latestVerified_id metric",
+		"proposalId", e.LastProposalId,
+	)
+	metrics.ProverLatestVerifiedIDGauge.Set(float64(e.LastProposalId.Int64()))
 
 	return nil
 }

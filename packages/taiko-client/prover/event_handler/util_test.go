@@ -11,7 +11,7 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
 )
 
@@ -89,7 +89,7 @@ func (s *ProverEventHandlerTestSuite) TestIsProvingWindowExpiredShasta_Remaining
 
 	notExpiredTs := int64(now + pw - 5)
 	meta := metadata.NewTaikoProposalMetadataShasta(
-		&shastaBindings.ShastaInboxClientProposed{
+		&surgeBindings.SurgeInboxClientProposed{
 			Id:       common.Big1,
 			Proposer: common.Address{},
 		},
@@ -103,7 +103,7 @@ func (s *ProverEventHandlerTestSuite) TestIsProvingWindowExpiredShasta_Remaining
 
 	expiredTs := int64(now - pw - 5)
 	metaExpired := metadata.NewTaikoProposalMetadataShasta(
-		&shastaBindings.ShastaInboxClientProposed{
+		&surgeBindings.SurgeInboxClientProposed{
 			Id:       common.Big2,
 			Proposer: common.Address{},
 		},

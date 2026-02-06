@@ -12,7 +12,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 	ontakeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/ontake"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 )
 
 // ABI arguments marshaling components.
@@ -217,7 +217,7 @@ func init() {
 		log.Crit("Get ProverSet ABI error", "error", err)
 	}
 
-	if ShastaInboxABI, err = shastaBindings.ShastaInboxClientMetaData.GetAbi(); err != nil {
+	if ShastaInboxABI, err = surgeBindings.SurgeInboxClientMetaData.GetAbi(); err != nil {
 		log.Crit("Get Shasta Inbox ABI error", "error", err)
 	}
 
@@ -233,11 +233,11 @@ func init() {
 		log.Crit("Proved event not found in Shasta inbox ABI")
 	}
 
-	if ShastaAnchorABI, err = shastaBindings.ShastaAnchorMetaData.GetAbi(); err != nil {
+	if ShastaAnchorABI, err = surgeBindings.SurgeAnchorMetaData.GetAbi(); err != nil {
 		log.Crit("Get Shasta Anchor ABI error", "error", err)
 	}
 
-	if BondManagerABI, err = shastaBindings.BondManagerMetaData.GetAbi(); err != nil {
+	if BondManagerABI, err = surgeBindings.BondManagerMetaData.GetAbi(); err != nil {
 		log.Crit("Get BondManager ABI error", "error", err)
 	}
 

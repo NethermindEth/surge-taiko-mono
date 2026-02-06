@@ -16,7 +16,8 @@ func TestComposeProducerRequestProof(t *testing.T) {
 		producer = &ComposeProofProducer{
 			Dummy:              true,
 			DummyProofProducer: DummyProofProducer{},
-			SgxGethProducer:    &SgxGethProofProducer{Dummy: true},
+			ZKVMProofType1:     ProofTypeZKR0,
+			ZKVMProofType2:     ProofTypeZKSP1,
 		}
 		blockID = common.Big32
 	)
@@ -30,5 +31,5 @@ func TestComposeProducerRequestProof(t *testing.T) {
 	require.Nil(t, err)
 
 	require.Equal(t, res.BatchID, blockID)
-	require.NotEmpty(t, res.Proof)
+	require.NotEmpty(t, res.Proof1)
 }

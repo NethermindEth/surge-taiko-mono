@@ -14,7 +14,7 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/signer"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
@@ -108,7 +108,7 @@ func (c *AnchorTxConstructor) AssembleAnchorV4Tx(
 
 	return c.rpc.ShastaClients.Anchor.AnchorV4(
 		opts,
-		shastaBindings.ICheckpointStoreCheckpoint{
+		surgeBindings.ICheckpointStoreCheckpoint{
 			BlockNumber: anchorBlockNumber,
 			BlockHash:   anchorBlockHash,
 			StateRoot:   anchorStateRoot,

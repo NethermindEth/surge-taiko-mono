@@ -1,19 +1,17 @@
-name: "[Nethermind] Taiko Client - Build and Push Multi-Arch Docker Image"
+name: "[Nethermind] Taiko Client - Build and Push Multi-Arch Docker Image (Surge)"
 
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main]
+    branches: [surge-shasta]
     paths:
       - "packages/taiko-client/**"
-      - ".github/workflows/taiko-client--docker-build.yml"
+      - ".github/workflows/taiko-client--docker-surge.yml"
   push:
-    branches: [main]
-    tags:
-      - "v*"
+    branches: [surge-shasta]
     paths:
       - "packages/taiko-client/**"
-      - ".github/workflows/taiko-client--docker-build.yml"
+      - ".github/workflows/taiko-client--docker-surge.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -73,10 +71,7 @@ jobs:
         with:
           images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}
           tags: |
-            type=sha
-            type=ref,event=pr
-            type=ref,event=branch
-            type=ref,event=tag
+            type=raw,value=surge-shasta-{{sha}}
 
       - name: Build and push by digest
         id: build
@@ -103,7 +98,6 @@ jobs:
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
-
 
   merge:
     runs-on: ubuntu-latest
@@ -134,30 +128,20 @@ jobs:
         id: event
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "is_tag=false" >> $GITHUB_OUTPUT
+            SHORT_SHA="${{ github.event.pull_request.head.sha }}"
+            SHORT_SHA="${SHORT_SHA:0:8}"
             echo "is_branch=false" >> $GITHUB_OUTPUT
             {
               echo "tag_list<<EOF"
-              echo "type=sha"
-              echo "type=ref,event=pr"
+              echo "type=raw,value=pr-${{ github.event.pull_request.number }}-${SHORT_SHA}"
               echo "EOF"
             } >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "is_tag=true" >> $GITHUB_OUTPUT
-            echo "is_branch=false" >> $GITHUB_OUTPUT
-            VERSION=${GITHUB_REF#refs/tags/}
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-            {
-              echo "tag_list<<EOF"
-              echo "type=raw,value=$VERSION"
-              echo "EOF"
-            } >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "is_tag=false" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/surge-shasta" ]]; then
+            SHORT_SHA="${GITHUB_SHA:0:8}"
             echo "is_branch=true" >> $GITHUB_OUTPUT
             {
               echo "tag_list<<EOF"
-              echo "type=raw,value=latest"
+              echo "type=raw,value=surge-shasta-${SHORT_SHA}"
               echo "EOF"
             } >> $GITHUB_OUTPUT
           fi
@@ -177,10 +161,9 @@ jobs:
 
       - name: Inspect image
         run: |
-          if [[ "${{ steps.event.outputs.is_tag }}" == "true" ]]; then
-            docker buildx imagetools inspect ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}:${{ steps.event.outputs.version }}
-          elif [[ "${{ steps.event.outputs.is_branch }}" == "true" ]]; then
-            docker buildx imagetools inspect ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}:latest
+          SHORT_SHA="${GITHUB_SHA:0:8}"
+          if [[ "${{ steps.event.outputs.is_branch }}" == "true" ]]; then
+            docker buildx imagetools inspect ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}:surge-shasta-${SHORT_SHA}
           else
             echo "Skipping inspect for PR builds"
           fi

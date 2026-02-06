@@ -25,7 +25,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	anchortxconstructor "github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/anchor_tx_constructor"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
@@ -53,7 +53,7 @@ func (s *ClientTestSuite) ProposeAndInsertEmptyBlocks(
 
 	// Propose txs in L2 execution engine's mempool
 	sink1 := make(chan *pacayaBindings.TaikoInboxClientBatchProposed)
-	sink2 := make(chan *shastaBindings.ShastaInboxClientProposed)
+	sink2 := make(chan *surgeBindings.SurgeInboxClientProposed)
 	sub1, err := s.RPCClient.PacayaClients.TaikoInbox.WatchBatchProposed(nil, sink1)
 	s.Nil(err)
 	sub2, err := s.RPCClient.ShastaClients.Inbox.WatchProposed(nil, sink2, nil, nil)
@@ -129,7 +129,7 @@ func (s *ClientTestSuite) ProposeAndInsertValidBlock(
 	sink1 := make(chan *pacayaBindings.TaikoInboxClientBatchProposed)
 	sub1, err := s.RPCClient.PacayaClients.TaikoInbox.WatchBatchProposed(nil, sink1)
 	s.Nil(err)
-	sink2 := make(chan *shastaBindings.ShastaInboxClientProposed)
+	sink2 := make(chan *surgeBindings.SurgeInboxClientProposed)
 	sub2, err := s.RPCClient.ShastaClients.Inbox.WatchProposed(nil, sink2, nil, nil)
 	s.Nil(err)
 
@@ -216,7 +216,7 @@ func (s *ClientTestSuite) ProposeValidBlock(proposer Proposer) {
 
 	// Propose txs in L2 execution engine's mempool
 	sink1 := make(chan *pacayaBindings.TaikoInboxClientBatchProposed)
-	sink2 := make(chan *shastaBindings.ShastaInboxClientProposed)
+	sink2 := make(chan *surgeBindings.SurgeInboxClientProposed)
 	sub1, err := s.RPCClient.PacayaClients.TaikoInbox.WatchBatchProposed(nil, sink1)
 	s.Nil(err)
 	sub2, err := s.RPCClient.ShastaClients.Inbox.WatchProposed(nil, sink2, nil, nil)

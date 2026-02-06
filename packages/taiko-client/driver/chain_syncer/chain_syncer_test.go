@@ -19,7 +19,7 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/manifest"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/state"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/jwt"
@@ -513,7 +513,7 @@ func (s *ChainSyncerTestSuite) TestShastaProposalsWithInvalidForcedInclusion() {
 	inbox := common.HexToAddress(os.Getenv("SHASTA_INBOX"))
 	config, err := s.RPCClient.ShastaClients.Inbox.GetConfig(nil)
 	s.Nil(err)
-	data, err := encoding.ShastaInboxABI.Pack("saveForcedInclusion", shastaBindings.LibBlobsBlobReference{
+	data, err := encoding.ShastaInboxABI.Pack("saveForcedInclusion", surgeBindings.LibBlobsBlobReference{
 		BlobStartIndex: 0,
 		NumBlobs:       1,
 		Offset:         common.Big0,
@@ -593,7 +593,7 @@ func (s *ChainSyncerTestSuite) TestShastaProposalsWithForcedInclusion() {
 	inbox := common.HexToAddress(os.Getenv("SHASTA_INBOX"))
 	config, err := s.RPCClient.ShastaClients.Inbox.GetConfig(nil)
 	s.Nil(err)
-	data, err := encoding.ShastaInboxABI.Pack("saveForcedInclusion", shastaBindings.LibBlobsBlobReference{
+	data, err := encoding.ShastaInboxABI.Pack("saveForcedInclusion", surgeBindings.LibBlobsBlobReference{
 		BlobStartIndex: 0,
 		NumBlobs:       1,
 		Offset:         common.Big0,

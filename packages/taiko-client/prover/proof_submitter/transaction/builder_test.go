@@ -20,11 +20,13 @@ func (s *TransactionTestSuite) TestBuildTxs() {
 
 	builder := s.builder.BuildProveBatchesPacaya(&producer.BatchProofs{
 		ProofResponses: []*producer.ProofResponse{{
-			BatchID:   common.Big1,
-			Meta:      metadata.NewTaikoDataBlockMetadataPacaya(&pacayaBindings.TaikoInboxClientBatchProposed{}),
-			Proof:     testutils.RandomBytes(100),
-			Opts:      &producer.ProofRequestOptionsPacaya{Headers: []*types.Header{header}},
-			ProofType: producer.ProofTypeOp,
+			BatchID:    common.Big1,
+			Meta:       metadata.NewTaikoDataBlockMetadataPacaya(&pacayaBindings.TaikoInboxClientBatchProposed{}),
+			Proof1:     testutils.RandomBytes(100),
+			ProofType1: producer.ProofTypeZKR0,
+			Proof2:     testutils.RandomBytes(100),
+			ProofType2: producer.ProofTypeZKSP1,
+			Opts:       &producer.ProofRequestOptionsPacaya{Headers: []*types.Header{header}},
 		}},
 	})
 	_, err = builder(&bind.TransactOpts{})

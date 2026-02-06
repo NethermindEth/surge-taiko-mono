@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	proofProducer "github.com/taikoxyz/taiko-mono/packages/taiko-client/prover/proof_producer"
 )
 
@@ -20,10 +20,10 @@ func TestProofDistributionWithOutOfOrderResponses(t *testing.T) {
 
 	submitter := &ProofSubmitterShasta{
 		proofBuffers: map[proofProducer.ProofType]*proofProducer.ProofBuffer{
-			proofProducer.ProofTypeOp: buffer,
+			proofProducer.ProofTypeZKR0: buffer,
 		},
 		proofCacheMaps: map[proofProducer.ProofType]cmap.ConcurrentMap[string, *proofProducer.ProofResponse]{
-			proofProducer.ProofTypeOp: cacheMap,
+			proofProducer.ProofTypeZKR0: cacheMap,
 		},
 		batchAggregationNotify:    make(chan proofProducer.ProofType, 1),
 		flushCacheNotify:          make(chan proofProducer.ProofType, 1),
@@ -62,7 +62,7 @@ func TestProofDistributionWithOutOfOrderResponses(t *testing.T) {
 
 func newShastaMetaForTest(id int64) metadata.TaikoProposalMetaData {
 	return metadata.NewTaikoProposalMetadataShasta(
-		&shastaBindings.ShastaInboxClientProposed{
+		&surgeBindings.SurgeInboxClientProposed{
 			Id:       big.NewInt(id),
 			Proposer: common.Address{},
 		},
@@ -72,7 +72,8 @@ func newShastaMetaForTest(id int64) metadata.TaikoProposalMetaData {
 
 func newProofResponse(id int64) *proofProducer.ProofResponse {
 	return &proofProducer.ProofResponse{
-		BatchID:   big.NewInt(id),
-		ProofType: proofProducer.ProofTypeOp,
+		BatchID:    big.NewInt(id),
+		ProofType1: proofProducer.ProofTypeZKR0,
+		ProofType2: proofProducer.ProofTypeZKSP1,
 	}
 }
