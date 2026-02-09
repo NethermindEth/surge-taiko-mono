@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.6
 
-FROM golang:1.24-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
 
 ARG PACKAGE=relayer
 ARG BUILDKIT_INLINE_CACHE=1
@@ -28,7 +28,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -o /build/bin/${PACKAGE} \
     ./cmd/main.go
 
-FROM alpine:latest AS runtime
+FROM --platform=$BUILDPLATFORM alpine:latest AS runtime
 
 ARG PACKAGE=relayer
 
