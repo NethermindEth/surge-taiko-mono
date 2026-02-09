@@ -95,7 +95,7 @@ jobs:
 
   docker-merge:
     name: Merge docker manifests
-    runs-on: arc-runner-set
+    runs-on: ubuntu-latest
     needs: [docker]
 
     steps:

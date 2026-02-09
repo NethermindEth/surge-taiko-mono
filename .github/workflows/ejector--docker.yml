@@ -101,7 +101,7 @@ jobs:
 
   merge:
     name: Create and push multi-arch manifest
-    runs-on: arc-runner-set
+    runs-on: ubuntu-latest
     needs: [build]
 
     steps:

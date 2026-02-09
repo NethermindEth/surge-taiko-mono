@@ -49,7 +49,7 @@ jobs:
       digest-arm64: ${{ steps.digest.outputs.arm64 }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -65,7 +65,7 @@ jobs:
 
       - name: Build and push by digest
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: packages/protocol
           platforms: ${{ matrix.platform }}
