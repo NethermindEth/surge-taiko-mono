@@ -108,7 +108,7 @@ interface IInbox {
         /// @notice The number of forced inclusions that the proposer wants to process.
         /// @dev This can be set to 0 if no forced inclusions are due, and there's none in the queue
         /// that he wants to include.
-        uint8 numForcedInclusions;
+        uint16 numForcedInclusions;
     }
 
     /// @notice Transition data for a proposal used in prove
