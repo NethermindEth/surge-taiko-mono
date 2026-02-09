@@ -1,9 +1,10 @@
 package transaction
 
 import (
-	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum-optimism/optimism/op-service/txmgr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -13,7 +14,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	proofProducer "github.com/taikoxyz/taiko-mono/packages/taiko-client/prover/proof_producer"
 )
@@ -52,7 +53,7 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesPacaya(batchProof *proofProduce
 			err         error
 			metas       = make([]metadata.TaikoProposalMetaData, len(batchProof.ProofResponses))
 			transitions = make([]pacayaBindings.ITaikoInboxTransition, len(batchProof.ProofResponses))
-			subProofs   = make([]encoding.SubProofPacaya, 2)
+			subProofs   []encoding.SubProofPacaya
 			batchIDs    = make([]uint64, len(batchProof.ProofResponses))
 		)
 		for i, proof := range batchProof.ProofResponses {
@@ -72,21 +73,27 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesPacaya(batchProof *proofProduce
 				"startBlockID", proof.Opts.PacayaOptions().Headers[0].Number,
 				"endBlockID", proof.Opts.PacayaOptions().Headers[len(proof.Opts.PacayaOptions().Headers)-1].Number,
 				"gasLimit", txOpts.GasLimit,
-				"verifier", batchProof.Verifier,
 			)
 		}
-		if bytes.Compare(batchProof.Verifier.Bytes(), batchProof.SgxGethProofVerifier.Bytes()) < 0 {
-			subProofs[0] = encoding.SubProofPacaya{Verifier: batchProof.Verifier, Proof: batchProof.BatchProof}
-			subProofs[1] = encoding.SubProofPacaya{
-				Verifier: batchProof.SgxGethProofVerifier,
-				Proof:    batchProof.SgxGethBatchProof,
-			}
-		} else {
-			subProofs[0] = encoding.SubProofPacaya{
-				Verifier: batchProof.SgxGethProofVerifier,
-				Proof:    batchProof.SgxGethBatchProof,
-			}
-			subProofs[1] = encoding.SubProofPacaya{Verifier: batchProof.Verifier, Proof: batchProof.BatchProof}
+		log.Info(
+			"Verifier information",
+			"ProofType1", batchProof.ProofType1,
+			"Verifier1", batchProof.Verifier1,
+			"Proof1", common.Bytes2Hex(batchProof.BatchProof1),
+			"ProofType2", batchProof.ProofType2,
+			"Verifier2", batchProof.Verifier2,
+			"Proof2", common.Bytes2Hex(batchProof.BatchProof2),
+		)
+
+		subProofs = []encoding.SubProofPacaya{
+			{
+				Verifier: batchProof.Verifier1,
+				Proof:    batchProof.BatchProof1,
+			},
+			{
+				Verifier: batchProof.Verifier2,
+				Proof:    batchProof.BatchProof2,
+			},
 		}
 
 		input, err := encoding.EncodeProveBatchesInput(metas, transitions)
@@ -121,13 +128,15 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesPacaya(batchProof *proofProduce
 }
 
 // BuildProveBatchesShasta creates a new Shasta Inbox.prove transaction.
-func (a *ProveBatchesTxBuilder) BuildProveBatchesShasta(batchProof *proofProducer.BatchProofs) TxBuilder {
+func (a *ProveBatchesTxBuilder) BuildProveBatchesShasta(
+	ctx context.Context,
+	batchProof *proofProducer.BatchProofs,
+) TxBuilder {
 	return func(txOpts *bind.TransactOpts) (*txmgr.TxCandidate, error) {
 		var (
-			proposals = make([]shastaBindings.IInboxProposal, len(batchProof.ProofResponses))
-			input     = &shastaBindings.IInboxProveInput{
-				Commitment:          shastaBindings.IInboxCommitment{ActualProver: txOpts.From},
-				ForceCheckpointSync: false,
+			proposals = make([]*surgeBindings.SurgeInboxClientProposed, len(batchProof.ProofResponses))
+			input     = &surgeBindings.IInboxProveInput{
+				Commitment: surgeBindings.IInboxCommitment{ActualProver: txOpts.From},
 			}
 		)
 
@@ -135,14 +144,29 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesShasta(batchProof *proofProduce
 			return nil, fmt.Errorf("no proof responses in batch proof")
 		}
 
+		// Query contract state - needed for genesis Shasta case where we use lastFinalizedBlockHash
+		// as the firstProposalParentBlockHash when there are no previous Pacaya blocks.
+		var coreState *surgeBindings.IInboxCoreState
+		coreState, coreStateErr := a.rpc.GetCoreStateShasta(&bind.CallOpts{Context: ctx})
+		if coreStateErr != nil {
+			log.Warn("Failed to get Shasta core state", "error", coreStateErr)
+		} else {
+			log.Debug(
+				"Contract CoreState before proof submission",
+				"nextProposalId", coreState.NextProposalId,
+				"lastFinalizedProposalId", coreState.LastFinalizedProposalId,
+				"lastFinalizedBlockHash", common.Bytes2Hex(coreState.LastFinalizedBlockHash[:]),
+			)
+		}
+
 		for i, proofResponse := range batchProof.ProofResponses {
 			if len(proofResponse.Opts.ShastaOptions().Headers) == 0 {
 				return nil, fmt.Errorf(
 					"no headers in proof response options for proposal ID %d",
-					proofResponse.Meta.Shasta().GetProposal().Id,
+					proofResponse.Meta.Shasta().GetEventData().Id,
 				)
 			}
-			proposals[i] = proofResponse.Meta.Shasta().GetProposal()
+			proposals[i] = proofResponse.Meta.Shasta().GetEventData()
 			lastHeader := proofResponse.Opts.ShastaOptions().Headers[len(proofResponse.Opts.ShastaOptions().Headers)-1]
 
 			proposalHash, err := a.rpc.GetShastaProposalHash(nil, proposals[i].Id)
@@ -153,7 +177,23 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesShasta(batchProof *proofProduce
 			// Set first proposal information.
 			if i == 0 {
 				input.Commitment.FirstProposalId = proposals[i].Id
-				input.Commitment.FirstProposalParentBlockHash = proofResponse.Opts.ShastaOptions().Headers[0].ParentHash
+				if proposals[i].Id.Cmp(common.Big1) == 0 {
+					if coreState == nil {
+						return nil, fmt.Errorf(
+							"cannot determine firstProposalParentBlockHash for proposalId=1: coreState is nil",
+						)
+					}
+					input.Commitment.FirstProposalParentBlockHash = coreState.LastFinalizedBlockHash
+				} else {
+					lastOriginInLastProposal, err := a.rpc.LastL1OriginInBatchShasta(
+						ctx,
+						new(big.Int).Sub(proposals[i].Id, common.Big1),
+					)
+					if err != nil {
+						return nil, err
+					}
+					input.Commitment.FirstProposalParentBlockHash = lastOriginInLastProposal.L2BlockHash
+				}
 			}
 
 			// Set last proposal information.
@@ -163,19 +203,11 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesShasta(batchProof *proofProduce
 				input.Commitment.EndStateRoot = lastHeader.Root
 			}
 
-			// Fetch anchor proposal state, which contains the designated prover for the proposal.
-			_, anchorProposalState, err := a.rpc.GetShastaAnchorState(
-				&bind.CallOpts{Context: txOpts.Context, BlockHash: lastHeader.Hash()},
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch anchor proposal state: %w", err)
-			}
-
-			input.Commitment.Transitions = append(input.Commitment.Transitions, shastaBindings.IInboxTransition{
-				Proposer:         proposals[i].Proposer,
-				DesignatedProver: anchorProposalState.DesignatedProver,
-				Timestamp:        proposals[i].Timestamp,
-				BlockHash:        lastHeader.Hash(),
+			// Set transition information.
+			input.Commitment.Transitions = append(input.Commitment.Transitions, surgeBindings.IInboxTransition{
+				Proposer:  proposals[i].Proposer,
+				Timestamp: new(big.Int).SetUint64(proofResponse.Meta.Shasta().GetTimestamp()),
+				BlockHash: lastHeader.Hash(),
 			})
 
 			log.Info(
@@ -186,6 +218,7 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesShasta(batchProof *proofProduce
 				"end", proofResponse.Opts.ShastaOptions().Headers[len(proofResponse.Opts.ShastaOptions().Headers)-1].Number,
 				"designatedProver", batchProof.ProofResponses[i].Opts.ShastaOptions().DesignatedProver,
 				"actualProver", txOpts.From,
+				"firstProposalParentBlockHash", common.Bytes2Hex(input.Commitment.FirstProposalParentBlockHash[:]),
 			)
 		}
 
@@ -205,20 +238,22 @@ func (a *ProveBatchesTxBuilder) BuildProveBatchesShasta(batchProof *proofProduce
 		}
 		log.Info(
 			"Verifier information",
-			"GethVerifierID", batchProof.SgxGethVerifierID,
-			"GethProof", common.Bytes2Hex(batchProof.SgxGethBatchProof),
-			"VerifierID", batchProof.VerifierID,
-			"Proof", common.Bytes2Hex(batchProof.BatchProof),
+			"ProofType1", batchProof.ProofType1,
+			"VerifierID1", batchProof.VerifierID1,
+			"Proof1", common.Bytes2Hex(batchProof.BatchProof1),
+			"ProofType2", batchProof.ProofType2,
+			"VerifierID2", batchProof.VerifierID2,
+			"Proof2", common.Bytes2Hex(batchProof.BatchProof2),
 		)
 
 		subProofs := []encoding.SubProofShasta{
 			{
-				VerifierId: batchProof.SgxGethVerifierID,
-				Proof:      batchProof.SgxGethBatchProof,
+				VerifierId: batchProof.VerifierID1,
+				Proof:      batchProof.BatchProof1,
 			},
 			{
-				VerifierId: batchProof.VerifierID,
-				Proof:      batchProof.BatchProof,
+				VerifierId: batchProof.VerifierID2,
+				Proof:      batchProof.BatchProof2,
 			},
 		}
 		encodedSubProofs, err := encoding.EncodeBatchesSubProofsShasta(subProofs)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
@@ -67,11 +68,13 @@ func (m *mockProofProducer) RequestProof(
 	}
 
 	return &proofProducer.ProofResponse{
-		BatchID:   batchID,
-		Meta:      meta,
-		Proof:     testutils.RandomBytes(100),
-		ProofType: proofProducer.ProofTypeOp,
-		Opts:      pacayaOpts,
+		BatchID:    batchID,
+		Meta:       meta,
+		Proof1:     testutils.RandomBytes(100),
+		ProofType1: proofProducer.ProofTypeZKR0,
+		Proof2:     testutils.RandomBytes(100),
+		ProofType2: proofProducer.ProofTypeZKSP1,
+		Opts:       pacayaOpts,
 	}, nil
 }
 
@@ -248,7 +251,7 @@ func TestProofRequestSuccessful(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, resp)
 	require.Equal(t, big.NewInt(5), resp.BatchID)
-	require.Equal(t, proofProducer.ProofTypeOp, resp.ProofType)
+	require.Equal(t, proofProducer.ProofTypeZKR0, resp.ProofType1)
 	require.Equal(t, 1, mockProducer.requestCount)
 }
 
@@ -269,7 +272,7 @@ func TestProofBufferMonitorTriggersAggregate(t *testing.T) {
 		proofPollingInterval:      10 * time.Millisecond,
 	}
 
-	s.startProofBufferMonitors(ctx)
+	go monitorProofBuffer(ctx, proofProducer.ProofTypeOp, buffer, 50*time.Millisecond, s.TryAggregate)
 
 	select {
 	case proofType := <-s.batchAggregationNotify:
@@ -279,4 +282,12 @@ func TestProofBufferMonitorTriggersAggregate(t *testing.T) {
 	}
 
 	require.True(t, buffer.IsAggregating())
+}
+
+func TestCacheAccess(t *testing.T) {
+	cacheMap := cmap.New[*proofProducer.ProofResponse]()
+	cacheMap.Set("1", &proofProducer.ProofResponse{})
+	value, ok := cacheMap.Get("1")
+	require.True(t, ok)
+	require.NotNil(t, value)
 }

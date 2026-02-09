@@ -1,12 +1,12 @@
 //! Shasta protocol constants and limits.
 
 use crate::shasta::error::{ForkConfigResult, ShastaForkConfigError};
-use alloy_eips::eip4844::{FIELD_ELEMENTS_PER_BLOB, USABLE_BITS_PER_FIELD_ELEMENT};
+use alloy_eips::eip4844::BYTES_PER_BLOB;
 use alloy_hardforks::ForkCondition;
 
 /// The maximum number of blocks allowed in a proposal. If we assume block time is as
-/// small as one second, 384 blocks will cover an Ethereum epoch.
-pub const PROPOSAL_MAX_BLOCKS: usize = 384;
+/// small as one second, 192 blocks will cover an Ethereum epoch.
+pub const DERIVATION_SOURCE_MAX_BLOCKS: usize = 192;
 
 /// The maximum anchor block number offset from the proposal origin block number.
 pub const MAX_ANCHOR_OFFSET: u64 = 128;
@@ -21,7 +21,7 @@ pub const MIN_BLOCK_GAS_LIMIT: u64 = 10_000_000;
 pub const MAX_BLOCK_GAS_LIMIT: u64 = 45_000_000;
 
 /// The maximum block gas limit change per block, expressed in millionths.
-pub const BLOCK_GAS_LIMIT_MAX_CHANGE: u64 = 10;
+pub const BLOCK_GAS_LIMIT_MAX_CHANGE: u64 = 200;
 
 /// Denominator (parts per million) used when clamping gas limits (10 ppm = 0.001%).
 pub const GAS_LIMIT_DENOMINATOR: u64 = 1_000_000;
@@ -33,14 +33,16 @@ pub const BOND_PROCESSING_DELAY: u64 = 6;
 pub const SHASTA_PAYLOAD_VERSION: u8 = 0x1;
 
 /// The maximum size of a blob data, in bytes.
-pub const PROPOSAL_MAX_BLOB_BYTES: usize =
-    (USABLE_BITS_PER_FIELD_ELEMENT - 1) * FIELD_ELEMENTS_PER_BLOB as usize;
+pub const PROPOSAL_MAX_BLOB_BYTES: usize = BYTES_PER_BLOB;
+
+/// Maximum number of forced inclusions processed per proposal.
+pub const MAX_FORCED_INCLUSIONS_PER_PROPOSAL: u16 = 10;
 
 /// Shasta fork activation on Taiko Devnet.
 pub const SHASTA_FORK_DEVNET: ForkCondition = ForkCondition::Timestamp(0);
 
-/// Shasta fork activation on Taiko Hoodi. This fork has not been scheduled yet.
-pub const SHASTA_FORK_HOODI: ForkCondition = ForkCondition::Never;
+/// Shasta fork activation on Taiko Hoodi.
+pub const SHASTA_FORK_HOODI: ForkCondition = ForkCondition::Timestamp(1_770_296_400);
 
 /// Shasta fork activation on Taiko Mainnet. This fork has not been scheduled yet.
 pub const SHASTA_FORK_MAINNET: ForkCondition = ForkCondition::Never;

@@ -12,7 +12,11 @@ concurrency:
 jobs:
   merge-gatekeeper:
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
+<<<<<<< HEAD
     runs-on: ubuntu-latest
+=======
+    runs-on: [ubuntu-latest]
+>>>>>>> surge-shasta
     permissions:
       checks: read
       statuses: read
@@ -23,3 +27,4 @@ jobs:
           timeout: 1800
           interval: 60
           token: ${{ secrets.GITHUB_TOKEN }}
+          ignored: "Integration tests (l2_nmc)"

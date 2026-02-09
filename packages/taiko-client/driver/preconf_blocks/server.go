@@ -32,7 +32,7 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/preconf"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
@@ -91,6 +91,9 @@ type PreconfBlockAPIServer struct {
 	// Last seen proposal
 	latestSeenProposalCh chan *encoding.LastSeenProposal
 	latestSeenProposal   *encoding.LastSeenProposal
+
+	// Sync readiness gate for preconfirmation inserts.
+	syncReady bool
 
 	// Mutex for P2P message handlers
 	mutex sync.Mutex
@@ -151,6 +154,7 @@ func New(
 		latestSeenProposalCh:          latestSeenProposalCh,
 		responseSeenCache:             responseSeenCache,
 		highestUnsafeL2PayloadBlockID: head.NumberU64(),
+		syncReady:                     false,
 	}
 
 	server.echo.HideBanner = true
@@ -173,6 +177,20 @@ func (s *PreconfBlockAPIServer) SetP2PSigner(p2pSigner p2p.Signer) {
 	s.p2pSigner = p2pSigner
 }
 
+// SetSyncReady toggles readiness for preconfirmation inserts.
+func (s *PreconfBlockAPIServer) SetSyncReady(ready bool) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.syncReady == ready {
+		log.Debug("Preconfirmation insert readiness unchanged", "ready", ready)
+		return
+	}
+
+	s.syncReady = ready
+	log.Info("Preconfirmation insert readiness updated", "ready", ready)
+}
+
 // LogSkipper implements the `middleware.Skipper` interface,
 // skip all ECHO logs for the preconfirmation block server.
 func LogSkipper(c echo.Context) bool {
@@ -183,6 +201,8 @@ func LogSkipper(c echo.Context) bool {
 func (s *PreconfBlockAPIServer) configureMiddleware(corsOrigins []string) {
 	s.echo.Use(middleware.RequestID())
 
+	// nolint:staticcheck
+	// Keep legacy logger format for now to avoid changing log consumers.
 	s.echo.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
 		Skipper: LogSkipper,
 		Format: `{"time":"${time_rfc3339_nano}","level":"INFO","message":{"id":"${id}","remote_ip":"${remote_ip}",` +
@@ -285,6 +305,19 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2Payload(
 		return nil
 	}
 
+	// Check if we are ready to insert preconfirmation blocks.
+	if !s.syncReady {
+		log.Info(
+			"Preconfirmation block server not ready to insert blocks, caching the payload",
+			"peer", from,
+			"blockID", uint64(msg.ExecutionPayload.BlockNumber),
+			"hash", msg.ExecutionPayload.BlockHash.Hex(),
+			"parentHash", msg.ExecutionPayload.ParentHash.Hex(),
+		)
+		s.tryPutEnvelopeIntoCache(msg, from)
+		return nil
+	}
+
 	// Check if the L2 execution engine is syncing from L1.
 	progress, err := s.rpc.L2ExecutionEngineSyncProgress(ctx)
 	if err != nil {
@@ -376,9 +409,22 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2Response(
 		return nil
 	}
 
+	// Check if we are ready to insert preconfirmation blocks.
+	if !s.syncReady {
+		log.Info(
+			"Preconfirmation block server not ready to insert blocks, caching the payload",
+			"peer", from,
+			"blockID", uint64(msg.ExecutionPayload.BlockNumber),
+			"hash", msg.ExecutionPayload.BlockHash.Hex(),
+			"parentHash", msg.ExecutionPayload.ParentHash.Hex(),
+		)
+		s.tryPutEnvelopeIntoCache(msg, from)
+		return nil
+	}
+
 	// Ignore the message if it has been inserted already.
 	head, err := s.rpc.L2.HeaderByHash(ctx, msg.ExecutionPayload.BlockHash)
-	if err != nil && !errors.Is(err, ethereum.NotFound) {
+	if err != nil && err.Error() != ethereum.NotFound.Error() {
 		return fmt.Errorf("failed to fetch header by hash: %w", err)
 	}
 	if head != nil {
@@ -512,7 +558,7 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2Request(
 			"l1OriginBlockID", l1Origin.BlockID.Uint64(),
 		)
 
-		return err
+		return nil
 	}
 
 	// we have the block, now wait a deterministic jitter before responding.
@@ -636,6 +682,18 @@ func (s *PreconfBlockAPIServer) OnUnsafeL2EndOfSequencingRequest(
 	}
 
 	sig := l1Origin.Signature
+
+	// Skip responding if we cannot provide a valid L1 origin signature (consistent with OnUnsafeL2Request)
+	if sig == [65]byte{} {
+		log.Warn(
+			"Empty L1 origin signature, unable to propagate end-of-sequencing block",
+			"peer", from,
+			"epoch", epoch,
+			"blockID", block.NumberU64(),
+			"hash", block.Hash().Hex(),
+		)
+		return nil
+	}
 
 	endOfSequencing := true
 	envelope, err := blockToEnvelope(block, &endOfSequencing, &l1Origin.IsForcedInclusion, &sig)
@@ -761,7 +819,7 @@ func (s *PreconfBlockAPIServer) ImportMissingAncientsFromCache(
 		// Check if the found parent payload is in the canonical chain,
 		// if it is not, continue to find the parent payload.
 		parentHeader, err := s.rpc.L2.HeaderByNumber(ctx, new(big.Int).SetUint64(uint64(parentPayload.Payload.BlockNumber)))
-		if err != nil && !errors.Is(err, ethereum.NotFound) {
+		if err != nil && err.Error() != ethereum.NotFound.Error() {
 			return fmt.Errorf("failed to fetch parent header: %w", err)
 		}
 
@@ -1103,25 +1161,14 @@ func (s *PreconfBlockAPIServer) monitorPacayaProposalOnChain(ctx context.Context
 
 // monitorShastaProposalOnChain monitors Shasta proposals for reorgs.
 func (s *PreconfBlockAPIServer) monitorShastaProposalOnChain(ctx context.Context, proposal *encoding.LastSeenProposal) {
-	shastaProposal := proposal.Shasta()
-	latestSeenProposalID := shastaProposal.GetProposal().Id
-	currentProposal := shastaProposal.GetProposal()
-
-	proposalHash, err := s.rpc.HashProposalShasta(&bind.CallOpts{Context: ctx}, &currentProposal)
+	header, err := s.rpc.L1.HeaderByNumber(ctx, proposal.GetRawBlockHeight())
 	if err != nil {
-		log.Error("Failed to hash shasta proposal", "err", err)
+		log.Error("Failed to get L1 header for shasta proposal", "blockNumber", proposal.GetRawBlockHeight(), "err", err)
 		return
 	}
-
-	onChainProposalHash, err := s.rpc.GetShastaProposalHash(&bind.CallOpts{Context: ctx}, latestSeenProposalID)
-	if err != nil {
-		log.Error("Failed to get shasta proposal on chain", "err", err)
-		return
-	}
-
 	// Check for reorg and handle it
-	if onChainProposalHash != proposalHash {
-		s.handleShastaProposalReorg(ctx, latestSeenProposalID)
+	if header.Hash() != proposal.GetRawBlockHash() {
+		s.handleShastaProposalReorg(ctx, proposal.GetProposalID())
 	}
 }
 
@@ -1129,55 +1176,61 @@ func (s *PreconfBlockAPIServer) monitorShastaProposalOnChain(ctx context.Context
 func (s *PreconfBlockAPIServer) handleShastaProposalReorg(ctx context.Context, latestSeenProposalID *big.Int) {
 	log.Warn("Shasta proposal reorg detected", "latestSeenProposalID", latestSeenProposalID)
 
-	// Find the last valid proposal by searching backwards
-	for i := uint64(1); i <= latestSeenProposalID.Uint64(); i++ {
-		currentProposalID := new(big.Int).Sub(latestSeenProposalID, new(big.Int).SetUint64(i))
-
-		onChainHash, err := s.rpc.GetShastaProposalHash(&bind.CallOpts{Context: ctx}, currentProposalID)
-		if err != nil {
-			log.Error("Failed to get shasta proposal on chain", "proposalId", currentProposalID, "err", err)
-			return
-		}
-
-		recordedProposal, eventLog, err := s.rpc.GetProposalByIDShasta(ctx, currentProposalID)
-		if err != nil {
-			log.Error("Proposal not found in cache", "proposalId", currentProposalID, "err", err)
-			return
-		}
-
-		recordedProposalHash, err := s.rpc.HashProposalShasta(&bind.CallOpts{Context: ctx}, &recordedProposal.Proposal)
-		if err != nil {
-			log.Error("Failed to hash recorded proposal", "proposalId", currentProposalID, "err", err)
-			return
-		}
-
-		// Found a valid proposal that matches on-chain state
-		if onChainHash == recordedProposalHash {
-			if currentProposalID.Cmp(s.latestSeenProposal.Shasta().GetProposal().Id) < 0 {
-				log.Info("Found valid proposal after reorg", "proposalId", currentProposalID)
-				blockID, err := s.rpc.L2.LastBlockIDByBatchID(ctx, currentProposalID)
-				if err != nil {
-					log.Error(
-						"Failed to get last block in batch for shasta proposal",
-						"proposalId", currentProposalID,
-						"err", err,
-					)
-					return
-				}
-
-				s.recordLatestSeenProposalShasta(&encoding.LastSeenProposal{
-					TaikoProposalMetaData: metadata.NewTaikoProposalMetadataShasta(&shastaBindings.IInboxProposedEventPayload{
-						Proposal: recordedProposal.Proposal,
-					}, *eventLog),
-					PreconfChainReorged: true,
-					LastBlockID:         blockID.Uint64(),
-				})
-			}
-			return
-		}
+	coreState, err := s.rpc.GetCoreStateShasta(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		log.Error("Failed to get core state from Shasta Inbox", "err", err)
+		return
 	}
 
-	log.Error("Could not find valid proposal after reorg", "searchedUpTo", latestSeenProposalID)
+	recordedProposal, eventLog, err := s.rpc.GetProposalByIDShasta(
+		ctx,
+		new(big.Int).Sub(coreState.NextProposalId, common.Big1),
+	)
+	if err != nil {
+		log.Error(
+			"Proposal not found in cache",
+			"proposalId", new(big.Int).Sub(coreState.NextProposalId, common.Big1),
+			"err", err,
+		)
+		return
+	}
+
+	blockID, err := s.rpc.L2Engine.LastBlockIDByBatchID(ctx, recordedProposal.Id)
+	if err != nil {
+		log.Error(
+			"Failed to get last block in batch for shasta proposal",
+			"proposalId", recordedProposal.Id,
+			"err", err,
+		)
+		return
+	}
+
+	header, err := s.rpc.L1.HeaderByHash(ctx, eventLog.BlockHash)
+	if err != nil {
+		log.Error(
+			"Failed to get L1 header for shasta proposal event",
+			"proposalId", recordedProposal.Id,
+			"blockHash", eventLog.BlockHash.Hex(),
+			"err", err,
+		)
+		return
+	}
+
+	s.recordLatestSeenProposalShasta(&encoding.LastSeenProposal{
+		TaikoProposalMetaData: metadata.NewTaikoProposalMetadataShasta(
+			&surgeBindings.SurgeInboxClientProposed{
+				Id:                             recordedProposal.Id,
+				Proposer:                       recordedProposal.Proposer,
+				EndOfSubmissionWindowTimestamp: recordedProposal.EndOfSubmissionWindowTimestamp,
+				BasefeeSharingPctg:             recordedProposal.BasefeeSharingPctg,
+				Sources:                        recordedProposal.Sources,
+				Raw:                            recordedProposal.Raw,
+			},
+			header.Time,
+		),
+		PreconfChainReorged: true,
+		LastBlockID:         blockID.ToInt().Uint64(),
+	})
 }
 
 // recordLatestSeenProposalPacaya records the latest seen proposal.
@@ -1214,7 +1267,7 @@ func (s *PreconfBlockAPIServer) recordLatestSeenProposalShasta(proposal *encodin
 
 	log.Info(
 		"Received latest shasta proposal seen in event",
-		"proposalId", proposal.Shasta().GetProposal().Id,
+		"proposalId", proposal.Shasta().GetEventData().Id,
 		"lastBlockId", proposal.LastBlockID,
 	)
 
@@ -1229,7 +1282,7 @@ func (s *PreconfBlockAPIServer) recordLatestSeenProposalShasta(proposal *encodin
 		s.highestUnsafeL2PayloadBlockID = proposal.LastBlockID
 		log.Info(
 			"Latest block ID seen in event is reorged, reset the highest unsafe L2 payload block ID",
-			"proposalId", proposal.Shasta().GetProposal().Id,
+			"proposalId", proposal.Shasta().GetEventData().Id,
 			"highestUnsafeL2PayloadBlockID", s.highestUnsafeL2PayloadBlockID,
 		)
 
@@ -1253,7 +1306,7 @@ func (s *PreconfBlockAPIServer) TryImportingPayload(
 		ctx,
 		new(big.Int).SetUint64(uint64(msg.ExecutionPayload.BlockNumber-1)),
 	)
-	if err != nil && !errors.Is(err, ethereum.NotFound) {
+	if err != nil && err.Error() != ethereum.NotFound.Error() {
 		return false, fmt.Errorf("failed to fetch parent header by number: %w", err)
 	}
 	cachedParent := s.envelopesCache.get(
@@ -1297,6 +1350,7 @@ func (s *PreconfBlockAPIServer) TryImportingPayload(
 				Withdrawals:  make([]*types.Withdrawal, 0),
 				Version:      engine.PayloadV2,
 				TxListHash:   &txListHash,
+				Extra:        cachedParent.Payload.ExtraData,
 			}
 			payloadID = args.Id()
 			parentID = new(big.Int).SetUint64(uint64(cachedParent.Payload.BlockNumber))
@@ -1365,7 +1419,7 @@ func (s *PreconfBlockAPIServer) TryImportingPayload(
 
 	// Check if the block already exists in the canonical chain, if it does, we ignore the message.
 	header, err := s.rpc.L2.HeaderByNumber(ctx, new(big.Int).SetUint64(uint64(msg.ExecutionPayload.BlockNumber)))
-	if err != nil && !errors.Is(err, ethereum.NotFound) {
+	if err != nil && err.Error() != ethereum.NotFound.Error() {
 		return false, fmt.Errorf("failed to fetch header by hash: %w", err)
 	}
 

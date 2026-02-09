@@ -12,7 +12,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 	ontakeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/ontake"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 )
 
 // ABI arguments marshaling components.
@@ -65,12 +65,6 @@ var (
 		{Name: "verifierId", Type: "uint8"},
 		{Name: "proof", Type: "bytes"},
 	}
-	ProverAuthComponents = []abi.ArgumentMarshaling{
-		{Name: "proposalId", Type: "uint48"},
-		{Name: "proposer", Type: "address"},
-		{Name: "provingFeeGwei", Type: "uint48"},
-		{Name: "signature", Type: "bytes"},
-	}
 )
 
 var (
@@ -107,8 +101,6 @@ var (
 		{Name: "bytesX", Type: bytesType},
 		{Name: "bytesY", Type: bytesType},
 	}
-	ProverAuthType, _ = abi.NewType("tuple", "ProverAuth", ProverAuthComponents)
-	ProverAuthArgs    = abi.Arguments{{Name: "ProverAuth", Type: ProverAuthType}}
 )
 
 // Contract ABIs.
@@ -225,7 +217,7 @@ func init() {
 		log.Crit("Get ProverSet ABI error", "error", err)
 	}
 
-	if ShastaInboxABI, err = shastaBindings.ShastaInboxClientMetaData.GetAbi(); err != nil {
+	if ShastaInboxABI, err = surgeBindings.SurgeInboxClientMetaData.GetAbi(); err != nil {
 		log.Crit("Get Shasta Inbox ABI error", "error", err)
 	}
 
@@ -241,11 +233,11 @@ func init() {
 		log.Crit("Proved event not found in Shasta inbox ABI")
 	}
 
-	if ShastaAnchorABI, err = shastaBindings.ShastaAnchorMetaData.GetAbi(); err != nil {
+	if ShastaAnchorABI, err = surgeBindings.SurgeAnchorMetaData.GetAbi(); err != nil {
 		log.Crit("Get Shasta Anchor ABI error", "error", err)
 	}
 
-	if BondManagerABI, err = shastaBindings.BondManagerMetaData.GetAbi(); err != nil {
+	if BondManagerABI, err = surgeBindings.BondManagerMetaData.GetAbi(); err != nil {
 		log.Crit("Get BondManager ABI error", "error", err)
 	}
 
@@ -333,29 +325,6 @@ func EncodeProveBatchesInput(
 	}
 
 	return input, nil
-}
-
-// EncodeProverAuth performs the solidity `abi.encode` for the given Shasta ProverAuth.
-func EncodeProverAuth(proverAuth *ProverAuth) ([]byte, error) {
-	if proverAuth == nil {
-		return nil, nil
-	}
-	// Normalize the signature so the recovery id matches Solidity's expected 27/28 format.
-	auth := *proverAuth
-	if len(auth.Signature) == crypto.SignatureLength {
-		recoveryID := auth.Signature[crypto.RecoveryIDOffset]
-		if recoveryID == 0 || recoveryID == 1 {
-			sig := make([]byte, crypto.SignatureLength)
-			copy(sig, auth.Signature)
-			sig[crypto.RecoveryIDOffset] = recoveryID + 27
-			auth.Signature = sig
-		}
-	}
-	b, err := ProverAuthArgs.Pack(&auth)
-	if err != nil {
-		return nil, fmt.Errorf("failed to abi.encode ProverAuth, %w", err)
-	}
-	return b, nil
 }
 
 // CalculatePacayaDifficulty calculates the difficulty for the given Pacaya block.

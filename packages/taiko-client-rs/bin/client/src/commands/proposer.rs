@@ -1,8 +1,8 @@
 //! Proposer Subcommand.
 use std::time::Duration;
 
+use crate::error::Result;
 use alloy::transports::http::reqwest::Url as RpcUrl;
-use anyhow::Result;
 use async_trait::async_trait;
 use clap::Parser;
 use proposer::{config::ProposerConfigs, metrics::ProposerMetrics, proposer::Proposer};
@@ -43,7 +43,7 @@ impl ProposerSubCommand {
             propose_interval: Duration::from_secs(self.proposer_flags.propose_interval),
             l1_proposer_private_key: self.proposer_flags.l1_proposer_private_key,
             gas_limit: self.proposer_flags.gas_limit,
-            anchor_offset: self.proposer_flags.anchor_offset,
+            use_engine_mode: self.proposer_flags.use_engine_mode,
         })
     }
 

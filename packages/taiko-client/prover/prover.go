@@ -18,7 +18,7 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 	eventIterator "github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/chain_iterator/event_iterator"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
@@ -64,6 +64,7 @@ type Prover struct {
 	proveNotify                    chan struct{}
 	batchesAggregationNotifyPacaya chan proofProducer.ProofType
 	batchesAggregationNotifyShasta chan proofProducer.ProofType
+	flushCacheNotify               chan proofProducer.ProofType
 
 	// Proof related channels
 	proofSubmissionCh      chan *proofProducer.ProofRequestBody
@@ -103,6 +104,8 @@ func InitFromConfig(
 	if p.rpc, err = rpc.NewClient(p.ctx, &rpc.ClientConfig{
 		L1Endpoint:         cfg.L1WsEndpoint,
 		L2Endpoint:         cfg.L2WsEndpoint,
+		L2EngineEndpoint:   cfg.L2EngineEndpoint,
+		JwtSecret:          cfg.JwtSecret,
 		PacayaInboxAddress: cfg.PacayaInboxAddress,
 		ShastaInboxAddress: cfg.ShastaInboxAddress,
 		TaikoAnchorAddress: cfg.TaikoAnchorAddress,
@@ -128,6 +131,7 @@ func InitFromConfig(
 	p.proveNotify = make(chan struct{}, 1)
 	p.batchesAggregationNotifyPacaya = make(chan proofProducer.ProofType, proofSubmitter.MaxNumSupportedProofTypes)
 	p.batchesAggregationNotifyShasta = make(chan proofProducer.ProofType, proofSubmitter.MaxNumSupportedProofTypes)
+	p.flushCacheNotify = make(chan proofProducer.ProofType, proofSubmitter.MaxNumSupportedProofTypes)
 
 	if err := p.initL1Current(cfg.StartingBatchID); err != nil {
 		return fmt.Errorf("initialize L1 current cursor error: %w", err)
@@ -227,8 +231,8 @@ func (p *Prover) eventLoop() {
 	batchProposedCh := make(chan *pacayaBindings.TaikoInboxClientBatchProposed, chBufferSize)
 	batchesVerifiedCh := make(chan *pacayaBindings.TaikoInboxClientBatchesVerified, chBufferSize)
 	batchesProvedCh := make(chan *pacayaBindings.TaikoInboxClientBatchesProved, chBufferSize)
-	shastaProposedCh := make(chan *shastaBindings.ShastaInboxClientProposed, chBufferSize)
-	shastaProvedCh := make(chan *shastaBindings.ShastaInboxClientProved, chBufferSize)
+	shastaProposedCh := make(chan *surgeBindings.SurgeInboxClientProposed, chBufferSize)
+	shastaProvedCh := make(chan *surgeBindings.SurgeInboxClientProved, chBufferSize)
 
 	// Subscriptions
 	batchProposedSub := rpc.SubscribeBatchProposedPacaya(p.rpc.PacayaClients.TaikoInbox, batchProposedCh)
@@ -260,6 +264,8 @@ func (p *Prover) eventLoop() {
 			p.withRetry(func() error { return p.aggregateOp(proofType, false) })
 		case proofType := <-p.batchesAggregationNotifyShasta:
 			p.withRetry(func() error { return p.aggregateOp(proofType, true) })
+		case proofType := <-p.flushCacheNotify:
+			p.withRetry(func() error { return p.proofSubmitterShasta.FlushCache(p.ctx, proofType) })
 		case e := <-batchesVerifiedCh:
 			if err := p.eventHandlers.batchesVerifiedHandler.HandlePacaya(p.ctx, e); err != nil {
 				log.Error("Failed to handle new BatchesVerified event", "error", err)
@@ -339,7 +345,7 @@ func (p *Prover) submitProofAggregationOp(batchProof *proofProducer.BatchProofs)
 		submitter = p.proofSubmitterShasta
 	}
 	if utils.IsNil(submitter) {
-		return fmt.Errorf("submitter not found: %s", batchProof.ProofType)
+		return fmt.Errorf("submitter not found: %s and %s", batchProof.ProofType1, batchProof.ProofType2)
 	}
 
 	if err := submitter.BatchSubmitProofs(p.ctx, batchProof); err != nil {
@@ -347,7 +353,8 @@ func (p *Prover) submitProofAggregationOp(batchProof *proofProducer.BatchProofs)
 			log.Error(
 				"Proof submission reverted",
 				"blockIDs", batchProof.BatchIDs,
-				"proofType", batchProof.ProofType,
+				"proofType1", batchProof.ProofType1,
+				"proofType2", batchProof.ProofType2,
 				"error", err,
 			)
 			return nil
@@ -355,7 +362,8 @@ func (p *Prover) submitProofAggregationOp(batchProof *proofProducer.BatchProofs)
 			log.Warn(
 				"Detected proven blocks",
 				"blockIDs", batchProof.BatchIDs,
-				"proofType", batchProof.ProofType,
+				"proofType1", batchProof.ProofType1,
+				"proofType2", batchProof.ProofType2,
 				"error", err,
 			)
 			return nil
@@ -363,7 +371,8 @@ func (p *Prover) submitProofAggregationOp(batchProof *proofProducer.BatchProofs)
 		log.Error(
 			"Submit proof error",
 			"blockIDs", batchProof.BatchIDs,
-			"proofType", batchProof.ProofType,
+			"proofType1", batchProof.ProofType1,
+			"proofType2", batchProof.ProofType2,
 			"error", err,
 		)
 		return err

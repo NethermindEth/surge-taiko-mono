@@ -49,6 +49,33 @@ impl DriverMetrics {
     /// Histogram tracking retry attempts per preconfirmation payload.
     pub const PRECONF_RETRY_ATTEMPTS: &'static str = "driver_preconf_retry_attempts";
 
+    // Event syncer metrics
+    /// Gauge tracking the last canonical proposal id from L1 events.
+    pub const EVENT_LAST_CANONICAL_PROPOSAL_ID: &'static str =
+        "driver_event_last_canonical_proposal_id";
+
+    // Preconf queue metrics
+    /// Counter for preconfirmation enqueue timeouts.
+    pub const PRECONF_ENQUEUE_TIMEOUTS_TOTAL: &'static str =
+        "driver_preconf_enqueue_timeouts_total";
+    /// Counter for preconfirmation response timeouts.
+    pub const PRECONF_RESPONSE_TIMEOUTS_TOTAL: &'static str =
+        "driver_preconf_response_timeouts_total";
+    /// Counter for preconfirmation enqueue failures.
+    pub const PRECONF_ENQUEUE_FAILURES_TOTAL: &'static str =
+        "driver_preconf_enqueue_failures_total";
+    /// Counter for preconfirmation responses dropped (channel closed).
+    pub const PRECONF_RESPONSE_DROPPED_TOTAL: &'static str =
+        "driver_preconf_response_dropped_total";
+
+    // Production path metrics
+    /// Histogram for parent hash lookup duration.
+    pub const PRECONF_PARENT_HASH_LOOKUP_DURATION_SECONDS: &'static str =
+        "driver_preconf_parent_hash_lookup_duration_seconds";
+    /// Counter for parent hash lookup failures.
+    pub const PRECONF_PARENT_HASH_LOOKUP_FAILURES_TOTAL: &'static str =
+        "driver_preconf_parent_hash_lookup_failures_total";
+
     /// Register metric descriptors and initialise gauges/counters.
     pub fn init() {
         metrics::describe_gauge!(
@@ -137,6 +164,47 @@ impl DriverMetrics {
             "Retry attempts per preconfirmation payload"
         );
 
+        // Event syncer metrics
+        metrics::describe_gauge!(
+            Self::EVENT_LAST_CANONICAL_PROPOSAL_ID,
+            Unit::Count,
+            "Last canonical proposal id processed from L1 events"
+        );
+
+        // Preconf queue metrics
+        metrics::describe_counter!(
+            Self::PRECONF_ENQUEUE_TIMEOUTS_TOTAL,
+            Unit::Count,
+            "Preconfirmation enqueue operations that timed out"
+        );
+        metrics::describe_counter!(
+            Self::PRECONF_RESPONSE_TIMEOUTS_TOTAL,
+            Unit::Count,
+            "Preconfirmation response waits that timed out"
+        );
+        metrics::describe_counter!(
+            Self::PRECONF_ENQUEUE_FAILURES_TOTAL,
+            Unit::Count,
+            "Preconfirmation enqueue operations that failed"
+        );
+        metrics::describe_counter!(
+            Self::PRECONF_RESPONSE_DROPPED_TOTAL,
+            Unit::Count,
+            "Preconfirmation responses dropped due to channel closure"
+        );
+
+        // Production path metrics
+        metrics::describe_histogram!(
+            Self::PRECONF_PARENT_HASH_LOOKUP_DURATION_SECONDS,
+            Unit::Seconds,
+            "Duration of parent hash lookups for preconfirmation"
+        );
+        metrics::describe_counter!(
+            Self::PRECONF_PARENT_HASH_LOOKUP_FAILURES_TOTAL,
+            Unit::Count,
+            "Parent hash lookup failures during preconfirmation"
+        );
+
         // Reset counters to zero.
         metrics::counter!(Self::BEACON_SYNC_REMOTE_SUBMISSIONS_TOTAL).absolute(0);
         metrics::counter!(Self::EVENT_SCANNER_BATCHES_TOTAL).absolute(0);
@@ -149,5 +217,17 @@ impl DriverMetrics {
         metrics::counter!(Self::PRECONF_INJECTION_FAILURES_TOTAL).absolute(0);
         metrics::counter!(Self::PRECONF_INJECTION_SUCCESS_TOTAL).absolute(0);
         metrics::gauge!(Self::PRECONF_QUEUE_DEPTH).set(0.0);
+
+        // Reset new preconf queue counters
+        metrics::counter!(Self::PRECONF_ENQUEUE_TIMEOUTS_TOTAL).absolute(0);
+        metrics::counter!(Self::PRECONF_RESPONSE_TIMEOUTS_TOTAL).absolute(0);
+        metrics::counter!(Self::PRECONF_ENQUEUE_FAILURES_TOTAL).absolute(0);
+        metrics::counter!(Self::PRECONF_RESPONSE_DROPPED_TOTAL).absolute(0);
+
+        // Reset production path counters
+        metrics::counter!(Self::PRECONF_PARENT_HASH_LOOKUP_FAILURES_TOTAL).absolute(0);
+
+        // Reset event syncer gauge
+        metrics::gauge!(Self::EVENT_LAST_CANONICAL_PROPOSAL_ID).set(0.0);
     }
 }

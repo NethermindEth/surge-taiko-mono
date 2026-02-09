@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"math"
 	"math/big"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
@@ -18,7 +19,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/manifest"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
@@ -37,7 +38,6 @@ type BlobTransactionBuilder struct {
 	gasLimit                uint64
 	chainConfig             *config.ChainConfig
 	revertProtectionEnabled bool
-	anchorOffset            uint64
 }
 
 // NewBlobTransactionBuilder creates a new BlobTransactionBuilder instance based on giving configurations.
@@ -52,7 +52,6 @@ func NewBlobTransactionBuilder(
 	gasLimit uint64,
 	chainConfig *config.ChainConfig,
 	revertProtectionEnabled bool,
-	anchorOffset uint64,
 ) *BlobTransactionBuilder {
 	return &BlobTransactionBuilder{
 		rpc,
@@ -65,7 +64,6 @@ func NewBlobTransactionBuilder(
 		gasLimit,
 		chainConfig,
 		revertProtectionEnabled,
-		anchorOffset,
 	}
 }
 
@@ -176,13 +174,11 @@ func (b *BlobTransactionBuilder) BuildPacaya(
 func (b *BlobTransactionBuilder) BuildShasta(
 	ctx context.Context,
 	txBatch []types.Transactions,
-	minTxsPerForcedInclusion *big.Int,
 	preconfRouterAddress common.Address,
-	proverAuth []byte,
 ) (*txmgr.TxCandidate, error) {
 	var (
 		to                       = &b.shastaInboxAddress
-		derivationSourceManifest = &manifest.DerivationSourceManifest{ProverAuthBytes: proverAuth}
+		derivationSourceManifest = &manifest.DerivationSourceManifest{}
 		blobs                    []*eth.Blob
 		data                     []byte
 	)
@@ -195,13 +191,7 @@ func (b *BlobTransactionBuilder) BuildShasta(
 		return nil, fmt.Errorf("failed to get L1 head: %w", err)
 	}
 
-	// Calculate anchor block number with configured offset
 	anchorBlockNumber := l1Head.Number.Uint64()
-	if anchorBlockNumber > b.anchorOffset {
-		anchorBlockNumber -= b.anchorOffset
-	} else {
-		anchorBlockNumber = 0
-	}
 
 	// For Shasta proposals submission in current implementation, we always use the parent block's gas limit.
 	l2Head, err := b.rpc.L2.HeaderByNumber(ctx, nil)
@@ -246,14 +236,15 @@ func (b *BlobTransactionBuilder) BuildShasta(
 	// ABI encode the ShastaInbox.propose parameters.
 	inputData, err := b.rpc.EncodeProposeInput(
 		&bind.CallOpts{Context: ctx},
-		&shastaBindings.IInboxProposeInput{
+		&surgeBindings.IInboxProposeInput{
 			Deadline: common.Big0,
-			BlobReference: shastaBindings.LibBlobsBlobReference{
+			BlobReference: surgeBindings.LibBlobsBlobReference{
 				BlobStartIndex: 0,
 				NumBlobs:       uint16(len(blobs)),
 				Offset:         common.Big0,
 			},
-			NumForcedInclusions: uint8(minTxsPerForcedInclusion.Uint64()),
+			// We try to include all the forced inclusions in the source manifest.
+			NumForcedInclusions: math.MaxUint8, // TODO(@jmadibekov): check with Anshu
 		},
 	)
 	if err != nil {

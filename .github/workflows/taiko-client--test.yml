@@ -49,8 +49,9 @@ jobs:
       SHASTA_FORK_TAIKO_MONO_DIR: shasta-fork-taiko-mono
 
     strategy:
+      fail-fast: false
       matrix:
-        execution_node: [l2_geth]
+        execution_node: [l2_nmc]
 
     steps:
       - name: Cancel Previous Runs
@@ -74,15 +75,15 @@ jobs:
 
       - uses: actions/checkout@v6
         with:
-          repository: taikoxyz/taiko-mono
+          repository: NethermindEth/surge-taiko-mono
           path: ${{ env.PACAYA_FORK_TAIKO_MONO_DIR }}
-          ref: taiko-alethia-protocol-v2.3.0-devnet-shasta-test
+          ref: jmadibekov/pacaya-dummy-verifiers-fix
 
       - uses: actions/checkout@v6
         with:
-          repository: taikoxyz/taiko-mono
+          repository: NethermindEth/surge-taiko-mono
           path: ${{ env.SHASTA_FORK_TAIKO_MONO_DIR }}
-          ref: taiko-alethia-protocol-v3.0.0
+          ref: surge-alethia-protocol-v3.0.0
 
       - name: Install pnpm dependencies for pacaya fork taiko-mono
         working-directory: ${{ env.PACAYA_FORK_TAIKO_MONO_DIR }}

@@ -47,7 +47,6 @@ func NewBuilderWithFallback(
 	revertProtectionEnabled bool,
 	blobAllowed bool,
 	fallback bool,
-	anchorOffset uint64,
 ) *TxBuilderWithFallback {
 	builder := &TxBuilderWithFallback{rpc: rpc, fallback: fallback, txmgrSelector: txmgrSelector}
 	if blobAllowed {
@@ -62,7 +61,6 @@ func NewBuilderWithFallback(
 			gasLimit,
 			chainConfig,
 			revertProtectionEnabled,
-			anchorOffset,
 		)
 	}
 
@@ -191,7 +189,6 @@ func (b *TxBuilderWithFallback) BuildPacaya(
 func (b *TxBuilderWithFallback) BuildShasta(
 	ctx context.Context,
 	txBatch []types.Transactions,
-	minTxsPerForcedInclusion *big.Int,
 	preconfRouterAddress common.Address,
 ) (*txmgr.TxCandidate, error) {
 	// Shasta requires blob transactions for proposal data availability.
@@ -201,9 +198,7 @@ func (b *TxBuilderWithFallback) BuildShasta(
 	return b.blobTransactionBuilder.BuildShasta(
 		ctx,
 		txBatch,
-		minTxsPerForcedInclusion,
 		preconfRouterAddress,
-		[]byte{},
 	)
 }
 

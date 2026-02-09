@@ -28,7 +28,6 @@ import (
 )
 
 var (
-	zeroAddress          = common.HexToAddress("0x0000000000000000000000000000000000000000")
 	errUnprocessable     = errors.New("message is unprocessable")
 	errAlreadyProcessing = errors.New("already processing txHash")
 )
@@ -161,19 +160,17 @@ func (p *Processor) processMessage(
 
 				return true, msgBody.TimesRetried, nil
 			}
+		} else {
+			diff := time.Duration(p.shastaForkTimestamp-blockTs) * time.Second
+			if diff <= p.forkWindow {
+				slog.Info("approaching shasta fork window, pausing processing",
+					"blockTimestamp", blockTs,
+					"shastaForkTimestamp", p.shastaForkTimestamp,
+					"windowSeconds", p.forkWindow.Seconds(),
+				)
 
-			return false, msgBody.TimesRetried, nil
-		}
-
-		diff := time.Duration(p.shastaForkTimestamp-blockTs) * time.Second
-		if diff <= p.forkWindow {
-			slog.Info("approaching shasta fork window, pausing processing",
-				"blockTimestamp", blockTs,
-				"shastaForkTimestamp", p.shastaForkTimestamp,
-				"windowSeconds", p.forkWindow.Seconds(),
-			)
-
-			return true, msgBody.TimesRetried, nil
+				return true, msgBody.TimesRetried, nil
+			}
 		}
 	}
 
@@ -204,7 +201,7 @@ func (p *Processor) processMessage(
 		// don't check quota for NFTs
 		if eventType == relayer.EventTypeSendERC20 || eventType == relayer.EventTypeSendETH {
 			// default to ETH (zero address) and msg value, overwrite if ERC20
-			var tokenAddress = zeroAddress
+			var tokenAddress = relayer.ZeroAddress
 
 			var value = msgBody.Event.Message.Value
 
@@ -248,8 +245,17 @@ func (p *Processor) processMessage(
 		return false, msgBody.TimesRetried, errors.Wrap(err, "p.destBridge.GetMessageStatus")
 	}
 
+	// internal will only be set if it's an actual queue message, not a targeted
+	// transaction hash set via config flag.
+	if msg.Internal != nil {
+		// update message status
+		if err := p.eventRepo.UpdateStatus(ctx, msgBody.ID, relayer.EventStatus(messageStatus)); err != nil {
+			return false, msgBody.TimesRetried, err
+		}
+	}
+
 	slog.Info(
-		"updating message status",
+		"message status updated",
 		"status", relayer.EventStatus(messageStatus).String(),
 		"occurredTxHash", msgBody.Event.Raw.TxHash.Hex(),
 	)
@@ -258,15 +264,6 @@ func (p *Processor) processMessage(
 		relayer.RetriableEvents.Inc()
 	} else if messageStatus == uint8(relayer.EventStatusDone) {
 		relayer.DoneEvents.Inc()
-	}
-
-	// internal will only be set if it's an actual queue message, not a targeted
-	// transaction hash set via config flag.
-	if msg.Internal != nil {
-		// update message status
-		if err := p.eventRepo.UpdateStatus(ctx, msgBody.ID, relayer.EventStatus(messageStatus)); err != nil {
-			return false, msgBody.TimesRetried, err
-		}
 	}
 
 	return false, msgBody.TimesRetried, nil
@@ -339,7 +336,7 @@ func (p *Processor) generateEncodedSignalProof(ctx context.Context,
 	// we can grab the latestBlockID, create a singular "hop" of srcChain => destChain,
 	// and generate a proof.
 	if len(p.hops) == 0 {
-		latestBlockID, err := p.latestSyncedBlockID(ctx, p.srcChainId.Uint64(), p.destChainId.Uint64())
+		latestBlockID, err := p.latestSyncedBlockID(ctx, p.destChainId.Uint64(), p.srcChainId.Uint64())
 		if err != nil {
 			return nil, err
 		}
@@ -446,10 +443,13 @@ func (p *Processor) signalServiceForBlock(
 	ctx context.Context,
 	blockNumber uint64,
 ) (relayer.SignalService, common.Address, error) {
-	if p.shastaForkTimestamp == 0 ||
-		p.shastaOldForkSignalService == nil ||
+	if p.shastaOldForkSignalService == nil ||
 		p.shastaNewForkSignalService == nil {
 		return p.srcSignalService, p.srcSignalServiceAddress, nil
+	}
+
+	if p.shastaForkTimestamp == 0 {
+		return p.shastaNewForkSignalService, p.srcSignalServiceAddress, nil
 	}
 
 	callCtx, cancel := context.WithTimeout(ctx, p.ethClientTimeout)
@@ -462,10 +462,10 @@ func (p *Processor) signalServiceForBlock(
 	}
 
 	if header.Time < p.shastaForkTimestamp {
-		return p.shastaOldForkSignalService, p.shastaOldForkAddress, nil
+		return p.shastaOldForkSignalService, p.srcSignalServiceAddress, nil
 	}
 
-	return p.shastaNewForkSignalService, p.shastaNewForkAddress, nil
+	return p.shastaNewForkSignalService, p.srcSignalServiceAddress, nil
 }
 
 // sendProcessMessageCall calls `bridge.processMessage` with latest nonce
@@ -729,12 +729,7 @@ func (p *Processor) getBaseFee(ctx context.Context) (*big.Int, error) {
 	var baseFee *big.Int
 
 	if p.taikoL2 != nil {
-		latestL2Block, err := p.destEthClient.BlockByNumber(ctx, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		bf, err := p.taikoL2.GetBasefee(&bind.CallOpts{Context: ctx}, blk.NumberU64(), uint32(latestL2Block.GasUsed()))
+		bf, err := p.taikoL2.GetBasefee(&bind.CallOpts{Context: ctx}, blk.NumberU64(), uint32(blk.GasUsed()))
 		if err != nil {
 			return nil, err
 		}

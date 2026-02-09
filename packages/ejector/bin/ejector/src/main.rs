@@ -58,6 +58,16 @@ async fn main() -> Result<()> {
     let preconf_router_address =
         Address::from_str(&config.preconf_router_address).expect("Invalid preconf router address");
 
+    let anchor_address = match &config.anchor_address {
+        Some(addr) => Some(Address::from_str(addr).expect("Invalid anchor address")),
+        None => {
+            if config.enable_reorg_ejection {
+                panic!("ANCHOR_ADDRESS is required when ENABLE_REORG_EJECTION is true");
+            }
+            None
+        }
+    };
+
     let l2_ws_url = Url::parse(&config.l2_ws_url).expect("Invalid L2 WS URL");
 
     let beacon_url = Url::parse(&config.beacon_url).expect("Invalid Beacon URL");
@@ -83,12 +93,12 @@ async fn main() -> Result<()> {
         l2_http_url.clone(),
         l1_ws_url.clone(),
         l1_http_url.clone(),
-        config.l2_target_block_time,
-        config.eject_after_n_slots_missed,
+        config.eject_after_seconds,
         taiko_wrapper_address,
         whitelist_address,
         handover_slots,
         preconf_router_address,
+        anchor_address,
         config.min_operators,
         config.min_reorg_depth_for_eject,
         config.enable_reorg_ejection,

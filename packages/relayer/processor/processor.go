@@ -3,7 +3,6 @@ package processor
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -416,7 +415,7 @@ func InitFromConfig(ctx context.Context, p *Processor, cfg *Config) error {
 
 	p.srcSignalServiceAddress = cfg.SrcSignalServiceAddress
 	if cfg.SrcSignalServiceForkRouterAddress != relayer.ZeroAddress {
-		p.srcSignalServiceAddress = p.shastaOldForkAddress
+		p.srcSignalServiceAddress = cfg.SrcSignalServiceForkRouterAddress
 	}
 
 	p.msgCh = make(chan queue.Message)
@@ -483,6 +482,14 @@ func (p *Processor) Start() error {
 	}
 
 	go func() {
+		bo := backoff.WithContext(
+			backoff.WithMaxRetries(
+				backoff.NewConstantBackOff(p.backOffRetryInterval),
+				p.backOffMaxRetries,
+			),
+			ctx,
+		)
+
 		if err := backoff.Retry(func() error {
 			slog.Info("attempting backoff queue subscription")
 			if err := p.queue.Subscribe(ctx, p.msgCh, &p.wg); err != nil {
@@ -491,7 +498,7 @@ func (p *Processor) Start() error {
 			}
 
 			return nil
-		}, backoff.WithContext(backoff.NewConstantBackOff(1*time.Second), ctx)); err != nil {
+		}, bo); err != nil {
 			slog.Error("rabbitmq subscribe backoff retry error", "err", err.Error())
 		}
 	}()
@@ -577,18 +584,9 @@ func (p *Processor) eventLoop(ctx context.Context) {
 				}
 
 				if shouldRequeue {
-					// we want to negatively acknowledge the message
+					// we want to negatively acknowledge the message and let the broker requeue it
 					if err := p.queue.Nack(ctx, m, true); err != nil {
 						slog.Error("Err nacking message", "err", err.Error())
-					}
-
-					marshalledMsg, err := json.Marshal(msg)
-					if err != nil {
-						slog.Error("err marshaling queue message", "err", err.Error())
-					} else {
-						if err := p.queue.Publish(ctx, p.queueName(), marshalledMsg, nil, nil); err != nil {
-							slog.Error("err publishing to queue", "err", err.Error())
-						}
 					}
 				} else {
 					// otherwise if no error, we can acknowledge it successfully.

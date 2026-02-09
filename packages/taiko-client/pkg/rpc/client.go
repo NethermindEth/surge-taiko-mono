@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 )
 
 const (
@@ -37,11 +37,10 @@ type PacayaClients struct {
 
 // ShastaClients contains all smart contract clients for ShastaClients fork.
 type ShastaClients struct {
-	Inbox           *shastaBindings.ShastaInboxClient
-	InboxCodec      *shastaBindings.CodecClient
-	Anchor          *shastaBindings.ShastaAnchor
-	ComposeVerifier *shastaBindings.ComposeVerifier
-	InboxAddress    common.Address
+	Inbox         *surgeBindings.SurgeInboxClient
+	Anchor        *surgeBindings.SurgeAnchor
+	SurgeVerifier *surgeBindings.SurgeVerifier // Surge
+	InboxAddress  common.Address
 	// ForkTime is the Shasta hardfork activation timestamp (unix seconds). Optional.
 	ForkTime uint64
 }
@@ -273,28 +272,25 @@ func (c *Client) initPacayaClients(cfg *ClientConfig) error {
 
 // initShastaClients initializes all Shasta smart contract clients.
 func (c *Client) initShastaClients(ctx context.Context, cfg *ClientConfig) error {
-	shastaInbox, err := shastaBindings.NewShastaInboxClient(cfg.ShastaInboxAddress, c.L1)
+	shastaInbox, err := surgeBindings.NewSurgeInboxClient(cfg.ShastaInboxAddress, c.L1)
 	if err != nil {
-		return fmt.Errorf("failed to create new instance of ShastaInboxClient: %w", err)
+		return fmt.Errorf("failed to create new instance of SurgeInboxClient: %w", err)
 	}
 
-	shastaAnchor, err := shastaBindings.NewShastaAnchor(cfg.TaikoAnchorAddress, c.L2)
+	shastaAnchor, err := surgeBindings.NewSurgeAnchor(cfg.TaikoAnchorAddress, c.L2)
 	if err != nil {
-		return fmt.Errorf("failed to create new instance of ShastaAnchorClient: %w", err)
+		return fmt.Errorf("failed to create new instance of SurgeAnchorClient: %w", err)
 	}
 
 	config, err := shastaInbox.GetConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return fmt.Errorf("failed to get shasta inbox config: %w", err)
 	}
-	inboxCodec, err := shastaBindings.NewCodecClient(config.Codec, c.L1)
+	surgeVerifier, err := surgeBindings.NewSurgeVerifier(config.ProofVerifier, c.L1)
 	if err != nil {
-		return fmt.Errorf("failed to create new instance of InboxCodecClient: %w", err)
+		return fmt.Errorf("failed to create new instance of SurgeVerifier: %w", err)
 	}
-	composeVerifier, err := shastaBindings.NewComposeVerifier(config.ProofVerifier, c.L1)
-	if err != nil {
-		return fmt.Errorf("failed to create new instance of ComposeVerifier: %w", err)
-	}
+
 	// Initialize Shasta clients with a fork-time value determined by precedence:
 	// 1) CLI flag (cfg.ShastaForkTime)
 	// 2) Env var TAIKO_INTERNAL_SHASTA_TIME
@@ -308,12 +304,11 @@ func (c *Client) initShastaClients(ctx context.Context, cfg *ClientConfig) error
 	}
 
 	c.ShastaClients = &ShastaClients{
-		Inbox:           shastaInbox,
-		InboxCodec:      inboxCodec,
-		Anchor:          shastaAnchor,
-		ComposeVerifier: composeVerifier,
-		InboxAddress:    cfg.ShastaInboxAddress,
-		ForkTime:        forkTime,
+		Inbox:         shastaInbox,
+		Anchor:        shastaAnchor,
+		SurgeVerifier: surgeVerifier,
+		InboxAddress:  cfg.ShastaInboxAddress,
+		ForkTime:      forkTime,
 	}
 
 	return nil

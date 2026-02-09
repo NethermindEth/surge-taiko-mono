@@ -7,12 +7,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
 )
 
@@ -90,14 +89,11 @@ func (s *ProverEventHandlerTestSuite) TestIsProvingWindowExpiredShasta_Remaining
 
 	notExpiredTs := int64(now + pw - 5)
 	meta := metadata.NewTaikoProposalMetadataShasta(
-		&shastaBindings.IInboxProposedEventPayload{
-			Proposal: shastaBindings.IInboxProposal{
-				Id:        big.NewInt(1),
-				Timestamp: big.NewInt(notExpiredTs),
-				Proposer:  common.Address{},
-			},
+		&surgeBindings.SurgeInboxClientProposed{
+			Id:       common.Big1,
+			Proposer: common.Address{},
 		},
-		types.Log{},
+		uint64(notExpiredTs),
 	)
 
 	expired, _, remaining, err := IsProvingWindowExpiredShasta(s.RPCClient, meta)
@@ -107,14 +103,11 @@ func (s *ProverEventHandlerTestSuite) TestIsProvingWindowExpiredShasta_Remaining
 
 	expiredTs := int64(now - pw - 5)
 	metaExpired := metadata.NewTaikoProposalMetadataShasta(
-		&shastaBindings.IInboxProposedEventPayload{
-			Proposal: shastaBindings.IInboxProposal{
-				Id:        big.NewInt(2),
-				Timestamp: big.NewInt(expiredTs),
-				Proposer:  common.Address{},
-			},
+		&surgeBindings.SurgeInboxClientProposed{
+			Id:       common.Big2,
+			Proposer: common.Address{},
 		},
-		types.Log{},
+		uint64(expiredTs),
 	)
 
 	expired2, _, remaining2, err := IsProvingWindowExpiredShasta(s.RPCClient, metaExpired)

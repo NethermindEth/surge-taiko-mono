@@ -14,7 +14,7 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/signer"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
@@ -83,9 +83,6 @@ func (c *AnchorTxConstructor) AssembleAnchorV4Tx(
 	ctx context.Context,
 	// Parameters of the ShastaAnchor.anchorV4 transaction.
 	parent *types.Header,
-	proposalId *big.Int,
-	proposer common.Address,
-	proverAuth []byte,
 	anchorBlockNumber *big.Int,
 	anchorBlockHash common.Hash,
 	anchorStateRoot common.Hash,
@@ -106,19 +103,12 @@ func (c *AnchorTxConstructor) AssembleAnchorV4Tx(
 		"anchorStateRoot", anchorStateRoot,
 		"parentGasUsed", parent.GasUsed,
 		"parentHash", parent.Hash(),
-		"proposalId", proposalId,
-		"proposer", proposer,
 		"endOfSubmissionWindowTimestamp", endOfSubmissionWindowTimestamp,
 	)
 
 	return c.rpc.ShastaClients.Anchor.AnchorV4(
 		opts,
-		shastaBindings.AnchorProposalParams{
-			ProposalId: proposalId,
-			Proposer:   proposer,
-			ProverAuth: proverAuth,
-		},
-		shastaBindings.ICheckpointStoreCheckpoint{
+		surgeBindings.ICheckpointStoreCheckpoint{
 			BlockNumber: anchorBlockNumber,
 			BlockHash:   anchorBlockHash,
 			StateRoot:   anchorStateRoot,

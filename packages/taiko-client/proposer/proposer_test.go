@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/chain_syncer/beaconsync"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/chain_syncer/event"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/state"
@@ -142,7 +142,6 @@ func (s *ProposerTestSuite) TestProposeWithRevertProtection() {
 		true,
 		true,
 		true,
-		0,
 	)
 	s.Nil(s.s.ProcessL1Blocks(context.Background()))
 
@@ -377,8 +376,8 @@ func (s *ProposerTestSuite) TestProposeOp() {
 	s.ForkIntoShasta(s.p, s.s)
 
 	// Propose txs in L2 execution engine's mempool
-	sink1 := make(chan *shastaBindings.ShastaInboxClientProposed)
-	sub1, err := s.RPCClient.ShastaClients.Inbox.WatchProposed(nil, sink1)
+	sink1 := make(chan *surgeBindings.SurgeInboxClientProposed)
+	sub1, err := s.RPCClient.ShastaClients.Inbox.WatchProposed(nil, sink1, nil, nil)
 	s.Nil(err)
 
 	defer func() {
@@ -393,10 +392,11 @@ func (s *ProposerTestSuite) TestProposeOp() {
 	s.Nil(s.p.ProposeOp(context.Background()))
 
 	event := <-sink1
-	payload, err := s.RPCClient.DecodeProposedEventPayload(nil, event.Data)
+	header, err := s.RPCClient.L1.HeaderByNumber(context.Background(), big.NewInt(int64(event.Raw.BlockNumber)))
 	s.Nil(err)
+	s.NotNil(header)
 
-	meta := metadata.NewTaikoProposalMetadataShasta(payload, event.Raw)
+	meta := metadata.NewTaikoProposalMetadataShasta(event, header.Time)
 
 	_, isPending, err := s.p.rpc.L1.TransactionByHash(context.Background(), meta.GetTxHash())
 	s.Nil(err)
@@ -450,7 +450,11 @@ func (s *ProposerTestSuite) TestProposeMultiBlobsInOneBatch() {
 				[]byte{1},
 			)
 			if err != nil {
-				s.Equal("replacement transaction underpriced", err.Error())
+				if os.Getenv("L2_NODE") == "l2_nmc" {
+					s.Equal("ReplacementNotAllowed", err.Error())
+				} else {
+					s.Equal("replacement transaction underpriced", err.Error())
+				}
 			}
 			txsBatch[i] = append(txsBatch[i], tx)
 		}

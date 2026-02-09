@@ -151,7 +151,6 @@ func (p *Proposer) InitFromConfig(
 		cfg.RevertProtectionEnabled,
 		cfg.BlobAllowed,
 		cfg.FallbackToCalldata,
-		cfg.AnchorOffset,
 	)
 
 	return nil
@@ -475,11 +474,6 @@ func (p *Proposer) ProposeTxListShasta(ctx context.Context, txBatch []types.Tran
 		txs += uint64(len(txList))
 	}
 
-	config, err := p.rpc.GetShastaInboxConfigs(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return fmt.Errorf("failed to get Shasta Inbox configs: %w", err)
-	}
-
 	// Get the last proposal to ensure we are proposing a block after its NextProposalBlockId.
 	state, err := p.rpc.GetCoreStateShasta(&bind.CallOpts{Context: ctx})
 	if err != nil {
@@ -508,7 +502,6 @@ func (p *Proposer) ProposeTxListShasta(ctx context.Context, txBatch []types.Tran
 	txCandidate, err := p.txBuilder.BuildShasta(
 		ctx,
 		txBatch,
-		config.MinForcedInclusionCount,
 		p.preconfRouterAddress,
 	)
 	if err != nil {

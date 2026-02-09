@@ -11,7 +11,11 @@ concurrency:
 jobs:
   check_label:
     if: github.event.pull_request.draft == false
+<<<<<<< HEAD
     runs-on: ubuntu-latest
+=======
+    runs-on: [ubuntu-latest]
+>>>>>>> surge-shasta
     steps:
       - name: Check for "option.do-not-merge" label
         id: check_label

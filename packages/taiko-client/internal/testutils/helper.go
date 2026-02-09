@@ -25,7 +25,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
-	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	surgeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/surge"
 	anchortxconstructor "github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/anchor_tx_constructor"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
@@ -53,10 +53,10 @@ func (s *ClientTestSuite) ProposeAndInsertEmptyBlocks(
 
 	// Propose txs in L2 execution engine's mempool
 	sink1 := make(chan *pacayaBindings.TaikoInboxClientBatchProposed)
-	sink2 := make(chan *shastaBindings.ShastaInboxClientProposed)
+	sink2 := make(chan *surgeBindings.SurgeInboxClientProposed)
 	sub1, err := s.RPCClient.PacayaClients.TaikoInbox.WatchBatchProposed(nil, sink1)
 	s.Nil(err)
-	sub2, err := s.RPCClient.ShastaClients.Inbox.WatchProposed(nil, sink2)
+	sub2, err := s.RPCClient.ShastaClients.Inbox.WatchProposed(nil, sink2, nil, nil)
 	s.Nil(err)
 
 	defer func() {
@@ -88,9 +88,9 @@ func (s *ClientTestSuite) ProposeAndInsertEmptyBlocks(
 			metadataList = append(metadataList, metadata.NewTaikoDataBlockMetadataPacaya(event))
 			txHash = event.Raw.TxHash
 		case event := <-sink2:
-			decoded, err := s.RPCClient.DecodeProposedEventPayload(nil, event.Data)
+			header, err := s.RPCClient.L1.HeaderByHash(context.Background(), event.Raw.BlockHash)
 			s.Nil(err)
-			meta := metadata.NewTaikoProposalMetadataShasta(decoded, event.Raw)
+			meta := metadata.NewTaikoProposalMetadataShasta(event, header.Time)
 			metadataList = append(metadataList, meta)
 			txHash = event.Raw.TxHash
 		}
@@ -129,8 +129,8 @@ func (s *ClientTestSuite) ProposeAndInsertValidBlock(
 	sink1 := make(chan *pacayaBindings.TaikoInboxClientBatchProposed)
 	sub1, err := s.RPCClient.PacayaClients.TaikoInbox.WatchBatchProposed(nil, sink1)
 	s.Nil(err)
-	sink2 := make(chan *shastaBindings.ShastaInboxClientProposed)
-	sub2, err := s.RPCClient.ShastaClients.Inbox.WatchProposed(nil, sink2)
+	sink2 := make(chan *surgeBindings.SurgeInboxClientProposed)
+	sub2, err := s.RPCClient.ShastaClients.Inbox.WatchProposed(nil, sink2, nil, nil)
 	s.Nil(err)
 
 	defer func() {
@@ -155,8 +155,13 @@ func (s *ClientTestSuite) ProposeAndInsertValidBlock(
 	s.Nil(err)
 	err = s.RPCClient.L2.SendTransaction(context.Background(), signedTx)
 	if err != nil {
-		// If the transaction is underpriced, we just ignore it.
-		s.Equal("replacement transaction underpriced", err.Error())
+		// If the transaction is underpriced or a replacement is not allowed, we just ignore it.
+		// Geth returns "replacement transaction underpriced", Nethermind returns "ReplacementNotAllowed"
+		if os.Getenv("L2_NODE") == "l2_nmc" {
+			s.Equal("ReplacementNotAllowed", err.Error())
+		} else {
+			s.Equal("replacement transaction underpriced", err.Error())
+		}
 	}
 
 	s.InitShastaGenesisProposal()
@@ -171,9 +176,9 @@ func (s *ClientTestSuite) ProposeAndInsertValidBlock(
 		meta = metadata.NewTaikoDataBlockMetadataPacaya(event)
 		txHash = event.Raw.TxHash
 	case event := <-sink2:
-		decoded, err := s.RPCClient.DecodeProposedEventPayload(nil, event.Data)
+		header, err := s.RPCClient.L1.HeaderByHash(context.Background(), event.Raw.BlockHash)
 		s.Nil(err)
-		meta = metadata.NewTaikoProposalMetadataShasta(decoded, event.Raw)
+		meta = metadata.NewTaikoProposalMetadataShasta(event, header.Time)
 		txHash = event.Raw.TxHash
 	}
 
@@ -211,10 +216,10 @@ func (s *ClientTestSuite) ProposeValidBlock(proposer Proposer) {
 
 	// Propose txs in L2 execution engine's mempool
 	sink1 := make(chan *pacayaBindings.TaikoInboxClientBatchProposed)
-	sink2 := make(chan *shastaBindings.ShastaInboxClientProposed)
+	sink2 := make(chan *surgeBindings.SurgeInboxClientProposed)
 	sub1, err := s.RPCClient.PacayaClients.TaikoInbox.WatchBatchProposed(nil, sink1)
 	s.Nil(err)
-	sub2, err := s.RPCClient.ShastaClients.Inbox.WatchProposed(nil, sink2)
+	sub2, err := s.RPCClient.ShastaClients.Inbox.WatchProposed(nil, sink2, nil, nil)
 	s.Nil(err)
 
 	defer func() {

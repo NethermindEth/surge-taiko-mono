@@ -8,40 +8,80 @@ use alloy::{
     sol_types::SolEvent,
 };
 use alloy_consensus::TxEnvelope;
+use alloy_provider::RootProvider;
 use alloy_rpc_types::{Transaction as RpcTransaction, eth::Block as RpcBlock};
 use anyhow::anyhow;
 use async_trait::async_trait;
-use bindings::{
-    codec::IInbox::{DerivationSource, ProposedEventPayload},
-    inbox::Inbox::Proposed,
-};
+use bindings::inbox::{IInbox::DerivationSource, Inbox::Proposed};
 use metrics::{counter, gauge};
 use protocol::shasta::{
-    constants::shasta_fork_timestamp_for_chain, manifest::DerivationSourceManifest,
+    constants::{PROPOSAL_MAX_BLOB_BYTES, shasta_fork_timestamp_for_chain},
+    manifest::DerivationSourceManifest,
 };
 use rpc::{blob::BlobDataSource, client::Client};
 use tracing::{debug, info, instrument, warn};
 
 use crate::{
-    derivation::{
-        manifest::{ManifestFetcher, fetcher::shasta::ShastaSourceManifestFetcher},
-        pipeline::shasta::anchor::AnchorTxConstructor,
-    },
+    derivation::manifest::{ManifestFetcher, fetcher::shasta::ShastaSourceManifestFetcher},
     metrics::DriverMetrics,
     sync::engine::{EngineBlockOutcome, PayloadApplier},
 };
+use protocol::shasta::AnchorTxConstructor;
 
 use super::super::{DerivationError, DerivationPipeline};
+
+/// Decoded Shasta `Proposed` event enriched with the containing L1 block metadata.
+#[derive(Debug, Clone)]
+struct ProposedEventContext {
+    /// Raw decoded `Proposed` event payload.
+    event: Proposed,
+    /// L1 block number that emitted the event.
+    l1_block_number: u64,
+    /// Hash of the L1 block that emitted the event.
+    l1_block_hash: B256,
+    /// Timestamp of the emitting L1 block (used as proposal timestamp).
+    l1_timestamp: u64,
+}
 
 mod bundle;
 mod payload;
 mod state;
-mod util;
 
 use bundle::{BundleMeta, SourceManifestSegment};
 use state::ParentState;
 
 pub use bundle::ShastaProposalBundle;
+
+/// Convert a derivation source's blob slice into ordered blob hashes for manifest fetch.
+fn derivation_source_to_blob_hashes(source: &DerivationSource) -> Vec<B256> {
+    source.blobSlice.blobHashes.iter().map(|hash| B256::from_slice(hash.as_ref())).collect()
+}
+
+/// Check if a derivation source has a valid blob offset.
+/// Returns true if the source has non-empty blob hashes and the offset is within bounds.
+fn is_source_offset_valid(source: &DerivationSource) -> bool {
+    !source.blobSlice.blobHashes.is_empty() &&
+        source.blobSlice.offset.to::<usize>() <= PROPOSAL_MAX_BLOB_BYTES - 64
+}
+
+/// Ensure forced-inclusion manifests adhere to protocol rules (single block) or default them.
+fn validate_forced_inclusion_manifest(
+    proposal_id: u64,
+    source: &DerivationSource,
+    manifest: DerivationSourceManifest,
+) -> DerivationSourceManifest {
+    if source.isForcedInclusion && manifest.blocks.len() != 1 {
+        info!(
+            proposal_id,
+            blocks = manifest.blocks.len(),
+            blob_hashes = source.blobSlice.blobHashes.len(),
+            "invalid blocks count in forced-inclusion source manifest, using default payload instead"
+        );
+        DerivationSourceManifest::default()
+    } else {
+        manifest
+    }
+}
 
 /// Shasta-specific derivation pipeline.
 ///
@@ -53,7 +93,7 @@ where
     P: Provider + Clone + 'static,
 {
     rpc: Client<P>,
-    anchor_constructor: AnchorTxConstructor<P>,
+    anchor_constructor: AnchorTxConstructor<RootProvider>,
     derivation_source_manifest_fetcher:
         Arc<dyn ManifestFetcher<Manifest = DerivationSourceManifest>>,
     shasta_fork_timestamp: u64,
@@ -76,7 +116,9 @@ where
     ) -> Result<Self, DerivationError> {
         let source_manifest_fetcher: Arc<dyn ManifestFetcher<Manifest = DerivationSourceManifest>> =
             Arc::new(ShastaSourceManifestFetcher::new(blob_source.clone()));
-        let anchor_constructor = AnchorTxConstructor::new(rpc.clone()).await?;
+        let anchor_address = *rpc.shasta.anchor.address();
+        let anchor_constructor =
+            AnchorTxConstructor::new(rpc.l2_provider.clone(), anchor_address).await?;
         let chain_id = rpc.l2_provider.get_chain_id().await?;
         let shasta_fork_timestamp = shasta_fork_timestamp_for_chain(chain_id)
             .map_err(|err| DerivationError::Other(err.into()))?;
@@ -147,32 +189,35 @@ where
             .ok_or(DerivationError::BlockUnavailable(block_number))
     }
 
-    /// Extract blob hashes from a derivation source, preserving the order expected by
-    /// the decoder.
-    fn derivation_source_to_blob_hashes(&self, source: &DerivationSource) -> Vec<B256> {
-        source.blobSlice.blobHashes.iter().map(|hash| B256::from_slice(hash.as_ref())).collect()
-    }
-
-    /// Decode a proposal log into the event payload.
+    /// Decode a proposal log into the event payload and enrich it with L1 block metadata.
     #[instrument(skip(self, log), level = "debug")]
-    async fn decode_log_to_event_payload(
+    async fn decode_log_to_event_context(
         &self,
         log: &Log,
-    ) -> Result<ProposedEventPayload, DerivationError> {
-        let payload = self
+    ) -> Result<ProposedEventContext, DerivationError> {
+        let event = Proposed::decode_raw_log(log.topics(), log.data().data.as_ref())?;
+
+        let l1_block_hash = log.block_hash.ok_or(DerivationError::MissingL1BlockHash)?;
+        let l1_block_number = log.block_number.ok_or(DerivationError::MissingL1BlockNumber)?;
+
+        let l1_block = self
             .rpc
-            .shasta
-            .codec
-            .decodeProposedEvent(Proposed::decode_log_data(log.data())?.data)
-            .call()
-            .await?;
+            .l1_provider
+            .get_block_by_hash(l1_block_hash)
+            .await?
+            .ok_or(DerivationError::BlockUnavailable(l1_block_number))?;
+
+        let l1_timestamp = l1_block.header.timestamp;
+
         debug!(
-            proposal_id = payload.proposal.id.to::<u64>(),
-            timestamp = payload.proposal.timestamp.to::<u64>(),
-            source_count = payload.proposal.sources.len(),
-            "decoded proposed event payload"
+            proposal_id = event.id.to::<u64>(),
+            l1_block_number = l1_block_number,
+            l1_block_hash = ?l1_block_hash,
+            source_count = event.sources.len(),
+            "decoded proposed event"
         );
-        Ok(payload)
+
+        Ok(ProposedEventContext { event, l1_block_number, l1_block_hash, l1_timestamp })
     }
 
     /// Read the inbox core state at the proposal log's block to extract the last finalized id.
@@ -203,7 +248,7 @@ where
     where
         M: Send,
     {
-        let hashes = self.derivation_source_to_blob_hashes(source);
+        let hashes = derivation_source_to_blob_hashes(source);
         let offset = source.blobSlice.offset.to::<u64>() as usize;
         let timestamp = source.blobSlice.timestamp.to::<u64>();
         debug!(hash_count = hashes.len(), offset, timestamp, "fetching manifest sidecars");
@@ -212,74 +257,56 @@ where
     }
 
     /// Build a proposal bundle from a decoded event payload.
-    async fn build_manifest_from_payload(
+    ///
+    /// Sources are processed sequentially in the order they appear, with the proposer's
+    /// source appended last per the protocol spec. Each source's `isForcedInclusion` flag
+    /// determines validation behavior.
+    async fn build_manifest_from_event(
         &self,
-        payload: &ProposedEventPayload,
+        event: &ProposedEventContext,
         last_finalized_proposal_id: u64,
     ) -> Result<ShastaProposalBundle, DerivationError> {
-        let sources = &payload.proposal.sources;
-        let proposal_id = payload.proposal.id.to::<u64>();
+        let sources = &event.event.sources;
+        let proposal_id = event.event.id.to::<u64>();
         info!(proposal_id, source_count = sources.len(), "decoded proposal payload");
 
-        // If sources is empty, we return an error, which should never happen for the current
-        // Shasta protocol inbox implementation.
-        let Some((last_source, forced_inclusion_sources)) = sources.split_last() else {
-            let err = DerivationError::EmptyDerivationSources(proposal_id);
+        if sources.is_empty() {
             warn!(proposal_id, "proposal contained no derivation sources");
-            return Err(err);
-        };
+            return Err(DerivationError::EmptyDerivationSources(proposal_id));
+        }
 
-        // Fetch the normal proposal manifest first so we can reuse its prover auth.
-        let final_manifest = self
-            .fetch_and_decode_manifest(
-                self.derivation_source_manifest_fetcher.as_ref(),
-                last_source,
-            )
-            .await?;
-
-        let prover_auth_bytes = final_manifest.prover_auth_bytes.clone();
-
-        // Fetch the forced inclusion sources afterwards, injecting the proposal-level prover auth
-        // so every segment carries the same signature payload as required by the protocol.
+        // Fetch and validate all source manifests sequentially in order.
         let mut manifest_segments = Vec::with_capacity(sources.len());
-        for source in forced_inclusion_sources {
-            let mut manifest = self
-                .fetch_and_decode_manifest(self.derivation_source_manifest_fetcher.as_ref(), source)
-                .await?;
-            // For forced-inclusion source, ensure it contains exactly one block and blob hash.
-            if source.isForcedInclusion && manifest.blocks.len() != 1 {
-                info!(
-                    proposal_id,
-                    blocks = manifest.blocks.len(),
-                    blob_hashes = source.blobSlice.blobHashes.len(),
-                    "invalid blocks count in forced-inclusion source manifest, using default payload instead"
-                );
-                manifest = DerivationSourceManifest::default();
-            }
-            // Inject the proposal-level prover auth into every segment.
-            manifest.prover_auth_bytes = prover_auth_bytes.clone();
+        for source in sources {
+            // If source has no blob hashes or invalid offset, use default manifest.
+            let manifest = if !is_source_offset_valid(source) {
+                DerivationSourceManifest::default()
+            } else {
+                let manifest = self
+                    .fetch_and_decode_manifest(
+                        self.derivation_source_manifest_fetcher.as_ref(),
+                        source,
+                    )
+                    .await?;
+                validate_forced_inclusion_manifest(proposal_id, source, manifest)
+            };
             manifest_segments.push(SourceManifestSegment {
                 manifest,
                 is_forced_inclusion: source.isForcedInclusion,
             });
         }
 
-        manifest_segments.push(SourceManifestSegment {
-            manifest: final_manifest,
-            is_forced_inclusion: last_source.isForcedInclusion,
-        });
-
         // Assemble the full Shasta protocol proposal bundle.
         let bundle = ShastaProposalBundle {
             meta: BundleMeta {
                 proposal_id,
                 last_finalized_proposal_id,
-                proposal_timestamp: payload.proposal.timestamp.to::<u64>(),
-                origin_block_number: payload.proposal.originBlockNumber.to::<u64>(),
-                origin_block_hash: B256::from(payload.proposal.originBlockHash),
-                proposer: payload.proposal.proposer,
-                basefee_sharing_pctg: payload.proposal.basefeeSharingPctg,
-                prover_auth_bytes,
+                proposal_timestamp: event.l1_timestamp,
+                l1_block_number: event.l1_block_number,
+                l1_block_hash: event.l1_block_hash,
+                origin_block_number: event.l1_block_number.saturating_sub(1),
+                proposer: event.event.proposer,
+                basefee_sharing_pctg: event.event.basefeeSharingPctg,
             },
             sources: manifest_segments,
         };
@@ -342,9 +369,9 @@ where
     // Convert a proposal log into a manifest for processing.
     #[instrument(skip(self, log), name = "shasta_manifest_from_log")]
     async fn log_to_manifest(&self, log: &Log) -> Result<Self::Manifest, DerivationError> {
-        let payload = self.decode_log_to_event_payload(log).await?;
+        let event = self.decode_log_to_event_context(log).await?;
         let last_finalized_proposal_id = self.inbox_last_finalized_proposal_id(log).await?;
-        self.build_manifest_from_payload(&payload, last_finalized_proposal_id).await
+        self.build_manifest_from_event(&event, last_finalized_proposal_id).await
     }
 
     // Convert a manifest into execution engine blocks for block production.
@@ -402,8 +429,8 @@ where
         log: &Log,
         applier: &(dyn PayloadApplier + Send + Sync),
     ) -> Result<Vec<EngineBlockOutcome>, DerivationError> {
-        let payload = self.decode_log_to_event_payload(log).await?;
-        let proposal_id = payload.proposal.id.to::<u64>();
+        let event = self.decode_log_to_event_context(log).await?;
+        let proposal_id = event.event.id.to::<u64>();
         let last_finalized_proposal_id = self.inbox_last_finalized_proposal_id(log).await?;
 
         if proposal_id == 0 {
@@ -412,8 +439,7 @@ where
             return Ok(Vec::new());
         }
 
-        let manifest =
-            self.build_manifest_from_payload(&payload, last_finalized_proposal_id).await?;
+        let manifest = self.build_manifest_from_event(&event, last_finalized_proposal_id).await?;
         let outcomes = self.manifest_to_engine_blocks(manifest, applier).await?;
 
         if let Some(last) = outcomes.last() {
@@ -433,5 +459,54 @@ where
         }
 
         Ok(outcomes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy::primitives::{
+        B256, FixedBytes,
+        aliases::{U24, U48},
+    };
+    use bindings::inbox::LibBlobs::BlobSlice;
+    use protocol::shasta::manifest::{BlockManifest, DerivationSourceManifest};
+
+    fn sample_derivation_source(
+        blob_hashes: Vec<FixedBytes<32>>,
+        is_forced: bool,
+    ) -> DerivationSource {
+        DerivationSource {
+            isForcedInclusion: is_forced,
+            blobSlice: BlobSlice {
+                blobHashes: blob_hashes,
+                offset: U24::from(0u32),
+                timestamp: U48::from(0u64),
+            },
+        }
+    }
+
+    #[test]
+    fn derivation_source_to_blob_hashes_preserves_order() {
+        let source = sample_derivation_source(
+            vec![FixedBytes::from([1u8; 32]), FixedBytes::from([2u8; 32])],
+            false,
+        );
+        let hashes = derivation_source_to_blob_hashes(&source);
+        assert_eq!(hashes.len(), 2);
+        assert_eq!(hashes[0], B256::from([1u8; 32]));
+        assert_eq!(hashes[1], B256::from([2u8; 32]));
+    }
+
+    #[test]
+    fn forced_inclusion_manifest_defaults_when_block_count_invalid() {
+        let source = sample_derivation_source(vec![FixedBytes::from([0u8; 32])], true);
+        let manifest = DerivationSourceManifest {
+            blocks: vec![BlockManifest::default(), BlockManifest::default()],
+        };
+
+        let validated = validate_forced_inclusion_manifest(1, &source, manifest);
+
+        assert_eq!(validated.blocks.len(), 1);
     }
 }
