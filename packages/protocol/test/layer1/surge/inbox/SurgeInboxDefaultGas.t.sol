@@ -228,6 +228,7 @@ contract SurgeInboxDefaultGas is InboxTestBase {
             livenessBond: 0,
             withdrawalDelay: 0,
             provingWindow: 2 hours,
+            permissionlessProvingDelay: 5 days,
             maxProofSubmissionDelay: 3 minutes,
             ringBufferSize: 100,
             basefeeSharingPctg: 0,

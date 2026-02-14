@@ -87,6 +87,9 @@ contract Inbox is IInbox, ICodec, IForcedInclusionStore, IBondManager, Essential
     /// @notice The proving window in seconds.
     uint48 internal immutable _provingWindow;
 
+    /// @notice The delay after which proving becomes permissionless when whitelist is enabled.
+    uint48 internal immutable _permissionlessProvingDelay;
+
     /// @notice Maximum delay allowed between sequential proofs to remain on time.
     uint48 internal immutable _maxProofSubmissionDelay;
 
@@ -158,6 +161,7 @@ contract Inbox is IInbox, ICodec, IForcedInclusionStore, IBondManager, Essential
         _livenessBond = _config.livenessBond;
         _withdrawalDelay = _config.withdrawalDelay;
         _provingWindow = _config.provingWindow;
+        _permissionlessProvingDelay = _config.permissionlessProvingDelay;
         _maxProofSubmissionDelay = _config.maxProofSubmissionDelay;
         _ringBufferSize = _config.ringBufferSize;
         _basefeeSharingPctg = _config.basefeeSharingPctg;
@@ -393,6 +397,7 @@ contract Inbox is IInbox, ICodec, IForcedInclusionStore, IBondManager, Essential
             livenessBond: _livenessBond,
             withdrawalDelay: _withdrawalDelay,
             provingWindow: _provingWindow,
+            permissionlessProvingDelay: _permissionlessProvingDelay,
             maxProofSubmissionDelay: _maxProofSubmissionDelay,
             ringBufferSize: _ringBufferSize,
             basefeeSharingPctg: _basefeeSharingPctg,

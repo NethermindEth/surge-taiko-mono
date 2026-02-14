@@ -70,6 +70,7 @@ contract DeploySurgeL1 is DeployCapability {
     // Inbox configuration
     // ---------------------------------------------------------------
     uint48 internal immutable provingWindow = uint48(vm.envUint("PROVING_WINDOW"));
+    uint48 internal immutable permissionlessProvingDelay = 5 days;
     uint48 internal immutable maxProofSubmissionDelay =
         uint48(vm.envUint("MAX_PROOF_SUBMISSION_DELAY"));
     uint256 internal immutable ringBufferSize = vm.envUint("RING_BUFFER_SIZE");
@@ -450,6 +451,7 @@ contract DeploySurgeL1 is DeployCapability {
             livenessBond: livenessBond,
             withdrawalDelay: withdrawalDelay,
             provingWindow: provingWindow,
+            permissionlessProvingDelay: permissionlessProvingDelay,
             maxProofSubmissionDelay: maxProofSubmissionDelay,
             ringBufferSize: ringBufferSize,
             basefeeSharingPctg: basefeeSharingPctg,

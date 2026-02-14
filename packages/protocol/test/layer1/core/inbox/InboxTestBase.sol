@@ -87,6 +87,7 @@ abstract contract InboxTestBase is CommonTest {
             livenessBond: LIVENESS_BOND,
             withdrawalDelay: WITHDRAWAL_DELAY,
             provingWindow: 2 hours,
+            permissionlessProvingDelay: 5 days,
             maxProofSubmissionDelay: 3 minutes,
             ringBufferSize: 100,
             basefeeSharingPctg: 0,
