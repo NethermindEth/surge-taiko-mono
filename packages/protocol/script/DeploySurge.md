@@ -8,31 +8,55 @@ This document describes the deployment sequence for the Surge protocol on both L
 
 ## Deployment Overview
 
-| Step | Script                  | Network | Description                                         |
-| ---- | ----------------------- | ------- | --------------------------------------------------- |
-| 1    | `DeploySurgeL1.s.sol`   | L1      | Deploy all L1 contracts                             |
-| 2    | Verifier setup scripts  | L1      | Configure prover image IDs                          |
-| 3    | `AcceptOwnership.s.sol` | L1      | Accept pending L1 ownership transfers               |
-| 4    | `SetupSurgeL2.s.sol`    | L2      | Register L1 contracts and setup delegate controller |
-| 5    | `AcceptOwnership.s.sol` | L2      | Accept pending L2 ownership transfers               |
+| Step | Script(s)                     | Network | Description                                           |
+| ---- | ----------------------------- | ------- | ----------------------------------------------------- |
+| 1a   | `DeployRollupCore.s.sol`      | L1      | Deploy Inbox proxy, SurgeVerifier, optional Timelock  |
+| 1b   | `DeployVerifiers.s.sol`       | L1      | Deploy internal verifiers, configure SurgeVerifier    |
+| 1c   | `DeploySharedContracts.s.sol` | L1      | Deploy Resolver, Bridge, Vaults, register L2 addrs    |
+| 1d   | `SetupInbox.s.sol`            | L1      | Deploy SurgeInbox impl, upgrade proxy, initialize     |
+| 1e   | `VerifyDeployment.s.sol`      | L1      | Read-only verification of all registrations/ownership |
+| 2    | Verifier setup scripts        | L1      | Configure prover image IDs                            |
+| 3    | `AcceptOwnership.s.sol`       | L1      | Accept pending L1 ownership transfers                 |
+| 4    | `SetupSurgeL2.s.sol`          | L2      | Register L1 contracts and setup delegate controller   |
+| 5    | `AcceptOwnership.s.sol`       | L2      | Accept pending L2 ownership transfers                 |
+
+> Steps 1b and 1c can run **in parallel** (no mutual dependencies).
 
 ---
 
-## Step 1: Deploy L1 Contracts
+## Step 1: Deploy L1 Contracts (Modular)
 
-**Script**: `script/layer1/surge/DeploySurgeL1.s.sol`  
-**Shell wrapper**: `script/layer1/surge/deploy_surge_l1.sh`
+L1 deployment is split into independent sub-steps. If a sub-step fails, only that sub-step needs to be re-run — previously completed sub-steps are not affected.
 
-### What it deploys
+All scripts are in `script/layer1/surge/deploy-modular/`. Each shell script is self-contained with its own env var defaults and auto-loads addresses from previous steps' JSON output files.
 
-#### Rollup Contracts
+### Dependency Graph
 
-- **Inbox** (proxy) - Main rollup contract for proposing and proving batches
+```
+Step 1a ──→ Step 1b (needs SURGE_VERIFIER, EFFECTIVE_OWNER)
+  │
+  ├──────→ Step 1c (needs SURGE_INBOX, EFFECTIVE_OWNER)
+  │            │
+  │            └──→ Step 1d (needs SURGE_INBOX, SURGE_VERIFIER, SIGNAL_SERVICE, EFFECTIVE_OWNER)
+  │
+  └──────→ Step 1e (needs all addresses, read-only)
+```
+
+### What gets deployed
+
+#### Rollup Contracts (Step 1a)
+
+- **Inbox** (proxy with EmptyImpl) - Main rollup contract (upgraded in Step 1d)
 - **Proof Verifier** (`SurgeVerifier`) - Routes proofs to internal verifiers
-- **Codec** (`SurgeCodec` - it is only used by offchain components) - Encoding/decoding for inputs
 - **SurgeTimelockController** (if `USE_TIMELOCK=true`) - Timelocked admin for protocol contracts
 
-#### Shared Contracts
+#### Internal Verifiers (Step 1b, optional)
+
+- **Risc0Verifier** (if `DEPLOY_RISC0_RETH_VERIFIER=true`)
+- **SP1Verifier** (if `DEPLOY_SP1_RETH_VERIFIER=true`)
+- **ProofVerifierDummy** (if `USE_DUMMY_VERIFIER=true`) - A single dummy verifier that accepts ECDSA signatures from a trusted signer, used in place of real internal verifiers for devnet testing
+
+#### Shared Contracts (Step 1c)
 
 - **SharedResolver** - Cross-contract discovery
 - **SignalService** - Cross-chain signal relay
@@ -42,50 +66,43 @@ This document describes the deployment sequence for the Surge protocol on both L
 - **ERC1155Vault** - ERC1155 token bridging
 - **BridgedERC20/721/1155** - Bridged token implementations (clone pattern)
 
-#### Preconf Contracts
+#### Inbox & Preconf (Step 1d)
 
 - **PreconfWhitelist** - Whitelisted preconfirmation operators store
-
-#### Internal Verifiers (optional)
-
-- **Risc0Verifier** (if `DEPLOY_RISC0_RETH_VERIFIER=true`)
-- **SP1Verifier** (if `DEPLOY_SP1_RETH_VERIFIER=true`)
-- **ProofVerifierDummy** (if `USE_DUMMY_VERIFIER=true`) - A single dummy verifier that accepts ECDSA signatures from a trusted signer, used in place of real internal verifiers for devnet testing
+- **SurgeInbox** (implementation) - Upgrades the proxy from Step 1a
 
 ### Ownership Configuration
 
 The `CONTRACT_OWNER` environment variable specifies the intended owner of all contracts.
 
-When `USE_TIMELOCK=true`, a `SurgeTimelockController` is deployed and becomes the effective owner of all contracts. The timelock's proposers/executors are configured via environment variables.
+When `USE_TIMELOCK=true`, a `SurgeTimelockController` is deployed (Step 1a) and becomes the effective owner of all contracts. The timelock's proposers/executors are configured via environment variables.
 
 When `USE_TIMELOCK=false`, `CONTRACT_OWNER` is used directly (typically an EOA for devnet or external DAO/multisig for production).
 
 #### Contracts with immediate ownership (`owner = effective owner`)
 
-These contracts have their ownership set directly during deployment:
-
-- SignalService
-- Bridge
-- ERC20Vault
-- ERC721Vault
-- ERC1155Vault
-- PreconfWhitelist
+- SignalService (Step 1c)
+- Bridge (Step 1c)
+- ERC20Vault (Step 1c)
+- ERC721Vault (Step 1c)
+- ERC1155Vault (Step 1c)
+- PreconfWhitelist (Step 1d)
 
 #### Contracts with pending ownership (`pendingOwner = effective owner`)
 
-These contracts use the 2-step ownership transfer pattern and require manual acceptance:
-
-- **Proof Verifier** (`SurgeVerifier`)
-- **Inbox** (SurgeInbox proxy)
-- **SharedResolver**
-- **Risc0Verifier** (if deployed and `USE_DUMMY_VERIFIER=false`)
-- **SP1Verifier** (if deployed and `USE_DUMMY_VERIFIER=false`)
+- **Proof Verifier** (`SurgeVerifier`) (Step 1b)
+- **Inbox** (SurgeInbox proxy) (Step 1d)
+- **SharedResolver** (Step 1c)
+- **Risc0Verifier** (if deployed and `USE_DUMMY_VERIFIER=false`) (Step 1b)
+- **SP1Verifier** (if deployed and `USE_DUMMY_VERIFIER=false`) (Step 1b)
 
 > **Note**: When `USE_DUMMY_VERIFIER=true`, the `ProofVerifierDummy` is used as the internal verifier and does not require ownership acceptance (it has no owner).
 
-> ⚠️ The pending owner must explicitly accept ownership in **Step 3**. When using timelock, the `SurgeTimelockController.acceptOwnership(address[])` function can be called permissionlessly.
+> The pending owner must explicitly accept ownership in **Step 3**. When using timelock, the `SurgeTimelockController.acceptOwnership(address[])` function can be called permissionlessly.
 
 ### Environment Variables
+
+All env vars have defaults in `deploy_surge_common.sh`. Override as needed.
 
 ```bash
 # Required
@@ -139,25 +156,60 @@ TIMELOCK_EXECUTORS=0x...,0x...           # Comma-separated executor addresses
 ```bash
 cd packages/protocol
 
-# Simulation (dry run)
-./script/layer1/surge/deploy_surge_l1.sh
+# Step 1a: Deploy rollup core
+BROADCAST=true ./script/layer1/surge/deploy-modular/deploy_rollup_core.sh
 
-# Broadcast transactions
-BROADCAST=true ./script/layer1/surge/deploy_surge_l1.sh
+# Step 1b: Deploy verifiers (auto-loads addresses from Step 1a JSON)
+BROADCAST=true ./script/layer1/surge/deploy-modular/deploy_verifiers.sh
 
-# With contract verification
-BROADCAST=true VERIFY=true ./script/layer1/surge/deploy_surge_l1.sh
+# Step 1c: Deploy shared contracts (auto-loads addresses from Step 1a JSON)
+# Can run in parallel with Step 1b
+BROADCAST=true ./script/layer1/surge/deploy-modular/deploy_shared_contracts.sh
+
+# Step 1d: Setup inbox (auto-loads addresses from Steps 1a and 1c JSON)
+BROADCAST=true ./script/layer1/surge/deploy-modular/setup_inbox.sh
+
+# Step 1e: Verify deployment (auto-loads all addresses, read-only)
+./script/layer1/surge/deploy-modular/verify_deployment.sh
 ```
+
+#### Manual address override
+
+If you need to point to specific addresses (e.g., re-running Step 1d after a failure):
+
+```bash
+SURGE_INBOX=0x... SURGE_VERIFIER=0x... SIGNAL_SERVICE=0x... EFFECTIVE_OWNER=0x... \
+    BROADCAST=true ./script/layer1/surge/deploy-modular/setup_inbox.sh
+```
+
+Explicit env vars always take precedence over JSON-loaded values.
+
+### Recovering from a failed step
+
+1. Identify which step failed
+2. Fix the issue (config, gas, RPC, etc.)
+3. Re-run **only that step's script** — previous steps' deployments are preserved
+4. Continue with the remaining steps
+
+> **Important**: Steps 1a and 1b must use the **same `PRIVATE_KEY`** because SurgeVerifier is owned by Step 1a's deployer, and Step 1b needs to call `setVerifier()` on it.
 
 ### Output
 
-Deployment addresses are written to `deployments/deploy_l1.json`. The following contracts are included:
+Each sub-step writes to its own JSON file in `deployments/`.
+
+| Step | Output File                                |
+| ---- | ------------------------------------------ |
+| 1a   | `deployments/deploy_rollup_core.json`      |
+| 1b   | `deployments/deploy_verifiers.json`        |
+| 1c   | `deployments/deploy_shared_contracts.json` |
+| 1d   | `deployments/setup_inbox.json`             |
+
+Output keys across all JSON files:
 
 - `empty_impl` - Empty implementation for proxy initialization
 - `surge_inbox` - SurgeInbox proxy address
 - `surge_inbox_impl` - SurgeInbox implementation address
 - `surge_verifier` - SurgeVerifier address
-- `surge_codec` - SurgeCodec address
 - `surge_timelock` - SurgeTimelockController address (if `USE_TIMELOCK=true`)
 - `shared_resolver` - SharedResolver proxy address
 - `signal_service` - SignalService proxy address
@@ -174,6 +226,8 @@ Deployment addresses are written to `deployments/deploy_l1.json`. The following 
 - `risc0_verifier` - Risc0Verifier address (if deployed and `USE_DUMMY_VERIFIER=false`)
 - `succinct_verifier` - Succinct verifier (if deployed and `USE_DUMMY_VERIFIER=false`)
 - `sp1_verifier` - SP1Verifier address (if deployed and `USE_DUMMY_VERIFIER=false`)
+
+> **Legacy**: The monolithic `DeploySurgeL1.s.sol` / `deploy_surge_l1.sh` is still available for single-shot deployment
 
 ---
 
@@ -198,7 +252,7 @@ Accept pending ownership for contracts that use the 2-step ownership transfer pa
 
 ### Contracts requiring ownership acceptance
 
-From Step 1, the following contracts have `CONTRACT_OWNER` as their `pendingOwner`:
+From Steps 1a-1d, the following contracts have `CONTRACT_OWNER` as their `pendingOwner`:
 
 - Proof Verifier (`SurgeVerifier`) address
 - Inbox proxy address
@@ -271,7 +325,7 @@ BROADCAST=true ./script/layer1/surge/accept_ownership.sh
 # Script Configuration
 PRIVATE_KEY          # Private key of current L2 contract owner
 
-# L1 Configuration (from Step 1 deployment output)
+# L1 Configuration (from Step 1 deployment output - see deploy_shared_contracts.json)
 L1_CHAINID           # L1 chain ID
 L1_BRIDGE            # L1 Bridge address
 L1_SIGNAL_SERVICE    # L1 SignalService address
@@ -357,7 +411,11 @@ BROADCAST=true ./script/layer1/surge/accept_ownership.sh
 ## Summary Checklist
 
 - [ ] Genesis/chainspec file generated
-- [ ] **Step 1**: L1 contracts deployed (`DeploySurgeL1.s.sol`)
+- [ ] **Step 1a**: Rollup core deployed (`DeployRollupCore.s.sol`)
+- [ ] **Step 1b**: Verifiers deployed and SurgeVerifier configured (`DeployVerifiers.s.sol`)
+- [ ] **Step 1c**: Shared contracts deployed (`DeploySharedContracts.s.sol`)
+- [ ] **Step 1d**: Inbox setup complete (`SetupInbox.s.sol`)
+- [ ] **Step 1e**: Deployment verified (`VerifyDeployment.s.sol`)
 - [ ] **Step 2**: Verifier image IDs configured
 - [ ] **Step 3**: L1 ownership accepted (`AcceptOwnership.s.sol`)
 - [ ] **Step 4**: L2 contracts configured (`SetupSurgeL2.s.sol`)
