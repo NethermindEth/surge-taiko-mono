@@ -2,6 +2,8 @@
 
 use alloy_contract::Error as ContractError;
 use alloy_transport::TransportError;
+use driver::DriverError as EmbeddedDriverError;
+use rpc::RpcClientError;
 use thiserror::Error;
 
 /// Result alias for preconfirmation client operations.
@@ -28,9 +30,9 @@ pub enum PreconfirmationClientError {
     /// Catch-up error when syncing with peers.
     #[error("catchup error: {0}")]
     Catchup(String),
-    /// Lookahead resolver initialization failed.
+    /// Lookahead resolver error.
     #[error("lookahead error: {0}")]
-    Lookahead(String),
+    Lookahead(#[from] protocol::preconfirmation::LookaheadError),
     /// Invalid configuration parameter.
     #[error("config error: {0}")]
     Config(String),
@@ -45,6 +47,12 @@ pub enum DriverApiError {
     /// Contract call error while fetching on-chain state.
     #[error("contract error: {0}")]
     Contract(#[from] ContractError),
+    /// RPC client error returned by taiko-client-rs RPC wrappers.
+    #[error("rpc client error: {0}")]
+    RpcClient(#[from] RpcClientError),
+    /// Embedded driver reported an error while evaluating sync state or tip.
+    #[error("driver error: {0}")]
+    Driver(#[from] EmbeddedDriverError),
     /// Requested block was not found.
     #[error("missing block {block_number}")]
     MissingBlock {
@@ -57,12 +65,12 @@ pub enum DriverApiError {
         /// Parent block number.
         parent_block_number: u64,
     },
-    /// Safe block not found on the L2 provider.
-    #[error("missing safe block")]
-    MissingSafeBlock,
     /// Latest block not found on the L2 provider.
     #[error("missing latest block")]
     MissingLatestBlock,
+    /// Event sync tip is unknown because `head_l1_origin` has not been established yet.
+    #[error("event sync tip is unknown")]
+    EventSyncTipUnknown,
     /// Missing transactions in the preconfirmation input.
     #[error("missing transactions for execution payload")]
     MissingTransactions,
@@ -81,16 +89,10 @@ impl From<preconfirmation_net::NetworkError> for PreconfirmationClientError {
     }
 }
 
-impl From<protocol::preconfirmation::LookaheadError> for PreconfirmationClientError {
-    /// Convert a lookahead resolver error.
-    fn from(err: protocol::preconfirmation::LookaheadError) -> Self {
-        PreconfirmationClientError::Lookahead(err.to_string())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{DriverApiError, PreconfirmationClientError};
+    use protocol::preconfirmation::LookaheadError;
 
     #[test]
     fn error_display_works() {
@@ -106,5 +108,16 @@ mod tests {
 
         let wrapped = PreconfirmationClientError::DriverInterface(err);
         assert!(wrapped.to_string().contains("missing block 42"));
+    }
+
+    #[test]
+    fn lookahead_error_preserves_variant() {
+        let err = PreconfirmationClientError::from(LookaheadError::TooNew(123));
+        match err {
+            PreconfirmationClientError::Lookahead(LookaheadError::TooNew(ts)) => {
+                assert_eq!(ts, 123);
+            }
+            other => panic!("unexpected error variant: {other}"),
+        }
     }
 }

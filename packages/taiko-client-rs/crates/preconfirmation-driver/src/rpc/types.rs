@@ -1,6 +1,6 @@
 //! Preconfirmation sidecar JSON-RPC API types for the preconfirmation driver node.
 
-use alloy_primitives::{B256, Bytes, U256};
+use alloy_primitives::{Address, B256, Bytes, U256};
 use serde::{Deserialize, Serialize};
 
 /// Request to publish a signed preconfirmation commitment.
@@ -39,16 +39,33 @@ pub struct PublishTxListResponse {
     pub tx_list_hash: B256,
 }
 
+/// Resolved signer and submission window end for a preconfirmation slot (RPC response).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreconfSlotInfo {
+    /// Address allowed to sign the commitment for the slot.
+    pub signer: Address,
+    /// Canonical end of the submission window for the slot.
+    pub submission_window_end: U256,
+}
+
+impl From<protocol::preconfirmation::PreconfSlotInfo> for PreconfSlotInfo {
+    /// Convert protocol-layer slot info into the RPC wire representation.
+    fn from(info: protocol::preconfirmation::PreconfSlotInfo) -> Self {
+        Self { signer: info.signer, submission_window_end: info.submission_window_end }
+    }
+}
+
 /// Current status of the preconfirmation driver node.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeStatus {
     /// Whether the node has completed sync with L1 inbox events.
     pub is_synced_with_inbox: bool,
+    /// The highest confirmed event-sync tip from `head_l1_origin`.
+    pub event_sync_tip: Option<U256>,
     /// The highest preconfirmed block number known to this node.
     pub preconf_tip: U256,
-    /// The last canonical proposal ID from L1 inbox events.
-    pub canonical_proposal_id: u64,
     /// Number of connected P2P peers.
     pub peer_count: u64,
     /// This node's libp2p peer ID.
@@ -71,6 +88,8 @@ pub enum PreconfRpcErrorCode {
     SubmissionWindowExpired = -32004,
     /// The signer is not the expected preconfirmer for this slot.
     InvalidSigner = -32005,
+    /// Lookahead data/state could not be resolved by the node.
+    LookaheadUnavailable = -32006,
 }
 
 impl PreconfRpcErrorCode {
@@ -88,6 +107,7 @@ impl PreconfRpcErrorCode {
             Self::NotSynced => "Node is not synced",
             Self::SubmissionWindowExpired => "Submission window has expired",
             Self::InvalidSigner => "Signer is not the expected preconfirmer",
+            Self::LookaheadUnavailable => "Lookahead data is unavailable",
         }
     }
 }
@@ -107,19 +127,31 @@ mod tests {
     }
 
     #[test]
+    fn test_preconf_slot_info_camel_case() {
+        let slot_info = PreconfSlotInfo {
+            signer: Address::repeat_byte(0x22),
+            submission_window_end: U256::from(2000),
+        };
+
+        let json = serde_json::to_string(&slot_info).unwrap();
+        assert!(json.contains("signer"));
+        assert!(json.contains("submissionWindowEnd"));
+    }
+
+    #[test]
     fn test_node_status_camel_case() {
         let status = NodeStatus {
             is_synced_with_inbox: true,
+            event_sync_tip: Some(U256::from(90)),
             preconf_tip: U256::from(100),
-            canonical_proposal_id: 42,
             peer_count: 5,
             peer_id: "test-peer-id".to_string(),
         };
 
         let json = serde_json::to_string(&status).unwrap();
         assert!(json.contains("isSyncedWithInbox"));
+        assert!(json.contains("eventSyncTip"));
         assert!(json.contains("preconfTip"));
-        assert!(json.contains("canonicalProposalId"));
     }
 
     #[test]
@@ -127,5 +159,6 @@ mod tests {
         assert_eq!(PreconfRpcErrorCode::InvalidCommitment.code(), -32001);
         assert_eq!(PreconfRpcErrorCode::NotSynced.code(), -32003);
         assert_eq!(PreconfRpcErrorCode::InternalError.code(), -32000);
+        assert_eq!(PreconfRpcErrorCode::LookaheadUnavailable.code(), -32006);
     }
 }
