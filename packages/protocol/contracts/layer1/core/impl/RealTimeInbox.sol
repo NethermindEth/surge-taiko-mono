@@ -1,0 +1,269 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+import { IInbox } from "../iface/IInbox.sol";
+import { IRealTimeInbox } from "../iface/IRealTimeInbox.sol";
+import { LibBlobs } from "../libs/LibBlobs.sol";
+import { IProofVerifier } from "src/layer1/verifiers/IProofVerifier.sol";
+import { EssentialContract } from "src/shared/common/EssentialContract.sol";
+import { ICheckpointStore } from "src/shared/signal/ICheckpointStore.sol";
+import { ISignalService } from "src/shared/signal/ISignalService.sol";
+
+/// @title RealTimeInbox
+/// @notice Inbox contract that combines proposal and proof verification into a single atomic
+/// operation. Each call to `propose()` submits a proposal, verifies a ZK proof, and finalizes
+/// the state in one transaction.
+/// @dev Proposer checks (lookahead, PreconfWhitelist), bond logic, forced inclusions, ring buffer
+///      storage, and prover whitelist are all scrapped for this real-time proving POC.
+/// @dev WARNING: This contract is vulnerable to proposal frontrunning. A malicious actor can observe
+///      a pending `propose()` transaction in the mempool and submit the same proposal with their own
+///      address to steal credit. In production, an `actualProver` field (msg.sender) should be included
+///      in the Commitment hash so that the proof is bound to a specific sender and cannot be replayed.
+/// @custom:security-contact security@nethermind.io
+contract RealTimeInbox is IRealTimeInbox, EssentialContract {
+    // ---------------------------------------------------------------
+    // Immutable Variables
+    // ---------------------------------------------------------------
+
+    /// @notice The proof verifier contract.
+    IProofVerifier internal immutable _proofVerifier;
+
+    /// @notice Signal service responsible for checkpoints and signal relay.
+    ISignalService internal immutable _signalService;
+
+    /// @notice The percentage of basefee paid to coinbase.
+    uint8 internal immutable _basefeeSharingPctg;
+
+    // ---------------------------------------------------------------
+    // State Variables
+    // ---------------------------------------------------------------
+
+    /// @notice Hash of the last accepted proposal. Serves as the chain head.
+    bytes32 public lastProposalHash;
+
+    uint256[49] private __gap;
+
+    // ---------------------------------------------------------------
+    // Constructor
+    // ---------------------------------------------------------------
+
+    /// @dev Initializes immutable configuration.
+    /// @param _config Configuration struct.
+    constructor(Config memory _config) {
+        require(_config.proofVerifier != address(0), "config: proofVerifier");
+        require(_config.signalService != address(0), "config: signalService");
+
+        _proofVerifier = IProofVerifier(_config.proofVerifier);
+        _signalService = ISignalService(_config.signalService);
+        _basefeeSharingPctg = _config.basefeeSharingPctg;
+    }
+
+    // ---------------------------------------------------------------
+    // External Functions
+    // ---------------------------------------------------------------
+
+    /// @notice Initializes the owner of the inbox.
+    /// @param _owner The owner of this contract.
+    function init(address _owner) external initializer {
+        __Essential_init(_owner);
+    }
+
+    /// @inheritdoc IRealTimeInbox
+    function activate(bytes32 _genesisProposalHash) external onlyOwner {
+        require(lastProposalHash == bytes32(0), AlreadyActivated());
+        require(_genesisProposalHash != bytes32(0), InvalidGenesisHash());
+
+        lastProposalHash = _genesisProposalHash;
+        emit Activated(_genesisProposalHash);
+    }
+
+    /// @inheritdoc IRealTimeInbox
+    function propose(
+        bytes calldata _data,
+        ICheckpointStore.Checkpoint calldata _checkpoint,
+        bytes calldata _proof
+    )
+        external
+        nonReentrant
+    {
+        require(lastProposalHash != bytes32(0), NotActivated());
+
+        // Build proposal from input and get its hash
+        (bytes32 proposalHash, Proposal memory proposal) = _buildProposal(_data);
+
+        // Verify proof and finalize
+        _verifyAndFinalize(proposalHash, _checkpoint, _proof);
+
+        // Emit event
+        emit ProposedAndProved(
+            proposalHash,
+            proposal.parentProposalHash,
+            proposal.maxAnchorBlockNumber,
+            proposal.basefeeSharingPctg,
+            proposal.sources,
+            proposal.signalSlotsHash,
+            _checkpoint
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // Encoding / Decoding / Hashing Functions
+    // ---------------------------------------------------------------
+
+    /// @notice Encodes a ProposeInput struct into bytes.
+    /// @param _input The ProposeInput to encode.
+    /// @return encoded_ The ABI-encoded bytes.
+    function encodeProposeInput(ProposeInput calldata _input)
+        public
+        pure
+        returns (bytes memory encoded_)
+    {
+        return abi.encode(_input);
+    }
+
+    /// @notice Decodes bytes into a ProposeInput struct.
+    /// @param _data The ABI-encoded ProposeInput.
+    /// @return input_ The decoded ProposeInput.
+    function decodeProposeInput(bytes calldata _data)
+        public
+        pure
+        returns (ProposeInput memory input_)
+    {
+        return abi.decode(_data, (ProposeInput));
+    }
+
+    /// @notice Hashes a Proposal struct.
+    /// @param _proposal The Proposal to hash.
+    /// @return The keccak256 hash.
+    function hashProposal(Proposal memory _proposal) public pure returns (bytes32) {
+        return keccak256(abi.encode(_proposal));
+    }
+
+    /// @notice Hashes a Commitment struct.
+    /// @param _commitment The Commitment to hash.
+    /// @return The keccak256 hash.
+    function hashCommitment(Commitment memory _commitment) public pure returns (bytes32) {
+        return keccak256(abi.encode(_commitment));
+    }
+
+    /// @notice Hashes an array of signal slots.
+    /// @param _signalSlots The signal slots to hash.
+    /// @return The keccak256 hash (bytes32(0) if empty).
+    function hashSignalSlots(bytes32[] memory _signalSlots) public pure returns (bytes32) {
+        if (_signalSlots.length == 0) return bytes32(0);
+        return keccak256(abi.encode(_signalSlots));
+    }
+
+    // ---------------------------------------------------------------
+    // External View Functions
+    // ---------------------------------------------------------------
+
+    /// @inheritdoc IRealTimeInbox
+    function getLastProposalHash() external view returns (bytes32) {
+        return lastProposalHash;
+    }
+
+    /// @inheritdoc IRealTimeInbox
+    function getConfig() external view returns (Config memory config_) {
+        config_ = Config({
+            proofVerifier: address(_proofVerifier),
+            signalService: address(_signalService),
+            basefeeSharingPctg: _basefeeSharingPctg
+        });
+    }
+
+    // ---------------------------------------------------------------
+    // Internal Functions
+    // ---------------------------------------------------------------
+
+    /// @dev Decodes input, validates it, and builds the transient proposal.
+    /// @param _data The encoded ProposeInput.
+    /// @return proposalHash_ The hash of the proposal.
+    /// @return proposal_ The built proposal struct.
+    function _buildProposal(bytes calldata _data)
+        internal
+        view
+        returns (bytes32 proposalHash_, Proposal memory proposal_)
+    {
+        ProposeInput memory input = decodeProposeInput(_data);
+
+        // Validate anchor block - blockhash returns 0 for blocks older than 256
+        bytes32 anchorHash = blockhash(input.maxAnchorBlockNumber);
+        require(anchorHash != bytes32(0), MaxAnchorBlockTooOld());
+
+        // Verify signal slots and compute hash
+        bytes32 signalSlotsHash = _verifySignalSlots(input.signalSlots);
+
+        // Validate blob reference
+        LibBlobs.BlobSlice memory blobSlice = LibBlobs.validateBlobReference(input.blobReference);
+
+        // Build derivation sources
+        IInbox.DerivationSource[] memory sources = new IInbox.DerivationSource[](1);
+        sources[0] = IInbox.DerivationSource(false, blobSlice);
+
+        // Build proposal
+        proposal_ = Proposal({
+            parentProposalHash: lastProposalHash,
+            maxAnchorBlockNumber: input.maxAnchorBlockNumber,
+            maxAnchorBlockHash: anchorHash,
+            basefeeSharingPctg: _basefeeSharingPctg,
+            sources: sources,
+            signalSlotsHash: signalSlotsHash
+        });
+
+        proposalHash_ = hashProposal(proposal_);
+    }
+
+    /// @dev Verifies the proof, saves checkpoint, and updates chain head.
+    /// @param _proposalHash The proposal hash.
+    /// @param _checkpoint The checkpoint to save.
+    /// @param _proof The ZK proof bytes.
+    function _verifyAndFinalize(
+        bytes32 _proposalHash,
+        ICheckpointStore.Checkpoint calldata _checkpoint,
+        bytes calldata _proof
+    )
+        internal
+    {
+        // Build commitment and hash it
+        bytes32 commitmentHash =
+            hashCommitment(Commitment({ proposalHash: _proposalHash, checkpoint: _checkpoint }));
+
+        // Verify proof via IProofVerifier
+        _proofVerifier.verifyProof(0, commitmentHash, _proof);
+
+        // Save checkpoint to signal service
+        _signalService.saveCheckpoint(_checkpoint);
+
+        // Update chain head
+        lastProposalHash = _proposalHash;
+    }
+
+    /// @dev Verifies signal slots exist on L1 and returns their hash.
+    /// @param _signalSlots The signal slots to verify.
+    /// @return signalSlotsHash_ The keccak256 hash of slots (bytes32(0) if empty).
+    function _verifySignalSlots(bytes32[] memory _signalSlots)
+        internal
+        view
+        returns (bytes32 signalSlotsHash_)
+    {
+        if (_signalSlots.length == 0) return bytes32(0);
+
+        for (uint256 i; i < _signalSlots.length; ++i) {
+            require(
+                _signalService.isSignalSent(_signalSlots[i]), SignalSlotNotSent(_signalSlots[i])
+            );
+        }
+        signalSlotsHash_ = hashSignalSlots(_signalSlots);
+    }
+
+    // ---------------------------------------------------------------
+    // Errors
+    // ---------------------------------------------------------------
+
+    error AlreadyActivated();
+    error MaxAnchorBlockTooOld();
+    error InvalidGenesisHash();
+    error NotActivated();
+    error SignalSlotNotSent(bytes32 slot);
+}
