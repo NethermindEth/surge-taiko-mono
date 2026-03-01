@@ -67,7 +67,7 @@ interface IRealTimeInbox {
     /// @param maxAnchorBlockNumber The L1 anchor block number.
     /// @param basefeeSharingPctg The basefee sharing percentage.
     /// @param sources Array of derivation sources.
-    /// @param signalSlotsHash Hash of signal slots to be set on L2.
+    /// @param signalSlots Array of signal slots to be set on L2.
     /// @param checkpoint The checkpoint data saved.
     event ProposedAndProved(
         bytes32 indexed proposalHash,
@@ -75,7 +75,7 @@ interface IRealTimeInbox {
         uint48 maxAnchorBlockNumber,
         uint8 basefeeSharingPctg,
         IInbox.DerivationSource[] sources,
-        bytes32 signalSlotsHash,
+        bytes32[] signalSlots,
         ICheckpointStore.Checkpoint checkpoint
     );
 

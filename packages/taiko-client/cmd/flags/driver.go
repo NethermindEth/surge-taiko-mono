@@ -72,6 +72,13 @@ var (
 		Category: driverCategory,
 		EnvVars:  []string{"TAIKO_WRAPPER"},
 	}
+	Fork = &cli.StringFlag{
+		Name:     "fork",
+		Usage:    `Active protocol fork: "pacaya", "shasta", or "realtime"`,
+		Value:    "realtime",
+		Category: driverCategory,
+		EnvVars:  []string{"FORK"},
+	}
 )
 
 // DriverFlags All driver flags.
@@ -89,4 +96,5 @@ var DriverFlags = MergeFlags(CommonFlags, []cli.Flag{
 	PreconfBlockServerCORSOrigins,
 	PreconfWhitelistAddress,
 	DriverTaikoWrapperAddress,
+	Fork,
 }, p2pFlags.P2PFlags("PRECONFIRMATION"))

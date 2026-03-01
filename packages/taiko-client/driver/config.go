@@ -24,6 +24,7 @@ import (
 // Config contains the configurations to initialize a Taiko driver.
 type Config struct {
 	*rpc.ClientConfig
+	Fork                          string
 	P2PSync                       bool
 	P2PSyncTimeout                time.Duration
 	RetryInterval                 time.Duration
@@ -80,6 +81,25 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		}
 	}
 
+	// Validate fork flag.
+	fork := c.String(flags.Fork.Name)
+	switch fork {
+	case "pacaya":
+		if !c.IsSet(flags.PacayaInboxAddress.Name) {
+			return nil, fmt.Errorf("--pacayaInbox is required for fork %q", fork)
+		}
+	case "shasta":
+		if !c.IsSet(flags.ShastaInboxAddress.Name) {
+			return nil, fmt.Errorf("--shastaInbox is required for fork %q", fork)
+		}
+	case "realtime":
+		if !c.IsSet(flags.RealTimeInboxAddress.Name) {
+			return nil, fmt.Errorf("--realtimeInbox is required for fork %q", fork)
+		}
+	default:
+		return nil, fmt.Errorf("invalid --fork value %q: must be \"pacaya\", \"shasta\", or \"realtime\"", fork)
+	}
+
 	// Check P2P network flags and create the P2P configurations.
 	var (
 		clientConfig = &rpc.ClientConfig{
@@ -89,6 +109,8 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			L2CheckPoint:            l2CheckPoint,
 			PacayaInboxAddress:      common.HexToAddress(c.String(flags.PacayaInboxAddress.Name)),
 			ShastaInboxAddress:      common.HexToAddress(c.String(flags.ShastaInboxAddress.Name)),
+			RealTimeInboxAddress:    common.HexToAddress(c.String(flags.RealTimeInboxAddress.Name)),
+			Fork:                    fork,
 			TaikoAnchorAddress:      common.HexToAddress(c.String(flags.TaikoAnchorAddress.Name)),
 			PreconfWhitelistAddress: common.HexToAddress(c.String(flags.PreconfWhitelistAddress.Name)),
 			L2EngineEndpoint:        c.String(flags.L2AuthEndpoint.Name),
@@ -96,6 +118,7 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			Timeout:                 c.Duration(flags.RPCTimeout.Name),
 			TaikoWrapperAddress:     common.HexToAddress(c.String(flags.DriverTaikoWrapperAddress.Name)),
 			ShastaForkTime:          c.Uint64(flags.ShastaForkTime.Name),
+			GenesisL1Height:         c.Uint64(flags.GenesisL1Height.Name),
 		}
 		p2pConfigs    *p2p.Config
 		signerConfigs p2p.SignerSetup
@@ -132,6 +155,7 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 
 	return &Config{
 		ClientConfig:                  clientConfig,
+		Fork:                          c.String(flags.Fork.Name),
 		RetryInterval:                 c.Duration(flags.BackOffRetryInterval.Name),
 		P2PSync:                       p2pSync,
 		P2PSyncTimeout:                c.Duration(flags.P2PSyncTimeout.Name),

@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 
@@ -41,6 +42,7 @@ type BatchProposedIteratorConfig struct {
 	EndHeight             *big.Int
 	OnBatchProposedEvent  OnBatchProposedEvent
 	BlockConfirmations    *uint64
+	Fork                  string
 }
 
 // NewBatchProposedIterator creates a new instance of BatchProposed event iterator.
@@ -66,6 +68,7 @@ func NewBatchProposedIterator(ctx context.Context, cfg *BatchProposedIteratorCon
 			cfg.RpcClient,
 			cfg.OnBatchProposedEvent,
 			iterator,
+			cfg.Fork,
 		),
 	})
 	if err != nil {
@@ -89,11 +92,13 @@ func (i *BatchProposedIterator) end() {
 }
 
 // assembleBatchProposedIteratorCallback assembles the callback which will be used
-// by a event iterator's inner block iterator.
+// by a event iterator's inner block iterator. Only the event loop for the active
+// fork is executed.
 func assembleBatchProposedIteratorCallback(
 	rpcClient *rpc.Client,
 	callback OnBatchProposedEvent,
 	eventIter *BatchProposedIterator,
+	fork string,
 ) chainIterator.OnBlocksFunc {
 	return func(
 		ctx context.Context,
@@ -101,129 +106,194 @@ func assembleBatchProposedIteratorCallback(
 		updateCurrentFunc chainIterator.UpdateCurrentFunc,
 		endFunc chainIterator.EndIterFunc,
 	) error {
-		var (
-			endHeight         = end.Number.Uint64()
-			lastPacayaBatchID uint64
-			lastShastaBatchID uint64
-		)
+		endHeight := end.Number.Uint64()
 
-		// Iterate the BatchProposed events.
-		iterPacaya, err := rpcClient.PacayaClients.TaikoInbox.FilterBatchProposed(
-			&bind.FilterOpts{Start: start.Number.Uint64(), End: &endHeight, Context: ctx},
-		)
-		if err != nil {
-			return err
+		switch fork {
+		case "pacaya":
+			return iteratePacayaEvents(ctx, rpcClient, callback, eventIter, start, endHeight, updateCurrentFunc, endFunc)
+		case "shasta":
+			return iterateShastaEvents(ctx, rpcClient, callback, eventIter, start, endHeight, updateCurrentFunc, endFunc)
+		case "realtime":
+			return iterateRealTimeEvents(ctx, rpcClient, callback, eventIter, start, endHeight, updateCurrentFunc, endFunc)
+		default:
+			return fmt.Errorf("unknown fork %q", fork)
 		}
-		defer iterPacaya.Close()
-
-		iterShasta, err := rpcClient.ShastaClients.Inbox.FilterProposed(
-			&bind.FilterOpts{Start: start.Number.Uint64(), End: &endHeight, Context: ctx}, nil, nil,
-		)
-		if err != nil {
-			return err
-		}
-		defer iterShasta.Close()
-
-		for iterPacaya.Next() {
-			event := iterPacaya.Event
-			log.Debug("Processing BatchProposed event", "batch", event.Meta.BatchId, "l1BlockHeight", event.Raw.BlockNumber)
-
-			if lastPacayaBatchID != 0 && event.Meta.BatchId != lastPacayaBatchID+1 {
-				log.Warn(
-					"BatchProposed event is not continuous, rescan the L1 chain",
-					"fromL1Block", start.Number,
-					"toL1Block", endHeight,
-					"lastScannedBatchID", lastPacayaBatchID,
-					"currentScannedBatchID", event.Meta.BatchId,
-				)
-				return fmt.Errorf(
-					"BatchProposed event is not continuous, lastScannedBatchID: %d, currentScannedBatchID: %d",
-					lastPacayaBatchID, event.Meta.BatchId,
-				)
-			}
-
-			if err := callback(ctx, metadata.NewTaikoDataBlockMetadataPacaya(event), eventIter.end); err != nil {
-				log.Warn("Error while processing BatchProposed events, keep retrying", "error", err)
-				return err
-			}
-
-			if eventIter.isEnd {
-				log.Debug("BatchProposedIterator is ended", "start", start.Number, "end", endHeight)
-				endFunc()
-				return nil
-			}
-
-			current, err := rpcClient.L1.HeaderByHash(ctx, event.Raw.BlockHash)
-			if err != nil {
-				return err
-			}
-
-			log.Debug("Updating current block cursor for processing BatchProposed events", "block", current.Number)
-
-			lastPacayaBatchID = event.Meta.BatchId
-
-			updateCurrentFunc(current)
-		}
-
-		// Check if there is any error during the Pacaya iteration.
-		if iterPacaya.Error() != nil {
-			return iterPacaya.Error()
-		}
-
-		for iterShasta.Next() {
-			event := iterShasta.Event
-
-			header, err := rpcClient.L1.HeaderByHash(ctx, event.Raw.BlockHash)
-			if err != nil {
-				return fmt.Errorf("failed to fetch L1 block header: %w", err)
-			}
-
-			proposedEventPayload := metadata.NewTaikoProposalMetadataShasta(event, header.Time)
-			proposalID := proposedEventPayload.Shasta().GetEventData().Id.Uint64()
-			log.Debug("Processing Proposed event", "proposalID", proposalID, "l1BlockHeight", event.Raw.BlockNumber)
-
-			if lastShastaBatchID != 0 && proposalID != lastShastaBatchID+1 {
-				log.Warn(
-					"Proposed event is not continuous, rescan the L1 chain",
-					"fromL1Block", start.Number,
-					"toL1Block", endHeight,
-					"lastScannedProposalID", lastShastaBatchID,
-					"currentScannedProposalID", proposalID,
-				)
-				return fmt.Errorf(
-					"proposed event is not continuous, lastScannedBatchID: %d, currentScannedBatchID: %d",
-					lastShastaBatchID, proposalID,
-				)
-			}
-
-			if err := callback(ctx, proposedEventPayload, eventIter.end); err != nil {
-				log.Warn("Error while processing Proposed events, keep retrying", "error", err)
-				return err
-			}
-
-			if eventIter.isEnd {
-				log.Debug("ProposedIterator is ended", "start", start.Number, "end", endHeight)
-				endFunc()
-				return nil
-			}
-
-			current, err := rpcClient.L1.HeaderByHash(ctx, event.Raw.BlockHash)
-			if err != nil {
-				return err
-			}
-
-			log.Debug("Updating current block cursor for processing Proposed events", "block", current.Number)
-
-			lastShastaBatchID = proposalID
-
-			updateCurrentFunc(current)
-		}
-
-		// Check if there is any error during the Shasta iteration.
-		if iterShasta.Error() != nil {
-			return iterShasta.Error()
-		}
-
-		return nil
 	}
+}
+
+// iteratePacayaEvents filters and processes Pacaya BatchProposed events.
+func iteratePacayaEvents(
+	ctx context.Context,
+	rpcClient *rpc.Client,
+	callback OnBatchProposedEvent,
+	eventIter *BatchProposedIterator,
+	start *types.Header,
+	endHeight uint64,
+	updateCurrentFunc chainIterator.UpdateCurrentFunc,
+	endFunc chainIterator.EndIterFunc,
+) error {
+	iter, err := rpcClient.PacayaClients.TaikoInbox.FilterBatchProposed(
+		&bind.FilterOpts{Start: start.Number.Uint64(), End: &endHeight, Context: ctx},
+	)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	var lastBatchID uint64
+	for iter.Next() {
+		event := iter.Event
+		log.Debug("Processing BatchProposed event", "batch", event.Meta.BatchId, "l1BlockHeight", event.Raw.BlockNumber)
+
+		if lastBatchID != 0 && event.Meta.BatchId != lastBatchID+1 {
+			return fmt.Errorf(
+				"BatchProposed event is not continuous, lastScannedBatchID: %d, currentScannedBatchID: %d",
+				lastBatchID, event.Meta.BatchId,
+			)
+		}
+
+		if err := callback(ctx, metadata.NewTaikoDataBlockMetadataPacaya(event), eventIter.end); err != nil {
+			return err
+		}
+
+		if eventIter.isEnd {
+			endFunc()
+			return nil
+		}
+
+		current, err := rpcClient.L1.HeaderByHash(ctx, event.Raw.BlockHash)
+		if err != nil {
+			return err
+		}
+
+		lastBatchID = event.Meta.BatchId
+		updateCurrentFunc(current)
+	}
+
+	return iter.Error()
+}
+
+// iterateShastaEvents filters and processes Shasta Proposed events.
+func iterateShastaEvents(
+	ctx context.Context,
+	rpcClient *rpc.Client,
+	callback OnBatchProposedEvent,
+	eventIter *BatchProposedIterator,
+	start *types.Header,
+	endHeight uint64,
+	updateCurrentFunc chainIterator.UpdateCurrentFunc,
+	endFunc chainIterator.EndIterFunc,
+) error {
+	iter, err := rpcClient.ShastaClients.Inbox.FilterProposed(
+		&bind.FilterOpts{Start: start.Number.Uint64(), End: &endHeight, Context: ctx}, nil, nil,
+	)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	var lastProposalID uint64
+	for iter.Next() {
+		event := iter.Event
+
+		header, err := rpcClient.L1.HeaderByHash(ctx, event.Raw.BlockHash)
+		if err != nil {
+			return fmt.Errorf("failed to fetch L1 block header: %w", err)
+		}
+
+		proposedEventPayload := metadata.NewTaikoProposalMetadataShasta(event, header.Time)
+		proposalID := proposedEventPayload.Shasta().GetEventData().Id.Uint64()
+		log.Debug("Processing Proposed event", "proposalID", proposalID, "l1BlockHeight", event.Raw.BlockNumber)
+
+		if lastProposalID != 0 && proposalID != lastProposalID+1 {
+			return fmt.Errorf(
+				"Proposed event is not continuous, lastScannedProposalID: %d, currentScannedProposalID: %d",
+				lastProposalID, proposalID,
+			)
+		}
+
+		if err := callback(ctx, proposedEventPayload, eventIter.end); err != nil {
+			return err
+		}
+
+		if eventIter.isEnd {
+			endFunc()
+			return nil
+		}
+
+		current, err := rpcClient.L1.HeaderByHash(ctx, event.Raw.BlockHash)
+		if err != nil {
+			return err
+		}
+
+		lastProposalID = proposalID
+		updateCurrentFunc(current)
+	}
+
+	return iter.Error()
+}
+
+// iterateRealTimeEvents filters and processes RealTime ProposedAndProved events.
+func iterateRealTimeEvents(
+	ctx context.Context,
+	rpcClient *rpc.Client,
+	callback OnBatchProposedEvent,
+	eventIter *BatchProposedIterator,
+	start *types.Header,
+	endHeight uint64,
+	updateCurrentFunc chainIterator.UpdateCurrentFunc,
+	endFunc chainIterator.EndIterFunc,
+) error {
+	iter, err := rpcClient.RealTimeClients.Inbox.FilterProposedAndProved(
+		&bind.FilterOpts{Start: start.Number.Uint64(), End: &endHeight, Context: ctx},
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	var lastProposalHash [32]byte
+	for iter.Next() {
+		event := iter.Event
+
+		header, err := rpcClient.L1.HeaderByHash(ctx, event.Raw.BlockHash)
+		if err != nil {
+			return fmt.Errorf("failed to fetch L1 block header: %w", err)
+		}
+
+		proposalMetadata := metadata.NewTaikoProposalMetadataRealTime(event, header.Time)
+		log.Debug("Processing ProposedAndProved event",
+			"proposalHash", common.Hash(event.ProposalHash),
+			"parentProposalHash", common.Hash(event.ParentProposalHash),
+			"l1BlockHeight", event.Raw.BlockNumber,
+		)
+
+		if lastProposalHash != ([32]byte{}) && event.ParentProposalHash != lastProposalHash {
+			return fmt.Errorf(
+				"ProposedAndProved event hash chain is not continuous, lastHash: %s, parentHash: %s",
+				common.Hash(lastProposalHash),
+				common.Hash(event.ParentProposalHash),
+			)
+		}
+
+		if err := callback(ctx, proposalMetadata, eventIter.end); err != nil {
+			return err
+		}
+
+		if eventIter.isEnd {
+			endFunc()
+			return nil
+		}
+
+		current, err := rpcClient.L1.HeaderByHash(ctx, event.Raw.BlockHash)
+		if err != nil {
+			return err
+		}
+
+		lastProposalHash = event.ProposalHash
+		updateCurrentFunc(current)
+	}
+
+	return iter.Error()
 }

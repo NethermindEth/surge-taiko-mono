@@ -128,7 +128,7 @@ func (s *PreconfBlockAPIServer) BuildPreconfBlock(c echo.Context) error {
 	}
 
 	if s.latestSeenProposal != nil {
-		if s.latestSeenProposal.IsShasta() {
+		if s.fork != "pacaya" {
 			if bytes.HasPrefix(parent.Transactions()[0].Data(), taiko.AnchorV4Selector) {
 				parentProposalID, err := core.DecodeShastaProposalID(parent.Extra())
 				if err != nil {
@@ -201,15 +201,16 @@ func (s *PreconfBlockAPIServer) BuildPreconfBlock(c echo.Context) error {
 	}
 
 	var difficulty []byte
-	if reqBody.ExecutableData.Timestamp >= s.rpc.ShastaClients.ForkTime {
-		if difficulty, err = encoding.CalculateShastaDifficulty(
-			parent.Difficulty(),
+	switch s.fork {
+	case "pacaya":
+		if difficulty, err = encoding.CalculatePacayaDifficulty(
 			new(big.Int).SetUint64(reqBody.ExecutableData.Number),
 		); err != nil {
 			return s.returnError(c, http.StatusBadRequest, err)
 		}
-	} else {
-		if difficulty, err = encoding.CalculatePacayaDifficulty(
+	case "shasta", "realtime":
+		if difficulty, err = encoding.CalculateShastaDifficulty(
+			parent.Difficulty(),
 			new(big.Int).SetUint64(reqBody.ExecutableData.Number),
 		); err != nil {
 			return s.returnError(c, http.StatusBadRequest, err)

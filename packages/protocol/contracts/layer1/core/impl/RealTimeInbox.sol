@@ -89,19 +89,20 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
         require(lastProposalHash != bytes32(0), NotActivated());
 
         // Build proposal from input and get its hash
-        (bytes32 proposalHash, Proposal memory proposal) = _buildProposal(_data);
+        (bytes32 proposalHash, Proposal memory proposal, bytes32[] memory signalSlots) =
+            _buildProposal(_data);
 
         // Verify proof and finalize
         _verifyAndFinalize(proposalHash, _checkpoint, _proof);
 
-        // Emit event
+        // Emit event with raw signal slots for driver derivation
         emit ProposedAndProved(
             proposalHash,
             proposal.parentProposalHash,
             proposal.maxAnchorBlockNumber,
             proposal.basefeeSharingPctg,
             proposal.sources,
-            proposal.signalSlotsHash,
+            signalSlots,
             _checkpoint
         );
     }
@@ -180,12 +181,14 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     /// @param _data The encoded ProposeInput.
     /// @return proposalHash_ The hash of the proposal.
     /// @return proposal_ The built proposal struct.
+    /// @return signalSlots_ The raw signal slots from the input.
     function _buildProposal(bytes calldata _data)
         internal
         view
-        returns (bytes32 proposalHash_, Proposal memory proposal_)
+        returns (bytes32 proposalHash_, Proposal memory proposal_, bytes32[] memory signalSlots_)
     {
         ProposeInput memory input = decodeProposeInput(_data);
+        signalSlots_ = input.signalSlots;
 
         // Validate anchor block - blockhash returns 0 for blocks older than 256
         bytes32 anchorHash = blockhash(input.maxAnchorBlockNumber);

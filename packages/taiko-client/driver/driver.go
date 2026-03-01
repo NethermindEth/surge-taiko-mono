@@ -88,7 +88,7 @@ func (d *Driver) InitFromConfig(ctx context.Context, cfg *Config) (err error) {
 		return fmt.Errorf("failed to create RPC client: %w", err)
 	}
 
-	if d.state, err = state.New(d.ctx, d.rpc); err != nil {
+	if d.state, err = state.New(d.ctx, d.rpc, cfg.Fork); err != nil {
 		return fmt.Errorf("failed to create driver state: %w", err)
 	}
 
@@ -110,6 +110,7 @@ func (d *Driver) InitFromConfig(ctx context.Context, cfg *Config) (err error) {
 		cfg.P2PSyncTimeout,
 		cfg.BlobServerEndpoint,
 		latestSeenProposalCh,
+		cfg.Fork,
 	); err != nil {
 		return fmt.Errorf("failed to create L2 chain syncer: %w", err)
 	}
@@ -130,13 +131,15 @@ func (d *Driver) InitFromConfig(ctx context.Context, cfg *Config) (err error) {
 
 	if d.PreconfBlockServerPort > 0 {
 		// Initialize the preconfirmation block server.
+		// Select the appropriate chain syncer based on the fork.
+		chainSyncer := d.l2ChainSyncer.EventSyncer().BlocksInserter()
 		if d.preconfBlockServer, err = preconfBlocks.New(
 			d.PreconfBlockServerCORSOrigins,
 			d.PreconfBlockServerJWTSecret,
 			d.PreconfOperatorAddress,
 			d.TaikoAnchorAddress,
-			d.l2ChainSyncer.EventSyncer().BlocksInserterPacaya(),
-			d.l2ChainSyncer.EventSyncer().BlocksInserterShasta(),
+			cfg.Fork,
+			chainSyncer,
 			d.rpc,
 			latestSeenProposalCh,
 		); err != nil {
@@ -327,6 +330,11 @@ func (d *Driver) reportProtocolStatus() {
 
 // reportStatus reports some status for Pacaya or Shasta protocol.
 func (d *Driver) reportStatus(maxNumProposals uint64) {
+	// If RealTime fork is active, report RealTime status.
+	if d.Fork == "realtime" && d.rpc.RealTimeClients != nil {
+		d.reportProtocolStatusRealTime()
+	}
+
 	proposal, err := d.rpc.GetShastaProposalHash(&bind.CallOpts{Context: d.ctx}, common.Big1)
 	if err != nil {
 		log.Debug("Failed to get Shasta proposal hash", "error", err)
@@ -363,6 +371,20 @@ func (d *Driver) reportProtocolStatusShasta() {
 		"lastFinalizedProposalId", coreState.LastFinalizedProposalId,
 		"lastFinalizedTimestamp", coreState.LastFinalizedTimestamp,
 		"nextProposalID", coreState.NextProposalId,
+	)
+}
+
+// reportProtocolStatusRealTime reports the RealTimeInbox status.
+func (d *Driver) reportProtocolStatusRealTime() {
+	lastProposalHash, err := d.rpc.RealTimeClients.Inbox.GetLastProposalHash(&bind.CallOpts{Context: d.ctx})
+	if err != nil {
+		log.Debug("Failed to get RealTimeInbox last proposal hash", "error", err)
+		return
+	}
+
+	log.Info(
+		"📖 RealTime protocol status",
+		"lastProposalHash", common.Hash(lastProposalHash),
 	)
 }
 
