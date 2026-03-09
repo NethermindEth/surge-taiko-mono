@@ -14,7 +14,7 @@ import {
     ControlID,
     RiscZeroGroth16Verifier
 } from "@risc0/contracts/groth16/RiscZeroGroth16Verifier.sol";
-import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v5.0.0/SP1VerifierPlonk.sol";
+import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v6.0.0/SP1VerifierGroth16.sol";
 import { console2 } from "forge-std/src/console2.sol";
 import { IRealTimeInbox } from "src/layer1/core/iface/IRealTimeInbox.sol";
 import { RealTimeInbox } from "src/layer1/core/impl/RealTimeInbox.sol";
