@@ -14,7 +14,7 @@ import {
     ControlID,
     RiscZeroGroth16Verifier
 } from "@risc0/contracts/groth16/RiscZeroGroth16Verifier.sol";
-import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v5.0.0/SP1VerifierPlonk.sol";
+import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v6.0.0/SP1VerifierGroth16.sol";
 import { console2 } from "forge-std/src/console2.sol";
 import { IInbox } from "src/layer1/core/iface/IInbox.sol";
 import { PreconfWhitelist } from "src/layer1/preconf/impl/PreconfWhitelist.sol";
@@ -364,12 +364,7 @@ contract DeploySurgeL1 is DeployCapability {
         }
     }
 
-    function setupSharedResolver(
-        SharedContracts memory _sharedContracts,
-        address _owner
-    )
-        internal
-    {
+    function setupSharedResolver(SharedContracts memory _sharedContracts, address _owner) internal {
         // Register L2 addresses
         // ---------------------------------------------------------------
         register(
