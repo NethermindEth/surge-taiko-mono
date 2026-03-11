@@ -38,8 +38,8 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     // State Variables
     // ---------------------------------------------------------------
 
-    /// @notice Hash of the last accepted proposal. Serves as the chain head.
-    bytes32 public lastProposalHash;
+    /// @notice Block hash of the last finalized L2 block. Serves as the chain head.
+    bytes32 public lastFinalizedBlockHash;
 
     uint256[49] private __gap;
 
@@ -69,12 +69,12 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     }
 
     /// @inheritdoc IRealTimeInbox
-    function activate(bytes32 _genesisProposalHash) external onlyOwner {
-        require(lastProposalHash == bytes32(0), AlreadyActivated());
-        require(_genesisProposalHash != bytes32(0), InvalidGenesisHash());
+    function activate(bytes32 _genesisBlockHash) external onlyOwner {
+        require(lastFinalizedBlockHash == bytes32(0), AlreadyActivated());
+        require(_genesisBlockHash != bytes32(0), InvalidGenesisBlockHash());
 
-        lastProposalHash = _genesisProposalHash;
-        emit Activated(_genesisProposalHash);
+        lastFinalizedBlockHash = _genesisBlockHash;
+        emit Activated(_genesisBlockHash);
     }
 
     /// @inheritdoc IRealTimeInbox
@@ -86,19 +86,22 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
         external
         nonReentrant
     {
-        require(lastProposalHash != bytes32(0), NotActivated());
+        require(lastFinalizedBlockHash != bytes32(0), NotActivated());
+
+        // Capture current chain head before it is updated
+        bytes32 prevFinalizedBlockHash = lastFinalizedBlockHash;
 
         // Build proposal from input and get its hash
         (bytes32 proposalHash, Proposal memory proposal, bytes32[] memory signalSlots) =
             _buildProposal(_data);
 
-        // Verify proof and finalize
-        _verifyAndFinalize(proposalHash, _checkpoint, _proof);
+        // Verify proof and finalize (updates lastFinalizedBlockHash)
+        _verifyAndFinalize(proposalHash, prevFinalizedBlockHash, _checkpoint, _proof);
 
         // Emit event with raw signal slots for driver derivation
         emit ProposedAndProved(
             proposalHash,
-            proposal.parentProposalHash,
+            prevFinalizedBlockHash,
             proposal.maxAnchorBlockNumber,
             proposal.basefeeSharingPctg,
             proposal.sources,
@@ -160,8 +163,8 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     // ---------------------------------------------------------------
 
     /// @inheritdoc IRealTimeInbox
-    function getLastProposalHash() external view returns (bytes32) {
-        return lastProposalHash;
+    function getLastFinalizedBlockHash() external view returns (bytes32) {
+        return lastFinalizedBlockHash;
     }
 
     /// @inheritdoc IRealTimeInbox
@@ -204,9 +207,8 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
         IInbox.DerivationSource[] memory sources = new IInbox.DerivationSource[](1);
         sources[0] = IInbox.DerivationSource(false, blobSlice);
 
-        // Build proposal
+        // Build proposal (standalone — no parent linkage)
         proposal_ = Proposal({
-            parentProposalHash: lastProposalHash,
             maxAnchorBlockNumber: input.maxAnchorBlockNumber,
             maxAnchorBlockHash: anchorHash,
             basefeeSharingPctg: _basefeeSharingPctg,
@@ -219,18 +221,25 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
 
     /// @dev Verifies the proof, saves checkpoint, and updates chain head.
     /// @param _proposalHash The proposal hash.
+    /// @param _lastFinalizedBlockHash The block hash of the last finalized L2 block.
     /// @param _checkpoint The checkpoint to save.
     /// @param _proof The ZK proof bytes.
     function _verifyAndFinalize(
         bytes32 _proposalHash,
+        bytes32 _lastFinalizedBlockHash,
         ICheckpointStore.Checkpoint calldata _checkpoint,
         bytes calldata _proof
     )
         internal
     {
         // Build commitment and hash it
-        bytes32 commitmentHash =
-            hashCommitment(Commitment({ proposalHash: _proposalHash, checkpoint: _checkpoint }));
+        bytes32 commitmentHash = hashCommitment(
+            Commitment({
+                proposalHash: _proposalHash,
+                lastFinalizedBlockHash: _lastFinalizedBlockHash,
+                checkpoint: _checkpoint
+            })
+        );
 
         // Verify proof via IProofVerifier
         _proofVerifier.verifyProof(0, commitmentHash, _proof);
@@ -238,8 +247,8 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
         // Save checkpoint to signal service
         _signalService.saveCheckpoint(_checkpoint);
 
-        // Update chain head
-        lastProposalHash = _proposalHash;
+        // Update chain head to the new finalized block hash
+        lastFinalizedBlockHash = _checkpoint.blockHash;
     }
 
     /// @dev Verifies signal slots exist on L1 and returns their hash.
@@ -266,7 +275,7 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
 
     error AlreadyActivated();
     error MaxAnchorBlockTooOld();
-    error InvalidGenesisHash();
+    error InvalidGenesisBlockHash();
     error NotActivated();
     error SignalSlotNotSent(bytes32 slot);
 }

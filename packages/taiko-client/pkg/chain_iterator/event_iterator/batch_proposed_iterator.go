@@ -253,7 +253,7 @@ func iterateRealTimeEvents(
 	}
 	defer iter.Close()
 
-	var lastProposalHash [32]byte
+	var lastFinalizedBlockHash [32]byte
 	for iter.Next() {
 		event := iter.Event
 
@@ -265,15 +265,15 @@ func iterateRealTimeEvents(
 		proposalMetadata := metadata.NewTaikoProposalMetadataRealTime(event, header.Time)
 		log.Debug("Processing ProposedAndProved event",
 			"proposalHash", common.Hash(event.ProposalHash),
-			"parentProposalHash", common.Hash(event.ParentProposalHash),
+			"lastFinalizedBlockHash", common.Hash(event.LastFinalizedBlockHash),
 			"l1BlockHeight", event.Raw.BlockNumber,
 		)
 
-		if lastProposalHash != ([32]byte{}) && event.ParentProposalHash != lastProposalHash {
+		if lastFinalizedBlockHash != ([32]byte{}) && event.LastFinalizedBlockHash != lastFinalizedBlockHash {
 			return fmt.Errorf(
-				"ProposedAndProved event hash chain is not continuous, lastHash: %s, parentHash: %s",
-				common.Hash(lastProposalHash),
-				common.Hash(event.ParentProposalHash),
+				"ProposedAndProved event block hash chain is not continuous, expected: %s, got: %s",
+				common.Hash(lastFinalizedBlockHash),
+				common.Hash(event.LastFinalizedBlockHash),
 			)
 		}
 
@@ -291,7 +291,7 @@ func iterateRealTimeEvents(
 			return err
 		}
 
-		lastProposalHash = event.ProposalHash
+		lastFinalizedBlockHash = event.Checkpoint.BlockHash
 		updateCurrentFunc(current)
 	}
 

@@ -376,15 +376,15 @@ func (d *Driver) reportProtocolStatusShasta() {
 
 // reportProtocolStatusRealTime reports the RealTimeInbox status.
 func (d *Driver) reportProtocolStatusRealTime() {
-	lastProposalHash, err := d.rpc.RealTimeClients.Inbox.GetLastProposalHash(&bind.CallOpts{Context: d.ctx})
+	lastFinalizedBlockHash, err := d.rpc.RealTimeClients.Inbox.GetLastFinalizedBlockHash(&bind.CallOpts{Context: d.ctx})
 	if err != nil {
-		log.Debug("Failed to get RealTimeInbox last proposal hash", "error", err)
+		log.Debug("Failed to get RealTimeInbox last finalized block hash", "error", err)
 		return
 	}
 
 	log.Info(
 		"📖 RealTime protocol status",
-		"lastProposalHash", common.Hash(lastProposalHash),
+		"lastFinalizedBlockHash", common.Hash(lastFinalizedBlockHash),
 	)
 }
 

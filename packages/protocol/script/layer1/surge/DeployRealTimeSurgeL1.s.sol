@@ -68,7 +68,7 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
 
     // Genesis configuration
     // ---------------------------------------------------------------
-    bytes32 internal immutable genesisProposalHash = vm.envBytes32("GENESIS_PROPOSAL_HASH");
+    bytes32 internal immutable genesisBlockHash = vm.envBytes32("GENESIS_BLOCK_HASH");
 
     struct SharedContracts {
         address sharedResolver;
@@ -373,9 +373,9 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         RealTimeInbox(payable(_rollupContracts.inbox)).init(msg.sender);
         console2.log("** RealTimeInbox initialized");
 
-        // Activate inbox with genesis proposal hash
-        RealTimeInbox(payable(_rollupContracts.inbox)).activate(genesisProposalHash);
-        console2.log("** RealTimeInbox activated with genesis hash");
+        // Activate inbox with genesis block hash
+        RealTimeInbox(payable(_rollupContracts.inbox)).activate(genesisBlockHash);
+        console2.log("** RealTimeInbox activated with genesis block hash");
 
         // Requires ownership acceptance
         Ownable2StepUpgradeable(_rollupContracts.inbox).transferOwnership(_owner);
@@ -399,9 +399,9 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
 
         // Verify inbox state
         require(
-            RealTimeInbox(payable(_rollupContracts.inbox)).getLastProposalHash()
-                == genesisProposalHash,
-            "verifyDeployment: lastProposalHash mismatch"
+            RealTimeInbox(payable(_rollupContracts.inbox)).getLastFinalizedBlockHash()
+                == genesisBlockHash,
+            "verifyDeployment: lastFinalizedBlockHash mismatch"
         );
 
         // Build list of contracts where owner is already set

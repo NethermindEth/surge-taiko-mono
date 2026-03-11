@@ -35,8 +35,6 @@ interface IRealTimeInbox {
 
     /// @notice Transient proposal (not stored on-chain, only hashed).
     struct Proposal {
-        /// @notice Hash of the parent proposal (zero for genesis).
-        bytes32 parentProposalHash;
         /// @notice The height of highest anchor block.
         uint48 maxAnchorBlockNumber;
         /// @notice The hash of the highest anchor block.
@@ -49,10 +47,12 @@ interface IRealTimeInbox {
         bytes32 signalSlotsHash;
     }
 
-    /// @notice Simplified commitment containing only proposal hash and checkpoint.
+    /// @notice Commitment binding proposal, prior finalized state, and new checkpoint.
     struct Commitment {
         /// @notice Hash of the proposal being proven.
         bytes32 proposalHash;
+        /// @notice Block hash of the last finalized L2 block (the proof's starting state).
+        bytes32 lastFinalizedBlockHash;
         /// @notice The checkpoint data for the proven state.
         ICheckpointStore.Checkpoint checkpoint;
     }
@@ -63,7 +63,7 @@ interface IRealTimeInbox {
 
     /// @notice Emitted on successful propose-and-prove.
     /// @param proposalHash The hash of the proposal.
-    /// @param parentProposalHash The hash of the parent proposal.
+    /// @param lastFinalizedBlockHash The block hash of the last finalized L2 block before this proposal.
     /// @param maxAnchorBlockNumber The L1 anchor block number.
     /// @param basefeeSharingPctg The basefee sharing percentage.
     /// @param sources Array of derivation sources.
@@ -71,7 +71,7 @@ interface IRealTimeInbox {
     /// @param checkpoint The checkpoint data saved.
     event ProposedAndProved(
         bytes32 indexed proposalHash,
-        bytes32 parentProposalHash,
+        bytes32 lastFinalizedBlockHash,
         uint48 maxAnchorBlockNumber,
         uint8 basefeeSharingPctg,
         IInbox.DerivationSource[] sources,
@@ -80,17 +80,17 @@ interface IRealTimeInbox {
     );
 
     /// @notice Emitted when the inbox is activated.
-    /// @param genesisProposalHash The genesis proposal hash.
-    event Activated(bytes32 genesisProposalHash);
+    /// @param genesisBlockHash The genesis block hash.
+    event Activated(bytes32 genesisBlockHash);
 
     // ---------------------------------------------------------------
     // External Transactional Functions
     // ---------------------------------------------------------------
 
-    /// @notice Activates the inbox with a genesis proposal hash.
+    /// @notice Activates the inbox with a genesis block hash.
     /// @dev Must be called by the owner before propose() can be used.
-    /// @param _genesisProposalHash The genesis proposal hash to set.
-    function activate(bytes32 _genesisProposalHash) external;
+    /// @param _genesisBlockHash The genesis block hash to set as the initial finalized state.
+    function activate(bytes32 _genesisBlockHash) external;
 
     /// @notice Proposes new L2 blocks with real-time proof verification.
     /// @dev Combines proposal submission and proof verification into a single atomic operation.
@@ -108,9 +108,9 @@ interface IRealTimeInbox {
     // External View Functions
     // ---------------------------------------------------------------
 
-    /// @notice Returns the hash of the last accepted proposal.
-    /// @return The last proposal hash (bytes32(0) before activation).
-    function getLastProposalHash() external view returns (bytes32);
+    /// @notice Returns the block hash of the last finalized L2 block.
+    /// @return The last finalized block hash (bytes32(0) before activation).
+    function getLastFinalizedBlockHash() external view returns (bytes32);
 
     /// @notice Returns the configuration parameters.
     /// @return config_ The configuration struct.

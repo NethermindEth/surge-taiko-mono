@@ -37,8 +37,8 @@ export BASEFEE_SHARING_PCTG=${BASEFEE_SHARING_PCTG:-75}
 
 # Genesis configuration
 # ---------------------------------------------------------------
-# The genesis proposal hash to activate the inbox with
-export GENESIS_PROPOSAL_HASH=${GENESIS_PROPOSAL_HASH:-"0x0000000000000000000000000000000000000000000000000000000000000001"}
+# The genesis block hash to activate the inbox with (last finalized L2 block hash)
+export GENESIS_BLOCK_HASH=${GENESIS_BLOCK_HASH:-"0x0000000000000000000000000000000000000000000000000000000000000001"}
 
 # Deploy configuration
 export FOUNDRY_PROFILE=${FOUNDRY_PROFILE:-"layer1"}

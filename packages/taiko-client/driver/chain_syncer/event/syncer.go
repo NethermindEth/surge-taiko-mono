@@ -458,12 +458,12 @@ func (s *Syncer) processRealTimeProposal(
 	)
 
 	proposalHash := common.BytesToHash(meta.GetEventData().ProposalHash[:])
-	parentProposalHash := common.BytesToHash(meta.GetEventData().ParentProposalHash[:])
+	lastFinalizedBlockHash := common.BytesToHash(meta.GetEventData().LastFinalizedBlockHash[:])
 
 	log.Info(
 		"New RealTime Proposed event",
 		"proposalHash", proposalHash,
-		"parentProposalHash", parentProposalHash,
+		"lastFinalizedBlockHash", lastFinalizedBlockHash,
 		"derivationSources", len(meta.GetEventData().Sources),
 		"l1Height", meta.GetRawBlockHeight(),
 		"l1Hash", meta.GetRawBlockHash(),

@@ -209,7 +209,7 @@ func (s *State) eventLoop(ctx context.Context) {
 				log.Info(
 					"✅ RealTime proposed and proved",
 					"proposalHash", common.Hash(e.ProposalHash),
-					"parentProposalHash", common.Hash(e.ParentProposalHash),
+					"lastFinalizedBlockHash", common.Hash(e.LastFinalizedBlockHash),
 					"checkpointBlockNumber", e.Checkpoint.BlockNumber,
 					"checkpointBlockHash", common.Hash(e.Checkpoint.BlockHash),
 					"checkpointStateRoot", common.Hash(e.Checkpoint.StateRoot),
