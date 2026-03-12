@@ -333,6 +333,7 @@ func (d *Driver) reportStatus(maxNumProposals uint64) {
 	// If RealTime fork is active, report RealTime status.
 	if d.Fork == "realtime" && d.rpc.RealTimeClients != nil {
 		d.reportProtocolStatusRealTime()
+		return
 	}
 
 	proposal, err := d.rpc.GetShastaProposalHash(&bind.CallOpts{Context: d.ctx}, common.Big1)
