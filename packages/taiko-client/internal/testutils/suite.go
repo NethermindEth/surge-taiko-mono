@@ -333,6 +333,13 @@ func (s *ClientTestSuite) RevertL1Snapshot(snapshotID string) {
 	s.True(revertRes)
 }
 
+func (s *ClientTestSuite) SetL1Storage(addr common.Address, slot, value common.Hash) {
+	s.Nil(s.RPCClient.L1.CallContext(
+		context.Background(), nil, "anvil_setStorageAt", addr, slot, value,
+	))
+	s.L1Mine()
+}
+
 func (s *ClientTestSuite) SetBlockTimestampInterval(interval time.Duration) {
 	s.Nil(s.RPCClient.L1.CallContext(
 		context.Background(),
