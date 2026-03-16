@@ -116,18 +116,28 @@ func (d *Driver) InitFromConfig(ctx context.Context, cfg *Config) (err error) {
 	}
 
 	d.l1HeadSub = d.state.SubL1HeadsFeed(d.l1HeadCh)
+	var ontakeForkHeight, pacayaForkHeight uint64
+	var shastaForkTime uint64
+	if d.rpc.PacayaClients != nil {
+		ontakeForkHeight = d.rpc.PacayaClients.ForkHeights.Ontake
+		pacayaForkHeight = d.rpc.PacayaClients.ForkHeights.Pacaya
+	}
+	if d.rpc.ShastaClients != nil {
+		shastaForkTime = d.rpc.ShastaClients.ForkTime
+	}
 	d.chainConfig = config.NewChainConfig(
 		d.rpc.L2.ChainID,
-		d.rpc.PacayaClients.ForkHeights.Ontake,
-		d.rpc.PacayaClients.ForkHeights.Pacaya,
-		d.rpc.ShastaClients.ForkTime,
+		ontakeForkHeight,
+		pacayaForkHeight,
+		shastaForkTime,
 	)
 
-	if d.protocolConfig, err = d.rpc.GetProtocolConfigs(&bind.CallOpts{Context: d.ctx}); err != nil {
-		return fmt.Errorf("failed to get protocol configs: %w", err)
+	if d.rpc.PacayaClients != nil {
+		if d.protocolConfig, err = d.rpc.GetProtocolConfigs(&bind.CallOpts{Context: d.ctx}); err != nil {
+			return fmt.Errorf("failed to get protocol configs: %w", err)
+		}
+		config.ReportProtocolConfigs(d.protocolConfig)
 	}
-
-	config.ReportProtocolConfigs(d.protocolConfig)
 
 	if d.PreconfBlockServerPort > 0 {
 		// Initialize the preconfirmation block server.
@@ -307,10 +317,11 @@ func (d *Driver) ChainSyncer() *chainSyncer.L2ChainSyncer {
 
 // reportProtocolStatus reports some protocol status intervally.
 func (d *Driver) reportProtocolStatus() {
-	var (
-		ticker          = time.NewTicker(protocolStatusReportInterval)
+	var maxNumProposals uint64
+	if d.protocolConfig != nil {
 		maxNumProposals = d.protocolConfig.MaxProposals()
-	)
+	}
+	ticker := time.NewTicker(protocolStatusReportInterval)
 	d.wg.Add(1)
 
 	defer func() {
@@ -548,6 +559,11 @@ func (d *Driver) cacheLookaheadLoop() {
 
 		lastSlot = currentSlot
 		seenBlockNumber = latestSeenBlockNumber
+
+		// Realtime fork has no whitelist contract — skip operator resolution.
+		if d.Fork == "realtime" {
+			return nil
+		}
 
 		currOp, err := d.rpc.GetPreconfWhiteListOperator(nil)
 		if err != nil {

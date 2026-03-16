@@ -88,7 +88,7 @@ func (s *PreconfBlockAPIServer) BuildPreconfBlock(c echo.Context) error {
 	// make a new context, we don't want to cancel the request if the caller times out.
 	ctx := context.Background()
 
-	if s.rpc.PacayaClients.TaikoWrapper != nil {
+	if s.rpc.PacayaClients != nil && s.rpc.PacayaClients.TaikoWrapper != nil {
 		// Check if the preconfirmation is enabled.
 		preconfRouter, err := s.rpc.GetPreconfRouterPacaya(&bind.CallOpts{Context: ctx})
 		if err != nil {
@@ -105,12 +105,16 @@ func (s *PreconfBlockAPIServer) BuildPreconfBlock(c echo.Context) error {
 	}
 
 	// Check if the L2 execution engine is syncing from L1.
-	progress, err := s.rpc.L2ExecutionEngineSyncProgress(ctx)
-	if err != nil {
-		return s.returnError(c, http.StatusBadRequest, err)
-	}
-	if progress.IsSyncing() {
-		return s.returnError(c, http.StatusBadRequest, errors.New("l2 execution engine is syncing"))
+	// For realtime fork, L2 blocks are built on-demand via the preconf route,
+	// so the sync check is not applicable.
+	if s.fork != "realtime" {
+		progress, err := s.rpc.L2ExecutionEngineSyncProgress(ctx)
+		if err != nil {
+			return s.returnError(c, http.StatusBadRequest, err)
+		}
+		if progress.IsSyncing() {
+			return s.returnError(c, http.StatusBadRequest, errors.New("l2 execution engine is syncing"))
+		}
 	}
 
 	// Parse the request body.
@@ -194,7 +198,8 @@ func (s *PreconfBlockAPIServer) BuildPreconfBlock(c echo.Context) error {
 	)
 
 	// Check if the fee recipient the current operator or the next operator if its in handover window.
-	if s.rpc.L1Beacon != nil {
+	// Realtime fork has no whitelist, so all fee recipients are accepted.
+	if s.fork != "realtime" && s.rpc.L1Beacon != nil {
 		if err := s.CheckLookaheadHandover(reqBody.ExecutableData.FeeRecipient, s.rpc.L1Beacon.CurrentSlot()); err != nil {
 			return s.returnError(c, http.StatusBadRequest, err)
 		}

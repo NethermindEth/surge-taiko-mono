@@ -539,11 +539,15 @@ func (s *Syncer) processRealTimeProposal(
 		sourcePayload.BlockPayloads = []*shastaManifest.ShastaBlockPayload{
 			{BlockManifest: manifest.BlockManifest{Transactions: types.Transactions{}}},
 		}
+		var shastaForkTime uint64
+		if s.rpc.ShastaClients != nil {
+			shastaForkTime = s.rpc.ShastaClients.ForkTime
+		}
 		shastaManifest.ApplyInheritedMetadataRealTime(
 			sourcePayload,
 			meta,
 			lastAnchorBlockNumber,
-			s.rpc.ShastaClients.ForkTime,
+			shastaForkTime,
 		)
 		log.Info(
 			"Use default RealTime derivation payload",
