@@ -99,9 +99,17 @@ func (s *DriverTestSuite) TestL1SLOADTransaction() {
 	s.Nil(err)
 	s.GreaterOrEqual(txCount, uint(2), "block should have anchor tx + L1SLOAD tx")
 
-	// Index 0 is the anchor tx; our L1SLOAD tx is at index 1.
-	userTx, err := s.RPCClient.L2.TransactionInBlock(context.Background(), l2Head.Hash(), 1)
-	s.Nil(err)
+	// Find the L1SLOAD tx by matching the To address instead of relying on a hardcoded index.
+	var userTx *types.Transaction
+	for idx := uint(0); idx < txCount; idx++ {
+		tx, err := s.RPCClient.L2.TransactionInBlock(context.Background(), l2Head.Hash(), idx)
+		s.Nil(err)
+		if tx.To() != nil && *tx.To() == l1SLOADPrecompileAddr {
+			userTx = tx
+			break
+		}
+	}
+	s.NotNil(userTx, "L1SLOAD tx not found in block")
 
 	receipt, err := s.RPCClient.L2.TransactionReceipt(context.Background(), userTx.Hash())
 	s.Nil(err)
@@ -118,9 +126,6 @@ func (s *DriverTestSuite) TestL1SLOADInvalidBlockRejected() {
 
 	targetAddr := common.HexToAddress("0x3333333333333333333333333333333333333333")
 	slot := common.BigToHash(big.NewInt(3))
-	value := common.BigToHash(big.NewInt(0xbaadf00d))
-
-	s.SetL1Storage(targetAddr, slot, value)
 
 	l1Head, err := s.RPCClient.L1.HeaderByNumber(context.Background(), nil)
 	s.Nil(err)
