@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -85,8 +86,15 @@ func (s *DriverTestSuite) TestL1SLOADTransaction() {
 	)
 	s.Nil(err)
 
-	// Propose and insert a block containing the L1SLOAD tx.
-	s.ProposeAndInsertValidBlock(s.p, s.d.ChainSyncer().EventSyncer())
+	// ProposeValidBlock uses PendingNonceAt for its dummy tx (nonce N+1),
+	// so it doesn't collide with our L1SLOAD tx (nonce N).
+	s.ProposeValidBlock(s.p)
+
+	// Sync the chain — ProposeValidBlock doesn't call ProcessL1Blocks.
+	s.Nil(backoff.Retry(func() error {
+		return s.d.ChainSyncer().EventSyncer().ProcessL1Blocks(context.Background())
+	}, backoff.NewExponentialBackOff()))
+	s.Nil(s.RPCClient.WaitTillL2ExecutionEngineSynced(context.Background()))
 
 	// Retrieve the L1SLOAD tx from the proposed block.
 	// We use TransactionInBlock rather than the client-side hash because the
