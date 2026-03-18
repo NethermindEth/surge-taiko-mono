@@ -27,6 +27,9 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
 
+// L2NodeNMC is the L2_NODE env value that selects the Nethermind-based client.
+const L2NodeNMC = "l2_nmc"
+
 type ClientTestSuite struct {
 	suite.Suite
 	testnetL1SnapshotID string
@@ -333,6 +336,7 @@ func (s *ClientTestSuite) RevertL1Snapshot(snapshotID string) {
 	s.True(revertRes)
 }
 
+// SetL1Storage overwrites a storage slot on L1 using the Anvil-specific anvil_setStorageAt RPC and mines a block.
 func (s *ClientTestSuite) SetL1Storage(addr common.Address, slot, value common.Hash) {
 	s.Nil(s.RPCClient.L1.CallContext(
 		context.Background(), nil, "anvil_setStorageAt", addr, slot, value,
@@ -382,7 +386,7 @@ func (s *ClientTestSuite) forkTo(attributes *engine.PayloadAttributes, parentHas
 	// with "already known" or "nonce too low". This clears hash cache, account cache, and pending txs.
 	// Pending txs must be cleared because tests resubmit transactions with the same hash/nonce,
 	// which would be rejected as "ReplacementNotAllowed" if they remain in the pool.
-	if os.Getenv("L2_NODE") == "l2_nmc" {
+	if os.Getenv("L2_NODE") == L2NodeNMC {
 		var cleared bool
 		err := s.RPCClient.L2Engine.CallContext(
 			context.Background(),

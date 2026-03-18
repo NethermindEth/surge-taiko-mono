@@ -13,8 +13,6 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
 )
 
-const l2NodeNMC = "l2_nmc"
-
 var l1SLOADPrecompileAddr = common.HexToAddress("0x0000000000000000000000000000000000010001")
 
 // buildL1SLOADCalldata constructs the 84-byte input for the L1SLOAD precompile.
@@ -30,7 +28,7 @@ func buildL1SLOADCalldata(addr common.Address, slot common.Hash, blockNum *big.I
 // TestL1SLOADStaticCall verifies that eth_call to the L1SLOAD precompile on L2
 // returns the correct storage value from L1 (Anvil).
 func (s *DriverTestSuite) TestL1SLOADStaticCall() {
-	if os.Getenv("L2_NODE") != l2NodeNMC {
+	if os.Getenv("L2_NODE") != testutils.L2NodeNMC {
 		s.T().Skip("L1SLOAD only supported on NMC")
 	}
 
@@ -62,7 +60,7 @@ func (s *DriverTestSuite) TestL1SLOADStaticCall() {
 // TestL1SLOADTransaction sends an actual L2 transaction to the L1SLOAD precompile,
 // proposes a block, and verifies the tx succeeded on-chain.
 func (s *DriverTestSuite) TestL1SLOADTransaction() {
-	if os.Getenv("L2_NODE") != l2NodeNMC {
+	if os.Getenv("L2_NODE") != testutils.L2NodeNMC {
 		s.T().Skip("L1SLOAD only supported on NMC")
 	}
 
@@ -128,7 +126,7 @@ func (s *DriverTestSuite) TestL1SLOADTransaction() {
 // TestL1SLOADInvalidBlockRejected verifies that requesting a non-existent (future)
 // L1 block via the precompile fails.
 func (s *DriverTestSuite) TestL1SLOADInvalidBlockRejected() {
-	if os.Getenv("L2_NODE") != l2NodeNMC {
+	if os.Getenv("L2_NODE") != testutils.L2NodeNMC {
 		s.T().Skip("L1SLOAD only supported on NMC")
 	}
 

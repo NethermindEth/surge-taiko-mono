@@ -157,7 +157,7 @@ func (s *ClientTestSuite) ProposeAndInsertValidBlock(
 	if err != nil {
 		// If the transaction is underpriced or a replacement is not allowed, we just ignore it.
 		// Geth returns "replacement transaction underpriced", Nethermind returns "ReplacementNotAllowed"
-		if os.Getenv("L2_NODE") == "l2_nmc" {
+		if os.Getenv("L2_NODE") == L2NodeNMC {
 			s.Equal("ReplacementNotAllowed", err.Error())
 		} else {
 			s.Equal("replacement transaction underpriced", err.Error())
