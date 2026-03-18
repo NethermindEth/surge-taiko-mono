@@ -90,3 +90,5 @@ services:
       - /nethermind/data
       - --log
       - DEBUG
+      - --Surge.L1EthApiEndpoint
+      - http://l1_node:8545
