@@ -202,7 +202,8 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
 
         // Validate blob reference
         LibBlobs.BlobSlice memory blobSlice = LibBlobs.validateBlobReference(input.blobReference);
-        // Zero timestamp so it doesn't interfere with the proof
+        // Zero timestamp so it doesn't become part of the proposal hash that must be proven.
+        // The driver can derive the blob timestamp from the L1 block that contains the event.
         blobSlice.timestamp = 0;
 
         // Build derivation sources

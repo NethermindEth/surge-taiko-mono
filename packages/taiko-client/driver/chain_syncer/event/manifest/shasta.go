@@ -87,7 +87,9 @@ func (f *ShastaDerivationSourceFetcher) FetchRealTime(
 	}
 
 	blobHashes := meta.GetBlobHashes(derivationIdx)
-	b, err := f.dataSource.GetBlobBytes(ctx, meta.GetBlobTimestamp(derivationIdx), blobHashes)
+	// Use L1 block timestamp instead of blob slice timestamp (zeroed in RealTimeInbox
+	// so it doesn't become part of the proven proposal hash).
+	b, err := f.dataSource.GetBlobBytes(ctx, meta.GetTimestamp(), blobHashes)
 	if err != nil {
 		if errors.Is(err, rpc.ErrInvalidBlobBytes) {
 			return &ShastaDerivationSourcePayload{Default: true}, nil
