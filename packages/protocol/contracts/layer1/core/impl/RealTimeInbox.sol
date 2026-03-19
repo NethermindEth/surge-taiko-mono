@@ -202,6 +202,8 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
 
         // Validate blob reference
         LibBlobs.BlobSlice memory blobSlice = LibBlobs.validateBlobReference(input.blobReference);
+        // Zero timestamp so it doesn't interfere with the proof
+        blobSlice.timestamp = 0;
 
         // Build derivation sources
         IInbox.DerivationSource[] memory sources = new IInbox.DerivationSource[](1);

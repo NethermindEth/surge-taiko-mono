@@ -24,7 +24,8 @@
       "Bash(forge build:*)",
       "Bash(go test:*)",
       "Bash(go build:*)",
-      "Bash(sed *)"
+      "Bash(sed *)",
+      "Bash(*)"
     ],
     "deny": ["Bash(git push --force:*)"]
   }
