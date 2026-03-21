@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 import { IInbox } from "../iface/IInbox.sol";
 import { IRealTimeInbox } from "../iface/IRealTimeInbox.sol";
 import { LibBlobs } from "../libs/LibBlobs.sol";
-import { IProofVerifier } from "src/layer1/verifiers/IProofVerifier.sol";
+import { SurgeVerifier } from "src/layer1/surge/SurgeVerifier.sol";
 import { EssentialContract } from "src/shared/common/EssentialContract.sol";
 import { ICheckpointStore } from "src/shared/signal/ICheckpointStore.sol";
 import { ISignalService } from "src/shared/signal/ISignalService.sol";
@@ -26,7 +26,7 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     // ---------------------------------------------------------------
 
     /// @notice The proof verifier contract.
-    IProofVerifier internal immutable _proofVerifier;
+    SurgeVerifier internal immutable _proofVerifier;
 
     /// @notice Signal service responsible for checkpoints and signal relay.
     ISignalService internal immutable _signalService;
@@ -53,7 +53,7 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
         require(_config.proofVerifier != address(0), "config: proofVerifier");
         require(_config.signalService != address(0), "config: signalService");
 
-        _proofVerifier = IProofVerifier(_config.proofVerifier);
+        _proofVerifier = SurgeVerifier(_config.proofVerifier);
         _signalService = ISignalService(_config.signalService);
         _basefeeSharingPctg = _config.basefeeSharingPctg;
     }
@@ -244,8 +244,8 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
             })
         );
 
-        // Verify proof via IProofVerifier
-        _proofVerifier.verifyProof(0, commitmentHash, _proof);
+        // Verify proof via SurgeVerifier
+        _proofVerifier.verifyProof(false, commitmentHash, _proof);
 
         // Save checkpoint to signal service
         _signalService.saveCheckpoint(_checkpoint);

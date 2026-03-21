@@ -47,7 +47,7 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
 
     // Zisk Verifier Configuration
     // ---------------------------------------------------------------
-    bytes32 internal immutable ziskProgramVKey = vm.envBytes32("ZISK_PROGRAM_VKEY");
+    bytes32 internal immutable ziskProgramVKey = vm.envOr("ZISK_PROGRAM_VKEY", bytes32(0));
 
     // SurgeVerifier configuration
     // ---------------------------------------------------------------
@@ -246,9 +246,12 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         console2.log("** Zisk verifier ownership transfer initiated to:", _owner);
     }
 
-    /// @dev Sets the trusted program VKey on the Zisk verifier.
+    /// @dev Sets the trusted program VKey on the Zisk verifier (skipped if no vkey provided).
     function setupZiskVerifier(ZiskVerifier _ziskVerifier) private {
-        require(ziskProgramVKey != bytes32(0), "config: ZISK_PROGRAM_VKEY");
+        if (ziskProgramVKey == bytes32(0)) {
+            console2.log("** Skipping Zisk program VKey setup (none provided)");
+            return;
+        }
 
         _ziskVerifier.setProgramTrusted(ziskProgramVKey, true);
         console2.log("** Set trusted program VKey:");

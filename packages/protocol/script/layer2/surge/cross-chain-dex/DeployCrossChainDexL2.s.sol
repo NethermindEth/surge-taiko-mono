@@ -15,6 +15,7 @@ contract DeployCrossChainDexL2 is Script {
     uint256 internal immutable privateKey = vm.envUint("PRIVATE_KEY");
     address internal immutable bridge = vm.envAddress("L2_BRIDGE");
     uint64 internal immutable l1ChainId = uint64(vm.envUint("L1_CHAIN_ID"));
+    uint8 internal immutable tokenDecimals = uint8(vm.envOr("TOKEN_DECIMALS", uint256(18)));
 
     modifier broadcast() {
         require(privateKey != 0, "invalid private key");
@@ -39,9 +40,9 @@ contract DeployCrossChainDexL2 is Script {
         console2.log("");
 
         // Deploy SwapTokenL2 (bridged token) with deployer as initial minter
-        // 6 decimals to match canonical USDC on L1
+        // Decimals must match L1 token (configurable via TOKEN_DECIMALS env var)
         SwapTokenL2 swapTokenL2 =
-            new SwapTokenL2("Bridged USDC", "bUSDC", deployer, 0, 6);
+            new SwapTokenL2("Bridged USDC", "bUSDC", deployer, 0, tokenDecimals);
         swapTokenL2_ = address(swapTokenL2);
         console2.log("SwapTokenL2 deployed at:", swapTokenL2_);
 

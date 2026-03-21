@@ -2,16 +2,16 @@ import { http } from 'wagmi';
 import { createConfig } from 'wagmi';
 import { injected } from 'wagmi/connectors';
 import { createPublicClient, defineChain } from 'viem';
-import { L1_RPC_URL, L2_RPC_URL, CHAIN_ID } from './constants';
+import { L1_RPC_URL, L2_RPC_URL, CHAIN_ID, L1_CHAIN_NAME, L1_NATIVE_SYMBOL, L1_NATIVE_NAME } from './constants';
 
 // Define custom chain for L1
 export const surgeL1Chain = defineChain({
   id: CHAIN_ID,
-  name: 'Gnosis',
+  name: L1_CHAIN_NAME,
   nativeCurrency: {
     decimals: 18,
-    name: 'xDAI',
-    symbol: 'xDAI',
+    name: L1_NATIVE_NAME,
+    symbol: L1_NATIVE_SYMBOL,
   },
   rpcUrls: {
     default: { http: [L1_RPC_URL] },
@@ -35,9 +35,9 @@ export const l1PublicClient = createPublicClient({
 
 // Define L2 chain
 export const surgeL2Chain = defineChain({
-  id: 763374, // L2 chain ID
+  id: Number(import.meta.env.VITE_L2_CHAIN_ID || '763374'),
   name: 'Surge L2',
-  nativeCurrency: { decimals: 18, name: 'xDAI', symbol: 'xDAI' },
+  nativeCurrency: { decimals: 18, name: L1_NATIVE_NAME, symbol: L1_NATIVE_SYMBOL },
   rpcUrls: {
     default: { http: [L2_RPC_URL] },
   },

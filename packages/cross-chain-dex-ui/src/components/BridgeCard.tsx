@@ -4,9 +4,9 @@ import { TokenInput } from './TokenInput';
 import { useSmartWallet } from '../hooks/useSmartWallet';
 import { useTokenBalances } from '../hooks/useTokenBalances';
 import { useUserOp } from '../hooks/useUserOp';
-import { ETH_TOKEN, USDC_TOKEN } from '../lib/constants';
+import { ETH_TOKEN, USDC_TOKEN, L1_NATIVE_SYMBOL } from '../lib/constants';
 
-type BridgeToken = 'xDAI' | 'USDC';
+type BridgeToken = typeof L1_NATIVE_SYMBOL | 'USDC';
 
 interface BridgeCardProps {
   onSetupWallet: () => void;
@@ -21,7 +21,7 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
   const [inputAmount, setInputAmount] = useState('');
   const [recipient, setRecipient] = useState('');
 
-  const currentToken = bridgeToken === 'xDAI' ? ETH_TOKEN : USDC_TOKEN;
+  const currentToken = bridgeToken === L1_NATIVE_SYMBOL ? ETH_TOKEN : USDC_TOKEN;
 
   const amountIn = useMemo(() => {
     try {
@@ -30,7 +30,7 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
       return 0n;
     }
   }, [inputAmount, currentToken.decimals]);
-  const currentBalance = bridgeToken === 'xDAI' ? ethBalance : usdcBalance;
+  const currentBalance = bridgeToken === L1_NATIVE_SYMBOL ? ethBalance : usdcBalance;
   const hasInsufficientBalance = amountIn > currentBalance;
 
   const effectiveRecipient = (recipient || smartWallet || '') as Address;
@@ -39,7 +39,7 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
     if (!smartWallet || amountIn === 0n) return;
 
     let success: boolean;
-    if (bridgeToken === 'xDAI') {
+    if (bridgeToken === L1_NATIVE_SYMBOL) {
       success = await executeBridgeNative({
         amount: amountIn,
         recipient: effectiveRecipient,
@@ -79,7 +79,7 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
 
         {/* Token Selector */}
         <div className="flex gap-2">
-          {(['xDAI', 'USDC'] as BridgeToken[]).map((t) => (
+          {([L1_NATIVE_SYMBOL, 'USDC'] as BridgeToken[]).map((t) => (
             <button
               key={t}
               onClick={() => { setBridgeToken(t); setInputAmount(''); }}
@@ -109,14 +109,14 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
             <div className="flex items-center gap-2 bg-surge-dark/50 px-3 py-2 rounded-lg">
               <span className="text-xs text-gray-400">L1</span>
               <span className="text-sm text-white font-medium">
-                {bridgeToken === 'xDAI' ? 'Send' : 'Lock'}
+                {bridgeToken === L1_NATIVE_SYMBOL ? 'Send' : 'Lock'}
               </span>
             </div>
             <div className="text-surge-primary">&rarr;</div>
             <div className="flex items-center gap-2 bg-surge-dark/50 px-3 py-2 rounded-lg">
               <span className="text-xs text-gray-400">L2</span>
               <span className="text-sm text-white font-medium">
-                {bridgeToken === 'xDAI' ? 'Receive' : 'Mint'}
+                {bridgeToken === L1_NATIVE_SYMBOL ? 'Receive' : 'Mint'}
               </span>
             </div>
           </div>

@@ -1,5 +1,7 @@
 import { Address } from 'viem';
 import toast from 'react-hot-toast';
+import { surgeL1Chain } from '../lib/config';
+import { L1_NATIVE_SYMBOL } from '../lib/constants';
 
 interface FundWalletProps {
   isOpen: boolean;
@@ -28,12 +30,12 @@ export function FundWallet({ isOpen, onClose, smartWallet, ethBalance, usdcBalan
           </div>
           <div>
             <h2 className="text-xl font-bold text-white">Fund Your Smart Wallet</h2>
-            <p className="text-sm text-gray-400">Add xDAI or USDC to start swapping</p>
+            <p className="text-sm text-gray-400">Add {L1_NATIVE_SYMBOL} or USDC to start swapping</p>
           </div>
         </div>
 
         <p className="text-gray-400 text-sm mb-6">
-          Your smart wallet needs funds to execute swaps. Send xDAI or USDC to the address below.
+          Your smart wallet needs funds to execute swaps. Send {L1_NATIVE_SYMBOL} or USDC to the address below.
         </p>
 
         {/* Smart Wallet Address */}
@@ -57,9 +59,9 @@ export function FundWallet({ isOpen, onClose, smartWallet, ethBalance, usdcBalan
         {/* Current Balances */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-surge-dark rounded-lg p-3">
-            <div className="text-xs text-gray-500 mb-1">xDAI Balance</div>
+            <div className="text-xs text-gray-500 mb-1">{L1_NATIVE_SYMBOL} Balance</div>
             <div className="text-lg font-semibold text-white">
-              {parseFloat(ethBalance).toFixed(4)} xDAI
+              {parseFloat(ethBalance).toFixed(4)} {L1_NATIVE_SYMBOL}
             </div>
           </div>
           <div className="bg-surge-dark rounded-lg p-3">
@@ -71,7 +73,7 @@ export function FundWallet({ isOpen, onClose, smartWallet, ethBalance, usdcBalan
         </div>
 
         <div className="text-xs text-gray-500 mb-4">
-          <strong>Note:</strong> Send funds on Gnosis (Chain ID: 100)
+          <strong>Note:</strong> Send funds on {surgeL1Chain.name} (Chain ID: {surgeL1Chain.id})
         </div>
 
         <button

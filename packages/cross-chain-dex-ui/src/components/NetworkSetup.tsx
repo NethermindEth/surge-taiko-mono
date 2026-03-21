@@ -34,7 +34,7 @@ export function NetworkSetup({ isOpen, onClose }: NetworkSetupProps) {
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: `0x${surgeL1Chain.id.toString(16)}` }],
       });
-      toast.success('Switched to Gnosis!');
+      toast.success(`Switched to ${surgeL1Chain.name}!`);
       onClose();
     } catch (switchError: any) {
       // Chain doesn't exist, try to add it
@@ -83,14 +83,14 @@ export function NetworkSetup({ isOpen, onClose }: NetworkSetupProps) {
           </div>
           <div>
             <h2 className="text-xl font-bold text-white">Wrong Network</h2>
-            <p className="text-sm text-gray-400">Connect to Gnosis to continue</p>
+            <p className="text-sm text-gray-400">Connect to {surgeL1Chain.name} to continue</p>
           </div>
         </div>
 
         {!showManual ? (
           <>
             <p className="text-gray-400 text-sm mb-6">
-              Click the button below to add Gnosis network to your wallet and switch to it.
+              Click the button below to add {surgeL1Chain.name} network to your wallet and switch to it.
             </p>
 
             <button
@@ -104,7 +104,7 @@ export function NetworkSetup({ isOpen, onClose }: NetworkSetupProps) {
                   Adding Network...
                 </>
               ) : (
-                'Add Gnosis Network'
+                `Add ${surgeL1Chain.name} Network`
               )}
             </button>
 

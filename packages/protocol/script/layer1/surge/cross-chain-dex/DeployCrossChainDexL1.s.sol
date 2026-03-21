@@ -16,6 +16,7 @@ contract DeployCrossChainDexL1 is Script {
     address internal immutable bridge = vm.envAddress("L1_BRIDGE");
     uint64 internal immutable l2ChainId = uint64(vm.envUint("L2_CHAIN_ID"));
     uint256 internal immutable initialTokenSupply = vm.envUint("INITIAL_TOKEN_SUPPLY");
+    uint8 internal immutable tokenDecimals = uint8(vm.envOr("TOKEN_DECIMALS", uint256(18)));
     address internal immutable existingToken = vm.envOr("SWAP_TOKEN", address(0));
 
     modifier broadcast() {
@@ -46,9 +47,10 @@ contract DeployCrossChainDexL1 is Script {
             console2.log("Using existing token at:", swapToken_);
         } else {
             // Deploy SwapToken (canonical token on L1)
-            SwapToken swapToken = new SwapToken("Swap Token", "SWAP", deployer, 0);
+            SwapToken swapToken = new SwapToken("USD Coin", "USDC", deployer, 0, tokenDecimals);
             swapToken_ = address(swapToken);
             console2.log("SwapToken deployed at:", swapToken_);
+            console2.log("Token decimals:", uint256(tokenDecimals));
 
             // Mint initial supply to deployer
             swapToken.mint(deployer, initialTokenSupply);

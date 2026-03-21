@@ -218,7 +218,7 @@ export function useUserOp(): UseUserOpReturn {
   const executeBridgeNative = useCallback(
     async ({ amount, recipient, smartWallet }: ExecuteBridgeNativeParams): Promise<boolean> => {
       const ops = buildBridgeNativeUserOps(amount, recipient, smartWallet);
-      return executeGenericOps(ops, smartWallet, 'bridge', 'xDAI bridge submitted!');
+      return executeGenericOps(ops, smartWallet, 'bridge', 'Native bridge submitted!');
     },
     [executeGenericOps]
   );

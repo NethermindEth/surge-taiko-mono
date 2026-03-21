@@ -1,17 +1,22 @@
 import { Token } from '../types';
 
+// L1 native currency — defaults to xDAI (Gnosis), configurable for devnets
+export const L1_NATIVE_SYMBOL = (import.meta.env.VITE_L1_NATIVE_SYMBOL as string) || 'xDAI';
+export const L1_NATIVE_NAME = (import.meta.env.VITE_L1_NATIVE_NAME as string) || L1_NATIVE_SYMBOL;
+export const L1_CHAIN_NAME = (import.meta.env.VITE_L1_CHAIN_NAME as string) || 'Gnosis';
+
 export const ETH_TOKEN: Token = {
-  symbol: 'xDAI',
-  name: 'xDAI',
+  symbol: L1_NATIVE_SYMBOL,
+  name: L1_NATIVE_NAME,
   decimals: 18,
   address: null,
-  logo: '/xdai-logo.svg',
+  logo: (import.meta.env.VITE_L1_NATIVE_LOGO as string) || '/xdai-logo.svg',
 };
 
 export const USDC_TOKEN: Token = {
   symbol: 'USDC',
   name: 'USD Coin',
-  decimals: 6, // Real Gnosis USDC has 6 decimals
+  decimals: Number(import.meta.env.VITE_USDC_DECIMALS || '18'),
   address: import.meta.env.VITE_USDC_TOKEN as `0x${string}`,
   logo: '/usdc-logo.svg',
 };

@@ -1476,6 +1476,12 @@ func (c *Client) GetShastaAnchorState(opts *bind.CallOpts) (
 	*shastaBindings.AnchorBlockState,
 	error,
 ) {
+	if c.ShastaClients == nil || c.ShastaClients.Anchor == nil {
+		return &shastaBindings.AnchorBlockState{
+			AnchorBlockNumber: new(big.Int),
+		}, nil
+	}
+
 	var cancel context.CancelFunc
 	if opts == nil {
 		opts = &bind.CallOpts{Context: context.Background()}

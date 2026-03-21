@@ -294,12 +294,10 @@ func assembleCreateExecutionPayloadMetaRealTime(
 		return nil, nil, fmt.Errorf("failed to create anchor transaction: %w", err)
 	}
 
-	// Create a unique 48-bit proposal ID from the proposal hash for extraData encoding.
 	proposalHash := meta.GetEventData().ProposalHash
-	proposalIDFromHash := new(big.Int).SetBytes(proposalHash[:6])
 
-	// Encode extraData with basefeeSharingPctg and proposal ID.
-	extraData, err := encodeShastaExtraData(meta.GetEventData().BasefeeSharingPctg, proposalIDFromHash)
+	// RealTime blocks use zero proposal ID in extraData.
+	extraData, err := encodeShastaExtraData(meta.GetEventData().BasefeeSharingPctg, new(big.Int))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to encode extraData: %w", err)
 	}

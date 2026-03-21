@@ -17,7 +17,10 @@ export L1_BRIDGE=${L1_BRIDGE:-"0xC935D1c64591Aa954F34eB49Ea6175D06A8F21Eb"}
 # If not set, a new SwapToken will be deployed
 export SWAP_TOKEN=${SWAP_TOKEN:-""}
 
-# Initial token supply (1 million tokens with 18 decimals)
+# Token decimals (default 18; set to 6 for real USDC)
+export TOKEN_DECIMALS=${TOKEN_DECIMALS:-"18"}
+
+# Initial token supply (1 million tokens — raw units, must account for decimals)
 # Only used when deploying a new token (SWAP_TOKEN is not set)
 export INITIAL_TOKEN_SUPPLY=${INITIAL_TOKEN_SUPPLY:-"1000000000000000000000000"}
 

@@ -490,10 +490,11 @@ func (s *Syncer) processRealTimeProposal(
 		time.Sleep(time.Until(time.Unix(int64(meta.GetTimestamp()), 0)))
 	}
 
-	// For RealTime proposals, use the latest L2 block as parent since we track via hash chain.
+	// For RealTime proposals, use the lastFinalizedBlockHash from the event as parent
+	// (not the latest L2 head, which may have advanced via preconf blocks).
 	var parent *types.Block
-	if parent, err = s.rpc.L2.BlockByNumber(ctx, nil); err != nil {
-		return fmt.Errorf("failed to fetch latest L2 block as parent: %w", err)
+	if parent, err = s.rpc.L2.BlockByHash(ctx, lastFinalizedBlockHash); err != nil {
+		return fmt.Errorf("failed to fetch parent block by lastFinalizedBlockHash %s: %w", lastFinalizedBlockHash, err)
 	}
 
 	log.Info(

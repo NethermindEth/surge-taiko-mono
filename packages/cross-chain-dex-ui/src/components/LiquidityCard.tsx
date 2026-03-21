@@ -5,7 +5,7 @@ import { useSmartWallet } from '../hooks/useSmartWallet';
 import { useDexReserves } from '../hooks/useDexReserves';
 import { useTokenBalances } from '../hooks/useTokenBalances';
 import { useUserOp } from '../hooks/useUserOp';
-import { ETH_TOKEN, USDC_TOKEN } from '../lib/constants';
+import { ETH_TOKEN, USDC_TOKEN, L1_NATIVE_SYMBOL } from '../lib/constants';
 
 interface LiquidityCardProps {
   onSetupWallet: () => void;
@@ -115,7 +115,7 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
     if (!isConnected) return 'Connect Wallet';
     if (!smartWallet) return 'Setup Smart Wallet First';
     if (!ethAmount || !tokenAmount) return 'Enter Amounts';
-    if (hasInsufficientETH) return 'Insufficient xDAI';
+    if (hasInsufficientETH) return `Insufficient ${L1_NATIVE_SYMBOL}`;
     if (hasInsufficientTokens) return 'Insufficient USDC Tokens';
     return 'Add Liquidity to L2';
   };
@@ -136,7 +136,7 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
           amount={ethInput}
           onAmountChange={handleEthChange}
           balance={ethBalance}
-          label="xDAI Amount"
+          label={`${L1_NATIVE_SYMBOL} Amount`}
         />
 
         <div className="flex justify-center">
@@ -157,7 +157,7 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 space-y-2">
             <div className="text-xs text-yellow-400 font-medium">Pool is empty — set the initial price</div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400 whitespace-nowrap">1 xDAI =</span>
+              <span className="text-sm text-gray-400 whitespace-nowrap">1 {L1_NATIVE_SYMBOL} =</span>
               <input
                 type="number"
                 value={priceInput}
@@ -175,8 +175,8 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
         <div className="bg-surge-dark/30 rounded-lg p-3 space-y-1">
           <div className="text-xs text-gray-400 font-medium mb-2">L2 DEX Pool</div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-400">xDAI Reserve</span>
-            <span className="text-white">{formatEther(ethReserve)} xDAI</span>
+            <span className="text-gray-400">{L1_NATIVE_SYMBOL} Reserve</span>
+            <span className="text-white">{formatEther(ethReserve)} {L1_NATIVE_SYMBOL}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-400">Token Reserve</span>
@@ -186,7 +186,7 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">Price</span>
               <span className="text-white">
-                1 xDAI = {price.toFixed(2)} USDC
+                1 {L1_NATIVE_SYMBOL} = {price.toFixed(2)} USDC
               </span>
             </div>
           )}

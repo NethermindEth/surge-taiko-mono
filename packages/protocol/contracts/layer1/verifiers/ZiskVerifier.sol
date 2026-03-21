@@ -77,11 +77,19 @@ contract ZiskVerifier is IProofVerifier, Ownable2Step {
             uint64(10_691_781_997_660_262_077)
         ];
 
+        bytes32[] memory padding = new bytes32[](7);
+
         // _proof[32:] is the Zisk PLONK proof
         (bool success,) = ziskRemoteVerifier.staticcall(
             abi.encodeCall(
                 IZiskVerifier.verifySnarkProof,
-                (programVK, rootCVadcopFinal, abi.encodePacked(publicInput), _proof[32:])
+                (
+                    programVK,
+                    rootCVadcopFinal,
+                    // ZISK expects right padding upto 256 bytes
+                    abi.encodePacked(publicInput, padding),
+                    _proof[32:]
+                )
             )
         );
 
