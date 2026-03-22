@@ -502,19 +502,23 @@ func (s *PreconfBlockAPIServer) ReorgStaleBlock(c echo.Context) error {
 	}
 
 	// Safety check: verify all blocks being removed are preconfirmed-only (not proposed on L1).
-	// Preconfirmed blocks have L1BlockHeight == nil in their L1Origin, while proposed blocks
-	// have a real L1BlockHeight set when the proposal event is processed.
+	// The L1Origin's IsPreconfBlock() method is the authoritative way to distinguish preconfirmed
+	// blocks from proposed blocks — proposed blocks have real L1BlockHeight/L1BlockHash values.
 	for blockNum := currentHead.Number.Uint64(); blockNum > reqBody.NewHeadBlockNumber; blockNum-- {
 		l1Origin, err := s.rpc.L2.L1OriginByID(ctx, new(big.Int).SetUint64(blockNum))
 		if err != nil {
 			// L1Origin not found means the block was never proposed — safe to reorg.
 			continue
 		}
-		if l1Origin != nil && l1Origin.L1BlockHeight != nil {
+		if l1Origin == nil {
+			continue
+		}
+		if !l1Origin.IsPreconfBlock() {
 			return s.returnError(c, http.StatusBadRequest, fmt.Errorf(
-				"block %d has already been proposed on L1 (L1BlockHeight: %d) and cannot be reorged",
+				"block %d has already been proposed on L1 (L1BlockHeight: %d, L1BlockHash: %s) and cannot be reorged",
 				blockNum,
 				l1Origin.L1BlockHeight,
+				l1Origin.L1BlockHash.Hex(),
 			))
 		}
 	}
