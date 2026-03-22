@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, createElement } from 'react';
 import { Address, Hex } from 'viem';
 import { useWalletClient } from 'wagmi';
 import toast from 'react-hot-toast';
@@ -15,6 +15,64 @@ import {
 } from '../lib/userOp';
 import { UserOp } from '../types';
 import { DEFAULT_SLIPPAGE } from '../lib/constants';
+
+// Inline SVG spinner components for toast icons
+function Spinner({ color = '#60a5fa' }: { color?: string }) {
+  return createElement('div', {
+    style: {
+      width: 20, height: 20,
+      border: `2px solid ${color}33`,
+      borderTop: `2px solid ${color}`,
+      borderRadius: '50%',
+      animation: 'spin 0.8s linear infinite',
+    },
+  });
+}
+
+function LightningSpinner() {
+  return createElement('div', {
+    style: { position: 'relative' as const, width: 20, height: 20 },
+  },
+    createElement('div', {
+      style: {
+        position: 'absolute' as const, inset: 0,
+        border: '2px solid #a78bfa33',
+        borderTop: '2px solid #a78bfa',
+        borderRadius: '50%',
+        animation: 'spin 0.8s linear infinite',
+      },
+    }),
+    createElement('svg', {
+      viewBox: '0 0 24 24', fill: '#a78bfa',
+      style: { position: 'absolute' as const, inset: 3, width: 14, height: 14 },
+    },
+      createElement('path', { d: 'M13 2L3 14h9l-1 8 10-12h-9l1-8z' })
+    ),
+  );
+}
+
+function PenSpinner() {
+  return createElement('div', {
+    style: { position: 'relative' as const, width: 20, height: 20 },
+  },
+    createElement('div', {
+      style: {
+        position: 'absolute' as const, inset: 0,
+        border: '2px solid #fbbf2433',
+        borderTop: '2px solid #fbbf24',
+        borderRadius: '50%',
+        animation: 'spin 0.8s linear infinite',
+      },
+    }),
+    createElement('svg', {
+      viewBox: '0 0 24 24', fill: 'none', stroke: '#fbbf24', strokeWidth: 2,
+      strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
+      style: { position: 'absolute' as const, inset: 3, width: 14, height: 14 },
+    },
+      createElement('path', { d: 'M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z' })
+    ),
+  );
+}
 
 interface UseUserOpReturn {
   executeSwap: (params: ExecuteSwapParams) => Promise<boolean>;
@@ -68,18 +126,22 @@ export function useUserOp(): UseUserOpReturn {
 
   const pollStatus = useCallback((userOpId: number, toastId: string = 'swap'): Promise<boolean> => {
     return new Promise((resolve) => {
-      toast.loading('Sending to builder...', { id: toastId });
+      toast.loading('Sending to builder', { id: toastId, icon: createElement(Spinner) });
 
       pollIntervalRef.current = setInterval(async () => {
         const status = await queryUserOpStatus(userOpId);
         if (!status) return;
 
-        if (status.status === 'Processing') {
-          toast.loading(`Processing (tx: ${status.tx_hash.slice(0, 10)}...)`, { id: toastId });
+        if (status.status === 'Pending') {
+          toast.loading('Pending', { id: toastId, icon: createElement(Spinner) });
+        } else if (status.status === 'Processing') {
+          toast.loading(`Proposing (tx: ${status.tx_hash.slice(0, 10)})`, { id: toastId, icon: createElement(Spinner, { color: '#34d399' }) });
+        } else if (status.status === 'ProvingBlock') {
+          toast.loading('Generating ZK Proof', { id: toastId, icon: createElement(LightningSpinner) });
         } else if (status.status === 'Executed') {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           pollIntervalRef.current = null;
-          toast.success('Executed successfully!', { id: toastId });
+          toast.success('Execution complete', { id: toastId });
           setIsPending(false);
           resolve(true);
         } else if (status.status === 'Rejected') {
@@ -90,7 +152,6 @@ export function useUserOp(): UseUserOpReturn {
           setIsPending(false);
           resolve(false);
         }
-        // Pending: keep polling
       }, 1000);
     });
   }, []);
@@ -118,7 +179,7 @@ export function useUserOp(): UseUserOpReturn {
         // Build UserOp(s)
         const ops = buildSwapUserOps(direction, amountIn, minAmountOut, smartWallet);
 
-        toast.loading('Signing transaction...', { id: 'swap' });
+        toast.loading('Signing transaction', { id: 'swap', icon: createElement(PenSpinner) });
 
         // Compute digest
         const digest = computeUserOpsDigest(ops);
@@ -174,7 +235,7 @@ export function useUserOp(): UseUserOpReturn {
       setError(null);
 
       try {
-        toast.loading('Signing transaction...', { id: toastId });
+        toast.loading('Signing transaction', { id: toastId, icon: createElement(PenSpinner) });
 
         const digest = computeUserOpsDigest(ops);
         const signature = await walletClient.signMessage({

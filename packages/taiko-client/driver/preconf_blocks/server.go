@@ -218,6 +218,7 @@ func (s *PreconfBlockAPIServer) configureRoutes() {
 	s.echo.GET("/healthz", s.HealthCheck)
 	s.echo.GET("/status", s.GetStatus)
 	s.echo.POST("/preconfBlocks", s.BuildPreconfBlock)
+	s.echo.POST("/reorgStaleBlock", s.ReorgStaleBlock)
 
 	// WebSocket routes
 	s.echo.GET("/ws", s.ws.handleWebSocket)

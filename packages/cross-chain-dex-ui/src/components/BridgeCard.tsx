@@ -1,12 +1,12 @@
-import { useState, useCallback, useMemo } from 'react';
-import { parseUnits, formatUnits, Address } from 'viem';
-import { TokenInput } from './TokenInput';
-import { useSmartWallet } from '../hooks/useSmartWallet';
-import { useTokenBalances } from '../hooks/useTokenBalances';
-import { useUserOp } from '../hooks/useUserOp';
-import { ETH_TOKEN, USDC_TOKEN, L1_NATIVE_SYMBOL } from '../lib/constants';
+import { useState, useCallback, useMemo } from "react";
+import { parseUnits, formatUnits, Address } from "viem";
+import { TokenInput } from "./TokenInput";
+import { useSmartWallet } from "../hooks/useSmartWallet";
+import { useTokenBalances } from "../hooks/useTokenBalances";
+import { useUserOp } from "../hooks/useUserOp";
+import { ETH_TOKEN, USDC_TOKEN, L1_NATIVE_SYMBOL } from "../lib/constants";
 
-type BridgeToken = typeof L1_NATIVE_SYMBOL | 'USDC';
+type BridgeToken = typeof L1_NATIVE_SYMBOL | "USDC";
 
 interface BridgeCardProps {
   onSetupWallet: () => void;
@@ -17,11 +17,12 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
   const { ethBalance, usdcBalance } = useTokenBalances(smartWallet);
   const { executeBridge, executeBridgeNative, isPending } = useUserOp();
 
-  const [bridgeToken, setBridgeToken] = useState<BridgeToken>('USDC');
-  const [inputAmount, setInputAmount] = useState('');
-  const [recipient, setRecipient] = useState('');
+  const [bridgeToken, setBridgeToken] = useState<BridgeToken>("USDC");
+  const [inputAmount, setInputAmount] = useState("");
+  const [recipient, setRecipient] = useState("");
 
-  const currentToken = bridgeToken === L1_NATIVE_SYMBOL ? ETH_TOKEN : USDC_TOKEN;
+  const currentToken =
+    bridgeToken === L1_NATIVE_SYMBOL ? ETH_TOKEN : USDC_TOKEN;
 
   const amountIn = useMemo(() => {
     try {
@@ -30,10 +31,11 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
       return 0n;
     }
   }, [inputAmount, currentToken.decimals]);
-  const currentBalance = bridgeToken === L1_NATIVE_SYMBOL ? ethBalance : usdcBalance;
+  const currentBalance =
+    bridgeToken === L1_NATIVE_SYMBOL ? ethBalance : usdcBalance;
   const hasInsufficientBalance = amountIn > currentBalance;
 
-  const effectiveRecipient = (recipient || smartWallet || '') as Address;
+  const effectiveRecipient = (recipient || smartWallet || "") as Address;
 
   const handleBridge = useCallback(async () => {
     if (!smartWallet || amountIn === 0n) return;
@@ -54,20 +56,32 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
     }
 
     if (success) {
-      setInputAmount('');
+      setInputAmount("");
     }
-  }, [smartWallet, amountIn, bridgeToken, effectiveRecipient, executeBridge, executeBridgeNative]);
+  }, [
+    smartWallet,
+    amountIn,
+    bridgeToken,
+    effectiveRecipient,
+    executeBridge,
+    executeBridgeNative,
+  ]);
 
   const getButtonText = () => {
-    if (isPending) return 'Bridging...';
-    if (!isConnected) return 'Connect Wallet';
-    if (!smartWallet) return 'Setup Smart Wallet First';
-    if (!amountIn) return 'Enter Amount';
-    if (hasInsufficientBalance) return 'Insufficient Balance';
+    if (isPending) return "Bridging...";
+    if (!isConnected) return "Connect Wallet";
+    if (!smartWallet) return "Setup Smart Wallet First";
+    if (!amountIn) return "Enter Amount";
+    if (hasInsufficientBalance) return "Insufficient Balance";
     return `Bridge ${bridgeToken} to L2`;
   };
 
-  const isDisabled = isPending || !isConnected || !smartWallet || !amountIn || hasInsufficientBalance;
+  const isDisabled =
+    isPending ||
+    !isConnected ||
+    !smartWallet ||
+    !amountIn ||
+    hasInsufficientBalance;
 
   return (
     <div className="w-full max-w-md mx-auto relative z-10">
@@ -79,14 +93,17 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
 
         {/* Token Selector */}
         <div className="flex gap-2">
-          {([L1_NATIVE_SYMBOL, 'USDC'] as BridgeToken[]).map((t) => (
+          {([L1_NATIVE_SYMBOL, "USDC"] as BridgeToken[]).map((t) => (
             <button
               key={t}
-              onClick={() => { setBridgeToken(t); setInputAmount(''); }}
+              onClick={() => {
+                setBridgeToken(t);
+                setInputAmount("");
+              }}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
                 bridgeToken === t
-                  ? 'bg-surge-primary text-white'
-                  : 'bg-surge-dark/50 text-gray-400 hover:text-white border border-surge-border/30'
+                  ? "bg-surge-primary text-white"
+                  : "bg-surge-dark/50 text-gray-400 hover:text-white border border-surge-border/30"
               }`}
             >
               {t}
@@ -109,14 +126,14 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
             <div className="flex items-center gap-2 bg-surge-dark/50 px-3 py-2 rounded-lg">
               <span className="text-xs text-gray-400">L1</span>
               <span className="text-sm text-white font-medium">
-                {bridgeToken === L1_NATIVE_SYMBOL ? 'Send' : 'Lock'}
+                {bridgeToken === L1_NATIVE_SYMBOL ? "Send" : "Lock"}
               </span>
             </div>
             <div className="text-surge-primary">&rarr;</div>
             <div className="flex items-center gap-2 bg-surge-dark/50 px-3 py-2 rounded-lg">
               <span className="text-xs text-gray-400">L2</span>
               <span className="text-sm text-white font-medium">
-                {bridgeToken === L1_NATIVE_SYMBOL ? 'Receive' : 'Mint'}
+                {bridgeToken === L1_NATIVE_SYMBOL ? "Receive" : "Mint"}
               </span>
             </div>
           </div>
@@ -124,12 +141,16 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
 
         {/* Recipient (optional) */}
         <div className="space-y-1">
-          <label className="text-xs text-gray-400">Recipient on L2 (optional)</label>
+          <label className="text-xs text-gray-400">
+            Recipient on L2 (optional)
+          </label>
           <input
             type="text"
             value={recipient}
             onChange={(e) => setRecipient(e.target.value)}
-            placeholder={smartWallet ? `Default: ${smartWallet.slice(0, 10)}...` : '0x...'}
+            placeholder={
+              smartWallet ? `Default: ${smartWallet.slice(0, 10)}...` : "0x..."
+            }
             className="w-full bg-surge-dark/50 border border-surge-border/30 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-surge-primary/50"
           />
         </div>
@@ -139,11 +160,16 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
           <div className="bg-surge-dark/30 rounded-lg p-3 space-y-1">
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">You send</span>
-              <span className="text-white">{formatUnits(amountIn, currentToken.decimals)} {bridgeToken}</span>
+              <span className="text-white">
+                {formatUnits(amountIn, currentToken.decimals)} {bridgeToken}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">You receive</span>
-              <span className="text-white">{formatUnits(amountIn, currentToken.decimals)} {bridgeToken} on L2</span>
+              <span className="text-white">
+                {formatUnits(amountIn, currentToken.decimals)} {bridgeToken} on
+                L2
+              </span>
             </div>
           </div>
         )}
@@ -154,8 +180,8 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
           disabled={isDisabled}
           className={`w-full py-4 rounded-xl font-semibold text-lg transition-all duration-200 ${
             isDisabled
-              ? 'bg-surge-card/50 text-gray-500 cursor-not-allowed border border-surge-border/30'
-              : 'bg-gradient-to-r from-surge-primary to-surge-secondary text-white hover:shadow-lg hover:shadow-surge-primary/30 hover:scale-[1.02] active:scale-[0.98]'
+              ? "bg-surge-card/50 text-gray-500 cursor-not-allowed border border-surge-border/30"
+              : "bg-gradient-to-r from-surge-primary to-surge-secondary text-white hover:shadow-lg hover:shadow-surge-primary/30 hover:scale-[1.02] active:scale-[0.98]"
           }`}
         >
           {isPending ? (

@@ -288,6 +288,7 @@ export async function sendUserOpToBuilder(
 export type UserOpStatus =
   | { status: 'Pending' }
   | { status: 'Processing'; tx_hash: string }
+  | { status: 'ProvingBlock'; block_id: number }
   | { status: 'Rejected'; reason: string }
   | { status: 'Executed' };
 

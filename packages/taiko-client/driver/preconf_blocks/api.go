@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/p2p"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus/taiko"
@@ -432,6 +433,131 @@ func (s *PreconfBlockAPIServer) GetStatus(c echo.Context) error {
 		TotalCached:                   s.envelopesCache.getTotalCached(),
 		HighestUnsafeL2PayloadBlockID: s.highestUnsafeL2PayloadBlockID,
 		EndOfSequencingBlockHash:      endOfSequencingBlockHash.Hex(),
+	})
+}
+
+// ReorgStaleBlockRequestBody represents a request body for reorging stale preconfirmed blocks.
+type ReorgStaleBlockRequestBody struct {
+	// @param NewHeadBlockNumber uint64 the block number to set as the new chain head.
+	// All blocks above this number will be removed.
+	NewHeadBlockNumber uint64 `json:"newHeadBlockNumber"`
+}
+
+// ReorgStaleBlockResponseBody represents a response body after a successful reorg of stale blocks.
+type ReorgStaleBlockResponseBody struct {
+	// @param NewHeadBlockHash common.Hash the hash of the new chain head after the reorg.
+	NewHeadBlockHash common.Hash `json:"newHeadBlockHash"`
+	// @param BlocksRemoved uint64 the number of blocks that were reorged out.
+	BlocksRemoved uint64 `json:"blocksRemoved"`
+}
+
+// ReorgStaleBlock handles a request to reorg stale preconfirmed blocks that cannot be proposed.
+// Only blocks that have been preconfirmed but NOT proposed on L1 can be reorged out.
+//
+//	@Summary		Reorg stale preconfirmed blocks from the L2 execution engine.
+//	@Description	Reorg preconfirmed blocks that were not proposed on L1.
+//	@Description	Sets the chain head to the specified block number, removing all blocks above it.
+//	@Description	Only preconfirmed (not yet proposed) blocks can be removed.
+//	@Param			request body ReorgStaleBlockRequestBody true "reorg stale block request body"
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object} ReorgStaleBlockResponseBody
+//	@Router			/reorgStaleBlock [post]
+func (s *PreconfBlockAPIServer) ReorgStaleBlock(c echo.Context) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	ctx := context.Background()
+
+	// Parse the request body.
+	reqBody := new(ReorgStaleBlockRequestBody)
+	if err := c.Bind(reqBody); err != nil {
+		return s.returnError(c, http.StatusUnprocessableEntity, err)
+	}
+
+	if reqBody.NewHeadBlockNumber == 0 {
+		return s.returnError(c, http.StatusBadRequest, errors.New("newHeadBlockNumber must be greater than 0"))
+	}
+
+	// Get current chain head.
+	currentHead, err := s.rpc.L2.HeaderByNumber(ctx, nil)
+	if err != nil {
+		return s.returnError(c, http.StatusInternalServerError, fmt.Errorf("failed to get current chain head: %w", err))
+	}
+
+	if reqBody.NewHeadBlockNumber >= currentHead.Number.Uint64() {
+		return s.returnError(c, http.StatusBadRequest, fmt.Errorf(
+			"newHeadBlockNumber (%d) must be less than current head (%d)",
+			reqBody.NewHeadBlockNumber,
+			currentHead.Number.Uint64(),
+		))
+	}
+
+	// Get the target block to verify it exists.
+	targetHeader, err := s.rpc.L2.HeaderByNumber(ctx, new(big.Int).SetUint64(reqBody.NewHeadBlockNumber))
+	if err != nil {
+		return s.returnError(c, http.StatusBadRequest, fmt.Errorf(
+			"failed to get target block %d: %w", reqBody.NewHeadBlockNumber, err,
+		))
+	}
+
+	// Safety check: verify all blocks being removed are preconfirmed-only (not proposed on L1).
+	// Preconfirmed blocks have L1BlockHeight == nil in their L1Origin, while proposed blocks
+	// have a real L1BlockHeight set when the proposal event is processed.
+	for blockNum := currentHead.Number.Uint64(); blockNum > reqBody.NewHeadBlockNumber; blockNum-- {
+		l1Origin, err := s.rpc.L2.L1OriginByID(ctx, new(big.Int).SetUint64(blockNum))
+		if err != nil {
+			// L1Origin not found means the block was never proposed — safe to reorg.
+			continue
+		}
+		if l1Origin != nil && l1Origin.L1BlockHeight != nil {
+			return s.returnError(c, http.StatusBadRequest, fmt.Errorf(
+				"block %d has already been proposed on L1 (L1BlockHeight: %d) and cannot be reorged",
+				blockNum,
+				l1Origin.L1BlockHeight,
+			))
+		}
+	}
+
+	// Execute ForkchoiceUpdate to set the new chain head.
+	fc := &engine.ForkchoiceStateV1{
+		HeadBlockHash:      targetHeader.Hash(),
+		SafeBlockHash:      common.Hash{},
+		FinalizedBlockHash: common.Hash{},
+	}
+	fcRes, err := s.rpc.L2Engine.ForkchoiceUpdate(ctx, fc, nil)
+	if err != nil {
+		return s.returnError(c, http.StatusInternalServerError, fmt.Errorf("failed to update fork choice: %w", err))
+	}
+	if fcRes.PayloadStatus.Status != engine.VALID {
+		return s.returnError(c, http.StatusInternalServerError, fmt.Errorf(
+			"unexpected ForkchoiceUpdate response status: %s", fcRes.PayloadStatus.Status,
+		))
+	}
+
+	// Update head L1 origin to keep L1Origin tracking consistent.
+	if _, err := s.rpc.L2Engine.SetHeadL1Origin(ctx, new(big.Int).SetUint64(reqBody.NewHeadBlockNumber)); err != nil {
+		log.Warn("Failed to set head L1 origin after stale block reorg", "error", err)
+	}
+
+	// Update internal state.
+	s.updateHighestUnsafeL2Payload(reqBody.NewHeadBlockNumber)
+
+	blocksRemoved := currentHead.Number.Uint64() - reqBody.NewHeadBlockNumber
+
+	log.Info(
+		"⚠️ Successfully reorged stale preconfirmed blocks",
+		"newHead", reqBody.NewHeadBlockNumber,
+		"newHeadHash", targetHeader.Hash(),
+		"blocksRemoved", blocksRemoved,
+		"previousHead", currentHead.Number.Uint64(),
+	)
+
+	metrics.DriverPreconfStaleReorgCounter.Inc()
+
+	return c.JSON(http.StatusOK, ReorgStaleBlockResponseBody{
+		NewHeadBlockHash: targetHeader.Hash(),
+		BlocksRemoved:    blocksRemoved,
 	})
 }
 

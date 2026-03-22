@@ -112,3 +112,8 @@ input[type='number'] {
 .glow-button:hover::before {
   left: 100%;
 }
+
+/* Toast spinner animation */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
