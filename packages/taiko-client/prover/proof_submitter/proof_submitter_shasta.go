@@ -45,6 +45,7 @@ type ProofSubmitterShasta struct {
 	// Intervals
 	forceBatchProvingInterval time.Duration
 	proofPollingInterval      time.Duration
+	backOffMaxInterval        time.Duration
 }
 
 // NewProofSubmitterShasta creates a new Shasta ProofSubmitter instance.
@@ -61,6 +62,7 @@ func NewProofSubmitterShasta(
 	forceBatchProvingInterval time.Duration,
 	proofCacheMaps map[proofProducer.ProofType]cmap.ConcurrentMap[string, *proofProducer.ProofResponse],
 	flushCacheNotify chan proofProducer.ProofType,
+	backOffMaxInterval time.Duration,
 ) (*ProofSubmitterShasta, error) {
 	proofSubmitter := &ProofSubmitterShasta{
 		rpc:                    senderOpts.RPCClient,
@@ -82,6 +84,7 @@ func NewProofSubmitterShasta(
 		forceBatchProvingInterval: forceBatchProvingInterval,
 		proofCacheMaps:            proofCacheMaps,
 		flushCacheNotify:          flushCacheNotify,
+		backOffMaxInterval:        backOffMaxInterval,
 	}
 
 	proofSubmitter.startBackgroundWorkers(ctx)
@@ -162,7 +165,8 @@ func (s *ProofSubmitterShasta) RequestProof(ctx context.Context, meta metadata.T
 	)
 
 	// Send the generated proof.
-	if err := backoff.Retry(func() error {
+	sbo := newRaikoBackOff(s.proofPollingInterval, s.backOffMaxInterval)
+	if err := backoff.RetryNotify(func() error {
 		if ctx.Err() != nil {
 			log.Error("Failed to request proof, context is canceled", "batchID", opts.ProposalID, "error", ctx.Err())
 			return nil
@@ -201,7 +205,14 @@ func (s *ProofSubmitterShasta) RequestProof(ctx context.Context, meta metadata.T
 			return err
 		}
 		return s.handleProofResponse(meta, fromID, proofResponse)
-	}, backoff.WithContext(backoff.NewConstantBackOff(s.proofPollingInterval), ctx)); err != nil {
+	},
+		backoff.WithContext(sbo, ctx),
+		func(err error, _ time.Duration) {
+			if isSoftRaikoError(err) {
+				sbo.Reset()
+			}
+		},
+	); err != nil {
 		if !errors.Is(err, proofProducer.ErrZkAnyNotDrawn) &&
 			!errors.Is(err, proofProducer.ErrProofInProgress) &&
 			!errors.Is(err, proofProducer.ErrRetry) {
@@ -386,7 +397,8 @@ func (s *ProofSubmitterShasta) AggregateProofsByType(ctx context.Context, proofT
 		log.Debug("Buffer is empty now, skip aggregating")
 		return nil
 	}
-	if err := backoff.Retry(
+	aabo := newRaikoBackOff(s.proofPollingInterval, s.backOffMaxInterval)
+	if err := backoff.RetryNotify(
 		func() error {
 			result, err := producer.Aggregate(ctx, buffer, startAt)
 			if err != nil {
@@ -408,7 +420,12 @@ func (s *ProofSubmitterShasta) AggregateProofsByType(ctx context.Context, proofT
 			s.batchResultCh <- result
 			return nil
 		},
-		backoff.WithContext(backoff.NewConstantBackOff(s.proofPollingInterval), ctx),
+		backoff.WithContext(aabo, ctx),
+		func(err error, _ time.Duration) {
+			if isSoftRaikoError(err) {
+				aabo.Reset()
+			}
+		},
 	); err != nil {
 		log.Error("Aggregate proof error", "error", err)
 		batchIDs := make([]uint64, 0, len(buffer))

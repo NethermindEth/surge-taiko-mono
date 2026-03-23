@@ -391,17 +391,21 @@ func (p *Prover) ProverAddress() common.Address {
 	return p.txmgr.From()
 }
 
-// withRetry retries the given function with prover backoff policy.
+// withRetry retries the given function with exponential backoff.
 func (p *Prover) withRetry(f func() error) {
 	p.wg.Add(1)
 	go func() {
 		defer p.wg.Done()
 		// Create a fresh, per-call backoff policy to avoid shared state across goroutines.
+		expBackOff := backoff.NewExponentialBackOff()
+		expBackOff.InitialInterval = p.cfg.BackOffRetryInterval
+		expBackOff.MaxInterval = p.cfg.BackOffMaxInterval
+		expBackOff.Multiplier = 2.0
+		expBackOff.RandomizationFactor = 0.3
+		expBackOff.MaxElapsedTime = 0
+		expBackOff.Reset()
 		bo := backoff.WithContext(
-			backoff.WithMaxRetries(
-				backoff.NewConstantBackOff(p.cfg.BackOffRetryInterval),
-				p.cfg.BackOffMaxRetries,
-			),
+			backoff.WithMaxRetries(expBackOff, p.cfg.BackOffMaxRetries),
 			p.ctx,
 		)
 		if err := backoff.Retry(f, bo); err != nil {

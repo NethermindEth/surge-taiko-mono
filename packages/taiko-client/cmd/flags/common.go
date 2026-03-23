@@ -148,6 +148,13 @@ var (
 		Value:    backoff.DefaultMaxInterval,
 		EnvVars:  []string{"BACKOFF_RETRY_INTERVAL"},
 	}
+	BackOffMaxInterval = &cli.DurationFlag{
+		Name:     "backoff.maxInterval",
+		Usage:    "Maximum interval between retries when using exponential backoff",
+		Category: commonCategory,
+		Value:    5 * time.Minute,
+		EnvVars:  []string{"BACKOFF_MAX_INTERVAL"},
+	}
 	RPCTimeout = &cli.DurationFlag{
 		Name:     "rpc.timeout",
 		Usage:    "Timeout in seconds for RPC calls",
@@ -187,6 +194,7 @@ var CommonFlags = []cli.Flag{
 	MetricsPort,
 	BackOffMaxRetries,
 	BackOffRetryInterval,
+	BackOffMaxInterval,
 	RPCTimeout,
 	L1PrivateEndpoint,
 }

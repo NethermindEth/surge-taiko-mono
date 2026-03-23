@@ -157,6 +157,7 @@ func (p *Prover) initShastaProofSubmitter(ctx context.Context, txBuilder *transa
 		p.cfg.ForceBatchProvingInterval,
 		cacheMaps,
 		p.flushCacheNotify,
+		p.cfg.BackOffMaxInterval,
 	); err != nil {
 		return fmt.Errorf("failed to initialize Shasta proof submitter: %w", err)
 	}
@@ -237,6 +238,7 @@ func (p *Prover) initPacayaProofSubmitter(txBuilder *transaction.ProveBatchesTxB
 		proofBuffers,
 		p.cfg.ForceBatchProvingInterval,
 		p.cfg.ProofPollingInterval,
+		p.cfg.BackOffMaxInterval,
 	); err != nil {
 		return fmt.Errorf("failed to initialize Pacaya proof submitter: %w", err)
 	}

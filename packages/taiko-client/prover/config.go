@@ -38,6 +38,7 @@ type Config struct {
 	StartingBatchID           *big.Int
 	BackOffMaxRetries         uint64
 	BackOffRetryInterval      time.Duration
+	BackOffMaxInterval        time.Duration
 	ProveUnassignedBlocks     bool
 	RPCTimeout                time.Duration
 	ProveBatchesGasLimit      uint64
@@ -155,6 +156,7 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		Dummy:                  c.Bool(flags.Dummy.Name),
 		BackOffMaxRetries:      c.Uint64(flags.BackOffMaxRetries.Name),
 		BackOffRetryInterval:   c.Duration(flags.BackOffRetryInterval.Name),
+		BackOffMaxInterval:     c.Duration(flags.BackOffMaxInterval.Name),
 		ProveUnassignedBlocks:  c.Bool(flags.ProveUnassignedBlocks.Name),
 		RPCTimeout:             c.Duration(flags.RPCTimeout.Name),
 		ProveBatchesGasLimit:   c.Uint64(flags.TxGasLimit.Name),

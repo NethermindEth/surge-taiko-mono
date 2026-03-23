@@ -51,6 +51,7 @@ type ProofSubmitterPacaya struct {
 	// Intervals
 	forceBatchProvingInterval time.Duration
 	proofPollingInterval      time.Duration
+	backOffMaxInterval        time.Duration
 }
 
 // SenderOptions is the options for the transaction sender.
@@ -75,6 +76,7 @@ func NewProofSubmitterPacaya(
 	proofBuffers map[proofProducer.ProofType]*proofProducer.ProofBuffer,
 	forceBatchProvingInterval time.Duration,
 	proofPollingInterval time.Duration,
+	backOffMaxInterval time.Duration,
 ) (*ProofSubmitterPacaya, error) {
 	anchorValidator, err := validator.New(
 		taikoAnchorAddress,
@@ -106,6 +108,7 @@ func NewProofSubmitterPacaya(
 		proofBuffers:              proofBuffers,
 		forceBatchProvingInterval: forceBatchProvingInterval,
 		proofPollingInterval:      proofPollingInterval,
+		backOffMaxInterval:        backOffMaxInterval,
 	}
 
 	proofSubmitter.startProofBufferMonitors(ctx)
@@ -157,7 +160,8 @@ func (s *ProofSubmitterPacaya) RequestProof(ctx context.Context, meta metadata.T
 	}
 
 	// Send the generated proof.
-	if err := backoff.Retry(
+	bo := newRaikoBackOff(s.proofPollingInterval, s.backOffMaxInterval)
+	if err := backoff.RetryNotify(
 		func() error {
 			if ctx.Err() != nil {
 				log.Error("Failed to request proof, context is canceled", "batchID", opts.BatchID, "error", ctx.Err())
@@ -226,7 +230,12 @@ func (s *ProofSubmitterPacaya) RequestProof(ctx context.Context, meta metadata.T
 			metrics.ProverQueuedProofCounter.Add(1)
 			return nil
 		},
-		backoff.WithContext(backoff.NewConstantBackOff(s.proofPollingInterval), ctx),
+		backoff.WithContext(bo, ctx),
+		func(err error, _ time.Duration) {
+			if isSoftRaikoError(err) {
+				bo.Reset()
+			}
+		},
 	); err != nil {
 		if !errors.Is(err, proofProducer.ErrZkAnyNotDrawn) &&
 			!errors.Is(err, proofProducer.ErrProofInProgress) &&
@@ -359,7 +368,8 @@ func (s *ProofSubmitterPacaya) AggregateProofsByType(ctx context.Context, proofT
 		log.Debug("Buffer is empty now, skip aggregating")
 		return nil
 	}
-	if err := backoff.Retry(
+	abo := newRaikoBackOff(s.proofPollingInterval, s.backOffMaxInterval)
+	if err := backoff.RetryNotify(
 		func() error {
 			result, err := producer.Aggregate(ctx, buffer, startAt)
 			if err != nil {
@@ -381,7 +391,12 @@ func (s *ProofSubmitterPacaya) AggregateProofsByType(ctx context.Context, proofT
 			s.batchResultCh <- result
 			return nil
 		},
-		backoff.WithContext(backoff.NewConstantBackOff(s.proofPollingInterval), ctx),
+		backoff.WithContext(abo, ctx),
+		func(err error, _ time.Duration) {
+			if isSoftRaikoError(err) {
+				abo.Reset()
+			}
+		},
 	); err != nil {
 		log.Error("Aggregate proof error", "error", err)
 		batchIDs := make([]uint64, 0, len(buffer))
