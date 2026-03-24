@@ -12,6 +12,8 @@ import { LiquidityCard } from './components/LiquidityCard';
 import { SmartWalletSetup } from './components/SmartWalletSetup';
 import { NetworkSetup } from './components/NetworkSetup';
 import { FundWallet } from './components/FundWallet';
+import { TxStatusOverlay } from './components/TxStatusOverlay';
+import { TxStatusProvider, useTxStatus } from './context/TxStatusContext';
 import { useSmartWallet } from './hooks/useSmartWallet';
 import { useTokenBalances } from './hooks/useTokenBalances';
 import { ActiveTab } from './types';
@@ -19,6 +21,7 @@ import { ActiveTab } from './types';
 const queryClient = new QueryClient();
 
 function AppContent() {
+  const { txStatus, setTxStatus } = useTxStatus();
   const { smartWallet, isConnected, isLoading } = useSmartWallet();
   const { chainId } = useAccount();
   const { ethBalance, usdcBalance, ethFormatted, usdcFormatted } = useTokenBalances(smartWallet);
@@ -57,19 +60,12 @@ function AppContent() {
   }, [smartWallet, hasInsufficientFunds, hasShownFundModal, isLoading]);
 
   return (
-    <div className="min-h-screen bg-surge-dark flex flex-col">
+    <div className="h-screen overflow-hidden bg-surge-dark flex flex-col">
       <Header onSetupWallet={() => setShowWalletSetup(true)} />
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
-        <div className="text-center mb-6">
-          <h2 className="text-3xl font-bold text-white mb-2">Cross-Chain DEX</h2>
-          <p className="text-gray-400">
-            L1 swaps powered by L2 liquidity. Real bridging, no mock minting.
-          </p>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="flex gap-1 mb-6 bg-surge-card/50 rounded-xl p-1 border border-surge-border/30">
+      <main className="flex-1 min-h-0 relative flex items-center justify-center px-4">
+        {/* Tab Navigation — absolutely positioned near header, independent of card */}
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 flex gap-1 bg-surge-card/50 rounded-xl p-1 border border-surge-border/30 z-10">
           {(['swap', 'liquidity', 'bridge'] as ActiveTab[]).map((tab) => (
             <button
               key={tab}
@@ -85,28 +81,30 @@ function AppContent() {
           ))}
         </div>
 
-        {/* Active Panel */}
-        {activeTab === 'swap' && (
-          <SwapCard
-            onSetupWallet={() => setShowWalletSetup(true)}
-            onFundWallet={() => setShowFundWallet(true)}
-          />
-        )}
-        {activeTab === 'bridge' && (
-          <BridgeCard
-            onSetupWallet={() => setShowWalletSetup(true)}
-          />
-        )}
-        {activeTab === 'liquidity' && (
-          <LiquidityCard
-            onSetupWallet={() => setShowWalletSetup(true)}
-          />
-        )}
+        {/* Footer tagline — absolutely positioned at bottom */}
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
+          <p className="text-sm text-gray-400">Powered by Surge Protocol</p>
+          <p className="text-sm text-gray-500 mt-1">L1 swaps through L2 liquidity • Real time cross chain settlement</p>
+        </div>
 
-        {/* Pool Info */}
-        <div className="mt-8 text-center text-sm text-gray-500">
-          <p>Powered by Surge Protocol</p>
-          <p className="mt-1">0.3% swap fee • Real token bridging • Cross-chain settlement</p>
+        {/* Active Panel — centered in full main area */}
+        <div className="w-full flex items-center justify-center">
+          {activeTab === 'swap' && (
+            <SwapCard
+              onSetupWallet={() => setShowWalletSetup(true)}
+              onFundWallet={() => setShowFundWallet(true)}
+            />
+          )}
+          {activeTab === 'bridge' && (
+            <BridgeCard
+              onSetupWallet={() => setShowWalletSetup(true)}
+            />
+          )}
+          {activeTab === 'liquidity' && (
+            <LiquidityCard
+              onSetupWallet={() => setShowWalletSetup(true)}
+            />
+          )}
         </div>
       </main>
 
@@ -129,6 +127,12 @@ function AppContent() {
           usdcBalance={usdcFormatted}
         />
       )}
+
+      {/* Full-screen transaction status overlay */}
+      <TxStatusOverlay
+        state={txStatus}
+        onClose={() => setTxStatus({ phase: 'idle' })}
+      />
 
       <Toaster
         position="bottom-right"
@@ -160,7 +164,9 @@ function App() {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <AppContent />
+        <TxStatusProvider>
+          <AppContent />
+        </TxStatusProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

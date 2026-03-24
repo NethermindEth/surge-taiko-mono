@@ -47,3 +47,6 @@ export const CHAIN_ID = Number(import.meta.env.VITE_CHAIN_ID || '31337');
 
 // Slippage tolerance (0.5%)
 export const DEFAULT_SLIPPAGE = 0.5;
+
+// Explorer base URL for transaction links
+export const EXPLORER_URL = (import.meta.env.VITE_EXPLORER_URL as string) || 'https://gnosisscan.io';

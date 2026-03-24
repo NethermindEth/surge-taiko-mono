@@ -35,7 +35,7 @@ export function SwapButton({
     <button
       onClick={onClick}
       disabled={isDisabled}
-      className={`w-full py-4 rounded-xl font-semibold text-lg transition-all duration-200 ${
+      className={`w-full py-3 rounded-xl font-semibold text-base transition-all duration-200 ${
         isDisabled
           ? 'bg-surge-card/50 text-gray-500 cursor-not-allowed border border-surge-border/30'
           : 'bg-gradient-to-r from-surge-primary to-surge-secondary text-white hover:shadow-lg hover:shadow-surge-primary/30 hover:scale-[1.02] active:scale-[0.98]'

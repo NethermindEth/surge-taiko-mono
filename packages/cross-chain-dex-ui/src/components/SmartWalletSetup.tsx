@@ -29,8 +29,8 @@ export function SmartWalletSetup({ isOpen, onClose }: SmartWalletSetupProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-surge-card/90 backdrop-blur-xl border border-surge-border/50 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl hover-glow">
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50">
+      <div className="bg-surge-card border border-surge-border/50 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl hover-glow">
         <h2 className="text-xl font-bold text-white mb-2">Setup Surge Smart Wallet</h2>
         <p className="text-gray-400 text-sm mb-6">
           A smart wallet (UserOpsSubmitter) is required to execute cross-chain swaps. Your connected EOA wallet will sign UserOps that the smart wallet executes.

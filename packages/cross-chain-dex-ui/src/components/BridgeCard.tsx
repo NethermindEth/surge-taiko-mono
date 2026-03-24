@@ -85,7 +85,7 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
 
   return (
     <div className="w-full max-w-md mx-auto relative z-10">
-      <div className="bg-surge-card/80 backdrop-blur-xl border border-surge-border/50 rounded-2xl p-5 space-y-4 shadow-xl shadow-black/20 hover-glow">
+      <div className="bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20 hover-glow">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Bridge</h2>
           <span className="text-xs text-gray-400">L1 &rarr; L2</span>
@@ -178,7 +178,7 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
         <button
           onClick={isConnected && !smartWallet ? onSetupWallet : handleBridge}
           disabled={isDisabled}
-          className={`w-full py-4 rounded-xl font-semibold text-lg transition-all duration-200 ${
+          className={`w-full py-3 rounded-xl font-semibold text-base transition-all duration-200 ${
             isDisabled
               ? "bg-surge-card/50 text-gray-500 cursor-not-allowed border border-surge-border/30"
               : "bg-gradient-to-r from-surge-primary to-surge-secondary text-white hover:shadow-lg hover:shadow-surge-primary/30 hover:scale-[1.02] active:scale-[0.98]"

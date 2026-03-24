@@ -123,8 +123,9 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
   const isDisabled = isPending || !isConnected || !smartWallet || !ethAmount || !tokenAmount || hasInsufficientETH || hasInsufficientTokens;
 
   return (
-    <div className="w-full max-w-md mx-auto relative z-10">
-      <div className="bg-surge-card/80 backdrop-blur-xl border border-surge-border/50 rounded-2xl p-5 space-y-4 shadow-xl shadow-black/20 hover-glow">
+    <div className="flex flex-col md:flex-row items-start gap-4 justify-center w-full relative z-10">
+      {/* Left panel — inputs */}
+      <div className="w-full md:max-w-md bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20 hover-glow">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Add Liquidity</h2>
           <span className="text-xs text-gray-400">L1 &rarr; L2 DEX</span>
@@ -152,6 +153,31 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
           label="Token Amount"
         />
 
+        {/* Add Liquidity Button */}
+        <button
+          onClick={isConnected && !smartWallet ? onSetupWallet : handleAddLiquidity}
+          disabled={isDisabled}
+          className={`w-full py-3 rounded-xl font-semibold text-base transition-all duration-200 ${
+            isDisabled
+              ? 'bg-surge-card/50 text-gray-500 cursor-not-allowed border border-surge-border/30'
+              : 'bg-gradient-to-r from-surge-primary to-surge-secondary text-white hover:shadow-lg hover:shadow-surge-primary/30 hover:scale-[1.02] active:scale-[0.98]'
+          }`}
+        >
+          {isPending ? (
+            <span className="flex items-center justify-center gap-2">
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Adding Liquidity...
+            </span>
+          ) : (
+            getButtonText()
+          )}
+        </button>
+      </div>
+
+      {/* Right panel — pool info */}
+      <div className="w-full md:max-w-sm bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20">
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Pool Info</h3>
+
         {/* Set initial price when pool is empty */}
         {!hasReserves && (
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 space-y-2">
@@ -171,9 +197,9 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
           </div>
         )}
 
-        {/* Current Pool Info */}
+        {/* Current Pool Stats */}
         <div className="bg-surge-dark/30 rounded-lg p-3 space-y-1">
-          <div className="text-xs text-gray-400 font-medium mb-2">L2 DEX Pool</div>
+          <div className="text-xs text-gray-500 font-medium mb-2">L2 DEX Reserves</div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-400">{L1_NATIVE_SYMBOL} Reserve</span>
             <span className="text-white">{formatEther(ethReserve)} {L1_NATIVE_SYMBOL}</span>
@@ -194,33 +220,22 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
 
         {/* Flow Info */}
         {ethAmount > 0n && tokenAmount > 0n && (
-          <div className="bg-surge-dark/30 rounded-lg p-3 space-y-1">
+          <div className="bg-surge-dark/30 rounded-lg p-3 space-y-1 animate-panel-in">
+            <div className="text-xs text-gray-500 font-medium mb-2">Your Deposit</div>
             <div className="flex justify-between text-sm">
+              <span className="text-gray-400">{L1_NATIVE_SYMBOL}</span>
+              <span className="text-white">{ethInput} {L1_NATIVE_SYMBOL}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-400">USDC</span>
+              <span className="text-white">{tokenInput} USDC</span>
+            </div>
+            <div className="flex justify-between text-sm mt-1 pt-1 border-t border-surge-border/30">
               <span className="text-gray-400">Operation</span>
-              <span className="text-white">Lock on L1 &rarr; Add to L2 DEX</span>
+              <span className="text-white text-xs">Lock on L1 &rarr; Add to L2 DEX</span>
             </div>
           </div>
         )}
-
-        {/* Add Liquidity Button */}
-        <button
-          onClick={isConnected && !smartWallet ? onSetupWallet : handleAddLiquidity}
-          disabled={isDisabled}
-          className={`w-full py-4 rounded-xl font-semibold text-lg transition-all duration-200 ${
-            isDisabled
-              ? 'bg-surge-card/50 text-gray-500 cursor-not-allowed border border-surge-border/30'
-              : 'bg-gradient-to-r from-surge-primary to-surge-secondary text-white hover:shadow-lg hover:shadow-surge-primary/30 hover:scale-[1.02] active:scale-[0.98]'
-          }`}
-        >
-          {isPending ? (
-            <span className="flex items-center justify-center gap-2">
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Adding Liquidity...
-            </span>
-          ) : (
-            getButtonText()
-          )}
-        </button>
       </div>
     </div>
   );

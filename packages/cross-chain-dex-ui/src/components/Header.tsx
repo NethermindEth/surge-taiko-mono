@@ -35,7 +35,7 @@ export function Header({ onSetupWallet }: HeaderProps) {
   };
 
   return (
-    <header className="w-full px-6 py-4 flex items-center justify-between border-b border-surge-border/30 bg-surge-dark/50 backdrop-blur-sm relative z-10">
+    <header className="w-full px-6 py-3 flex items-center justify-between border-b border-surge-border/30 bg-surge-dark/50 backdrop-blur-sm relative z-10">
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 bg-gradient-to-br from-surge-primary to-surge-secondary rounded-lg shadow-lg shadow-surge-primary/20" />
         <h1 className="text-xl font-bold text-white">Surge DEX</h1>

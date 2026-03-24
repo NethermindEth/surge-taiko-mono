@@ -20,8 +20,8 @@ export function FundWallet({ isOpen, onClose, smartWallet, ethBalance, usdcBalan
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-surge-card/90 backdrop-blur-xl border border-surge-border/50 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl hover-glow">
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50">
+      <div className="bg-surge-card border border-surge-border/50 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl hover-glow">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 bg-yellow-500/20 rounded-full flex items-center justify-center">
             <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
