@@ -16,13 +16,32 @@ import { TxStatusOverlay } from './components/TxStatusOverlay';
 import { TxStatusProvider, useTxStatus } from './context/TxStatusContext';
 import { useSmartWallet } from './hooks/useSmartWallet';
 import { useTokenBalances } from './hooks/useTokenBalances';
-import { ActiveTab } from './types';
+import { ActiveTab, TxOverlayState } from './types';
 
 const queryClient = new QueryClient();
+
+const PREVIEW_PHASES: TxOverlayState[] = [
+  { phase: 'signing' },
+  { phase: 'sequencing' },
+  { phase: 'proving' },
+  { phase: 'proposing' },
+  { phase: 'complete', txHash: '0xabc123def456abc123def456abc123def456abc123def456abc123def456abc1' },
+  { phase: 'rejected', errorMessage: 'Slippage exceeded: output too low' },
+];
 
 function AppContent() {
   const { txStatus, setTxStatus } = useTxStatus();
   const { smartWallet, isConnected, isLoading } = useSmartWallet();
+
+  useEffect(() => {
+    let idx = 0;
+    setTxStatus(PREVIEW_PHASES[0]);
+    const id = setInterval(() => {
+      idx = (idx + 1) % PREVIEW_PHASES.length;
+      setTxStatus(PREVIEW_PHASES[idx]);
+    }, 5000);
+    return () => clearInterval(id);
+  }, []);
   const { chainId } = useAccount();
   const { ethBalance, usdcBalance, ethFormatted, usdcFormatted } = useTokenBalances(smartWallet);
 

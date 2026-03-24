@@ -341,11 +341,11 @@ function Card({ children }: { children: React.ReactNode }) {
       className="w-full mx-4"
       style={{
         maxWidth: 400,
-        background: 'linear-gradient(160deg, #0d1929 0%, #070c16 55%, #090e1c 100%)',
-        border: '1px solid rgba(255, 255, 255, 0.07)',
+        background: 'linear-gradient(180deg, #090d12 0%, #07090d 100%)',
+        border: '1px solid rgba(24, 32, 48, 0.9)',
         borderRadius: 24,
         boxShadow:
-          'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 32px 64px rgba(0, 0, 0, 0.8), 0 0 60px rgba(16, 185, 129, 0.06)',
+          'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 32px 64px rgba(0, 0, 0, 0.8), 0 0 60px rgba(16, 185, 129, 0.06)',
       }}
     >
       {children}
