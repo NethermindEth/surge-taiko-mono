@@ -214,8 +214,8 @@ export function buildAddLiquidityUserOps(
  * Get the builder RPC URL (use proxy in development to avoid CORS)
  */
 function getBuilderUrl(): string {
-  // Use proxy in development to avoid CORS issues
-  if (BUILDER_RPC_URL.includes('localhost') && typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+  // Always use Vite proxy in dev to avoid CORS issues
+  if (import.meta.env.DEV) {
     return '/api/builder';
   }
   return BUILDER_RPC_URL;
