@@ -71,7 +71,7 @@ export function SwapCard({ onSetupWallet, onFundWallet }: SwapCardProps) {
   return (
     <div className="flex flex-col md:flex-row items-start gap-4 justify-center w-full relative z-10">
       {/* Left panel — inputs */}
-      <div className="w-full md:max-w-md bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20 hover-glow">
+      <div className="w-full md:max-w-md bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20 hover-glow transition-all duration-[1000ms] ease-[cubic-bezier(0.16,1,0.3,1)]">
         {/* Header */}
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Swap</h2>

@@ -7,7 +7,7 @@ import {
   buildBridgeUserOps,
   buildBridgeNativeUserOps,
   buildAddLiquidityUserOps,
-  computeUserOpsDigest,
+  buildExecuteBatchTypedData,
   sendUserOpToBuilder,
   calculateMinOutput,
   queryUserOpStatus,
@@ -121,14 +121,8 @@ export function useUserOp(): UseUserOpReturn {
 
         setTxStatus({ phase: 'signing' });
 
-        const digest = computeUserOpsDigest(ops);
-        console.log('UserOps:', ops);
-        console.log('Digest to sign:', digest);
-        console.log('Signer address:', walletClient.account.address);
-
-        const signature = await walletClient.signMessage({
-          message: { raw: digest as `0x${string}` },
-        });
+        const typedData = buildExecuteBatchTypedData(smartWallet, ops);
+        const signature = await walletClient.signTypedData(typedData);
         console.log('Signature:', signature);
 
         const result = await sendUserOpToBuilder(smartWallet, ops, signature as Hex);
@@ -171,10 +165,8 @@ export function useUserOp(): UseUserOpReturn {
       try {
         setTxStatus({ phase: 'signing' });
 
-        const digest = computeUserOpsDigest(ops);
-        const signature = await walletClient.signMessage({
-          message: { raw: digest as `0x${string}` },
-        });
+        const typedData = buildExecuteBatchTypedData(smartWallet, ops);
+        const signature = await walletClient.signTypedData(typedData);
 
         const result = await sendUserOpToBuilder(smartWallet, ops, signature as Hex);
 

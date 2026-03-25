@@ -41,6 +41,13 @@ export const UserOpsSubmitterABI = [
   },
   {
     type: 'function',
+    name: 'domainSeparator',
+    inputs: [],
+    outputs: [{ name: '', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'getDigest',
     inputs: [
       {
@@ -54,7 +61,7 @@ export const UserOpsSubmitterABI = [
       },
     ],
     outputs: [{ name: 'digest_', type: 'bytes32' }],
-    stateMutability: 'pure',
+    stateMutability: 'view',
   },
   {
     type: 'function',

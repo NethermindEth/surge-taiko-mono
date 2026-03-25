@@ -1,14 +1,53 @@
 import {
   encodeFunctionData,
-  encodeAbiParameters,
-  keccak256,
   Address,
   Hex,
-  hexToBytes,
 } from 'viem';
 import { UserOp, SwapDirection } from '../types';
 import { CrossChainSwapVaultL1ABI, BridgeABI, ERC20ABI, UserOpsSubmitterABI } from './contracts';
-import { L1_VAULT, L1_BRIDGE, L2_CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL } from './constants';
+import { L1_VAULT, L1_BRIDGE, L2_CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL, CHAIN_ID } from './constants';
+
+// ---------------------------------------------------------------
+// EIP-712 Domain & Types
+// ---------------------------------------------------------------
+
+export function getEIP712Domain(verifyingContract: Address) {
+  return {
+    name: 'UserOpsSubmitter' as const,
+    version: '1' as const,
+    chainId: CHAIN_ID,
+    verifyingContract,
+  };
+}
+
+export const ExecuteBatchTypes = {
+  ExecuteBatch: [
+    { name: 'ops', type: 'UserOp[]' },
+  ],
+  UserOp: [
+    { name: 'target', type: 'address' },
+    { name: 'value', type: 'uint256' },
+    { name: 'data', type: 'bytes' },
+  ],
+} as const;
+
+/**
+ * Build EIP-712 signTypedData params for an ExecuteBatch
+ */
+export function buildExecuteBatchTypedData(submitter: Address, ops: UserOp[]) {
+  return {
+    domain: getEIP712Domain(submitter),
+    types: ExecuteBatchTypes,
+    primaryType: 'ExecuteBatch' as const,
+    message: {
+      ops: ops.map((op) => ({ target: op.target, value: op.value, data: op.data })),
+    },
+  };
+}
+
+// ---------------------------------------------------------------
+// UserOp Builders
+// ---------------------------------------------------------------
 
 /**
  * Build UserOp(s) for a swap
@@ -167,34 +206,9 @@ export function buildAddLiquidityUserOps(
   ];
 }
 
-/**
- * Compute the digest for signing UserOps
- * This matches: keccak256(abi.encode(ops))
- */
-export function computeUserOpsDigest(ops: UserOp[]): Hex {
-  const encoded = encodeAbiParameters(
-    [
-      {
-        type: 'tuple[]',
-        components: [
-          { name: 'target', type: 'address' },
-          { name: 'value', type: 'uint256' },
-          { name: 'data', type: 'bytes' },
-        ],
-      },
-    ],
-    [ops.map((op) => ({ target: op.target, value: op.value, data: op.data }))]
-  );
-
-  return keccak256(encoded);
-}
-
-/**
- * Convert hex string to byte array for RPC
- */
-export function hexToByteArray(hex: Hex): number[] {
-  return Array.from(hexToBytes(hex));
-}
+// ---------------------------------------------------------------
+// Builder RPC
+// ---------------------------------------------------------------
 
 /**
  * Get the builder RPC URL (use proxy in development to avoid CORS)
@@ -263,7 +277,7 @@ export async function sendUserOpToBuilder(
     let json;
     try {
       json = JSON.parse(text);
-    } catch (parseError) {
+    } catch {
       console.error('Failed to parse builder response:', text);
       return { success: false, error: `Invalid JSON response: ${text.slice(0, 100)}` };
     }
