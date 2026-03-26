@@ -12,7 +12,6 @@ import { console2 } from "forge-std/src/console2.sol";
 /// @notice Script to deploy the Cross-Chain DEX L1 contracts (vault-based)
 /// @dev If SWAP_TOKEN env var is set, uses that existing token instead of deploying a new one.
 contract DeployCrossChainDexL1 is Script {
-    uint256 internal immutable privateKey = vm.envUint("PRIVATE_KEY");
     address internal immutable bridge = vm.envAddress("L1_BRIDGE");
     uint64 internal immutable l2ChainId = uint64(vm.envUint("L2_CHAIN_ID"));
     uint256 internal immutable initialTokenSupply = vm.envUint("INITIAL_TOKEN_SUPPLY");
@@ -20,8 +19,7 @@ contract DeployCrossChainDexL1 is Script {
     address internal immutable existingToken = vm.envOr("SWAP_TOKEN", address(0));
 
     modifier broadcast() {
-        require(privateKey != 0, "invalid private key");
-        vm.startBroadcast(privateKey);
+        vm.startBroadcast();
         _;
         vm.stopBroadcast();
     }
@@ -31,7 +29,7 @@ contract DeployCrossChainDexL1 is Script {
         broadcast
         returns (address swapToken_, address l1Vault_)
     {
-        address deployer = vm.addr(privateKey);
+        address deployer = msg.sender;
 
         console2.log("=====================================");
         console2.log("Deploying Cross-Chain DEX L1 (Vault)");

@@ -12,14 +12,12 @@ import { console2 } from "forge-std/src/console2.sol";
 /// @title DeployCrossChainDexL2
 /// @notice Script to deploy the Cross-Chain DEX L2 contracts (vault-based, no mock minting)
 contract DeployCrossChainDexL2 is Script {
-    uint256 internal immutable privateKey = vm.envUint("PRIVATE_KEY");
     address internal immutable bridge = vm.envAddress("L2_BRIDGE");
     uint64 internal immutable l1ChainId = uint64(vm.envUint("L1_CHAIN_ID"));
     uint8 internal immutable tokenDecimals = uint8(vm.envOr("TOKEN_DECIMALS", uint256(18)));
 
     modifier broadcast() {
-        require(privateKey != 0, "invalid private key");
-        vm.startBroadcast(privateKey);
+        vm.startBroadcast();
         _;
         vm.stopBroadcast();
     }
@@ -29,7 +27,7 @@ contract DeployCrossChainDexL2 is Script {
         broadcast
         returns (address swapTokenL2_, address dex_, address l2Vault_)
     {
-        address deployer = vm.addr(privateKey);
+        address deployer = msg.sender;
 
         console2.log("=====================================");
         console2.log("Deploying Cross-Chain DEX L2 (Vault)");

@@ -475,10 +475,6 @@ func (s *PreconfBlockAPIServer) ReorgStaleBlock(c echo.Context) error {
 		return s.returnError(c, http.StatusUnprocessableEntity, err)
 	}
 
-	if reqBody.NewHeadBlockNumber == 0 {
-		return s.returnError(c, http.StatusBadRequest, errors.New("newHeadBlockNumber must be greater than 0"))
-	}
-
 	// Get current chain head.
 	currentHead, err := s.rpc.L2.HeaderByNumber(ctx, nil)
 	if err != nil {

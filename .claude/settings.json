@@ -24,9 +24,13 @@
       "Bash(forge build:*)",
       "Bash(go test:*)",
       "Bash(go build:*)",
-      "Bash(sed *)",
-      "Bash(*)"
+      "Bash(sed *)"
     ],
-    "deny": ["Bash(git push --force:*)"]
+    "deny": [
+      "Bash(git push --force:*)",
+      "Read(.env*)",
+      "Read(*keystore-pw*)",
+      "Bash(cat *keystore-pw*)"
+    ]
   }
 }
