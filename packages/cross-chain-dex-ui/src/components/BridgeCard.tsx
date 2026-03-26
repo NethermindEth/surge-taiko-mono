@@ -94,8 +94,9 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
     exceedsL2Limit;
 
   return (
-    <div className="w-full max-w-md mx-auto relative z-10">
-      <div className="bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20 hover-glow">
+    <div className="flex flex-col md:flex-row items-start gap-4 justify-center w-full relative z-10">
+      {/* Left panel — inputs */}
+      <div className="w-full md:max-w-md bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20 hover-glow transition-all duration-[1000ms] ease-[cubic-bezier(0.16,1,0.3,1)]">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Bridge</h2>
           <span className="text-xs text-gray-400">L1 &rarr; L2</span>
@@ -136,25 +137,6 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
           label="Amount"
         />
 
-        {/* Flow Visualization */}
-        {amountIn > 0n && (
-          <div className="flex items-center justify-center gap-3 py-3">
-            <div className="flex items-center gap-2 bg-surge-dark/50 px-3 py-2 rounded-lg">
-              <span className="text-xs text-gray-400">L1</span>
-              <span className="text-sm text-white font-medium">
-                {bridgeToken === L1_NATIVE_SYMBOL ? "Send" : "Lock"}
-              </span>
-            </div>
-            <div className="text-surge-primary">&rarr;</div>
-            <div className="flex items-center gap-2 bg-surge-dark/50 px-3 py-2 rounded-lg">
-              <span className="text-xs text-gray-400">L2</span>
-              <span className="text-sm text-white font-medium">
-                {bridgeToken === L1_NATIVE_SYMBOL ? "Receive" : "Mint"}
-              </span>
-            </div>
-          </div>
-        )}
-
         {/* Recipient (optional) */}
         <div className="space-y-1">
           <label className="text-xs text-gray-400">
@@ -170,25 +152,6 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
             className="w-full bg-surge-dark/50 border border-surge-border/30 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-surge-primary/50"
           />
         </div>
-
-        {/* Info */}
-        {amountIn > 0n && (
-          <div className="bg-surge-dark/30 rounded-lg p-3 space-y-1">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-400">You send</span>
-              <span className="text-white">
-                {formatUnits(amountIn, currentToken.decimals)} {bridgeToken}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-400">You receive</span>
-              <span className="text-white">
-                {formatUnits(amountIn, currentToken.decimals)} {bridgeToken} on
-                L2
-              </span>
-            </div>
-          </div>
-        )}
 
         {/* Bridge Button */}
         <button
@@ -210,6 +173,54 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
           )}
         </button>
       </div>
+
+      {/* Right panel — bridge details (shown when amount is entered) */}
+      {amountIn > 0n && (
+        <div className="w-full md:max-w-sm bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20 animate-panel-in">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Bridge Details</h3>
+
+          {/* Flow Visualization */}
+          <div className="flex items-center justify-center gap-3 py-3">
+            <div className="flex items-center gap-2 bg-surge-dark/50 px-3 py-2 rounded-lg">
+              <span className="text-xs text-gray-400">L1</span>
+              <span className="text-sm text-white font-medium">
+                {bridgeToken === L1_NATIVE_SYMBOL ? "Send" : "Lock"}
+              </span>
+            </div>
+            <div className="text-surge-primary">&rarr;</div>
+            <div className="flex items-center gap-2 bg-surge-dark/50 px-3 py-2 rounded-lg">
+              <span className="text-xs text-gray-400">L2</span>
+              <span className="text-sm text-white font-medium">
+                {bridgeToken === L1_NATIVE_SYMBOL ? "Receive" : "Mint"}
+              </span>
+            </div>
+          </div>
+
+          {/* Transfer Summary */}
+          <div className="bg-surge-dark/30 rounded-lg p-3 space-y-1">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-400">You send</span>
+              <span className="text-white">
+                {formatUnits(amountIn, currentToken.decimals)} {bridgeToken}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-400">You receive</span>
+              <span className="text-white">
+                {formatUnits(amountIn, currentToken.decimals)} {bridgeToken} on L2
+              </span>
+            </div>
+            <div className="flex justify-between text-sm mt-1 pt-1 border-t border-surge-border/30">
+              <span className="text-gray-400">Recipient</span>
+              <span className="text-white text-xs font-mono">
+                {effectiveRecipient
+                  ? `${effectiveRecipient.slice(0, 6)}...${effectiveRecipient.slice(-4)}`
+                  : "—"}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
