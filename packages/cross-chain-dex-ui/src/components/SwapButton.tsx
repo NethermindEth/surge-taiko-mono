@@ -7,6 +7,7 @@ interface SwapButtonProps {
   hasInsufficientBalance: boolean;
   hasInsufficientLiquidity: boolean;
   hasAmount: boolean;
+  exceedsSwapLimit?: string;
 }
 
 export function SwapButton({
@@ -18,18 +19,20 @@ export function SwapButton({
   hasInsufficientBalance,
   hasInsufficientLiquidity,
   hasAmount,
+  exceedsSwapLimit,
 }: SwapButtonProps) {
   const getButtonText = () => {
     if (isLoading) return 'Swapping...';
     if (!isConnected) return 'Connect Wallet';
     if (!hasSmartWallet) return 'Setup Smart Wallet First';
     if (!hasAmount) return 'Enter Amount';
+    if (exceedsSwapLimit) return exceedsSwapLimit;
     if (hasInsufficientLiquidity) return 'Insufficient Liquidity';
     if (hasInsufficientBalance) return 'Insufficient Balance';
     return 'Swap';
   };
 
-  const isDisabled = disabled || isLoading || !isConnected || !hasSmartWallet || !hasAmount || hasInsufficientBalance || hasInsufficientLiquidity;
+  const isDisabled = disabled || isLoading || !isConnected || !hasSmartWallet || !hasAmount || hasInsufficientBalance || hasInsufficientLiquidity || !!exceedsSwapLimit;
 
   return (
     <button

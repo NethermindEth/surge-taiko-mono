@@ -5,6 +5,7 @@ import { useSmartWallet } from '../hooks/useSmartWallet';
 import { useDexReserves } from '../hooks/useDexReserves';
 import { useTokenBalances } from '../hooks/useTokenBalances';
 import { useUserOp } from '../hooks/useUserOp';
+import { useSpendingLimit } from '../hooks/useSpendingLimit';
 import { ETH_TOKEN, USDC_TOKEN, L1_NATIVE_SYMBOL } from '../lib/constants';
 
 interface LiquidityCardProps {
@@ -16,6 +17,7 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
   const { ethReserve, tokenReserve } = useDexReserves();
   const { ethBalance, usdcBalance } = useTokenBalances(smartWallet);
   const { executeAddLiquidity, isPending } = useUserOp();
+  const { hasExceededL2Limit, wouldExceed, recordSpending, remaining } = useSpendingLimit(smartWallet);
 
   const [ethInput, setEthInput] = useState('');
   const [tokenInput, setTokenInput] = useState('');
@@ -95,6 +97,11 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
   const hasInsufficientETH = ethAmount > ethBalance;
   const hasInsufficientTokens = tokenAmount > usdcBalance;
 
+  // Both xDAI and USDC are $1 stablecoins
+  const liquidityUsd = (ethAmount > 0n ? Number(formatEther(ethAmount)) : 0)
+    + (tokenAmount > 0n ? Number(formatUnits(tokenAmount, USDC_TOKEN.decimals)) : 0);
+  const exceedsL2Limit = hasExceededL2Limit || (liquidityUsd > 0 && wouldExceed(liquidityUsd));
+
   const handleAddLiquidity = useCallback(async () => {
     if (!smartWallet || ethAmount === 0n || tokenAmount === 0n) return;
 
@@ -105,22 +112,25 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
     });
 
     if (success) {
+      recordSpending(liquidityUsd);
       setEthInput('');
       setTokenInput('');
     }
-  }, [smartWallet, ethAmount, tokenAmount, executeAddLiquidity]);
+  }, [smartWallet, ethAmount, tokenAmount, liquidityUsd, executeAddLiquidity, recordSpending]);
 
   const getButtonText = () => {
     if (isPending) return 'Adding Liquidity...';
     if (!isConnected) return 'Connect Wallet';
     if (!smartWallet) return 'Setup Smart Wallet First';
     if (!ethAmount || !tokenAmount) return 'Enter Amounts';
+    if (hasExceededL2Limit) return 'L2 deposit limit reached ($1)';
+    if (exceedsL2Limit) return `Exceeds $1 limit ($${remaining.toFixed(2)} left)`;
     if (hasInsufficientETH) return `Insufficient ${L1_NATIVE_SYMBOL}`;
     if (hasInsufficientTokens) return 'Insufficient USDC Tokens';
     return 'Add Liquidity to L2';
   };
 
-  const isDisabled = isPending || !isConnected || !smartWallet || !ethAmount || !tokenAmount || hasInsufficientETH || hasInsufficientTokens;
+  const isDisabled = isPending || !isConnected || !smartWallet || !ethAmount || !tokenAmount || hasInsufficientETH || hasInsufficientTokens || exceedsL2Limit;
 
   return (
     <div className="flex flex-col md:flex-row items-start gap-4 justify-center w-full relative z-10">
@@ -129,6 +139,12 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Add Liquidity</h2>
           <span className="text-xs text-gray-400">L1 &rarr; L2 DEX</span>
+        </div>
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-3 py-2 text-xs text-yellow-400 flex items-center gap-1.5">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          We limit swaps and deposits to $1 on this experimental alpha
         </div>
 
         {/* ETH Input */}

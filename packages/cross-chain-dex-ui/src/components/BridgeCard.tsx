@@ -4,6 +4,7 @@ import { TokenInput } from "./TokenInput";
 import { useSmartWallet } from "../hooks/useSmartWallet";
 import { useTokenBalances } from "../hooks/useTokenBalances";
 import { useUserOp } from "../hooks/useUserOp";
+import { useSpendingLimit } from "../hooks/useSpendingLimit";
 import { ETH_TOKEN, USDC_TOKEN, L1_NATIVE_SYMBOL } from "../lib/constants";
 
 type BridgeToken = typeof L1_NATIVE_SYMBOL | "USDC";
@@ -16,6 +17,7 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
   const { smartWallet, isConnected } = useSmartWallet();
   const { ethBalance, usdcBalance } = useTokenBalances(smartWallet);
   const { executeBridge, executeBridgeNative, isPending } = useUserOp();
+  const { hasExceededL2Limit, wouldExceed, recordSpending, remaining } = useSpendingLimit(smartWallet);
 
   const [bridgeToken, setBridgeToken] = useState<BridgeToken>("USDC");
   const [inputAmount, setInputAmount] = useState("");
@@ -34,6 +36,8 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
   const currentBalance =
     bridgeToken === L1_NATIVE_SYMBOL ? ethBalance : usdcBalance;
   const hasInsufficientBalance = amountIn > currentBalance;
+  const bridgeAmountUsd = amountIn > 0n ? Number(formatUnits(amountIn, currentToken.decimals)) : 0;
+  const exceedsL2Limit = hasExceededL2Limit || (bridgeAmountUsd > 0 && wouldExceed(bridgeAmountUsd));
 
   const effectiveRecipient = (recipient || smartWallet || "") as Address;
 
@@ -56,15 +60,18 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
     }
 
     if (success) {
+      recordSpending(bridgeAmountUsd);
       setInputAmount("");
     }
   }, [
     smartWallet,
     amountIn,
     bridgeToken,
+    bridgeAmountUsd,
     effectiveRecipient,
     executeBridge,
     executeBridgeNative,
+    recordSpending,
   ]);
 
   const getButtonText = () => {
@@ -72,6 +79,8 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
     if (!isConnected) return "Connect Wallet";
     if (!smartWallet) return "Setup Smart Wallet First";
     if (!amountIn) return "Enter Amount";
+    if (hasExceededL2Limit) return "L2 deposit limit reached ($1)";
+    if (exceedsL2Limit) return `Exceeds $1 limit ($${remaining.toFixed(2)} left)`;
     if (hasInsufficientBalance) return "Insufficient Balance";
     return `Bridge ${bridgeToken} to L2`;
   };
@@ -81,7 +90,8 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
     !isConnected ||
     !smartWallet ||
     !amountIn ||
-    hasInsufficientBalance;
+    hasInsufficientBalance ||
+    exceedsL2Limit;
 
   return (
     <div className="w-full max-w-md mx-auto relative z-10">
@@ -89,6 +99,12 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Bridge</h2>
           <span className="text-xs text-gray-400">L1 &rarr; L2</span>
+        </div>
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-3 py-2 text-xs text-yellow-400 flex items-center gap-1.5">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          We limit swaps and deposits to $1 on this experimental alpha
         </div>
 
         {/* Token Selector */}

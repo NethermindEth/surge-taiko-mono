@@ -12,6 +12,8 @@ import { useUserOp } from '../hooks/useUserOp';
 import { SwapDirection } from '../types';
 import { ETH_TOKEN, USDC_TOKEN } from '../lib/constants';
 
+const MAX_SWAP_AMOUNT = 1; // $1 max per swap
+
 interface SwapCardProps {
   onSetupWallet: () => void;
   onFundWallet?: () => void;
@@ -47,6 +49,9 @@ export function SwapCard({ onSetupWallet, onFundWallet }: SwapCardProps) {
   const outputBalance = direction === 'ETH_TO_USDC' ? usdcBalance : ethBalance;
 
   const hasInsufficientBalance = amountIn > inputBalance;
+  const exceedsSwapLimit = amountIn > parseUnits(String(MAX_SWAP_AMOUNT), inputToken.decimals)
+    ? `Max ${MAX_SWAP_AMOUNT} ${inputToken.symbol} per swap`
+    : undefined;
 
   const handleSwapDirection = useCallback(() => {
     setDirection((prev) => (prev === 'ETH_TO_USDC' ? 'USDC_TO_ETH' : 'ETH_TO_USDC'));
@@ -78,6 +83,12 @@ export function SwapCard({ onSetupWallet, onFundWallet }: SwapCardProps) {
           {reservesLoading && (
             <span className="text-xs text-gray-400">Loading reserves...</span>
           )}
+        </div>
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-3 py-2 text-xs text-yellow-400 flex items-center gap-1.5">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          We limit swaps and deposits to $1 on this experimental alpha
         </div>
 
         {/* Input Token */}
@@ -136,6 +147,7 @@ export function SwapCard({ onSetupWallet, onFundWallet }: SwapCardProps) {
           hasInsufficientBalance={hasInsufficientBalance}
           hasInsufficientLiquidity={quote.insufficientLiquidity}
           hasAmount={amountIn > 0n}
+          exceedsSwapLimit={exceedsSwapLimit}
         />
 
       </div>
