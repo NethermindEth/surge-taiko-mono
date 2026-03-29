@@ -62,15 +62,19 @@ function AppContent() {
     }
   }, [isConnected, isWrongNetwork, smartWallet, isLoading, showWalletSetup]);
 
-  // Auto-show fund wallet modal if smart wallet has no funds (only once per session)
-  // balancesLoading stays true until the first real fetch completes for this wallet
+  // Auto-show fund wallet modal when:
+  // 1. Wallet has no funds (needs funding), OR
+  // 2. Wallet has funds but L2 wallet doesn't exist (needs L2 creation)
+  // Only once per session
   useEffect(() => {
-    if (!smartWallet || hasShownFundModal || balancesLoading || isLoading) return;
-    if (ethBalance === 0n && usdcBalance === 0n) {
+    if (!smartWallet || hasShownFundModal || balancesLoading || isLoading || showNetworkSetup || showWalletSetup) return;
+    const needsFunding = ethBalance === 0n && usdcBalance === 0n;
+    const needsL2 = !l2WalletExists;
+    if (needsFunding || needsL2) {
       setShowFundWallet(true);
       setHasShownFundModal(true);
     }
-  }, [smartWallet, ethBalance, usdcBalance, balancesLoading, hasShownFundModal, isLoading]);
+  }, [smartWallet, ethBalance, usdcBalance, balancesLoading, hasShownFundModal, isLoading, l2WalletExists, showNetworkSetup, showWalletSetup]);
 
   return (
     <div className="h-screen overflow-hidden bg-surge-dark flex flex-col">
