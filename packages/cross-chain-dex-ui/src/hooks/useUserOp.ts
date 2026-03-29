@@ -86,7 +86,7 @@ export function useUserOp(): UseUserOpReturn {
       let highestPhase = 0;
       let hasSeenProving = false;
       let pollCount = 0;
-      const MAX_POLLS = 300; // 5 minutes at 1s intervals
+      const MAX_POLLS = 60; // 1 minute at 1s intervals
 
       pollIntervalRef.current = setInterval(async () => {
         pollCount++;
