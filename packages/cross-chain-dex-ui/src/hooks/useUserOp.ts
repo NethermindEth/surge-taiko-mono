@@ -78,30 +78,37 @@ export function useUserOp(): UseUserOpReturn {
     return new Promise((resolve) => {
       setTxStatus({ phase: 'sequencing' });
 
-      // Phase ordering: sequencing(0) < proposing(1) < proving(2) < complete(3)
+      // Phase ordering: sequencing(0) < proving(1) < proposing(2) < complete(3)
+      // proving comes before proposing because the ZK proof is generated before L1 submission
       const phaseOrder: Record<string, number> = {
-        sequencing: 0, proposing: 1, proving: 2, complete: 3, rejected: 3,
+        sequencing: 0, proving: 1, proposing: 2, complete: 3, rejected: 3,
       };
       let highestPhase = 0;
+      let hasSeenProving = false;
 
       pollIntervalRef.current = setInterval(async () => {
         const status = await queryUserOpStatus(userOpId);
         if (!status) return;
 
         if (status.status === 'Pending') {
-          if (highestPhase < phaseOrder.sequencing) {
+          if (highestPhase <= phaseOrder.sequencing) {
             setTxStatus({ phase: 'sequencing' });
           }
-        } else if (status.status === 'Processing') {
-          txHashRef.current = status.tx_hash;
-          if (phaseOrder.proposing > highestPhase) {
-            highestPhase = phaseOrder.proposing;
-            setTxStatus({ phase: 'proposing' });
-          }
         } else if (status.status === 'ProvingBlock') {
+          hasSeenProving = true;
           if (phaseOrder.proving > highestPhase) {
             highestPhase = phaseOrder.proving;
             setTxStatus({ phase: 'proving' });
+          }
+        } else if (status.status === 'Processing') {
+          txHashRef.current = status.tx_hash;
+          // Only show "proposing" after proving has been seen
+          // Before proving, Processing means "sequencing"
+          if (hasSeenProving && phaseOrder.proposing > highestPhase) {
+            highestPhase = phaseOrder.proposing;
+            setTxStatus({ phase: 'proposing' });
+          } else if (!hasSeenProving && highestPhase <= phaseOrder.sequencing) {
+            setTxStatus({ phase: 'sequencing' });
           }
         } else if (status.status === 'Executed') {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
