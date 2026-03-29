@@ -25,25 +25,16 @@ function AppContent() {
   const { smartWallet, isConnected, isLoading, l2WalletExists, createL2Wallet, isCreatingL2Wallet } = useSmartWallet();
   const { chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
-  const { ethBalance, usdcBalance, ethFormatted, usdcFormatted } = useTokenBalances(smartWallet);
+  const { ethBalance, usdcBalance, ethFormatted, usdcFormatted, isLoading: balancesLoading } = useTokenBalances(smartWallet);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('swap');
   const [showWalletSetup, setShowWalletSetup] = useState(false);
   const [showNetworkSetup, setShowNetworkSetup] = useState(false);
   const [showFundWallet, setShowFundWallet] = useState(false);
   const [hasShownFundModal, setHasShownFundModal] = useState(false);
-  const [balancesLoaded, setBalancesLoaded] = useState(false);
-
   // Accept both L1 and L2 as valid networks
   const isWrongNetwork = isConnected && chainId !== surgeL1Chain.id && chainId !== surgeL2Chain.id;
   const hasInsufficientFunds = smartWallet && ethBalance === 0n && usdcBalance === 0n;
-
-  // Track when balances have been loaded at least once
-  useEffect(() => {
-    if (smartWallet && !isLoading) {
-      setBalancesLoaded(true);
-    }
-  }, [smartWallet, isLoading]);
 
   // Auto-show network setup if on wrong network
   useEffect(() => {
@@ -69,13 +60,13 @@ function AppContent() {
   }, [isConnected, isWrongNetwork, smartWallet, isLoading]);
 
   // Auto-show fund wallet modal if smart wallet has no funds (only once per session)
-  // Wait for balance load before showing to avoid false positives
+  // Wait for token balances to finish loading before deciding
   useEffect(() => {
-    if (smartWallet && hasInsufficientFunds && !hasShownFundModal && balancesLoaded) {
+    if (smartWallet && !balancesLoading && hasInsufficientFunds && !hasShownFundModal && !isLoading) {
       setShowFundWallet(true);
       setHasShownFundModal(true);
     }
-  }, [smartWallet, hasInsufficientFunds, hasShownFundModal, balancesLoaded]);
+  }, [smartWallet, balancesLoading, hasInsufficientFunds, hasShownFundModal, isLoading]);
 
   return (
     <div className="h-screen overflow-hidden bg-surge-dark flex flex-col">
