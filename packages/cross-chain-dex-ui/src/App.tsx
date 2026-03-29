@@ -53,11 +53,14 @@ function AppContent() {
   }, [activeTab, chainId, isConnected, switchChainAsync]);
 
   // Auto-show wallet setup if connected, on correct network, but no smart wallet
+  // Auto-close when wallet is created
   useEffect(() => {
     if (isConnected && !isWrongNetwork && !smartWallet && !isLoading) {
       setShowWalletSetup(true);
+    } else if (smartWallet && showWalletSetup) {
+      setShowWalletSetup(false);
     }
-  }, [isConnected, isWrongNetwork, smartWallet, isLoading]);
+  }, [isConnected, isWrongNetwork, smartWallet, isLoading, showWalletSetup]);
 
   // Auto-show fund wallet modal if smart wallet has no funds (only once per session)
   // balancesLoading stays true until the first real fetch completes for this wallet
