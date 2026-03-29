@@ -36,15 +36,20 @@ export function useL2TokenBalances(smartWallet: Address | null): TokenBalances {
       const ethBal = await l2PublicClient.getBalance({ address: smartWallet });
       setEthBalance(ethBal);
 
-      // Fetch USDC balance on L2
+      // Fetch USDC balance on L2 (may not exist if token isn't bridged)
       if (USDC_TOKEN.address && USDC_TOKEN.address !== '0x0000000000000000000000000000000000000000') {
-        const usdcBal = await l2PublicClient.readContract({
-          address: USDC_TOKEN.address,
-          abi: ERC20ABI,
-          functionName: 'balanceOf',
-          args: [smartWallet],
-        });
-        setUsdcBalance(usdcBal);
+        try {
+          const usdcBal = await l2PublicClient.readContract({
+            address: USDC_TOKEN.address,
+            abi: ERC20ABI,
+            functionName: 'balanceOf',
+            args: [smartWallet],
+          });
+          setUsdcBalance(usdcBal);
+        } catch {
+          // Token contract may not exist on L2
+          setUsdcBalance(0n);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch L2 balances:', err);
