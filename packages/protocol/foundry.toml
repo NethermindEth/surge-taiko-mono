@@ -132,6 +132,22 @@ test = "test/shared"
 script = "script/shared"
 out = "out/shared"
 evm_version = "shanghai"
+remappings = [
+    "@safe/=lib/safe-smart-account/contracts/",
+    "forge-std/=node_modules/forge-std/",
+    "openzeppelin/=node_modules/@openzeppelin/",
+    "@openzeppelin=node_modules/@openzeppelin",
+    "@openzeppelin-upgrades/contracts/=node_modules/@openzeppelin/contracts-upgradeable/",
+    "@solady/=node_modules/solady/",
+    "solady/src/=node_modules/solady/src/",
+    "solady/utils/=node_modules/solady/src/utils/",
+    "@optimism/=node_modules/optimism/",
+    "openzeppelin-contracts/contracts/=node_modules/@openzeppelin/contracts-v5/",
+    "ds-test/=node_modules/ds-test/",
+    "src/=contracts/",
+    "test/=test/",
+    "script/=script/",
+]
 
 [profile.genesis]
 src = "contracts/layer2"
