@@ -12,5 +12,15 @@ contract DeployCrossChainRelay is Script {
         CrossChainRelay relay = new CrossChainRelay();
         console2.log("CrossChainRelay:", address(relay));
         vm.stopBroadcast();
+
+        _writeJson("cross_chain_relay", address(relay));
+    }
+
+    /// @dev Writes an address to the deployment JSON file
+    function _writeJson(string memory _name, address _addr) internal {
+        vm.writeJson(
+            vm.serializeAddress("deployment", _name, _addr),
+            string.concat(vm.projectRoot(), "/deployments/relay.json")
+        );
     }
 }
