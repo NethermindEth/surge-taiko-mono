@@ -5,6 +5,11 @@ import { IBridge } from "../../../shared/bridge/IBridge.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+interface ISwapTokenL2 {
+    function mint(address _to, uint256 _amount) external;
+    function burn(address _from, uint256 _amount) external;
+}
+
 interface ISimpleDEX {
     function swapETHForToken(uint256 _minTokenOut) external payable returns (uint256);
     function swapTokenForETH(uint256 _tokenIn, uint256 _minETHOut) external returns (uint256);
@@ -45,8 +50,11 @@ contract CrossChainSwapHandlerL2 {
     /// @notice The DEX contract
     ISimpleDEX public immutable dex;
 
-    /// @notice The L2 swap token
-    IERC20 public immutable swapTokenL2;
+    /// @notice The L2 swap token (mintable)
+    ISwapTokenL2 public immutable swapToken;
+
+    /// @notice The L2 swap token (ERC20 interface for approvals)
+    IERC20 public immutable swapTokenERC20;
 
     /// @notice Admin address for configuration
     address public immutable admin;
@@ -84,11 +92,12 @@ contract CrossChainSwapHandlerL2 {
     // Constructor
     // ---------------------------------------------------------------
 
-    constructor(address _bridge, uint64 _l1ChainId, address _dex, address _admin) {
+    constructor(address _bridge, uint64 _l1ChainId, address _dex, address _swapToken, address _admin) {
         bridge = _bridge;
         l1ChainId = _l1ChainId;
         dex = ISimpleDEX(_dex);
-        swapTokenL2 = dex.token();
+        swapToken = ISwapTokenL2(_swapToken);
+        swapTokenERC20 = IERC20(_swapToken);
         admin = _admin;
     }
 
@@ -104,12 +113,6 @@ contract CrossChainSwapHandlerL2 {
         emit L1HandlerSet(_l1Handler);
     }
 
-    /// @notice Approves DEX to spend tokens (called once after deployment)
-    function approveTokenForDEX() external {
-        if (msg.sender != admin) revert ONLY_ADMIN();
-        swapTokenL2.approve(address(dex), type(uint256).max);
-    }
-
     // ---------------------------------------------------------------
     // Bridge Callback
     // ---------------------------------------------------------------
@@ -120,8 +123,8 @@ contract CrossChainSwapHandlerL2 {
         if (msg.sender != bridge) revert ONLY_BRIDGE();
 
         IBridge.Context memory ctx = IBridge(bridge).context();
-        if (ctx.from != l1Handler) revert INVALID_SENDER();
         if (l1Handler == address(0)) revert L1_HANDLER_NOT_SET();
+        if (ctx.from != l1Handler) revert INVALID_SENDER();
 
         Action action = abi.decode(_data, (Action));
 
@@ -202,8 +205,11 @@ contract CrossChainSwapHandlerL2 {
     )
         internal
     {
-        // Execute swap on DEX using pre-approved tokens held by this handler
-        // These tokens represent the "virtual" bridged tokens matching L1 locked tokens
+        // Mint bridged tokens to this contract (representing locked canonical tokens on L1)
+        swapToken.mint(address(this), _tokenAmount);
+
+        // Approve DEX and swap tokens for ETH
+        swapTokenERC20.approve(address(dex), _tokenAmount);
         uint256 ethOut = dex.swapTokenForETH(_tokenAmount, _minETHOut);
 
         emit SwapExecutedTokenToETH(_initiator, _recipient, _tokenAmount, ethOut);
@@ -235,6 +241,11 @@ contract CrossChainSwapHandlerL2 {
     /// @param _provider User to credit liquidity shares to
     /// @param _tokenAmount Token amount to add
     function _handleAddLiquidity(address _provider, uint256 _tokenAmount) internal {
+        // Mint bridged tokens to this contract
+        swapToken.mint(address(this), _tokenAmount);
+
+        // Approve DEX and add liquidity
+        swapTokenERC20.approve(address(dex), _tokenAmount);
         dex.addLiquidity{ value: msg.value }(_tokenAmount, _provider);
         emit LiquidityAddedOnL2(_provider, msg.value, _tokenAmount);
     }

@@ -104,8 +104,8 @@ contract CrossChainSwapVaultL2 {
         if (msg.sender != bridge) revert ONLY_BRIDGE();
 
         IBridge.Context memory ctx = IBridge(bridge).context();
-        if (ctx.from != l1Vault) revert INVALID_SENDER();
         if (l1Vault == address(0)) revert L1_VAULT_NOT_SET();
+        if (ctx.from != l1Vault) revert INVALID_SENDER();
 
         Action action = abi.decode(_data, (Action));
 
