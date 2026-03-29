@@ -6,6 +6,7 @@ import {
   buildSwapUserOps,
   buildBridgeUserOps,
   buildBridgeNativeUserOps,
+  buildBridgeOutNativeUserOps,
   buildAddLiquidityUserOps,
   buildRemoveLiquidityUserOps,
   buildCreateL2SafeOps,
@@ -24,6 +25,7 @@ interface UseUserOpReturn {
   executeSwap: (params: ExecuteSwapParams) => Promise<boolean>;
   executeBridge: (params: ExecuteBridgeParams) => Promise<boolean>;
   executeBridgeNative: (params: ExecuteBridgeNativeParams) => Promise<boolean>;
+  executeBridgeOutNative: (params: ExecuteBridgeNativeParams) => Promise<boolean>;
   executeAddLiquidity: (params: ExecuteAddLiquidityParams) => Promise<boolean>;
   executeRemoveLiquidity: (params: { smartWallet: Address }) => Promise<boolean>;
   executeCreateL2Wallet: (params: { owner: Address; smartWallet: Address }) => Promise<boolean>;
@@ -248,6 +250,14 @@ export function useUserOp(): UseUserOpReturn {
     [executeGenericOps]
   );
 
+  const executeBridgeOutNative = useCallback(
+    async ({ amount, recipient, smartWallet }: ExecuteBridgeNativeParams): Promise<boolean> => {
+      const ops = buildBridgeOutNativeUserOps(amount, recipient, smartWallet);
+      return executeGenericOps(ops, smartWallet, L2_CHAIN_ID);
+    },
+    [executeGenericOps]
+  );
+
   const executeAddLiquidity = useCallback(
     async ({ ethAmount, tokenAmount, smartWallet }: ExecuteAddLiquidityParams): Promise<boolean> => {
       const ops = buildAddLiquidityUserOps(ethAmount, tokenAmount);
@@ -271,6 +281,7 @@ export function useUserOp(): UseUserOpReturn {
     executeSwap,
     executeBridge,
     executeBridgeNative,
+    executeBridgeOutNative,
     executeAddLiquidity,
     executeRemoveLiquidity,
     executeCreateL2Wallet,

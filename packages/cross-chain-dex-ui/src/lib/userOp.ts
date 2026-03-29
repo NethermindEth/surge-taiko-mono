@@ -8,7 +8,7 @@ import {
 } from 'viem';
 import { UserOp, SwapDirection } from '../types';
 import { CrossChainSwapVaultL1ABI, BridgeABI, ERC20ABI, SafeProxyFactoryABI } from './contracts';
-import { L1_VAULT, L1_BRIDGE, L2_CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL, L2_RELAY, SAFE_PROXY_FACTORY, SAFE_SINGLETON, SAFE_FALLBACK_HANDLER } from './constants';
+import { L1_VAULT, L1_BRIDGE, L2_BRIDGE, L2_CHAIN_ID, CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL, L2_RELAY, SAFE_PROXY_FACTORY, SAFE_SINGLETON, SAFE_FALLBACK_HANDLER } from './constants';
 import { SafeTxParams, buildMultiSendSafeTx, buildSafeSetupCalldata } from './safeOp';
 
 // ---------------------------------------------------------------
@@ -163,6 +163,39 @@ export function buildBridgeNativeUserOps(
       }),
     },
   ];
+}
+
+/**
+ * Build UserOp(s) for bridging native currency from L2 to L1 via the L2 bridge
+ */
+export function buildBridgeOutNativeUserOps(
+  amount: bigint,
+  recipient: Address,
+  sender: Address
+): UserOp[] {
+  const zeroAddr = '0x0000000000000000000000000000000000000000' as Address;
+
+  return [{
+    target: L2_BRIDGE,
+    value: amount,
+    data: encodeFunctionData({
+      abi: BridgeABI,
+      functionName: 'sendMessage',
+      args: [{
+        id: 0n,
+        fee: 0n,
+        gasLimit: 1_000_000,
+        from: zeroAddr,
+        srcChainId: 0n,
+        srcOwner: sender,
+        destChainId: BigInt(CHAIN_ID),
+        destOwner: recipient,
+        to: recipient,
+        value: amount,
+        data: '0x',
+      }],
+    }),
+  }];
 }
 
 /**
