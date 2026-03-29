@@ -211,19 +211,42 @@ export function buildBridgeOutNativeUserOps(
 }
 
 /**
- * Build UserOp(s) for creating a smart wallet on L2 via the factory.
- * Executed by the L1 smart wallet (same address on L2 via CREATE2) calling
- * factory.createSubmitter(owner) on L2.
+ * Build UserOp(s) for creating a smart wallet on L2 via the bridge.
+ * The L1 smart wallet calls bridge.sendMessage to invoke
+ * factory.createSubmitter(owner) on L2 via processMessage.
  */
-export function buildCreateL2WalletUserOps(owner: Address): UserOp[] {
+export function buildCreateL2WalletUserOps(owner: Address, sender: Address): UserOp[] {
+  const zeroAddr = '0x0000000000000000000000000000000000000000' as Address;
+
+  // The data the bridge will deliver to the factory on L2
+  const createSubmitterData = encodeFunctionData({
+    abi: UserOpsSubmitterFactoryABI,
+    functionName: 'createSubmitter',
+    args: [owner],
+  });
+
   return [
     {
-      target: USER_OPS_FACTORY,
+      target: L1_BRIDGE,
       value: 0n,
       data: encodeFunctionData({
-        abi: UserOpsSubmitterFactoryABI,
-        functionName: 'createSubmitter',
-        args: [owner],
+        abi: BridgeABI,
+        functionName: 'sendMessage',
+        args: [
+          {
+            id: 0n,
+            fee: 0n,
+            gasLimit: 1_000_000,
+            from: zeroAddr,
+            srcChainId: 0n,
+            srcOwner: sender,
+            destChainId: BigInt(L2_CHAIN_ID),
+            destOwner: sender,
+            to: USER_OPS_FACTORY,
+            value: 0n,
+            data: createSubmitterData,
+          },
+        ],
       }),
     },
   ];

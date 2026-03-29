@@ -236,9 +236,9 @@ export function useUserOp(): UseUserOpReturn {
 
   const executeCreateL2Wallet = useCallback(
     async ({ owner, smartWallet }: ExecuteCreateL2WalletParams): Promise<boolean> => {
-      const ops = buildCreateL2WalletUserOps(owner);
-      // Sign with L2 chain ID — catalyst executes createSubmitter on L2
-      return executeGenericOps(ops, smartWallet, L2_CHAIN_ID);
+      const ops = buildCreateL2WalletUserOps(owner, smartWallet);
+      // L1 UserOp — bridge.sendMessage routes createSubmitter to L2 via processMessage
+      return executeGenericOps(ops, smartWallet);
     },
     [executeGenericOps]
   );
