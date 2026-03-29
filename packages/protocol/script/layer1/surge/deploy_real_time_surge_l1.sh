@@ -15,20 +15,15 @@ export CONTRACT_OWNER=${CONTRACT_OWNER:-"0x70997970C51812dc3A010C7d01b50e0d17dc7
 # L2 configuration
 export L2_CHAIN_ID=${L2_CHAIN_ID:-167004}
 
-# Verifier deployment flags (only RISC0 and SP1)
-export DEPLOY_RISC0_RETH_VERIFIER=${DEPLOY_RISC0_RETH_VERIFIER:-true}
-export DEPLOY_SP1_RETH_VERIFIER=${DEPLOY_SP1_RETH_VERIFIER:-true}
-
-# Use dummy verifier for testing (default: false for production, set to true for devnet testing)
-export USE_DUMMY_VERIFIER=${USE_DUMMY_VERIFIER:-false}
-
-# Signer address for ProofVerifierDummy (required if USE_DUMMY_VERIFIER=true)
-export DUMMY_VERIFIER_SIGNER=${DUMMY_VERIFIER_SIGNER:-"0x0000000000000000000000000000000000000000"}
+# Zisk verifier configuration
+# ---------------------------------------------------------------
+# Trusted program VKey (bytes32, packed uint64[4] big-endian)
+export ZISK_PROGRAM_VKEY=${ZISK_PROGRAM_VKEY:-"0x0000000000000000000000000000000000000000000000000000000000000000"}
 
 # SurgeVerifier configuration
 # ---------------------------------------------------------------
 # Minimum number of distinct proofs required for a transition to finalize
-export NUM_PROOFS_THRESHOLD=${NUM_PROOFS_THRESHOLD:-2}
+export NUM_PROOFS_THRESHOLD=${NUM_PROOFS_THRESHOLD:-1}
 
 # Inbox configuration
 # ---------------------------------------------------------------
@@ -37,8 +32,8 @@ export BASEFEE_SHARING_PCTG=${BASEFEE_SHARING_PCTG:-75}
 
 # Genesis configuration
 # ---------------------------------------------------------------
-# The genesis proposal hash to activate the inbox with
-export GENESIS_PROPOSAL_HASH=${GENESIS_PROPOSAL_HASH:-"0x0000000000000000000000000000000000000000000000000000000000000001"}
+# The genesis block hash to activate the inbox with (last finalized L2 block hash)
+export GENESIS_BLOCK_HASH=${GENESIS_BLOCK_HASH:-"0x0000000000000000000000000000000000000000000000000000000000000001"}
 
 # Deploy configuration
 export FOUNDRY_PROFILE=${FOUNDRY_PROFILE:-"layer1"}

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.26;
 
 import { EmptyImpl } from "./common/EmptyImpl.sol";
-import { ProofVerifierDummy } from "./common/ProofVerifierDummy.sol";
 import {
     Ownable2StepUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
@@ -10,18 +9,13 @@ import {
     UUPSUpgradeable
 } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
-import {
-    ControlID,
-    RiscZeroGroth16Verifier
-} from "@risc0/contracts/groth16/RiscZeroGroth16Verifier.sol";
-import { SP1Verifier as SuccinctVerifier } from "@sp1-contracts/src/v5.0.0/SP1VerifierPlonk.sol";
 import { console2 } from "forge-std/src/console2.sol";
 import { IRealTimeInbox } from "src/layer1/core/iface/IRealTimeInbox.sol";
 import { RealTimeInbox } from "src/layer1/core/impl/RealTimeInbox.sol";
 import { SurgeVerifier } from "src/layer1/surge/SurgeVerifier.sol";
 import { LibProofBitmap } from "src/layer1/surge/libs/LibProofBitmap.sol";
-import { Risc0Verifier } from "src/layer1/verifiers/Risc0Verifier.sol";
-import { SP1Verifier } from "src/layer1/verifiers/SP1Verifier.sol";
+import { ZiskVerifier } from "src/layer1/verifiers/ZiskVerifier.sol";
+import { ZiskVerifierImpl } from "src/layer1/verifiers/zisk-vendor/ZiskVerifierImpl.sol";
 import { Bridge } from "src/shared/bridge/Bridge.sol";
 import { DefaultResolver } from "src/shared/common/DefaultResolver.sol";
 import { SignalService } from "src/shared/signal/SignalService.sol";
@@ -51,12 +45,9 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
     // ---------------------------------------------------------------
     uint64 internal immutable l2ChainId = uint64(vm.envUint("L2_CHAIN_ID"));
 
-    // Verifier Configuration
+    // Zisk Verifier Configuration
     // ---------------------------------------------------------------
-    bool internal immutable useDummyVerifier = vm.envBool("USE_DUMMY_VERIFIER");
-    address internal immutable dummyVerifierSigner = vm.envAddress("DUMMY_VERIFIER_SIGNER");
-    bool internal immutable deployRisc0RethVerifier = vm.envBool("DEPLOY_RISC0_RETH_VERIFIER");
-    bool internal immutable deploySp1RethVerifier = vm.envBool("DEPLOY_SP1_RETH_VERIFIER");
+    bytes32 internal immutable ziskProgramVKey = vm.envOr("ZISK_PROGRAM_VKEY", bytes32(0));
 
     // SurgeVerifier configuration
     // ---------------------------------------------------------------
@@ -68,7 +59,7 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
 
     // Genesis configuration
     // ---------------------------------------------------------------
-    bytes32 internal immutable genesisProposalHash = vm.envBytes32("GENESIS_PROPOSAL_HASH");
+    bytes32 internal immutable genesisBlockHash = vm.envBytes32("GENESIS_BLOCK_HASH");
 
     struct SharedContracts {
         address sharedResolver;
@@ -85,8 +76,7 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
     }
 
     struct VerifierContracts {
-        address risc0RethVerifier;
-        address sp1RethVerifier;
+        address ziskRethVerifier;
     }
 
     modifier broadcast() {
@@ -230,61 +220,42 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         writeJson("surge_verifier", rollupContracts.proofVerifier);
     }
 
-    /// @dev The deployer is the initial owner of the internal verifiers.
+    /// @dev The deployer is the initial owner of the Zisk verifier.
     /// Ownership is transferred to the effective owner and must be accepted.
     function deployInternalVerifiers(address _owner)
         private
         returns (VerifierContracts memory verifierContracts)
     {
-        if (useDummyVerifier) {
-            require(dummyVerifierSigner != address(0), "config: DUMMY_VERIFIER_SIGNER");
+        // Deploy Zisk PLONK verifier (from Polygon Hermez)
+        ZiskVerifierImpl ziskPlonkVerifier = new ZiskVerifierImpl();
+        writeJson("zisk_plonk_verifier", address(ziskPlonkVerifier));
+        console2.log("** Deployed Zisk PLONK verifier:", address(ziskPlonkVerifier));
 
-            ProofVerifierDummy dummyVerifier = new ProofVerifierDummy(dummyVerifierSigner);
-            address dummyAddr = address(dummyVerifier);
-            writeJson("proof_verifier_dummy", dummyAddr);
-            console2.log("** Deployed ProofVerifierDummy:", dummyAddr);
-            console2.log("** ProofVerifierDummy signer:", dummyVerifierSigner);
+        // Deploy Zisk wrapper verifier
+        ZiskVerifier ziskVerifier =
+            new ZiskVerifier(l2ChainId, address(ziskPlonkVerifier), msg.sender);
+        verifierContracts.ziskRethVerifier = address(ziskVerifier);
+        writeJson("zisk_verifier", address(ziskVerifier));
+        console2.log("** Deployed Zisk verifier:", address(ziskVerifier));
 
-            if (deployRisc0RethVerifier) {
-                verifierContracts.risc0RethVerifier = dummyAddr;
-                console2.log("** Using ProofVerifierDummy for RISC0");
-            }
-            if (deploySp1RethVerifier) {
-                verifierContracts.sp1RethVerifier = dummyAddr;
-                console2.log("** Using ProofVerifierDummy for SP1");
-            }
-        } else {
-            if (deployRisc0RethVerifier) {
-                RiscZeroGroth16Verifier verifier =
-                    new RiscZeroGroth16Verifier(ControlID.CONTROL_ROOT, ControlID.BN254_CONTROL_ID);
-                writeJson("risc0_groth16_verifier", address(verifier));
-                console2.log("** Deployed Risc0 groth16 verifier: ", address(verifier));
+        // Set trusted program VKeys
+        setupZiskVerifier(ziskVerifier);
 
-                Risc0Verifier risc0Verifier =
-                    new Risc0Verifier(l2ChainId, address(verifier), msg.sender);
-                verifierContracts.risc0RethVerifier = address(risc0Verifier);
-                writeJson("risc0_verifier", address(risc0Verifier));
-                console2.log("** Deployed Risc0 verifier: ", address(risc0Verifier));
+        // Transfer ownership (requires acceptance)
+        ziskVerifier.transferOwnership(_owner);
+        console2.log("** Zisk verifier ownership transfer initiated to:", _owner);
+    }
 
-                risc0Verifier.transferOwnership(_owner);
-                console2.log("** Risc0 verifier ownership transfer initiated to:", _owner);
-            }
-
-            if (deploySp1RethVerifier) {
-                SuccinctVerifier succinctVerifier = new SuccinctVerifier();
-                writeJson("succinct_verifier", address(succinctVerifier));
-                console2.log("** Deployed Succinct verifier: ", address(succinctVerifier));
-
-                SP1Verifier sp1Verifier =
-                    new SP1Verifier(l2ChainId, address(succinctVerifier), msg.sender);
-                verifierContracts.sp1RethVerifier = address(sp1Verifier);
-                writeJson("sp1_verifier", address(sp1Verifier));
-                console2.log("** Deployed SP1 verifier: ", address(sp1Verifier));
-
-                sp1Verifier.transferOwnership(_owner);
-                console2.log("** SP1 verifier ownership transfer initiated to:", _owner);
-            }
+    /// @dev Sets the trusted program VKey on the Zisk verifier (skipped if no vkey provided).
+    function setupZiskVerifier(ZiskVerifier _ziskVerifier) private {
+        if (ziskProgramVKey == bytes32(0)) {
+            console2.log("** Skipping Zisk program VKey setup (none provided)");
+            return;
         }
+
+        _ziskVerifier.setProgramTrusted(ziskProgramVKey, true);
+        console2.log("** Set trusted program VKey:");
+        console2.logBytes32(ziskProgramVKey);
     }
 
     function setupSharedResolver(
@@ -326,20 +297,12 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
     {
         SurgeVerifier proofVerifier = SurgeVerifier(_rollupContracts.proofVerifier);
 
-        if (_verifierContracts.risc0RethVerifier != address(0)) {
+        if (_verifierContracts.ziskRethVerifier != address(0)) {
             proofVerifier.setVerifier(
-                LibProofBitmap.ProofBitmap.wrap(proofVerifier.RISC0_RETH()),
-                _verifierContracts.risc0RethVerifier
+                LibProofBitmap.ProofBitmap.wrap(proofVerifier.ZISK_RETH()),
+                _verifierContracts.ziskRethVerifier
             );
-            console2.log("** Set RISC0 verifier:", _verifierContracts.risc0RethVerifier);
-        }
-
-        if (_verifierContracts.sp1RethVerifier != address(0)) {
-            proofVerifier.setVerifier(
-                LibProofBitmap.ProofBitmap.wrap(proofVerifier.SP1_RETH()),
-                _verifierContracts.sp1RethVerifier
-            );
-            console2.log("** Set SP1 verifier:", _verifierContracts.sp1RethVerifier);
+            console2.log("** Set ZISK verifier:", _verifierContracts.ziskRethVerifier);
         }
 
         // Requires ownership acceptance
@@ -373,9 +336,9 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         RealTimeInbox(payable(_rollupContracts.inbox)).init(msg.sender);
         console2.log("** RealTimeInbox initialized");
 
-        // Activate inbox with genesis proposal hash
-        RealTimeInbox(payable(_rollupContracts.inbox)).activate(genesisProposalHash);
-        console2.log("** RealTimeInbox activated with genesis hash");
+        // Activate inbox with genesis block hash
+        RealTimeInbox(payable(_rollupContracts.inbox)).activate(genesisBlockHash);
+        console2.log("** RealTimeInbox activated with genesis block hash");
 
         // Requires ownership acceptance
         Ownable2StepUpgradeable(_rollupContracts.inbox).transferOwnership(_owner);
@@ -399,9 +362,9 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
 
         // Verify inbox state
         require(
-            RealTimeInbox(payable(_rollupContracts.inbox)).getLastProposalHash()
-                == genesisProposalHash,
-            "verifyDeployment: lastProposalHash mismatch"
+            RealTimeInbox(payable(_rollupContracts.inbox)).getLastFinalizedBlockHash()
+                == genesisBlockHash,
+            "verifyDeployment: lastFinalizedBlockHash mismatch"
         );
 
         // Build list of contracts where owner is already set
@@ -413,20 +376,11 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         ownerContracts[4] = _sharedContracts.erc1155Vault;
 
         // Build list of contracts with pending ownership transfer
-        address[] memory pendingOwnerContracts;
-        if (useDummyVerifier) {
-            pendingOwnerContracts = new address[](3);
-            pendingOwnerContracts[0] = _rollupContracts.proofVerifier;
-            pendingOwnerContracts[1] = _rollupContracts.inbox;
-            pendingOwnerContracts[2] = _sharedContracts.sharedResolver;
-        } else {
-            pendingOwnerContracts = new address[](5);
-            pendingOwnerContracts[0] = _rollupContracts.proofVerifier;
-            pendingOwnerContracts[1] = _rollupContracts.inbox;
-            pendingOwnerContracts[2] = _sharedContracts.sharedResolver;
-            pendingOwnerContracts[3] = _verifierContracts.risc0RethVerifier; // May be address(0)
-            pendingOwnerContracts[4] = _verifierContracts.sp1RethVerifier; // May be address(0)
-        }
+        address[] memory pendingOwnerContracts = new address[](4);
+        pendingOwnerContracts[0] = _rollupContracts.proofVerifier;
+        pendingOwnerContracts[1] = _rollupContracts.inbox;
+        pendingOwnerContracts[2] = _sharedContracts.sharedResolver;
+        pendingOwnerContracts[3] = _verifierContracts.ziskRethVerifier;
 
         // Verify ownership
         verifyOwnership(ownerContracts, pendingOwnerContracts, _expectedOwner);

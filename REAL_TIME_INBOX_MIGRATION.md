@@ -124,7 +124,6 @@ struct Proposal {
 
 ```solidity
 struct Proposal {
-    bytes32                  parentProposalHash;    // Hash of parent (from lastProposalHash)
     uint48                   maxAnchorBlockNumber;  // NEW — highest L1 anchor block number
     bytes32                  maxAnchorBlockHash;    // NEW — blockhash(maxAnchorBlockNumber)
     uint8                    basefeeSharingPctg;
@@ -133,6 +132,7 @@ struct Proposal {
 }
 ```
 
+- Standalone — no parent linkage. State continuity is enforced via `Commitment.lastBlockHash`.
 - No sequential `id` — proposals identified by hash only.
 - No `timestamp`, `proposer`, or `endOfSubmissionWindowTimestamp`.
 - `originBlockNumber`/`originBlockHash` replaced by `maxAnchorBlockNumber`/`maxAnchorBlockHash`.
@@ -163,12 +163,14 @@ struct Commitment {
 ```solidity
 struct Commitment {
     bytes32                       proposalHash;
-    ICheckpointStore.Checkpoint   checkpoint;   // { blockNumber, blockHash, stateRoot }
+    bytes32                       lastFinalizedBlockHash;  // Block hash of last finalized L2 block (proof starting state)
+    ICheckpointStore.Checkpoint   checkpoint;              // { blockNumber, blockHash, stateRoot }
 }
 ```
 
-No batch support. No `actualProver`, no `Transition[]`. The checkpoint contains the finalized L2
-state for the single proposal.
+No batch support. No `actualProver`, no `Transition[]`. The `lastFinalizedBlockHash` binds the
+proof to the correct starting state (must match `lastFinalizedBlockHash` on-chain). The checkpoint
+contains the finalized L2 state for the single proposal.
 
 ### 2.5 Removed Types
 
@@ -208,8 +210,8 @@ function activate(bytes32 _lastPacayaBlockHash) external onlyOwner;
 // Sets up CoreState, stores genesis proposal hash in ring buffer slot 0
 
 // RealTimeInbox
-function activate(bytes32 _genesisProposalHash) external onlyOwner;
-// Sets lastProposalHash = _genesisProposalHash. Can only be called once.
+function activate(bytes32 _genesisBlockHash) external onlyOwner;
+// Sets lastFinalizedBlockHash = _genesisBlockHash. Can only be called once.
 ```
 
 ### Propose
@@ -248,7 +250,7 @@ function getCoreState() external view returns (CoreState memory);
 function getProposalHash(uint256 _proposalId) external view returns (bytes32);
 
 // RealTimeInbox — replaces both with:
-function getLastProposalHash() external view returns (bytes32);
+function getLastFinalizedBlockHash() external view returns (bytes32);
 ```
 
 ### Encoding Helpers
@@ -280,7 +282,7 @@ LibBonds.Storage _bondStorage;
 **RealTimeInbox**:
 
 ```solidity
-bytes32 public lastProposalHash;   // 1 slot — the chain head
+bytes32 public lastFinalizedBlockHash;   // 1 slot — block hash of last finalized L2 block
 ```
 
 ---
@@ -307,16 +309,17 @@ event Proved(
 ```solidity
 event ProposedAndProved(
     bytes32 indexed proposalHash,
-    bytes32 parentProposalHash,
+    bytes32 lastFinalizedBlockHash,
     uint48  maxAnchorBlockNumber,
     uint8   basefeeSharingPctg,
     IInbox.DerivationSource[] sources,
-    bytes32 signalSlotsHash,
+    bytes32[] signalSlots,
     ICheckpointStore.Checkpoint checkpoint
 );
 ```
 
 - Indexed by `proposalHash` instead of sequential `id`.
+- `lastFinalizedBlockHash` replaces `parentProposalHash` — the block hash of the last finalized L2 block.
 - Includes the finalized `Checkpoint` directly.
 - No `proposer` or `actualProver` field.
 
@@ -349,7 +352,6 @@ For off-chain reconstruction of the commitment hash:
 
 ```
 proposalHash = keccak256(abi.encode(
-    bytes32 parentProposalHash,
     uint48  maxAnchorBlockNumber,       // padded to 32 bytes by abi.encode
     bytes32 maxAnchorBlockHash,
     uint8   basefeeSharingPctg,         // padded to 32 bytes by abi.encode
@@ -359,6 +361,7 @@ proposalHash = keccak256(abi.encode(
 
 commitmentHash = keccak256(abi.encode(
     bytes32 proposalHash,
+    bytes32 lastFinalizedBlockHash,    // last finalized L2 block hash
     uint48  checkpoint.blockNumber,     // padded to 32 bytes by abi.encode
     bytes32 checkpoint.blockHash,
     bytes32 checkpoint.stateRoot
@@ -374,7 +377,69 @@ signalSlotsHash = keccak256(abi.encode(signalSlots))     // if non-empty (bytes3
 
 ---
 
-## 7. Removed Features Summary
+## 7. L2 Anchor Integration — Signal Slot Relay
+
+`signalSlots` provided in `ProposeInput` must be relayed to L2 so that nodes can verify L1→L2
+cross-chain messages without a separate proof. The relay happens through the L2 anchor
+transaction of the **first block** in the batch.
+
+### Anchor Function
+
+The standard `anchorV4` is replaced by `anchorV4WithSignalSlots`:
+
+```solidity
+// Anchor.sol (L2)
+
+// Standard — no signal relay
+function anchorV4(ICheckpointStore.Checkpoint calldata _checkpoint) external;
+
+// Real-time inbox — relays signal slots in the first block's anchor tx
+function anchorV4WithSignalSlots(
+    ICheckpointStore.Checkpoint calldata _checkpoint,
+    bytes32[]              calldata _signalSlots
+) external;
+```
+
+### Placement Rule
+
+Only the **first block** of a batch carries all signal slots. Subsequent blocks in the same
+batch call `anchorV4WithSignalSlots` with an empty `_signalSlots` array (or `anchorV4`).
+
+```
+Batch (from one propose() call)
+├── Block 0 — anchorV4WithSignalSlots(checkpoint, signalSlots)   ← all slots here
+├── Block 1 — anchorV4WithSignalSlots(checkpoint, [])
+└── Block N — anchorV4WithSignalSlots(checkpoint, [])
+```
+
+### What the Anchor Does with Signal Slots
+
+```solidity
+if (_signalSlots.length > 0) {
+    ISignalService(address(checkpointStore)).setSignalsReceived(_signalSlots);
+}
+```
+
+Each slot is marked as received in the `SignalService`, making L1 signals immediately
+consumable on L2 without a merkle proof — consistent with the real-time proving model where
+L1 state is already finalized before the L2 block is executed.
+
+### Relationship to `signalSlotsHash`
+
+The same `signalSlots` array that is passed to `anchorV4WithSignalSlots` on L2 is also hashed
+into the proposal on L1:
+
+```
+L1 propose():  signalSlotsHash = keccak256(abi.encode(signalSlots))  →  committed in proposalHash
+L2 anchor():   anchorV4WithSignalSlots(checkpoint, signalSlots)       →  signals set in SignalService
+```
+
+The ZK proof covers both sides, ensuring the same set of slots is committed on L1 and
+activated on L2.
+
+---
+
+## 8. Removed Features Summary
 
 | Feature                            | Impact                                    |
 | ---------------------------------- | ----------------------------------------- |

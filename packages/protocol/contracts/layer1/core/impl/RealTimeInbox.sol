@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 import { IInbox } from "../iface/IInbox.sol";
 import { IRealTimeInbox } from "../iface/IRealTimeInbox.sol";
 import { LibBlobs } from "../libs/LibBlobs.sol";
-import { IProofVerifier } from "src/layer1/verifiers/IProofVerifier.sol";
+import { SurgeVerifier } from "src/layer1/surge/SurgeVerifier.sol";
 import { EssentialContract } from "src/shared/common/EssentialContract.sol";
 import { ICheckpointStore } from "src/shared/signal/ICheckpointStore.sol";
 import { ISignalService } from "src/shared/signal/ISignalService.sol";
@@ -26,7 +26,7 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     // ---------------------------------------------------------------
 
     /// @notice The proof verifier contract.
-    IProofVerifier internal immutable _proofVerifier;
+    SurgeVerifier internal immutable _proofVerifier;
 
     /// @notice Signal service responsible for checkpoints and signal relay.
     ISignalService internal immutable _signalService;
@@ -38,8 +38,8 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     // State Variables
     // ---------------------------------------------------------------
 
-    /// @notice Hash of the last accepted proposal. Serves as the chain head.
-    bytes32 public lastProposalHash;
+    /// @notice Block hash of the last finalized L2 block. Serves as the chain head.
+    bytes32 public lastFinalizedBlockHash;
 
     uint256[49] private __gap;
 
@@ -53,7 +53,7 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
         require(_config.proofVerifier != address(0), "config: proofVerifier");
         require(_config.signalService != address(0), "config: signalService");
 
-        _proofVerifier = IProofVerifier(_config.proofVerifier);
+        _proofVerifier = SurgeVerifier(_config.proofVerifier);
         _signalService = ISignalService(_config.signalService);
         _basefeeSharingPctg = _config.basefeeSharingPctg;
     }
@@ -69,12 +69,12 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     }
 
     /// @inheritdoc IRealTimeInbox
-    function activate(bytes32 _genesisProposalHash) external onlyOwner {
-        require(lastProposalHash == bytes32(0), AlreadyActivated());
-        require(_genesisProposalHash != bytes32(0), InvalidGenesisHash());
+    function activate(bytes32 _genesisBlockHash) external onlyOwner {
+        require(lastFinalizedBlockHash == bytes32(0), AlreadyActivated());
+        require(_genesisBlockHash != bytes32(0), InvalidGenesisBlockHash());
 
-        lastProposalHash = _genesisProposalHash;
-        emit Activated(_genesisProposalHash);
+        lastFinalizedBlockHash = _genesisBlockHash;
+        emit Activated(_genesisBlockHash);
     }
 
     /// @inheritdoc IRealTimeInbox
@@ -86,22 +86,26 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
         external
         nonReentrant
     {
-        require(lastProposalHash != bytes32(0), NotActivated());
+        require(lastFinalizedBlockHash != bytes32(0), NotActivated());
+
+        // Capture current chain head before it is updated
+        bytes32 prevFinalizedBlockHash = lastFinalizedBlockHash;
 
         // Build proposal from input and get its hash
-        (bytes32 proposalHash, Proposal memory proposal) = _buildProposal(_data);
+        (bytes32 proposalHash, Proposal memory proposal, bytes32[] memory signalSlots) =
+            _buildProposal(_data);
 
-        // Verify proof and finalize
-        _verifyAndFinalize(proposalHash, _checkpoint, _proof);
+        // Verify proof and finalize (updates lastFinalizedBlockHash)
+        _verifyAndFinalize(proposalHash, prevFinalizedBlockHash, _checkpoint, _proof);
 
-        // Emit event
+        // Emit event with raw signal slots for driver derivation
         emit ProposedAndProved(
             proposalHash,
-            proposal.parentProposalHash,
+            prevFinalizedBlockHash,
             proposal.maxAnchorBlockNumber,
             proposal.basefeeSharingPctg,
             proposal.sources,
-            proposal.signalSlotsHash,
+            signalSlots,
             _checkpoint
         );
     }
@@ -159,8 +163,8 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     // ---------------------------------------------------------------
 
     /// @inheritdoc IRealTimeInbox
-    function getLastProposalHash() external view returns (bytes32) {
-        return lastProposalHash;
+    function getLastFinalizedBlockHash() external view returns (bytes32) {
+        return lastFinalizedBlockHash;
     }
 
     /// @inheritdoc IRealTimeInbox
@@ -180,12 +184,14 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     /// @param _data The encoded ProposeInput.
     /// @return proposalHash_ The hash of the proposal.
     /// @return proposal_ The built proposal struct.
+    /// @return signalSlots_ The raw signal slots from the input.
     function _buildProposal(bytes calldata _data)
         internal
         view
-        returns (bytes32 proposalHash_, Proposal memory proposal_)
+        returns (bytes32 proposalHash_, Proposal memory proposal_, bytes32[] memory signalSlots_)
     {
         ProposeInput memory input = decodeProposeInput(_data);
+        signalSlots_ = input.signalSlots;
 
         // Validate anchor block - blockhash returns 0 for blocks older than 256
         bytes32 anchorHash = blockhash(input.maxAnchorBlockNumber);
@@ -196,14 +202,16 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
 
         // Validate blob reference
         LibBlobs.BlobSlice memory blobSlice = LibBlobs.validateBlobReference(input.blobReference);
+        // Zero timestamp so it doesn't become part of the proposal hash that must be proven.
+        // The driver can derive the blob timestamp from the L1 block that contains the event.
+        blobSlice.timestamp = 0;
 
         // Build derivation sources
         IInbox.DerivationSource[] memory sources = new IInbox.DerivationSource[](1);
         sources[0] = IInbox.DerivationSource(false, blobSlice);
 
-        // Build proposal
+        // Build proposal (standalone — no parent linkage)
         proposal_ = Proposal({
-            parentProposalHash: lastProposalHash,
             maxAnchorBlockNumber: input.maxAnchorBlockNumber,
             maxAnchorBlockHash: anchorHash,
             basefeeSharingPctg: _basefeeSharingPctg,
@@ -216,27 +224,34 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
 
     /// @dev Verifies the proof, saves checkpoint, and updates chain head.
     /// @param _proposalHash The proposal hash.
+    /// @param _lastFinalizedBlockHash The block hash of the last finalized L2 block.
     /// @param _checkpoint The checkpoint to save.
     /// @param _proof The ZK proof bytes.
     function _verifyAndFinalize(
         bytes32 _proposalHash,
+        bytes32 _lastFinalizedBlockHash,
         ICheckpointStore.Checkpoint calldata _checkpoint,
         bytes calldata _proof
     )
         internal
     {
         // Build commitment and hash it
-        bytes32 commitmentHash =
-            hashCommitment(Commitment({ proposalHash: _proposalHash, checkpoint: _checkpoint }));
+        bytes32 commitmentHash = hashCommitment(
+            Commitment({
+                proposalHash: _proposalHash,
+                lastFinalizedBlockHash: _lastFinalizedBlockHash,
+                checkpoint: _checkpoint
+            })
+        );
 
-        // Verify proof via IProofVerifier
-        _proofVerifier.verifyProof(0, commitmentHash, _proof);
+        // Verify proof via SurgeVerifier
+        _proofVerifier.verifyProof(false, commitmentHash, _proof);
 
         // Save checkpoint to signal service
         _signalService.saveCheckpoint(_checkpoint);
 
-        // Update chain head
-        lastProposalHash = _proposalHash;
+        // Update chain head to the new finalized block hash
+        lastFinalizedBlockHash = _checkpoint.blockHash;
     }
 
     /// @dev Verifies signal slots exist on L1 and returns their hash.
@@ -263,7 +278,7 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
 
     error AlreadyActivated();
     error MaxAnchorBlockTooOld();
-    error InvalidGenesisHash();
+    error InvalidGenesisBlockHash();
     error NotActivated();
     error SignalSlotNotSent(bytes32 slot);
 }
