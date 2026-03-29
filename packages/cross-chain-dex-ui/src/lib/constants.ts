@@ -28,11 +28,11 @@ export const FEE_NUMERATOR = 3n;
 export const FEE_DENOMINATOR = 1000n;
 export const FEE_PERCENT = 0.3;
 
-// Safe contract addresses (same on both chains)
-export const SAFE_PROXY_FACTORY = import.meta.env.VITE_SAFE_PROXY_FACTORY as `0x${string}`;
-export const SAFE_SINGLETON = import.meta.env.VITE_SAFE_SINGLETON as `0x${string}`;
-export const SAFE_MULTISEND = import.meta.env.VITE_SAFE_MULTISEND as `0x${string}`;
-export const SAFE_FALLBACK_HANDLER = import.meta.env.VITE_SAFE_FALLBACK_HANDLER as `0x${string}`;
+// Safe v1.4.1 contract addresses (canonical, same on all chains)
+export const SAFE_PROXY_FACTORY = (import.meta.env.VITE_SAFE_PROXY_FACTORY as `0x${string}`) || '0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67';
+export const SAFE_SINGLETON = (import.meta.env.VITE_SAFE_SINGLETON as `0x${string}`) || '0x29fcB43b46531BcA003ddC8FCB67FFE91900C762';
+export const SAFE_MULTISEND = (import.meta.env.VITE_SAFE_MULTISEND as `0x${string}`) || '0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526';
+export const SAFE_FALLBACK_HANDLER = (import.meta.env.VITE_SAFE_FALLBACK_HANDLER as `0x${string}`) || '0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99';
 
 // Contract addresses
 export const L1_VAULT = import.meta.env.VITE_L1_VAULT as `0x${string}`;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { type Address, keccak256, encodePacked, decodeEventLog } from 'viem';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import toast from 'react-hot-toast';
@@ -38,6 +38,14 @@ export function useSmartWallet() {
   });
 
   const { executeCreateL2Wallet } = useUserOp();
+  const l2PollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Cleanup L2 poll on unmount
+  useEffect(() => {
+    return () => {
+      if (l2PollRef.current) clearInterval(l2PollRef.current);
+    };
+  }, []);
 
   // On connect: check localStorage for a saved Safe address and verify it has code on-chain.
   useEffect(() => {
@@ -133,12 +141,23 @@ export function useSmartWallet() {
       const success = await executeCreateL2Wallet({ owner: ownerAddress, smartWallet });
       if (success) {
         toast.success('L2 Safe creation submitted via bridge');
-        // Re-check L2 code after a short delay to allow bridging
-        setTimeout(() => {
-          l2PublicClient
-            .getCode({ address: smartWallet })
-            .then((code) => setL2WalletExists(!!(code && code !== '0x')))
-            .catch(() => {});
+        // Poll L2 for wallet code every 5s until found (max 60 attempts = 5 min)
+        let attempts = 0;
+        if (l2PollRef.current) clearInterval(l2PollRef.current);
+        l2PollRef.current = setInterval(async () => {
+          attempts++;
+          try {
+            const code = await l2PublicClient.getCode({ address: smartWallet });
+            if (code && code !== '0x') {
+              setL2WalletExists(true);
+              if (l2PollRef.current) clearInterval(l2PollRef.current);
+              l2PollRef.current = null;
+            }
+          } catch {}
+          if (attempts >= 60 && l2PollRef.current) {
+            clearInterval(l2PollRef.current);
+            l2PollRef.current = null;
+          }
         }, 5000);
       } else {
         toast.error('Failed to create L2 Safe');
