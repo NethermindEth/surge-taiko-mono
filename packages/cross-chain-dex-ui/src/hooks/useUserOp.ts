@@ -78,17 +78,31 @@ export function useUserOp(): UseUserOpReturn {
     return new Promise((resolve) => {
       setTxStatus({ phase: 'sequencing' });
 
+      // Phase ordering: sequencing(0) < proposing(1) < proving(2) < complete(3)
+      const phaseOrder: Record<string, number> = {
+        sequencing: 0, proposing: 1, proving: 2, complete: 3, rejected: 3,
+      };
+      let highestPhase = 0;
+
       pollIntervalRef.current = setInterval(async () => {
         const status = await queryUserOpStatus(userOpId);
         if (!status) return;
 
         if (status.status === 'Pending') {
-          setTxStatus({ phase: 'sequencing' });
+          if (highestPhase < phaseOrder.sequencing) {
+            setTxStatus({ phase: 'sequencing' });
+          }
         } else if (status.status === 'Processing') {
           txHashRef.current = status.tx_hash;
-          setTxStatus({ phase: 'proposing' });
+          if (phaseOrder.proposing > highestPhase) {
+            highestPhase = phaseOrder.proposing;
+            setTxStatus({ phase: 'proposing' });
+          }
         } else if (status.status === 'ProvingBlock') {
-          setTxStatus({ phase: 'proving' });
+          if (phaseOrder.proving > highestPhase) {
+            highestPhase = phaseOrder.proving;
+            setTxStatus({ phase: 'proving' });
+          }
         } else if (status.status === 'Executed') {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           pollIntervalRef.current = null;
