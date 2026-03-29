@@ -8,6 +8,7 @@ import {
   buildBridgeNativeUserOps,
   buildAddLiquidityUserOps,
   buildRemoveLiquidityUserOps,
+  buildCreateL2SafeOps,
   userOpsToSafeTx,
   sendUserOpToBuilder,
   calculateMinOutput,
@@ -25,6 +26,7 @@ interface UseUserOpReturn {
   executeBridgeNative: (params: ExecuteBridgeNativeParams) => Promise<boolean>;
   executeAddLiquidity: (params: ExecuteAddLiquidityParams) => Promise<boolean>;
   executeRemoveLiquidity: (params: { smartWallet: Address }) => Promise<boolean>;
+  executeCreateL2Wallet: (params: { owner: Address; smartWallet: Address }) => Promise<boolean>;
   isPending: boolean;
   error: Error | null;
 }
@@ -257,6 +259,9 @@ export function useUserOp(): UseUserOpReturn {
   const executeRemoveLiquidity = useCallback(
     async ({ smartWallet }: { smartWallet: Address }): Promise<boolean> => {
       const ops = buildRemoveLiquidityUserOps();
+  const executeCreateL2Wallet = useCallback(
+    async ({ owner, smartWallet }: { owner: Address; smartWallet: Address }): Promise<boolean> => {
+      const ops = buildCreateL2SafeOps(owner, smartWallet);
       return executeGenericOps(ops, smartWallet);
     },
     [executeGenericOps]
@@ -268,6 +273,7 @@ export function useUserOp(): UseUserOpReturn {
     executeBridgeNative,
     executeAddLiquidity,
     executeRemoveLiquidity,
+    executeCreateL2Wallet,
     isPending,
     error,
   };

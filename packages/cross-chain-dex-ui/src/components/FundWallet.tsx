@@ -9,9 +9,21 @@ interface FundWalletProps {
   smartWallet: Address;
   ethBalance: string;
   usdcBalance: string;
+  l2WalletExists?: boolean;
+  onCreateL2Wallet?: () => Promise<void>;
+  isCreatingL2Wallet?: boolean;
 }
 
-export function FundWallet({ isOpen, onClose, smartWallet, ethBalance, usdcBalance }: FundWalletProps) {
+export function FundWallet({
+  isOpen,
+  onClose,
+  smartWallet,
+  ethBalance,
+  usdcBalance,
+  l2WalletExists = false,
+  onCreateL2Wallet,
+  isCreatingL2Wallet = false,
+}: FundWalletProps) {
   if (!isOpen) return null;
 
   const copyAddress = () => {
@@ -82,6 +94,28 @@ export function FundWallet({ isOpen, onClose, smartWallet, ethBalance, usdcBalan
         <div className="text-xs text-gray-500 mb-4">
           <strong>Note:</strong> Send funds on {surgeL1Chain.name} (Chain ID: {surgeL1Chain.id})
         </div>
+
+        {/* L2 Safe status / creation */}
+        {!l2WalletExists && onCreateL2Wallet && (
+          <div className="mb-4">
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-3 py-2 text-xs text-yellow-400 mb-3">
+              Your Safe wallet does not yet exist on L2. Create it via the bridge to enable L2 DEX operations.
+            </div>
+            <button
+              onClick={onCreateL2Wallet}
+              disabled={isCreatingL2Wallet}
+              className="w-full py-3 bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+            >
+              {isCreatingL2Wallet ? 'Creating L2 Wallet...' : 'Create L2 Wallet'}
+            </button>
+          </div>
+        )}
+
+        {l2WalletExists && (
+          <div className="bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-2 text-xs text-green-400 mb-4">
+            L2 Safe wallet is active at the same address.
+          </div>
+        )}
 
         <button
           onClick={onClose}

@@ -1,12 +1,15 @@
 import {
   encodeFunctionData,
+  encodeAbiParameters,
+  keccak256,
+  encodePacked,
   Address,
   Hex,
 } from 'viem';
 import { UserOp, SwapDirection } from '../types';
-import { CrossChainSwapVaultL1ABI, BridgeABI, ERC20ABI } from './contracts';
-import { L1_VAULT, L1_BRIDGE, L2_CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL } from './constants';
-import { SafeTxParams, buildMultiSendSafeTx } from './safeOp';
+import { CrossChainSwapVaultL1ABI, BridgeABI, ERC20ABI, SafeProxyFactoryABI } from './contracts';
+import { L1_VAULT, L1_BRIDGE, L2_CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL, L2_RELAY, SAFE_PROXY_FACTORY, SAFE_SINGLETON, SAFE_FALLBACK_HANDLER } from './constants';
+import { SafeTxParams, buildMultiSendSafeTx, buildSafeSetupCalldata } from './safeOp';
 
 // ---------------------------------------------------------------
 // Safe tx conversion
@@ -211,6 +214,64 @@ export function buildRemoveLiquidityUserOps(): UserOp[] {
       }),
     },
   ];
+ * Build UserOp(s) for creating a Safe on L2 via bridge + relay.
+ * The L1 Safe calls bridge.sendMessage targeting the CrossChainRelay on L2,
+ * which forwards to SafeProxyFactory.createProxyWithNonce.
+ */
+export function buildCreateL2SafeOps(owner: Address, sender: Address): UserOp[] {
+  const zeroAddr = '0x0000000000000000000000000000000000000000' as Address;
+
+  // Build the same initializer and saltNonce as L1 creation
+  const initializer = buildSafeSetupCalldata(owner, SAFE_FALLBACK_HANDLER);
+  const saltNonce = BigInt(keccak256(encodePacked(['address'], [owner])));
+
+  // The call the relay will forward to the factory
+  const createProxyCalldata = encodeFunctionData({
+    abi: SafeProxyFactoryABI,
+    functionName: 'createProxyWithNonce',
+    args: [SAFE_SINGLETON, initializer, saltNonce],
+  });
+
+  // Encode for relay: abi.encode(target, callData)
+  const relayPayload = encodeAbiParameters(
+    [{ type: 'address' }, { type: 'bytes' }],
+    [SAFE_PROXY_FACTORY, createProxyCalldata],
+  );
+
+  // Bridge requires onMessageInvocation selector
+  const onMessageInvocationData = encodeFunctionData({
+    abi: [{
+      type: 'function',
+      name: 'onMessageInvocation',
+      inputs: [{ name: '_data', type: 'bytes' }],
+      outputs: [],
+      stateMutability: 'payable',
+    }],
+    functionName: 'onMessageInvocation',
+    args: [relayPayload],
+  });
+
+  return [{
+    target: L1_BRIDGE,
+    value: 0n,
+    data: encodeFunctionData({
+      abi: BridgeABI,
+      functionName: 'sendMessage',
+      args: [{
+        id: 0n,
+        fee: 0n,
+        gasLimit: 2_000_000,
+        from: zeroAddr,
+        srcChainId: 0n,
+        srcOwner: sender,
+        destChainId: BigInt(L2_CHAIN_ID),
+        destOwner: sender,
+        to: L2_RELAY,
+        value: 0n,
+        data: onMessageInvocationData,
+      }],
+    }),
+  }];
 }
 
 // ---------------------------------------------------------------

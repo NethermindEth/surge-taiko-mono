@@ -5,7 +5,8 @@ import toast from 'react-hot-toast';
 import { SafeProxyFactoryABI } from '../lib/contracts';
 import { SAFE_PROXY_FACTORY, SAFE_SINGLETON, SAFE_FALLBACK_HANDLER } from '../lib/constants';
 import { buildSafeSetupCalldata } from '../lib/safeOp';
-import { l1PublicClient } from '../lib/config';
+import { l1PublicClient, l2PublicClient } from '../lib/config';
+import { useUserOp } from './useUserOp';
 
 const STORAGE_KEY = 'surge_safe_address_';
 
@@ -28,11 +29,15 @@ export function useSmartWallet() {
   const { address: ownerAddress, isConnected } = useAccount();
   const [isInitializing, setIsInitializing] = useState(true);
   const [smartWallet, setSmartWallet] = useState<Address | null>(null);
+  const [l2WalletExists, setL2WalletExists] = useState(false);
+  const [isCreatingL2Wallet, setIsCreatingL2Wallet] = useState(false);
 
   const { writeContract, data: txHash, isPending: isCreating, reset } = useWriteContract();
   const { data: receipt, isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash: txHash,
   });
+
+  const { executeCreateL2Wallet } = useUserOp();
 
   // On connect: check localStorage for a saved Safe address and verify it has code on-chain.
   useEffect(() => {
@@ -88,6 +93,21 @@ export function useSmartWallet() {
     }
   }, [isSuccess, receipt, ownerAddress, reset]);
 
+  // After L1 Safe is known, check if the same address has code on L2
+  useEffect(() => {
+    if (!smartWallet) {
+      setL2WalletExists(false);
+      return;
+    }
+
+    l2PublicClient
+      .getCode({ address: smartWallet })
+      .then((code) => {
+        setL2WalletExists(!!(code && code !== '0x'));
+      })
+      .catch(() => setL2WalletExists(false));
+  }, [smartWallet]);
+
   const createSmartWallet = useCallback(async () => {
     if (!ownerAddress) throw new Error('Wallet not connected');
 
@@ -102,6 +122,35 @@ export function useSmartWallet() {
     });
   }, [ownerAddress, writeContract]);
 
+  const createL2Wallet = useCallback(async (): Promise<void> => {
+    if (!ownerAddress || !smartWallet) {
+      toast.error('Smart wallet not ready');
+      return;
+    }
+
+    setIsCreatingL2Wallet(true);
+    try {
+      const success = await executeCreateL2Wallet({ owner: ownerAddress, smartWallet });
+      if (success) {
+        toast.success('L2 Safe creation submitted via bridge');
+        // Re-check L2 code after a short delay to allow bridging
+        setTimeout(() => {
+          l2PublicClient
+            .getCode({ address: smartWallet })
+            .then((code) => setL2WalletExists(!!(code && code !== '0x')))
+            .catch(() => {});
+        }, 5000);
+      } else {
+        toast.error('Failed to create L2 Safe');
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to create L2 Safe';
+      toast.error(msg);
+    } finally {
+      setIsCreatingL2Wallet(false);
+    }
+  }, [ownerAddress, smartWallet, executeCreateL2Wallet]);
+
   return {
     smartWallet,
     isLoading: isInitializing,
@@ -110,5 +159,8 @@ export function useSmartWallet() {
     ownerAddress,
     isConnected,
     refetch: () => {},
+    l2WalletExists,
+    createL2Wallet,
+    isCreatingL2Wallet,
   };
 }

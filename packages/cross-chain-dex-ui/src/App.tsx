@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { WagmiProvider } from 'wagmi';
-import { useAccount } from 'wagmi';
+import { useAccount, useSwitchChain } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 
-import { config, surgeL1Chain } from './lib/config';
+import { config, surgeL1Chain, surgeL2Chain } from './lib/config';
 import { Header } from './components/Header';
 import { SwapCard } from './components/SwapCard';
 import { BridgeCard } from './components/BridgeCard';
@@ -22,8 +22,9 @@ const queryClient = new QueryClient();
 
 function AppContent() {
   const { txStatus, setTxStatus } = useTxStatus();
-  const { smartWallet, isConnected, isLoading } = useSmartWallet();
+  const { smartWallet, isConnected, isLoading, l2WalletExists, createL2Wallet, isCreatingL2Wallet } = useSmartWallet();
   const { chainId } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
   const { ethBalance, usdcBalance, ethFormatted, usdcFormatted } = useTokenBalances(smartWallet);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('swap');
@@ -31,9 +32,18 @@ function AppContent() {
   const [showNetworkSetup, setShowNetworkSetup] = useState(false);
   const [showFundWallet, setShowFundWallet] = useState(false);
   const [hasShownFundModal, setHasShownFundModal] = useState(false);
+  const [balancesLoaded, setBalancesLoaded] = useState(false);
 
-  const isWrongNetwork = isConnected && chainId !== surgeL1Chain.id;
+  // Accept both L1 and L2 as valid networks
+  const isWrongNetwork = isConnected && chainId !== surgeL1Chain.id && chainId !== surgeL2Chain.id;
   const hasInsufficientFunds = smartWallet && ethBalance === 0n && usdcBalance === 0n;
+
+  // Track when balances have been loaded at least once
+  useEffect(() => {
+    if (smartWallet && !isLoading) {
+      setBalancesLoaded(true);
+    }
+  }, [smartWallet, isLoading]);
 
   // Auto-show network setup if on wrong network
   useEffect(() => {
@@ -44,6 +54,13 @@ function AppContent() {
     }
   }, [isWrongNetwork]);
 
+  // Auto-switch to L1 when on swap/liquidity tabs
+  useEffect(() => {
+    if ((activeTab === 'swap' || activeTab === 'liquidity') && chainId === surgeL2Chain.id && isConnected) {
+      switchChainAsync({ chainId: surgeL1Chain.id }).catch(() => {});
+    }
+  }, [activeTab, chainId, isConnected, switchChainAsync]);
+
   // Auto-show wallet setup if connected, on correct network, but no smart wallet
   useEffect(() => {
     if (isConnected && !isWrongNetwork && !smartWallet && !isLoading) {
@@ -52,12 +69,13 @@ function AppContent() {
   }, [isConnected, isWrongNetwork, smartWallet, isLoading]);
 
   // Auto-show fund wallet modal if smart wallet has no funds (only once per session)
+  // Wait for balance load before showing to avoid false positives
   useEffect(() => {
-    if (smartWallet && hasInsufficientFunds && !hasShownFundModal && !isLoading) {
+    if (smartWallet && hasInsufficientFunds && !hasShownFundModal && balancesLoaded) {
       setShowFundWallet(true);
       setHasShownFundModal(true);
     }
-  }, [smartWallet, hasInsufficientFunds, hasShownFundModal, isLoading]);
+  }, [smartWallet, hasInsufficientFunds, hasShownFundModal, balancesLoaded]);
 
   return (
     <div className="h-screen overflow-hidden bg-surge-dark flex flex-col">
@@ -125,6 +143,9 @@ function AppContent() {
           smartWallet={smartWallet}
           ethBalance={ethFormatted}
           usdcBalance={usdcFormatted}
+          l2WalletExists={l2WalletExists}
+          onCreateL2Wallet={createL2Wallet}
+          isCreatingL2Wallet={isCreatingL2Wallet}
         />
       )}
 
