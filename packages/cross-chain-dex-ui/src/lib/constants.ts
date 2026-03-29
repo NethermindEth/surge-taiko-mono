@@ -28,8 +28,13 @@ export const FEE_NUMERATOR = 3n;
 export const FEE_DENOMINATOR = 1000n;
 export const FEE_PERCENT = 0.3;
 
+// Safe contract addresses (same on both chains)
+export const SAFE_PROXY_FACTORY = import.meta.env.VITE_SAFE_PROXY_FACTORY as `0x${string}`;
+export const SAFE_SINGLETON = import.meta.env.VITE_SAFE_SINGLETON as `0x${string}`;
+export const SAFE_MULTISEND = import.meta.env.VITE_SAFE_MULTISEND as `0x${string}`;
+export const SAFE_FALLBACK_HANDLER = import.meta.env.VITE_SAFE_FALLBACK_HANDLER as `0x${string}`;
+
 // Contract addresses
-export const USER_OPS_FACTORY = import.meta.env.VITE_USER_OPS_FACTORY as `0x${string}`;
 export const L1_VAULT = import.meta.env.VITE_L1_VAULT as `0x${string}`;
 export const SIMPLE_DEX = import.meta.env.VITE_SIMPLE_DEX as `0x${string}`;
 

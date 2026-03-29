@@ -4,7 +4,7 @@ import {
   Hex,
 } from 'viem';
 import { UserOp, SwapDirection } from '../types';
-import { CrossChainSwapVaultL1ABI, BridgeABI, ERC20ABI, UserOpsSubmitterABI } from './contracts';
+import { CrossChainSwapVaultL1ABI, BridgeABI, ERC20ABI } from './contracts';
 import { L1_VAULT, L1_BRIDGE, L2_CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL, CHAIN_ID } from './constants';
 
 // ---------------------------------------------------------------
@@ -243,24 +243,14 @@ function getBuilderUrl(): string {
  */
 export async function sendUserOpToBuilder(
   submitter: Address,
-  ops: UserOp[],
-  signature: Hex
+  calldata: Hex,
+  chainId?: number
 ): Promise<{ success: boolean; result?: unknown; error?: string; userOpId?: number }> {
   try {
     const builderUrl = getBuilderUrl();
     console.log('Sending UserOp to:', builderUrl);
     console.log('Submitter:', submitter);
-    console.log('Ops count:', ops.length);
-
-    // Encode the full executeBatch(ops, signature) calldata
-    const calldata = encodeFunctionData({
-      abi: UserOpsSubmitterABI,
-      functionName: 'executeBatch',
-      args: [
-        ops.map((op) => ({ target: op.target, value: op.value, data: op.data })),
-        signature,
-      ],
-    });
+    console.log('ChainId:', chainId);
 
     const response = await fetch(builderUrl, {
       method: 'POST',
