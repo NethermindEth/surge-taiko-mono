@@ -50,7 +50,7 @@ export const CHAIN_ID = Number(import.meta.env.VITE_CHAIN_ID || '31337');
 export const DEFAULT_SLIPPAGE = 0.5;
 
 // Cross-chain relay on L2 (for arbitrary cross-chain calls via bridge)
-export const L2_RELAY = (import.meta.env.VITE_L2_RELAY as `0x${string}`) || '0x09faEDa84c1ea96B3179Fe19B3D65aA5eb673aE1';
+export const L2_RELAY = (import.meta.env.VITE_L2_RELAY as `0x${string}`) || '0xFf3F45cD388f33f7AaBa43CF705F3f8D09911412';
 
 // Explorer base URL for transaction links
 export const EXPLORER_URL = (import.meta.env.VITE_EXPLORER_URL as string) || 'https://gnosisscan.io';
