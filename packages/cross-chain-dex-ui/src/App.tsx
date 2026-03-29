@@ -60,13 +60,20 @@ function AppContent() {
   }, [isConnected, isWrongNetwork, smartWallet, isLoading]);
 
   // Auto-show fund wallet modal if smart wallet has no funds (only once per session)
-  // Wait for token balances to finish loading before deciding
+  // Delay check to ensure balances have had time to load
   useEffect(() => {
-    if (smartWallet && !balancesLoading && hasInsufficientFunds && !hasShownFundModal && !isLoading) {
-      setShowFundWallet(true);
-      setHasShownFundModal(true);
-    }
-  }, [smartWallet, balancesLoading, hasInsufficientFunds, hasShownFundModal, isLoading]);
+    if (!smartWallet || hasShownFundModal || isLoading) return;
+
+    // Wait 2s after wallet is known to let balances load
+    const timer = setTimeout(() => {
+      if (ethBalance === 0n && usdcBalance === 0n) {
+        setShowFundWallet(true);
+        setHasShownFundModal(true);
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [smartWallet, isLoading, hasShownFundModal, ethBalance, usdcBalance]);
 
   return (
     <div className="h-screen overflow-hidden bg-surge-dark flex flex-col">
