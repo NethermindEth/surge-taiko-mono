@@ -4,16 +4,20 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadCont
 import toast from 'react-hot-toast';
 import { UserOpsSubmitterFactoryABI } from '../lib/contracts';
 import { USER_OPS_FACTORY } from '../lib/constants';
+import { useUserOp } from './useUserOp';
 
 export function useSmartWallet() {
   const { address: ownerAddress, isConnected } = useAccount();
   const [isInitializing, setIsInitializing] = useState(true);
   const [justCreatedWallet, setJustCreatedWallet] = useState<Address | null>(null);
+  const [l2WalletCreated, setL2WalletCreated] = useState(false);
 
   const { writeContract, data: txHash, isPending: isCreating, reset } = useWriteContract();
   const { data: receipt, isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash: txHash,
   });
+
+  const { executeCreateL2Wallet } = useUserOp();
 
   // Read smart wallet from factory contract
   const { data: smartWalletFromFactory, isLoading: isLoadingFromFactory, refetch } = useReadContract({
@@ -38,6 +42,7 @@ export function useSmartWallet() {
     if (!isConnected || !ownerAddress) {
       setIsInitializing(false);
       setJustCreatedWallet(null);
+      setL2WalletCreated(false);
       return;
     }
     if (!isLoadingFromFactory) {
@@ -45,7 +50,7 @@ export function useSmartWallet() {
     }
   }, [isConnected, ownerAddress, isLoadingFromFactory]);
 
-  // Handle successful wallet creation - parse event logs
+  // Handle successful wallet creation - parse event logs, then create on L2
   useEffect(() => {
     if (isSuccess && receipt && ownerAddress) {
       // Parse the SubmitterCreated event from logs
@@ -59,20 +64,33 @@ export function useSmartWallet() {
 
           if (decoded.eventName === 'SubmitterCreated') {
             const createdAddress = decoded.args.submitter as Address;
-            console.log('Smart wallet created:', createdAddress);
+            console.log('Smart wallet created on L1:', createdAddress);
 
-            // Dismiss loading and show success
             toast.dismiss('create-wallet');
             toast.success(`Smart wallet created: ${createdAddress.slice(0, 8)}...${createdAddress.slice(-6)}`);
 
-            // Immediately set the wallet address to trigger UI update
+            // Set the wallet address immediately
             setJustCreatedWallet(createdAddress);
-
-            // Also refetch from factory for consistency
             refetch();
-
-            // Reset the write contract state
             reset();
+
+            // Trigger L2 wallet creation via UserOp
+            if (!l2WalletCreated) {
+              setL2WalletCreated(true);
+              toast.loading('Creating L2 wallet...', { id: 'create-l2-wallet' });
+              executeCreateL2Wallet({
+                owner: ownerAddress,
+                smartWallet: createdAddress,
+              }).then((success) => {
+                toast.dismiss('create-l2-wallet');
+                if (success) {
+                  toast.success('L2 wallet created at same address');
+                } else {
+                  toast.error('L2 wallet creation failed — try bridge-out later');
+                }
+              });
+            }
+
             break;
           }
         } catch {
@@ -80,7 +98,7 @@ export function useSmartWallet() {
         }
       }
     }
-  }, [isSuccess, receipt, ownerAddress, reset, refetch]);
+  }, [isSuccess, receipt, ownerAddress, reset, refetch, executeCreateL2Wallet, l2WalletCreated]);
 
   const createSmartWallet = useCallback(async () => {
     if (!ownerAddress) {

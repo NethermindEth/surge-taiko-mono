@@ -4,8 +4,8 @@ import {
   Hex,
 } from 'viem';
 import { UserOp, SwapDirection } from '../types';
-import { CrossChainSwapVaultL1ABI, BridgeABI, ERC20ABI, UserOpsSubmitterABI } from './contracts';
-import { L1_VAULT, L1_BRIDGE, L2_BRIDGE, L2_CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL, CHAIN_ID } from './constants';
+import { CrossChainSwapVaultL1ABI, BridgeABI, ERC20ABI, UserOpsSubmitterABI, UserOpsSubmitterFactoryABI } from './contracts';
+import { L1_VAULT, L1_BRIDGE, L2_BRIDGE, L2_CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL, CHAIN_ID, USER_OPS_FACTORY } from './constants';
 
 // ---------------------------------------------------------------
 // EIP-712 Domain & Types
@@ -205,6 +205,25 @@ export function buildBridgeOutNativeUserOps(
             data: '0x',
           },
         ],
+      }),
+    },
+  ];
+}
+
+/**
+ * Build UserOp(s) for creating a smart wallet on L2 via the factory.
+ * Executed by the L1 smart wallet (same address on L2 via CREATE2) calling
+ * factory.createSubmitter(owner) on L2.
+ */
+export function buildCreateL2WalletUserOps(owner: Address): UserOp[] {
+  return [
+    {
+      target: USER_OPS_FACTORY,
+      value: 0n,
+      data: encodeFunctionData({
+        abi: UserOpsSubmitterFactoryABI,
+        functionName: 'createSubmitter',
+        args: [owner],
       }),
     },
   ];
