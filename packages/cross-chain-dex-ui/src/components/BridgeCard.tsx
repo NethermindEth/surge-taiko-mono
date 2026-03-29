@@ -18,7 +18,7 @@ interface BridgeCardProps {
 }
 
 export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
-  const { smartWallet, isConnected } = useSmartWallet();
+  const { smartWallet, isConnected, l2WalletExists } = useSmartWallet();
   const { ethBalance, usdcBalance } = useTokenBalances(smartWallet);
   const { ethBalance: l2EthBalance, usdcBalance: l2UsdcBalance } = useL2TokenBalances(smartWallet);
   const { executeBridge, executeBridgeNative, executeBridgeOutNative, isPending } = useUserOp();
@@ -111,6 +111,7 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
     if (isWithdrawUSDC) return "USDC withdrawal not supported yet";
     if (isDeposit && hasExceededL2Limit) return "L2 deposit limit reached ($1)";
     if (isDeposit && exceedsL2Limit) return `Exceeds $1 limit ($${remaining.toFixed(2)} left)`;
+    if (!isDeposit && !l2WalletExists) return "Create L2 wallet first";
     if (hasInsufficientBalance) return "Insufficient Balance";
     if (!isDeposit) return `Withdraw ${bridgeToken} to L1`;
     return `Bridge ${bridgeToken} to L2`;
@@ -123,7 +124,8 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
     !amountIn ||
     hasInsufficientBalance ||
     exceedsL2Limit ||
-    isWithdrawUSDC;
+    isWithdrawUSDC ||
+    (!isDeposit && !l2WalletExists);
 
   return (
     <div className="flex flex-col md:flex-row items-start gap-4 justify-center w-full relative z-10">
