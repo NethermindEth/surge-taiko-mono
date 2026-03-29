@@ -1,11 +1,12 @@
 import {
   encodeFunctionData,
+  encodeAbiParameters,
   Address,
   Hex,
 } from 'viem';
 import { UserOp, SwapDirection } from '../types';
 import { CrossChainSwapVaultL1ABI, BridgeABI, ERC20ABI, UserOpsSubmitterABI, UserOpsSubmitterFactoryABI } from './contracts';
-import { L1_VAULT, L1_BRIDGE, L2_BRIDGE, L2_CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL, CHAIN_ID, USER_OPS_FACTORY } from './constants';
+import { L1_VAULT, L1_BRIDGE, L2_BRIDGE, L2_CHAIN_ID, L2_RELAY, USDC_TOKEN, BUILDER_RPC_URL, CHAIN_ID, USER_OPS_FACTORY } from './constants';
 
 // ---------------------------------------------------------------
 // EIP-712 Domain & Types
@@ -211,18 +212,37 @@ export function buildBridgeOutNativeUserOps(
 }
 
 /**
- * Build UserOp(s) for creating a smart wallet on L2 via the bridge.
- * The L1 smart wallet calls bridge.sendMessage to invoke
- * factory.createSubmitter(owner) on L2 via processMessage.
+ * Build UserOp(s) for creating a smart wallet on L2 via bridge + relay.
+ * The L1 smart wallet calls bridge.sendMessage targeting the CrossChainRelay
+ * on L2, which forwards the call to factory.createSubmitter(owner).
  */
 export function buildCreateL2WalletUserOps(owner: Address, sender: Address): UserOp[] {
   const zeroAddr = '0x0000000000000000000000000000000000000000' as Address;
 
-  // The data the bridge will deliver to the factory on L2
+  // Inner call: factory.createSubmitter(owner)
   const createSubmitterData = encodeFunctionData({
     abi: UserOpsSubmitterFactoryABI,
     functionName: 'createSubmitter',
     args: [owner],
+  });
+
+  // Relay payload: abi.encode(target, callData)
+  const relayPayload = encodeAbiParameters(
+    [{ type: 'address' }, { type: 'bytes' }],
+    [USER_OPS_FACTORY, createSubmitterData],
+  );
+
+  // Bridge message data must be onMessageInvocation(bytes) for the bridge to allow it
+  const onMessageInvocationData = encodeFunctionData({
+    abi: [{
+      type: 'function',
+      name: 'onMessageInvocation',
+      inputs: [{ name: '_data', type: 'bytes' }],
+      outputs: [],
+      stateMutability: 'payable',
+    }],
+    functionName: 'onMessageInvocation',
+    args: [relayPayload],
   });
 
   return [
@@ -236,15 +256,15 @@ export function buildCreateL2WalletUserOps(owner: Address, sender: Address): Use
           {
             id: 0n,
             fee: 0n,
-            gasLimit: 1_000_000,
+            gasLimit: 2_000_000,
             from: zeroAddr,
             srcChainId: 0n,
             srcOwner: sender,
             destChainId: BigInt(L2_CHAIN_ID),
             destOwner: sender,
-            to: USER_OPS_FACTORY,
+            to: L2_RELAY,
             value: 0n,
-            data: createSubmitterData,
+            data: onMessageInvocationData,
           },
         ],
       }),
