@@ -5,17 +5,17 @@ import {
 } from 'viem';
 import { UserOp, SwapDirection } from '../types';
 import { CrossChainSwapVaultL1ABI, BridgeABI, ERC20ABI, UserOpsSubmitterABI } from './contracts';
-import { L1_VAULT, L1_BRIDGE, L2_CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL, CHAIN_ID } from './constants';
+import { L1_VAULT, L1_BRIDGE, L2_BRIDGE, L2_CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL, CHAIN_ID } from './constants';
 
 // ---------------------------------------------------------------
 // EIP-712 Domain & Types
 // ---------------------------------------------------------------
 
-export function getEIP712Domain(verifyingContract: Address) {
+export function getEIP712Domain(verifyingContract: Address, chainId?: number) {
   return {
     name: 'UserOpsSubmitter' as const,
     version: '1' as const,
-    chainId: CHAIN_ID,
+    chainId: chainId ?? CHAIN_ID,
     verifyingContract,
   };
 }
@@ -34,9 +34,9 @@ export const ExecuteBatchTypes = {
 /**
  * Build EIP-712 signTypedData params for an ExecuteBatch
  */
-export function buildExecuteBatchTypedData(submitter: Address, ops: UserOp[]) {
+export function buildExecuteBatchTypedData(submitter: Address, ops: UserOp[], chainId?: number) {
   return {
-    domain: getEIP712Domain(submitter),
+    domain: getEIP712Domain(submitter, chainId),
     types: ExecuteBatchTypes,
     primaryType: 'ExecuteBatch' as const,
     message: {
@@ -161,6 +161,44 @@ export function buildBridgeNativeUserOps(
             srcChainId: 0n,
             srcOwner: sender,
             destChainId: BigInt(L2_CHAIN_ID),
+            destOwner: recipient,
+            to: recipient,
+            value: amount,
+            data: '0x',
+          },
+        ],
+      }),
+    },
+  ];
+}
+
+/**
+ * Build UserOp(s) for bridging native currency from L2 to L1 via the L2 bridge.
+ * These ops target the L2 bridge and will be signed with L2's chain ID.
+ */
+export function buildBridgeOutNativeUserOps(
+  amount: bigint,
+  recipient: Address,
+  sender: Address
+): UserOp[] {
+  const zeroAddr = '0x0000000000000000000000000000000000000000' as Address;
+
+  return [
+    {
+      target: L2_BRIDGE,
+      value: amount,
+      data: encodeFunctionData({
+        abi: BridgeABI,
+        functionName: 'sendMessage',
+        args: [
+          {
+            id: 0n,
+            fee: 0n,
+            gasLimit: 0,
+            from: zeroAddr,
+            srcChainId: 0n,
+            srcOwner: sender,
+            destChainId: BigInt(CHAIN_ID), // destination is L1
             destOwner: recipient,
             to: recipient,
             value: amount,

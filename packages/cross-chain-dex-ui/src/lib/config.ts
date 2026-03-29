@@ -18,21 +18,6 @@ export const surgeL1Chain = defineChain({
   },
 });
 
-// Wagmi config - only injected wallets (MetaMask, Rabby, etc.)
-export const config = createConfig({
-  chains: [surgeL1Chain],
-  connectors: [injected()],
-  transports: {
-    [surgeL1Chain.id]: http(L1_RPC_URL),
-  },
-});
-
-// Public client for L1 (reading)
-export const l1PublicClient = createPublicClient({
-  chain: surgeL1Chain,
-  transport: http(L1_RPC_URL),
-});
-
 // Define L2 chain
 export const surgeL2Chain = defineChain({
   id: Number(import.meta.env.VITE_L2_CHAIN_ID || '763374'),
@@ -41,6 +26,22 @@ export const surgeL2Chain = defineChain({
   rpcUrls: {
     default: { http: [L2_RPC_URL] },
   },
+});
+
+// Wagmi config - only injected wallets (MetaMask, Rabby, etc.)
+export const config = createConfig({
+  chains: [surgeL1Chain, surgeL2Chain],
+  connectors: [injected()],
+  transports: {
+    [surgeL1Chain.id]: http(L1_RPC_URL),
+    [surgeL2Chain.id]: http(L2_RPC_URL),
+  },
+});
+
+// Public client for L1 (reading)
+export const l1PublicClient = createPublicClient({
+  chain: surgeL1Chain,
+  transport: http(L1_RPC_URL),
 });
 
 // Public client for L2 (reading DEX reserves)

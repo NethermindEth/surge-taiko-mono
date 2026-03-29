@@ -35,6 +35,7 @@ export const SIMPLE_DEX = import.meta.env.VITE_SIMPLE_DEX as `0x${string}`;
 
 // Bridge
 export const L1_BRIDGE = import.meta.env.VITE_L1_BRIDGE as `0x${string}`;
+export const L2_BRIDGE = import.meta.env.VITE_L2_BRIDGE as `0x${string}`;
 export const L2_CHAIN_ID = Number(import.meta.env.VITE_L2_CHAIN_ID || '763374');
 
 // RPC URLs

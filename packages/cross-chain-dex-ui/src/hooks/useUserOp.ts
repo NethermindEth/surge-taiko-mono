@@ -6,6 +6,7 @@ import {
   buildSwapUserOps,
   buildBridgeUserOps,
   buildBridgeNativeUserOps,
+  buildBridgeOutNativeUserOps,
   buildAddLiquidityUserOps,
   buildExecuteBatchTypedData,
   sendUserOpToBuilder,
@@ -13,13 +14,20 @@ import {
   queryUserOpStatus,
 } from '../lib/userOp';
 import { UserOp } from '../types';
-import { DEFAULT_SLIPPAGE } from '../lib/constants';
+import { DEFAULT_SLIPPAGE, L2_CHAIN_ID } from '../lib/constants';
 import { useTxStatus } from '../context/TxStatusContext';
+
+interface ExecuteBridgeOutNativeParams {
+  amount: bigint;
+  recipient: Address;
+  smartWallet: Address;
+}
 
 interface UseUserOpReturn {
   executeSwap: (params: ExecuteSwapParams) => Promise<boolean>;
   executeBridge: (params: ExecuteBridgeParams) => Promise<boolean>;
   executeBridgeNative: (params: ExecuteBridgeNativeParams) => Promise<boolean>;
+  executeBridgeOutNative: (params: ExecuteBridgeOutNativeParams) => Promise<boolean>;
   executeAddLiquidity: (params: ExecuteAddLiquidityParams) => Promise<boolean>;
   isPending: boolean;
   error: Error | null;
@@ -152,7 +160,7 @@ export function useUserOp(): UseUserOpReturn {
   );
 
   const executeGenericOps = useCallback(
-    async (ops: UserOp[], smartWallet: Address): Promise<boolean> => {
+    async (ops: UserOp[], smartWallet: Address, chainId?: number): Promise<boolean> => {
       if (!walletClient) {
         setTxStatus({ phase: 'rejected', errorMessage: 'Wallet not connected' });
         return false;
@@ -165,7 +173,7 @@ export function useUserOp(): UseUserOpReturn {
       try {
         setTxStatus({ phase: 'signing' });
 
-        const typedData = buildExecuteBatchTypedData(smartWallet, ops);
+        const typedData = buildExecuteBatchTypedData(smartWallet, ops, chainId);
         const signature = await walletClient.signTypedData(typedData);
 
         const result = await sendUserOpToBuilder(smartWallet, ops, signature as Hex);
@@ -210,6 +218,15 @@ export function useUserOp(): UseUserOpReturn {
     [executeGenericOps]
   );
 
+  const executeBridgeOutNative = useCallback(
+    async ({ amount, recipient, smartWallet }: ExecuteBridgeOutNativeParams): Promise<boolean> => {
+      const ops = buildBridgeOutNativeUserOps(amount, recipient, smartWallet);
+      // Sign with L2 chain ID — catalyst auto-detects the target chain from the signature
+      return executeGenericOps(ops, smartWallet, L2_CHAIN_ID);
+    },
+    [executeGenericOps]
+  );
+
   const executeAddLiquidity = useCallback(
     async ({ ethAmount, tokenAmount, smartWallet }: ExecuteAddLiquidityParams): Promise<boolean> => {
       const ops = buildAddLiquidityUserOps(ethAmount, tokenAmount);
@@ -222,6 +239,7 @@ export function useUserOp(): UseUserOpReturn {
     executeSwap,
     executeBridge,
     executeBridgeNative,
+    executeBridgeOutNative,
     executeAddLiquidity,
     isPending,
     error,
