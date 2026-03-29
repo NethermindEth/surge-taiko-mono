@@ -85,8 +85,21 @@ export function useUserOp(): UseUserOpReturn {
       };
       let highestPhase = 0;
       let hasSeenProving = false;
+      let pollCount = 0;
+      const MAX_POLLS = 300; // 5 minutes at 1s intervals
 
       pollIntervalRef.current = setInterval(async () => {
+        pollCount++;
+        if (pollCount > MAX_POLLS) {
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+          setTxStatus({ phase: 'rejected', errorMessage: 'Transaction timed out' });
+          setError(new Error('Transaction timed out'));
+          setIsPending(false);
+          resolve(false);
+          return;
+        }
+
         const status = await queryUserOpStatus(userOpId);
         if (!status) return;
 
