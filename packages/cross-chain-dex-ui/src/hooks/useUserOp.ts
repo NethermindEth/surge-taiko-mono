@@ -183,7 +183,7 @@ export function useUserOp(): UseUserOpReturn {
         const typedData = buildExecuteBatchTypedData(smartWallet, ops, chainId);
         const signature = await walletClient.signTypedData(typedData);
 
-        const result = await sendUserOpToBuilder(smartWallet, ops, signature as Hex);
+        const result = await sendUserOpToBuilder(smartWallet, ops, signature as Hex, chainId);
 
         if (result.success && result.userOpId !== undefined) {
           return await pollStatus(result.userOpId);

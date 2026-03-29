@@ -22,7 +22,7 @@ const queryClient = new QueryClient();
 
 function AppContent() {
   const { txStatus, setTxStatus } = useTxStatus();
-  const { smartWallet, isConnected, isLoading } = useSmartWallet();
+  const { smartWallet, l2WalletExists, isConnected, isLoading, createL2Wallet } = useSmartWallet();
   const { chainId } = useAccount();
   const { ethBalance, usdcBalance, ethFormatted, usdcFormatted } = useTokenBalances(smartWallet);
 
@@ -122,6 +122,8 @@ function AppContent() {
         <FundWallet
           isOpen={showFundWallet}
           onClose={() => setShowFundWallet(false)}
+          onCreateL2Wallet={createL2Wallet}
+          l2WalletExists={l2WalletExists}
           smartWallet={smartWallet}
           ethBalance={ethFormatted}
           usdcBalance={usdcFormatted}

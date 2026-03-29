@@ -6,12 +6,14 @@ import { L1_NATIVE_SYMBOL } from '../lib/constants';
 interface FundWalletProps {
   isOpen: boolean;
   onClose: () => void;
+  onCreateL2Wallet?: () => Promise<boolean>;
+  l2WalletExists?: boolean | null;
   smartWallet: Address;
   ethBalance: string;
   usdcBalance: string;
 }
 
-export function FundWallet({ isOpen, onClose, smartWallet, ethBalance, usdcBalance }: FundWalletProps) {
+export function FundWallet({ isOpen, onClose, onCreateL2Wallet, l2WalletExists, smartWallet, ethBalance, usdcBalance }: FundWalletProps) {
   if (!isOpen) return null;
 
   const copyAddress = () => {
@@ -84,10 +86,15 @@ export function FundWallet({ isOpen, onClose, smartWallet, ethBalance, usdcBalan
         </div>
 
         <button
-          onClick={onClose}
+          onClick={async () => {
+            if (l2WalletExists === false && onCreateL2Wallet) {
+              await onCreateL2Wallet();
+            }
+            onClose();
+          }}
           className="w-full py-3 bg-surge-primary hover:bg-surge-secondary text-white rounded-lg font-medium transition-colors"
         >
-          I've Funded My Wallet
+          {l2WalletExists === false ? "I've Funded My Wallet — Create L2 Wallet" : "I've Funded My Wallet"}
         </button>
       </div>
     </div>

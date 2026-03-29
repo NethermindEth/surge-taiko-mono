@@ -284,7 +284,8 @@ function getBuilderUrl(): string {
 export async function sendUserOpToBuilder(
   submitter: Address,
   ops: UserOp[],
-  signature: Hex
+  signature: Hex,
+  chainId?: number
 ): Promise<{ success: boolean; result?: unknown; error?: string; userOpId?: number }> {
   try {
     const builderUrl = getBuilderUrl();
@@ -311,6 +312,7 @@ export async function sendUserOpToBuilder(
         params: {
           submitter,
           calldata,
+          ...(chainId ? { chainId } : {}),
         },
         id: 1,
       }),
