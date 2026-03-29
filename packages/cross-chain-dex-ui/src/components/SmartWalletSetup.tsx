@@ -1,22 +1,15 @@
-import { useEffect } from 'react';
-import { useSmartWallet } from '../hooks/useSmartWallet';
 import toast from 'react-hot-toast';
+import { Address } from 'viem';
 
 interface SmartWalletSetupProps {
   isOpen: boolean;
   onClose: () => void;
+  ownerAddress?: Address;
+  isCreating: boolean;
+  createSmartWallet: () => Promise<void>;
 }
 
-export function SmartWalletSetup({ isOpen, onClose }: SmartWalletSetupProps) {
-  const { createSmartWallet, isCreating, ownerAddress, smartWallet } = useSmartWallet();
-
-  // Auto-close modal when smart wallet is created
-  useEffect(() => {
-    if (smartWallet && isOpen) {
-      onClose();
-    }
-  }, [smartWallet, isOpen, onClose]);
-
+export function SmartWalletSetup({ isOpen, onClose, ownerAddress, isCreating, createSmartWallet }: SmartWalletSetupProps) {
   if (!isOpen) return null;
 
   const handleCreate = async () => {

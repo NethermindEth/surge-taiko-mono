@@ -22,13 +22,14 @@ const queryClient = new QueryClient();
 
 function AppContent() {
   const { txStatus, setTxStatus } = useTxStatus();
-  const { smartWallet, isConnected, isLoading, l2WalletExists, createL2Wallet, isCreatingL2Wallet } = useSmartWallet();
+  const { smartWallet, isConnected, isLoading, ownerAddress, createSmartWallet, isCreating, l2WalletExists, createL2Wallet, isCreatingL2Wallet } = useSmartWallet();
   const { chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const { ethBalance, usdcBalance, ethFormatted, usdcFormatted, isLoading: balancesLoading } = useTokenBalances(smartWallet);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('swap');
   const [showWalletSetup, setShowWalletSetup] = useState(false);
+  const [dismissedWalletSetup, setDismissedWalletSetup] = useState(false);
   const [showNetworkSetup, setShowNetworkSetup] = useState(false);
   const [showFundWallet, setShowFundWallet] = useState(false);
   const [hasShownFundModal, setHasShownFundModal] = useState(false);
@@ -52,15 +53,20 @@ function AppContent() {
     }
   }, [activeTab, chainId, isConnected, switchChainAsync]);
 
+  // Reset dismissed flag when wallet connects/disconnects or smart wallet changes
+  useEffect(() => {
+    setDismissedWalletSetup(false);
+  }, [isConnected, ownerAddress]);
+
   // Auto-show wallet setup if connected, on correct network, but no smart wallet
   // Auto-close when wallet is created
   useEffect(() => {
-    if (isConnected && !isWrongNetwork && !smartWallet && !isLoading) {
+    if (isConnected && !isWrongNetwork && !smartWallet && !isLoading && !dismissedWalletSetup) {
       setShowWalletSetup(true);
     } else if (smartWallet && showWalletSetup) {
       setShowWalletSetup(false);
     }
-  }, [isConnected, isWrongNetwork, smartWallet, isLoading, showWalletSetup]);
+  }, [isConnected, isWrongNetwork, smartWallet, isLoading, showWalletSetup, dismissedWalletSetup]);
 
   // Auto-show fund wallet modal when:
   // 1. Wallet has no funds (needs funding), OR
@@ -132,7 +138,13 @@ function AppContent() {
 
       <SmartWalletSetup
         isOpen={showWalletSetup && !isWrongNetwork}
-        onClose={() => setShowWalletSetup(false)}
+        onClose={() => {
+          setShowWalletSetup(false);
+          setDismissedWalletSetup(true);
+        }}
+        ownerAddress={ownerAddress}
+        isCreating={isCreating}
+        createSmartWallet={createSmartWallet}
       />
 
       {smartWallet && (
