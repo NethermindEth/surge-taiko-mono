@@ -128,70 +128,6 @@ export function useUserOp(): UseUserOpReturn {
     });
   }, [setTxStatus]);
 
-  const executeSwap = useCallback(
-    async ({
-      direction,
-      amountIn,
-      expectedAmountOut,
-      smartWallet,
-      slippage = DEFAULT_SLIPPAGE,
-    }: ExecuteSwapParams): Promise<boolean> => {
-      if (!walletClient) {
-        setTxStatus({ phase: 'rejected', errorMessage: 'Wallet not connected' });
-        return false;
-      }
-
-      setIsPending(true);
-      setError(null);
-      txHashRef.current = undefined;
-
-      try {
-        const minAmountOut = calculateMinOutput(expectedAmountOut, slippage);
-        const ops = buildSwapUserOps(direction, amountIn, minAmountOut, smartWallet);
-
-        setTxStatus({ phase: 'signing' });
-
-        // Fetch nonce from the Safe on L1
-        const nonce = await getSafeNonce(l1PublicClient, smartWallet);
-
-        // Convert ops to a single SafeTxParams
-        const safeTx = userOpsToSafeTx(ops);
-
-        // Build Safe EIP-712 typed data
-        const typedData = buildSafeTxTypedData(smartWallet, CHAIN_ID, nonce, safeTx);
-
-        const signature = await walletClient.signTypedData(typedData);
-        console.log('Signature:', signature);
-
-        // Encode execTransaction calldata
-        const calldata = buildExecTransactionCalldata(safeTx, signature as Hex);
-
-        const result = await sendUserOpToBuilder(smartWallet, calldata);
-
-        if (result.success && result.userOpId !== undefined) {
-          return await pollStatus(result.userOpId);
-        } else if (result.success) {
-          setTxStatus({ phase: 'complete' });
-          setIsPending(false);
-          return true;
-        } else {
-          setTxStatus({ phase: 'rejected', errorMessage: result.error || 'Failed to submit swap' });
-          setError(new Error(result.error || 'Failed to submit swap'));
-          setIsPending(false);
-          return false;
-        }
-      } catch (err) {
-        console.error('Swap failed:', err);
-        const msg = err instanceof Error ? err.message : 'Swap failed';
-        setTxStatus({ phase: 'rejected', errorMessage: msg });
-        setError(err instanceof Error ? err : new Error(msg));
-        setIsPending(false);
-        return false;
-      }
-    },
-    [walletClient, pollStatus, setTxStatus]
-  );
-
   const executeGenericOps = useCallback(
     async (ops: UserOp[], smartWallet: Address, chainId?: number): Promise<boolean> => {
       if (!walletClient) {
@@ -255,6 +191,21 @@ export function useUserOp(): UseUserOpReturn {
     [walletClient, switchChainAsync, pollStatus, setTxStatus]
   );
 
+  const executeSwap = useCallback(
+    async ({
+      direction,
+      amountIn,
+      expectedAmountOut,
+      smartWallet,
+      slippage = DEFAULT_SLIPPAGE,
+    }: ExecuteSwapParams): Promise<boolean> => {
+      const minAmountOut = calculateMinOutput(expectedAmountOut, slippage);
+      const ops = buildSwapUserOps(direction, amountIn, minAmountOut, smartWallet);
+      return executeGenericOps(ops, smartWallet);
+    },
+    [executeGenericOps]
+  );
+
   const executeBridge = useCallback(
     async ({ amount, recipient, smartWallet }: ExecuteBridgeParams): Promise<boolean> => {
       const ops = buildBridgeUserOps(amount, recipient);
@@ -290,6 +241,11 @@ export function useUserOp(): UseUserOpReturn {
   const executeRemoveLiquidity = useCallback(
     async ({ smartWallet }: { smartWallet: Address }): Promise<boolean> => {
       const ops = buildRemoveLiquidityUserOps();
+      return executeGenericOps(ops, smartWallet);
+    },
+    [executeGenericOps]
+  );
+
   const executeCreateL2Wallet = useCallback(
     async ({ owner, smartWallet }: { owner: Address; smartWallet: Address }): Promise<boolean> => {
       const ops = buildCreateL2SafeOps(owner, smartWallet);

@@ -247,6 +247,9 @@ export function buildRemoveLiquidityUserOps(): UserOp[] {
       }),
     },
   ];
+}
+
+/**
  * Build UserOp(s) for creating a Safe on L2 via bridge + relay.
  * The L1 Safe calls bridge.sendMessage targeting the CrossChainRelay on L2,
  * which forwards to SafeProxyFactory.createProxyWithNonce.
