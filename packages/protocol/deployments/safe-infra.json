@@ -1,8 +1,10 @@
 {
-  "note": "Deployed with matching addresses on both L1 (Gnosis, chainId=100) and L2 (Surge, chainId=763374). Deployer: 0xC525e845F4318d93D4FF2D3a3113913DaB1a4434 (nonce 0 on both chains at time of deployment).",
-  "SafeL2": "0x2d45De2E0e2091677d3d8199e44bb83B5F6Ada06",
-  "SafeProxyFactory": "0x58AFc212667A0EB72148bEAFFAc1A542c6a29177",
-  "MultiSend": "0x1F1f2eea04c0D932D09163f949308cFbB9cab970",
-  "MultiSendCallOnly": "0x8354C69fC286D1c77a0066f1E7F272510CF69283",
-  "CompatibilityFallbackHandler": "0x221B688d8582B6a34870543ecE7ae2C2D3DD72B6"
+  "version": "1.4.1",
+  "note": "Official Safe v1.4.1 canonical deployments — same addresses on Gnosis L1 and Surge L2 genesis",
+  "safeL2Singleton": "0x29fcB43b46531BcA003ddC8FCB67FFE91900C762",
+  "safe": "0x41675C099F32341bf84BFc5382aF534df5C7461a",
+  "safeProxyFactory": "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67",
+  "multiSend": "0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526",
+  "multiSendCallOnly": "0x9641d764fc13c8B624c04430C7356C1C7C8102e2",
+  "compatibilityFallbackHandler": "0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99"
 }
