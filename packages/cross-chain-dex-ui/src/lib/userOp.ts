@@ -1,48 +1,41 @@
 import {
   encodeFunctionData,
+  encodeAbiParameters,
+  keccak256,
+  encodePacked,
   Address,
   Hex,
 } from 'viem';
 import { UserOp, SwapDirection } from '../types';
-import { CrossChainSwapVaultL1ABI, BridgeABI, ERC20ABI, UserOpsSubmitterABI } from './contracts';
-import { L1_VAULT, L1_BRIDGE, L2_CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL, CHAIN_ID } from './constants';
+import { CrossChainSwapVaultL1ABI, BridgeABI, ERC20ABI, SafeProxyFactoryABI } from './contracts';
+import { L1_VAULT, L1_BRIDGE, L2_BRIDGE, L2_CHAIN_ID, CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL, L2_RELAY, SAFE_PROXY_FACTORY, SAFE_SINGLETON, SAFE_FALLBACK_HANDLER } from './constants';
+import { SafeTxParams, buildMultiSendSafeTx, buildSafeSetupCalldata } from './safeOp';
 
 // ---------------------------------------------------------------
-// EIP-712 Domain & Types
+// Safe tx conversion
 // ---------------------------------------------------------------
-
-export function getEIP712Domain(verifyingContract: Address) {
-  return {
-    name: 'UserOpsSubmitter' as const,
-    version: '1' as const,
-    chainId: CHAIN_ID,
-    verifyingContract,
-  };
-}
-
-export const ExecuteBatchTypes = {
-  ExecuteBatch: [
-    { name: 'ops', type: 'UserOp[]' },
-  ],
-  UserOp: [
-    { name: 'target', type: 'address' },
-    { name: 'value', type: 'uint256' },
-    { name: 'data', type: 'bytes' },
-  ],
-} as const;
 
 /**
- * Build EIP-712 signTypedData params for an ExecuteBatch
+ * Convert UserOp[] to a single SafeTxParams.
+ * Single op: direct CALL. Multiple ops: wrap in MultiSend DELEGATECALL.
  */
-export function buildExecuteBatchTypedData(submitter: Address, ops: UserOp[]) {
-  return {
-    domain: getEIP712Domain(submitter),
-    types: ExecuteBatchTypes,
-    primaryType: 'ExecuteBatch' as const,
-    message: {
-      ops: ops.map((op) => ({ target: op.target, value: op.value, data: op.data })),
-    },
-  };
+export function userOpsToSafeTx(ops: UserOp[]): SafeTxParams {
+  if (ops.length === 1) {
+    return {
+      to: ops[0].target,
+      value: ops[0].value,
+      data: ops[0].data,
+      operation: 0, // CALL
+    };
+  }
+  // Multiple ops: use MultiSend
+  const safeTxs: SafeTxParams[] = ops.map(op => ({
+    to: op.target,
+    value: op.value,
+    data: op.data,
+    operation: 0 as const,
+  }));
+  return buildMultiSendSafeTx(safeTxs);
 }
 
 // ---------------------------------------------------------------
@@ -156,7 +149,7 @@ export function buildBridgeNativeUserOps(
           {
             id: 0n,
             fee: 0n,
-            gasLimit: 0,
+            gasLimit: 1_000_000,
             from: zeroAddr,
             srcChainId: 0n,
             srcOwner: sender,
@@ -170,6 +163,39 @@ export function buildBridgeNativeUserOps(
       }),
     },
   ];
+}
+
+/**
+ * Build UserOp(s) for bridging native currency from L2 to L1 via the L2 bridge
+ */
+export function buildBridgeOutNativeUserOps(
+  amount: bigint,
+  recipient: Address,
+  sender: Address
+): UserOp[] {
+  const zeroAddr = '0x0000000000000000000000000000000000000000' as Address;
+
+  return [{
+    target: L2_BRIDGE,
+    value: amount,
+    data: encodeFunctionData({
+      abi: BridgeABI,
+      functionName: 'sendMessage',
+      args: [{
+        id: 0n,
+        fee: 0n,
+        gasLimit: 1_000_000,
+        from: zeroAddr,
+        srcChainId: 0n,
+        srcOwner: sender,
+        destChainId: BigInt(CHAIN_ID),
+        destOwner: recipient,
+        to: recipient,
+        value: amount,
+        data: '0x',
+      }],
+    }),
+  }];
 }
 
 /**
@@ -207,6 +233,42 @@ export function buildAddLiquidityUserOps(
 }
 
 /**
+ * Build UserOp(s) for withdrawing all funds from the Safe to the owner EOA
+ */
+export function buildWithdrawUserOps(
+  owner: Address,
+  ethBalance: bigint,
+  usdcBalance: bigint
+): UserOp[] {
+  const ops: UserOp[] = [];
+
+  if (usdcBalance > 0n) {
+    const usdcAddress = USDC_TOKEN.address;
+    if (usdcAddress) {
+      ops.push({
+        target: usdcAddress,
+        value: 0n,
+        data: encodeFunctionData({
+          abi: ERC20ABI,
+          functionName: 'transfer',
+          args: [owner, usdcBalance],
+        }),
+      });
+    }
+  }
+
+  if (ethBalance > 0n) {
+    ops.push({
+      target: owner,
+      value: ethBalance,
+      data: '0x',
+    });
+  }
+
+  return ops;
+}
+
+/**
  * Build UserOp(s) for removing all liquidity from L2 DEX
  */
 export function buildRemoveLiquidityUserOps(): UserOp[] {
@@ -221,6 +283,67 @@ export function buildRemoveLiquidityUserOps(): UserOp[] {
       }),
     },
   ];
+}
+
+/**
+ * Build UserOp(s) for creating a Safe on L2 via bridge + relay.
+ * The L1 Safe calls bridge.sendMessage targeting the CrossChainRelay on L2,
+ * which forwards to SafeProxyFactory.createProxyWithNonce.
+ */
+export function buildCreateL2SafeOps(owner: Address, sender: Address): UserOp[] {
+  const zeroAddr = '0x0000000000000000000000000000000000000000' as Address;
+
+  // Build the same initializer and saltNonce as L1 creation
+  const initializer = buildSafeSetupCalldata(owner, SAFE_FALLBACK_HANDLER);
+  const saltNonce = BigInt(keccak256(encodePacked(['address'], [owner])));
+
+  // The call the relay will forward to the factory
+  const createProxyCalldata = encodeFunctionData({
+    abi: SafeProxyFactoryABI,
+    functionName: 'createProxyWithNonce',
+    args: [SAFE_SINGLETON, initializer, saltNonce],
+  });
+
+  // Encode for relay: abi.encode(target, callData)
+  const relayPayload = encodeAbiParameters(
+    [{ type: 'address' }, { type: 'bytes' }],
+    [SAFE_PROXY_FACTORY, createProxyCalldata],
+  );
+
+  // Bridge requires onMessageInvocation selector
+  const onMessageInvocationData = encodeFunctionData({
+    abi: [{
+      type: 'function',
+      name: 'onMessageInvocation',
+      inputs: [{ name: '_data', type: 'bytes' }],
+      outputs: [],
+      stateMutability: 'payable',
+    }],
+    functionName: 'onMessageInvocation',
+    args: [relayPayload],
+  });
+
+  return [{
+    target: L1_BRIDGE,
+    value: 0n,
+    data: encodeFunctionData({
+      abi: BridgeABI,
+      functionName: 'sendMessage',
+      args: [{
+        id: 0n,
+        fee: 0n,
+        gasLimit: 2_000_000,
+        from: zeroAddr,
+        srcChainId: 0n,
+        srcOwner: sender,
+        destChainId: BigInt(L2_CHAIN_ID),
+        destOwner: sender,
+        to: L2_RELAY,
+        value: 0n,
+        data: onMessageInvocationData,
+      }],
+    }),
+  }];
 }
 
 // ---------------------------------------------------------------
@@ -243,24 +366,14 @@ function getBuilderUrl(): string {
  */
 export async function sendUserOpToBuilder(
   submitter: Address,
-  ops: UserOp[],
-  signature: Hex
+  calldata: Hex,
+  chainId?: number
 ): Promise<{ success: boolean; result?: unknown; error?: string; userOpId?: number }> {
   try {
     const builderUrl = getBuilderUrl();
     console.log('Sending UserOp to:', builderUrl);
     console.log('Submitter:', submitter);
-    console.log('Ops count:', ops.length);
-
-    // Encode the full executeBatch(ops, signature) calldata
-    const calldata = encodeFunctionData({
-      abi: UserOpsSubmitterABI,
-      functionName: 'executeBatch',
-      args: [
-        ops.map((op) => ({ target: op.target, value: op.value, data: op.data })),
-        signature,
-      ],
-    });
+    console.log('ChainId:', chainId);
 
     const response = await fetch(builderUrl, {
       method: 'POST',
@@ -271,6 +384,7 @@ export async function sendUserOpToBuilder(
         params: {
           submitter,
           calldata,
+          ...(chainId ? { chainId } : {}),
         },
         id: 1,
       }),
