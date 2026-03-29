@@ -26,7 +26,7 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
   const { isDisclaimerOpen, requireDisclaimer, onAccept, onCancel } = useDisclaimer();
 
   const [direction, setDirection] = useState<BridgeDirection>("L1_TO_L2");
-  const [bridgeToken, setBridgeToken] = useState<BridgeToken>("USDC");
+  const [bridgeToken, setBridgeToken] = useState<BridgeToken>(L1_NATIVE_SYMBOL);
   const [inputAmount, setInputAmount] = useState("");
   const [recipient, setRecipient] = useState("");
 
