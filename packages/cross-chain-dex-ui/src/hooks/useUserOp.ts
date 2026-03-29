@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Address, Hex } from 'viem';
-import { useWalletClient } from 'wagmi';
+import { useWalletClient, useSwitchChain } from 'wagmi';
 import { SwapDirection } from '../types';
 import {
   buildSwapUserOps,
@@ -8,13 +8,15 @@ import {
   buildBridgeNativeUserOps,
   buildAddLiquidityUserOps,
   buildRemoveLiquidityUserOps,
-  buildExecuteBatchTypedData,
+  userOpsToSafeTx,
   sendUserOpToBuilder,
   calculateMinOutput,
   queryUserOpStatus,
 } from '../lib/userOp';
+import { getSafeNonce, buildSafeTxTypedData, buildExecTransactionCalldata } from '../lib/safeOp';
 import { UserOp } from '../types';
-import { DEFAULT_SLIPPAGE } from '../lib/constants';
+import { CHAIN_ID, L2_CHAIN_ID, DEFAULT_SLIPPAGE } from '../lib/constants';
+import { l1PublicClient, l2PublicClient } from '../lib/config';
 import { useTxStatus } from '../context/TxStatusContext';
 
 interface UseUserOpReturn {
@@ -55,6 +57,7 @@ interface ExecuteAddLiquidityParams {
 
 export function useUserOp(): UseUserOpReturn {
   const { data: walletClient } = useWalletClient();
+  const { switchChainAsync } = useSwitchChain();
   const { setTxStatus } = useTxStatus();
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -123,11 +126,22 @@ export function useUserOp(): UseUserOpReturn {
 
         setTxStatus({ phase: 'signing' });
 
-        const typedData = buildExecuteBatchTypedData(smartWallet, ops);
+        // Fetch nonce from the Safe on L1
+        const nonce = await getSafeNonce(l1PublicClient, smartWallet);
+
+        // Convert ops to a single SafeTxParams
+        const safeTx = userOpsToSafeTx(ops);
+
+        // Build Safe EIP-712 typed data
+        const typedData = buildSafeTxTypedData(smartWallet, CHAIN_ID, nonce, safeTx);
+
         const signature = await walletClient.signTypedData(typedData);
         console.log('Signature:', signature);
 
-        const result = await sendUserOpToBuilder(smartWallet, ops, signature as Hex);
+        // Encode execTransaction calldata
+        const calldata = buildExecTransactionCalldata(safeTx, signature as Hex);
+
+        const result = await sendUserOpToBuilder(smartWallet, calldata);
 
         if (result.success && result.userOpId !== undefined) {
           return await pollStatus(result.userOpId);
@@ -154,7 +168,7 @@ export function useUserOp(): UseUserOpReturn {
   );
 
   const executeGenericOps = useCallback(
-    async (ops: UserOp[], smartWallet: Address): Promise<boolean> => {
+    async (ops: UserOp[], smartWallet: Address, chainId?: number): Promise<boolean> => {
       if (!walletClient) {
         setTxStatus({ phase: 'rejected', errorMessage: 'Wallet not connected' });
         return false;
@@ -167,10 +181,30 @@ export function useUserOp(): UseUserOpReturn {
       try {
         setTxStatus({ phase: 'signing' });
 
-        const typedData = buildExecuteBatchTypedData(smartWallet, ops);
+        // Determine which chain this Safe lives on
+        const targetChainId = chainId ?? CHAIN_ID;
+        const publicClient = targetChainId === L2_CHAIN_ID ? l2PublicClient : l1PublicClient;
+
+        // Switch chain if needed (e.g. bridge-out: signing on L2)
+        if (chainId !== undefined && chainId !== walletClient.chain?.id) {
+          await switchChainAsync({ chainId });
+        }
+
+        // Fetch nonce from the Safe on the correct chain
+        const nonce = await getSafeNonce(publicClient, smartWallet);
+
+        // Convert ops to a single SafeTxParams
+        const safeTx = userOpsToSafeTx(ops);
+
+        // Build Safe EIP-712 typed data
+        const typedData = buildSafeTxTypedData(smartWallet, targetChainId, nonce, safeTx);
+
         const signature = await walletClient.signTypedData(typedData);
 
-        const result = await sendUserOpToBuilder(smartWallet, ops, signature as Hex);
+        // Encode execTransaction calldata
+        const calldata = buildExecTransactionCalldata(safeTx, signature as Hex);
+
+        const result = await sendUserOpToBuilder(smartWallet, calldata, chainId);
 
         if (result.success && result.userOpId !== undefined) {
           return await pollStatus(result.userOpId);
@@ -193,7 +227,7 @@ export function useUserOp(): UseUserOpReturn {
         return false;
       }
     },
-    [walletClient, pollStatus, setTxStatus]
+    [walletClient, switchChainAsync, pollStatus, setTxStatus]
   );
 
   const executeBridge = useCallback(

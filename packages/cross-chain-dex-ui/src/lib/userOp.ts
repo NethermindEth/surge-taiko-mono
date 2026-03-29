@@ -5,44 +5,34 @@ import {
 } from 'viem';
 import { UserOp, SwapDirection } from '../types';
 import { CrossChainSwapVaultL1ABI, BridgeABI, ERC20ABI } from './contracts';
-import { L1_VAULT, L1_BRIDGE, L2_CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL, CHAIN_ID } from './constants';
+import { L1_VAULT, L1_BRIDGE, L2_CHAIN_ID, USDC_TOKEN, BUILDER_RPC_URL } from './constants';
+import { SafeTxParams, buildMultiSendSafeTx } from './safeOp';
 
 // ---------------------------------------------------------------
-// EIP-712 Domain & Types
+// Safe tx conversion
 // ---------------------------------------------------------------
-
-export function getEIP712Domain(verifyingContract: Address) {
-  return {
-    name: 'UserOpsSubmitter' as const,
-    version: '1' as const,
-    chainId: CHAIN_ID,
-    verifyingContract,
-  };
-}
-
-export const ExecuteBatchTypes = {
-  ExecuteBatch: [
-    { name: 'ops', type: 'UserOp[]' },
-  ],
-  UserOp: [
-    { name: 'target', type: 'address' },
-    { name: 'value', type: 'uint256' },
-    { name: 'data', type: 'bytes' },
-  ],
-} as const;
 
 /**
- * Build EIP-712 signTypedData params for an ExecuteBatch
+ * Convert UserOp[] to a single SafeTxParams.
+ * Single op: direct CALL. Multiple ops: wrap in MultiSend DELEGATECALL.
  */
-export function buildExecuteBatchTypedData(submitter: Address, ops: UserOp[]) {
-  return {
-    domain: getEIP712Domain(submitter),
-    types: ExecuteBatchTypes,
-    primaryType: 'ExecuteBatch' as const,
-    message: {
-      ops: ops.map((op) => ({ target: op.target, value: op.value, data: op.data })),
-    },
-  };
+export function userOpsToSafeTx(ops: UserOp[]): SafeTxParams {
+  if (ops.length === 1) {
+    return {
+      to: ops[0].target,
+      value: ops[0].value,
+      data: ops[0].data,
+      operation: 0, // CALL
+    };
+  }
+  // Multiple ops: use MultiSend
+  const safeTxs: SafeTxParams[] = ops.map(op => ({
+    to: op.target,
+    value: op.value,
+    data: op.data,
+    operation: 0 as const,
+  }));
+  return buildMultiSendSafeTx(safeTxs);
 }
 
 // ---------------------------------------------------------------
