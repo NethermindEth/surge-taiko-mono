@@ -133,8 +133,8 @@ func (s *PreconfBlockAPIServer) BuildPreconfBlock(c echo.Context) error {
 	}
 
 	if s.latestSeenProposal != nil {
-		if s.fork != "pacaya" {
-			if bytes.HasPrefix(parent.Transactions()[0].Data(), taiko.AnchorV4Selector) {
+		if s.fork == "shasta" {
+			if len(parent.Transactions()) > 0 && bytes.HasPrefix(parent.Transactions()[0].Data(), taiko.AnchorV4Selector) {
 				parentProposalID, err := core.DecodeShastaProposalID(parent.Extra())
 				if err != nil {
 					return s.returnError(c, http.StatusBadRequest, fmt.Errorf("failed to get parent block proposal ID: %w", err))
