@@ -9,6 +9,7 @@ import {
   buildBridgeOutNativeUserOps,
   buildAddLiquidityUserOps,
   buildRemoveLiquidityUserOps,
+  buildWithdrawUserOps,
   buildCreateL2SafeOps,
   userOpsToSafeTx,
   sendUserOpToBuilder,
@@ -259,6 +260,42 @@ export function useUserOp(): UseUserOpReturn {
     [executeGenericOps]
   );
 
+  const executeWithdraw = useCallback(
+    async ({ owner, smartWallet, ethBalance, usdcBalance }: { owner: Address; smartWallet: Address; ethBalance: bigint; usdcBalance: bigint }): Promise<boolean> => {
+      if (!walletClient) return false;
+
+      const ops = buildWithdrawUserOps(owner, ethBalance, usdcBalance);
+      if (ops.length === 0) return false;
+
+      setIsPending(true);
+      setError(null);
+
+      try {
+        const nonce = await getSafeNonce(l1PublicClient, smartWallet);
+        const safeTx = userOpsToSafeTx(ops);
+        const typedData = buildSafeTxTypedData(smartWallet, CHAIN_ID, nonce, safeTx);
+        const signature = await walletClient.signTypedData(typedData);
+        const calldata = buildExecTransactionCalldata(safeTx, signature as Hex);
+
+        await walletClient.sendTransaction({
+          to: smartWallet,
+          data: calldata,
+          chain: walletClient.chain,
+          account: walletClient.account,
+        });
+
+        setIsPending(false);
+        return true;
+      } catch (err) {
+        console.error('Withdraw failed:', err);
+        setError(err instanceof Error ? err : new Error('Withdraw failed'));
+        setIsPending(false);
+        return false;
+      }
+    },
+    [walletClient]
+  );
+
   const executeCreateL2Wallet = useCallback(
     async ({ owner, smartWallet }: { owner: Address; smartWallet: Address }): Promise<boolean> => {
       const ops = buildCreateL2SafeOps(owner, smartWallet);
@@ -274,6 +311,7 @@ export function useUserOp(): UseUserOpReturn {
     executeBridgeOutNative,
     executeAddLiquidity,
     executeRemoveLiquidity,
+    executeWithdraw,
     executeCreateL2Wallet,
     isPending,
     error,

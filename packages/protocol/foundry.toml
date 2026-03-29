@@ -37,6 +37,7 @@ remappings = [
     # For Azure TDX
     "solady/utils/=node_modules/solady/src/utils/",
     "openzeppelin-contracts/contracts/=node_modules/@openzeppelin/contracts-v5/",
+    "@safe/=lib/safe-smart-account/contracts/",
 ]
 
 # Do not change the block_gas_limit value, TaikoL2.t.sol depends on it.
@@ -59,6 +60,7 @@ fs_permissions = [
 # 5574: Contract code size is xxx bytes and exceeds 24576 byte
 # 5740: Unreachable code
 ignored_error_codes = [2394, 3860, 5574, 5740]
+libs = ["node_modules", "lib"]
 
 [fmt]
 bracket_spacing = true
@@ -101,9 +103,6 @@ script = "script/layer1"
 out = "out/layer1"
 # Surge: Exclude CCIP tests since they require mainnet fork and special setup
 no_match_path = "test/layer1/surge/ccip/*"
-remappings = [
-    "@safe/=lib/safe-smart-account/contracts/",
-]
 
 # Surge: Add this profile for CCIP TDX tests
 [profile.layer1ccip]

@@ -233,6 +233,42 @@ export function buildAddLiquidityUserOps(
 }
 
 /**
+ * Build UserOp(s) for withdrawing all funds from the Safe to the owner EOA
+ */
+export function buildWithdrawUserOps(
+  owner: Address,
+  ethBalance: bigint,
+  usdcBalance: bigint
+): UserOp[] {
+  const ops: UserOp[] = [];
+
+  if (usdcBalance > 0n) {
+    const usdcAddress = USDC_TOKEN.address;
+    if (usdcAddress) {
+      ops.push({
+        target: usdcAddress,
+        value: 0n,
+        data: encodeFunctionData({
+          abi: ERC20ABI,
+          functionName: 'transfer',
+          args: [owner, usdcBalance],
+        }),
+      });
+    }
+  }
+
+  if (ethBalance > 0n) {
+    ops.push({
+      target: owner,
+      value: ethBalance,
+      data: '0x',
+    });
+  }
+
+  return ops;
+}
+
+/**
  * Build UserOp(s) for removing all liquidity from L2 DEX
  */
 export function buildRemoveLiquidityUserOps(): UserOp[] {
