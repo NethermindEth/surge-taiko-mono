@@ -149,7 +149,7 @@ export function buildBridgeNativeUserOps(
           {
             id: 0n,
             fee: 0n,
-            gasLimit: 0,
+            gasLimit: 1_000_000,
             from: zeroAddr,
             srcChainId: 0n,
             srcOwner: sender,
@@ -345,6 +345,7 @@ export async function sendUserOpToBuilder(
         params: {
           submitter,
           calldata,
+          ...(chainId ? { chainId } : {}),
         },
         id: 1,
       }),
