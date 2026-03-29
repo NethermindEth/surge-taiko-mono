@@ -7,6 +7,7 @@ import {
   buildBridgeUserOps,
   buildBridgeNativeUserOps,
   buildAddLiquidityUserOps,
+  buildRemoveLiquidityUserOps,
   buildExecuteBatchTypedData,
   sendUserOpToBuilder,
   calculateMinOutput,
@@ -21,6 +22,7 @@ interface UseUserOpReturn {
   executeBridge: (params: ExecuteBridgeParams) => Promise<boolean>;
   executeBridgeNative: (params: ExecuteBridgeNativeParams) => Promise<boolean>;
   executeAddLiquidity: (params: ExecuteAddLiquidityParams) => Promise<boolean>;
+  executeRemoveLiquidity: (params: { smartWallet: Address }) => Promise<boolean>;
   isPending: boolean;
   error: Error | null;
 }
@@ -218,11 +220,20 @@ export function useUserOp(): UseUserOpReturn {
     [executeGenericOps]
   );
 
+  const executeRemoveLiquidity = useCallback(
+    async ({ smartWallet }: { smartWallet: Address }): Promise<boolean> => {
+      const ops = buildRemoveLiquidityUserOps();
+      return executeGenericOps(ops, smartWallet);
+    },
+    [executeGenericOps]
+  );
+
   return {
     executeSwap,
     executeBridge,
     executeBridgeNative,
     executeAddLiquidity,
+    executeRemoveLiquidity,
     isPending,
     error,
   };

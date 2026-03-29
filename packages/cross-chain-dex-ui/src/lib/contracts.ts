@@ -126,6 +126,13 @@ export const CrossChainSwapVaultL1ABI = [
   },
   {
     type: 'function',
+    name: 'removeLiquidityFromL2',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'swapToken',
     inputs: [],
     outputs: [{ name: '', type: 'address' }],
@@ -167,6 +174,16 @@ export const SimpleDEXABI = [
     name: 'reserveToken',
     inputs: [],
     outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getLiquidity',
+    inputs: [{ name: '_provider', type: 'address' }],
+    outputs: [
+      { name: 'ethAmount_', type: 'uint256' },
+      { name: 'tokenAmount_', type: 'uint256' },
+    ],
     stateMutability: 'view',
   },
 ] as const;

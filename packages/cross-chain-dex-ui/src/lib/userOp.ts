@@ -206,6 +206,23 @@ export function buildAddLiquidityUserOps(
   ];
 }
 
+/**
+ * Build UserOp(s) for removing all liquidity from L2 DEX
+ */
+export function buildRemoveLiquidityUserOps(): UserOp[] {
+  return [
+    {
+      target: L1_VAULT,
+      value: 0n,
+      data: encodeFunctionData({
+        abi: CrossChainSwapVaultL1ABI,
+        functionName: 'removeLiquidityFromL2',
+        args: [],
+      }),
+    },
+  ];
+}
+
 // ---------------------------------------------------------------
 // Builder RPC
 // ---------------------------------------------------------------
