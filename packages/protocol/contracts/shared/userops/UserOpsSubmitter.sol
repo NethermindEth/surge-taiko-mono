@@ -67,6 +67,23 @@ contract UserOpsSubmitter is EIP712 {
 
     receive() external payable { }
 
+    /// @dev ERC-1271: validate that a signature was produced by the owner.
+    ///      Wallets like Ambire call this to verify EIP-712 typed data signatures.
+    function isValidSignature(
+        bytes32 _hash,
+        bytes calldata _signature
+    )
+        external
+        view
+        returns (bytes4)
+    {
+        address signer = ECDSA.recover(_hash, _signature);
+        if (signer == owner) {
+            return 0x1626ba7e; // ERC-1271 magic value
+        }
+        return 0xffffffff;
+    }
+
     // ---------------------------------------------------------------
     // Internal Functions
     // ---------------------------------------------------------------

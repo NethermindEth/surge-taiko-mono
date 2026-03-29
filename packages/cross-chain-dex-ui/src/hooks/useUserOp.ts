@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Address, Hex } from 'viem';
-import { useWalletClient } from 'wagmi';
+import { useWalletClient, useAccount, useSwitchChain } from 'wagmi';
 import { SwapDirection } from '../types';
 import {
   buildSwapUserOps,
@@ -68,6 +68,8 @@ interface ExecuteAddLiquidityParams {
 
 export function useUserOp(): UseUserOpReturn {
   const { data: walletClient } = useWalletClient();
+  const { chainId: connectedChainId } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
   const { setTxStatus } = useTxStatus();
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -178,6 +180,13 @@ export function useUserOp(): UseUserOpReturn {
       txHashRef.current = undefined;
 
       try {
+        // Switch to target chain if needed (e.g. L2 for bridge-out)
+        const needsSwitch = chainId && chainId !== connectedChainId;
+        if (needsSwitch) {
+          setTxStatus({ phase: 'signing' });
+          await switchChainAsync({ chainId });
+        }
+
         setTxStatus({ phase: 'signing' });
 
         const typedData = buildExecuteBatchTypedData(smartWallet, ops, chainId);
@@ -206,7 +215,7 @@ export function useUserOp(): UseUserOpReturn {
         return false;
       }
     },
-    [walletClient, pollStatus, setTxStatus]
+    [walletClient, connectedChainId, switchChainAsync, pollStatus, setTxStatus]
   );
 
   const executeBridge = useCallback(

@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
 import { parseUnits, formatUnits, Address } from "viem";
-import { useAccount } from "wagmi";
 import { TokenInput } from "./TokenInput";
 import { useSmartWallet } from "../hooks/useSmartWallet";
 import { useTokenBalances } from "../hooks/useTokenBalances";
@@ -20,10 +19,9 @@ interface BridgeCardProps {
 
 export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
   const { smartWallet, isConnected } = useSmartWallet();
-  const { address } = useAccount();
   const { ethBalance: l1EthBalance, usdcBalance: l1UsdcBalance } = useTokenBalances(smartWallet);
-  // L2 balances are read for the EOA, since bridge deposits go to the EOA (not the smart wallet)
-  const { ethBalance: l2EthBalance, usdcBalance: l2UsdcBalance } = useL2TokenBalances(address ?? null);
+  // L2 balances for the smart wallet (same address on both chains via CREATE2)
+  const { ethBalance: l2EthBalance, usdcBalance: l2UsdcBalance } = useL2TokenBalances(smartWallet);
   const { executeBridge, executeBridgeNative, executeBridgeOutNative, isPending } = useUserOp();
   const { hasExceededL2Limit, wouldExceed, recordSpending, remaining } = useSpendingLimit(smartWallet);
   const { isDisclaimerOpen, requireDisclaimer, onAccept, onCancel } = useDisclaimer();
@@ -52,9 +50,8 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
   const bridgeAmountUsd = amountIn > 0n ? Number(formatUnits(amountIn, currentToken.decimals)) : 0;
   const exceedsL2Limit = isDeposit && (hasExceededL2Limit || (bridgeAmountUsd > 0 && wouldExceed(bridgeAmountUsd)));
 
-  // Always default to EOA address — smart wallet addresses differ across chains,
-  // so depositing to EOA ensures the user can withdraw from L2 with the same wallet.
-  const effectiveRecipient = (recipient || address || "") as Address;
+  // Default recipient is the smart wallet (same address on both chains)
+  const effectiveRecipient = (recipient || smartWallet || "") as Address;
 
   const handleBridge = useCallback(async () => {
     if (!isConnected || amountIn === 0n) return;
@@ -97,7 +94,6 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
     amountIn,
     isDeposit,
     smartWallet,
-    address,
     bridgeToken,
     bridgeAmountUsd,
     effectiveRecipient,
@@ -234,7 +230,7 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
             value={recipient}
             onChange={(e) => setRecipient(e.target.value)}
             placeholder={
-              address ? `Default: ${address.slice(0, 10)}...` : "0x..."
+              smartWallet ? `Default: ${smartWallet.slice(0, 10)}...` : "0x..."
             }
             className="w-full bg-surge-dark/50 border border-surge-border/30 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-surge-primary/50"
           />

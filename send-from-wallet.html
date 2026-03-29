@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Send from Smart Wallet</title>
+  <script type="module" src="https://esm.sh/viem@2.21.0"></script>
+  <style>
+    body { font-family: monospace; background: #1a1a2e; color: #e0e0e0; padding: 2rem; max-width: 640px; margin: auto; }
+    button { background: #0f3460; color: white; border: none; padding: 12px 24px; cursor: pointer; font-size: 16px; border-radius: 8px; margin: 4px 4px 4px 0; }
+    button:hover { background: #1a4a80; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .box { background: #16213e; padding: 12px; border-radius: 8px; margin: 8px 0; word-break: break-all; font-size: 13px; }
+    .ok { color: #10b981; }
+    .err { color: #ef4444; }
+    .warn { color: #f59e0b; }
+    #log { white-space: pre-wrap; margin-top: 1rem; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <h2>Send xDAI from Smart Wallet</h2>
+  <div class="box">
+    <b>Smart Wallet:</b> 0xaF6DCE446C5F04692e83cB4C38C7C9EfffdF2982<br>
+    <b>Owner EOA:</b> 0x93a1bFc9382DB4ef4547B46ffdE1f0E9f5242e09<br>
+    <b>Recipient:</b> 0x1344C2960f451E89AC4eCcCFE61ca8eF28815FFc<br>
+    <b>Amount:</b> 0.002 xDAI
+  </div>
+  <div>
+    <button id="btn1" onclick="step1()">1. Connect Wallet</button>
+    <button id="btn2" onclick="step2()" disabled>2. Sign & Send</button>
+  </div>
+  <div id="log"></div>
+
+  <script type="module">
+    import { encodeFunctionData, parseEther, createWalletClient, custom, createPublicClient, http } from 'https://esm.sh/viem@2.21.0';
+    import { gnosis } from 'https://esm.sh/viem@2.21.0/chains';
+
+    const SW = '0xaF6DCE446C5F04692e83cB4C38C7C9EfffdF2982';
+    const DEPLOYER = '0x1344C2960f451E89AC4eCcCFE61ca8eF28815FFc';
+    const OWNER = '0x93a1bfc9382db4ef4547b46ffde1f0e9f5242e09';
+    const AMT = parseEther('0.002');
+
+    const ABI = [{
+      type: 'function', name: 'executeBatch', stateMutability: 'nonpayable',
+      inputs: [
+        { name: '_ops', type: 'tuple[]', components: [
+          { name: 'target', type: 'address' },
+          { name: 'value', type: 'uint256' },
+          { name: 'data', type: 'bytes' }
+        ]},
+        { name: '_signature', type: 'bytes' }
+      ],
+      outputs: []
+    }];
+
+    const EIP712Types = {
+      ExecuteBatch: [{ name: 'ops', type: 'UserOp[]' }],
+      UserOp: [
+        { name: 'target', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'data', type: 'bytes' }
+      ]
+    };
+
+    const domain = { name: 'UserOpsSubmitter', version: '1', chainId: 100, verifyingContract: SW };
+    const ops = [{ target: DEPLOYER, value: AMT, data: '0x' }];
+
+    let walletClient, publicClient;
+
+    function log(msg, cls) {
+      const s = document.createElement('span');
+      s.className = cls || '';
+      s.textContent = msg + '\n';
+      document.getElementById('log').appendChild(s);
+    }
+
+    window.step1 = async function() {
+      try {
+        if (!window.ethereum) { log('No wallet extension found!', 'err'); return; }
+        const [addr] = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        log('Connected: ' + addr);
+
+        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+        if (parseInt(chainId, 16) !== 100) {
+          log('Switching to Gnosis...', 'warn');
+          await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x64' }] });
+        }
+        log('Chain: Gnosis (100)', 'ok');
+
+        if (addr.toLowerCase() !== OWNER) {
+          log('WARNING: not the owner EOA! Expected ' + OWNER, 'err');
+        }
+
+        walletClient = createWalletClient({ account: addr, chain: gnosis, transport: custom(window.ethereum) });
+        publicClient = createPublicClient({ chain: gnosis, transport: http('https://rpc.gnosis.gateway.fm') });
+
+        document.getElementById('btn2').disabled = false;
+        document.getElementById('btn1').textContent = 'Connected ✓';
+      } catch (e) { log('Error: ' + e.message, 'err'); }
+    };
+
+    window.step2 = async function() {
+      try {
+        document.getElementById('btn2').disabled = true;
+        log('\nSigning EIP-712 typed data...');
+
+        const signature = await walletClient.signTypedData({
+          domain,
+          types: EIP712Types,
+          primaryType: 'ExecuteBatch',
+          message: { ops: ops.map(o => ({ target: o.target, value: o.value, data: o.data })) }
+        });
+        log('Signature: ' + signature.slice(0, 22) + '...', 'ok');
+
+        log('Encoding executeBatch calldata...');
+        const calldata = encodeFunctionData({
+          abi: ABI,
+          functionName: 'executeBatch',
+          args: [
+            ops.map(o => ({ target: o.target, value: o.value, data: o.data })),
+            signature
+          ]
+        });
+
+        log('Sending transaction...');
+        const hash = await walletClient.sendTransaction({ to: SW, data: calldata, gas: 100000n });
+        log('Tx hash: ' + hash, 'ok');
+
+        log('Waiting for confirmation...');
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status === 'success') {
+          log('SUCCESS! 0.002 xDAI sent to deployer.', 'ok');
+        } else {
+          log('Transaction reverted!', 'err');
+        }
+      } catch (e) {
+        log('Error: ' + e.message, 'err');
+        document.getElementById('btn2').disabled = false;
+      }
+    };
+  </script>
+</body>
+</html>
