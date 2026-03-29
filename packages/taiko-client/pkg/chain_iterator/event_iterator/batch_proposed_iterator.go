@@ -13,6 +13,7 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 	chainIterator "github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/chain_iterator"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/fork"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 )
 
@@ -98,7 +99,7 @@ func assembleBatchProposedIteratorCallback(
 	rpcClient *rpc.Client,
 	callback OnBatchProposedEvent,
 	eventIter *BatchProposedIterator,
-	fork string,
+	forkStr string,
 ) chainIterator.OnBlocksFunc {
 	return func(
 		ctx context.Context,
@@ -108,15 +109,15 @@ func assembleBatchProposedIteratorCallback(
 	) error {
 		endHeight := end.Number.Uint64()
 
-		switch fork {
-		case "pacaya":
+		switch forkStr {
+		case fork.Pacaya:
 			return iteratePacayaEvents(ctx, rpcClient, callback, eventIter, start, endHeight, updateCurrentFunc, endFunc)
-		case "shasta":
+		case fork.Shasta:
 			return iterateShastaEvents(ctx, rpcClient, callback, eventIter, start, endHeight, updateCurrentFunc, endFunc)
-		case "realtime":
+		case fork.RealTime:
 			return iterateRealTimeEvents(ctx, rpcClient, callback, eventIter, start, endHeight, updateCurrentFunc, endFunc)
 		default:
-			return fmt.Errorf("unknown fork %q", fork)
+			return fmt.Errorf("unknown fork %q", forkStr)
 		}
 	}
 }

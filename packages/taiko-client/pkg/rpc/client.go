@@ -15,6 +15,7 @@ import (
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
 	realtimeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/realtime"
 	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/fork"
 )
 
 const (
@@ -165,7 +166,7 @@ func NewClient(ctx context.Context, cfg *ClientConfig) (*Client, error) {
 
 	// Initialize only the fork-specific smart contract clients.
 	switch cfg.Fork {
-	case "pacaya":
+	case fork.Pacaya:
 		if err := c.initPacayaClients(cfg); err != nil {
 			return nil, fmt.Errorf("failed to initialize Pacaya clients: %w", err)
 		}
@@ -184,12 +185,12 @@ func NewClient(ctx context.Context, cfg *ClientConfig) (*Client, error) {
 				return nil, fmt.Errorf("failed to ensure genesis block matched: %w", err)
 			}
 		}
-	case "shasta":
+	case fork.Shasta:
 		if err := c.initShastaClients(ctxWithTimeout, cfg); err != nil {
 			return nil, fmt.Errorf("failed to initialize Shasta clients: %w", err)
 		}
 		c.GenesisL1Height = cfg.GenesisL1Height
-	case "realtime":
+	case fork.RealTime:
 		if err := c.initRealTimeClients(cfg); err != nil {
 			return nil, fmt.Errorf("failed to initialize RealTime clients: %w", err)
 		}

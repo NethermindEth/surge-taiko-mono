@@ -25,6 +25,7 @@ import (
 	txlistFetcher "github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/txlist_fetcher"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 	eventIterator "github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/chain_iterator/event_iterator"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/fork"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/preconf"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 )
@@ -62,7 +63,7 @@ func NewSyncer(
 	progressTracker *beaconsync.SyncProgressTracker,
 	blobServerEndpoint *url.URL,
 	latestSeenProposalCh chan *encoding.LastSeenProposal,
-	fork string,
+	forkStr string,
 ) (*Syncer, error) {
 	constructor, err := anchorTxConstructor.New(client)
 	if err != nil {
@@ -80,12 +81,12 @@ func NewSyncer(
 		state:                   state,
 		progressTracker:         progressTracker,
 		txListDecompressor:      txListDecompressor,
-		fork:                    fork,
+		fork:                    forkStr,
 		derivationSourceFetcher: shastaManifest.NewDerivationSourceFetcher(client, blobDataSource),
 	}
 
-	switch fork {
-	case "pacaya":
+	switch forkStr {
+	case fork.Pacaya:
 		s.blocksInserterPacaya = blocksInserter.NewBlocksInserterPacaya(
 			client,
 			progressTracker,
@@ -96,14 +97,14 @@ func NewSyncer(
 			txlistFetcher.NewBlobFetcher(client, blobDataSource),
 			latestSeenProposalCh,
 		)
-	case "shasta":
+	case fork.Shasta:
 		s.blocksInserterShasta = blocksInserter.NewBlocksInserterShasta(
 			client,
 			progressTracker,
 			constructor,
 			latestSeenProposalCh,
 		)
-	case "realtime":
+	case fork.RealTime:
 		s.blocksInserterRealTime = blocksInserter.NewBlocksInserterRealTime(
 			client,
 			progressTracker,
@@ -193,11 +194,11 @@ func (s *Syncer) onBatchProposed(
 	endIter eventIterator.EndBatchProposedEventIterFunc,
 ) error {
 	switch s.fork {
-	case "pacaya":
+	case fork.Pacaya:
 		return s.processPacayaBatch(ctx, meta, endIter)
-	case "shasta":
+	case fork.Shasta:
 		return s.processShastaProposal(ctx, meta, endIter)
-	case "realtime":
+	case fork.RealTime:
 		return s.processRealTimeProposal(ctx, meta, endIter)
 	default:
 		return fmt.Errorf("unknown fork %q in onBatchProposed", s.fork)
@@ -845,11 +846,11 @@ func (s *Syncer) BlocksInserter() interface {
 	InsertPreconfBlocksFromEnvelopes(context.Context, []*preconf.Envelope, bool) ([]*types.Header, error)
 } {
 	switch s.fork {
-	case "pacaya":
+	case fork.Pacaya:
 		return s.blocksInserterPacaya.(*blocksInserter.Pacaya)
-	case "shasta":
+	case fork.Shasta:
 		return s.blocksInserterShasta.(*blocksInserter.Shasta)
-	case "realtime":
+	case fork.RealTime:
 		return s.blocksInserterRealTime.(*blocksInserter.RealTime)
 	default:
 		return nil

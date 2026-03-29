@@ -25,6 +25,7 @@ import (
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/encoding"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/fork"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/preconf"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
@@ -108,7 +109,7 @@ func (s *PreconfBlockAPIServer) BuildPreconfBlock(c echo.Context) error {
 	// Check if the L2 execution engine is syncing from L1.
 	// For realtime fork, L2 blocks are built on-demand via the preconf route,
 	// so the sync check is not applicable.
-	if s.fork != "realtime" {
+	if s.fork != fork.RealTime {
 		progress, err := s.rpc.L2ExecutionEngineSyncProgress(ctx)
 		if err != nil {
 			return s.returnError(c, http.StatusBadRequest, err)
@@ -133,7 +134,7 @@ func (s *PreconfBlockAPIServer) BuildPreconfBlock(c echo.Context) error {
 	}
 
 	if s.latestSeenProposal != nil {
-		if s.fork == "shasta" {
+		if s.fork == fork.Shasta {
 			if len(parent.Transactions()) > 0 && bytes.HasPrefix(parent.Transactions()[0].Data(), taiko.AnchorV4Selector) {
 				parentProposalID, err := core.DecodeShastaProposalID(parent.Extra())
 				if err != nil {
@@ -200,7 +201,7 @@ func (s *PreconfBlockAPIServer) BuildPreconfBlock(c echo.Context) error {
 
 	// Check if the fee recipient the current operator or the next operator if its in handover window.
 	// Realtime fork has no whitelist, so all fee recipients are accepted.
-	if s.fork != "realtime" && s.rpc.L1Beacon != nil {
+	if s.fork != fork.RealTime && s.rpc.L1Beacon != nil {
 		if err := s.CheckLookaheadHandover(reqBody.ExecutableData.FeeRecipient, s.rpc.L1Beacon.CurrentSlot()); err != nil {
 			return s.returnError(c, http.StatusBadRequest, err)
 		}
@@ -208,13 +209,13 @@ func (s *PreconfBlockAPIServer) BuildPreconfBlock(c echo.Context) error {
 
 	var difficulty []byte
 	switch s.fork {
-	case "pacaya":
+	case fork.Pacaya:
 		if difficulty, err = encoding.CalculatePacayaDifficulty(
 			new(big.Int).SetUint64(reqBody.ExecutableData.Number),
 		); err != nil {
 			return s.returnError(c, http.StatusBadRequest, err)
 		}
-	case "shasta", "realtime":
+	case fork.Shasta, fork.RealTime:
 		if difficulty, err = encoding.CalculateShastaDifficulty(
 			parent.Difficulty(),
 			new(big.Int).SetUint64(reqBody.ExecutableData.Number),

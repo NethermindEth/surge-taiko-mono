@@ -25,6 +25,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/state"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/fork"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 )
 
@@ -342,7 +343,7 @@ func (d *Driver) reportProtocolStatus() {
 // reportStatus reports some status for Pacaya or Shasta protocol.
 func (d *Driver) reportStatus(maxNumProposals uint64) {
 	// If RealTime fork is active, report RealTime status.
-	if d.Fork == "realtime" && d.rpc.RealTimeClients != nil {
+	if d.Fork == fork.RealTime && d.rpc.RealTimeClients != nil {
 		d.reportProtocolStatusRealTime()
 		return
 	}
@@ -561,7 +562,7 @@ func (d *Driver) cacheLookaheadLoop() {
 		seenBlockNumber = latestSeenBlockNumber
 
 		// Realtime fork has no whitelist contract — skip operator resolution.
-		if d.Fork == "realtime" {
+		if d.Fork == fork.RealTime {
 			return nil
 		}
 

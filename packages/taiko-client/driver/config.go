@@ -17,6 +17,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/cmd/flags"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/fork"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/jwt"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 )
@@ -82,22 +83,22 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 	}
 
 	// Validate fork flag.
-	fork := c.String(flags.Fork.Name)
-	switch fork {
-	case "pacaya":
+	forkName := c.String(flags.Fork.Name)
+	switch forkName {
+	case fork.Pacaya:
 		if !c.IsSet(flags.PacayaInboxAddress.Name) {
-			return nil, fmt.Errorf("--pacayaInbox is required for fork %q", fork)
+			return nil, fmt.Errorf("--pacayaInbox is required for fork %q", forkName)
 		}
-	case "shasta":
+	case fork.Shasta:
 		if !c.IsSet(flags.ShastaInboxAddress.Name) {
-			return nil, fmt.Errorf("--shastaInbox is required for fork %q", fork)
+			return nil, fmt.Errorf("--shastaInbox is required for fork %q", forkName)
 		}
-	case "realtime":
+	case fork.RealTime:
 		if !c.IsSet(flags.RealTimeInboxAddress.Name) {
-			return nil, fmt.Errorf("--realtimeInbox is required for fork %q", fork)
+			return nil, fmt.Errorf("--realtimeInbox is required for fork %q", forkName)
 		}
 	default:
-		return nil, fmt.Errorf("invalid --fork value %q: must be \"pacaya\", \"shasta\", or \"realtime\"", fork)
+		return nil, fmt.Errorf("invalid --fork value %q: must be \"pacaya\", \"shasta\", or \"realtime\"", forkName)
 	}
 
 	// Check P2P network flags and create the P2P configurations.
@@ -110,7 +111,7 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 			PacayaInboxAddress:      common.HexToAddress(c.String(flags.PacayaInboxAddress.Name)),
 			ShastaInboxAddress:      common.HexToAddress(c.String(flags.ShastaInboxAddress.Name)),
 			RealTimeInboxAddress:    common.HexToAddress(c.String(flags.RealTimeInboxAddress.Name)),
-			Fork:                    fork,
+			Fork:                    forkName,
 			TaikoAnchorAddress:      common.HexToAddress(c.String(flags.TaikoAnchorAddress.Name)),
 			PreconfWhitelistAddress: common.HexToAddress(c.String(flags.PreconfWhitelistAddress.Name)),
 			L2EngineEndpoint:        c.String(flags.L2AuthEndpoint.Name),

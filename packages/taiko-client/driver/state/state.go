@@ -17,6 +17,7 @@ import (
 	realtimeBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/realtime"
 	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/fork"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 )
 
@@ -69,15 +70,15 @@ func (s *State) init(ctx context.Context) error {
 	log.Info("Genesis L1 height", "height", s.GenesisL1Height)
 
 	switch s.Fork {
-	case "pacaya":
+	case fork.Pacaya:
 		s.OnTakeForkHeight = new(big.Int).SetUint64(s.rpc.PacayaClients.ForkHeights.Ontake)
 		s.PacayaForkHeight = new(big.Int).SetUint64(s.rpc.PacayaClients.ForkHeights.Pacaya)
 		log.Info("OnTake fork height", "blockID", s.OnTakeForkHeight)
 		log.Info("Pacaya fork height", "blockID", s.PacayaForkHeight)
-	case "shasta":
+	case fork.Shasta:
 		s.ShastaForkTime = s.rpc.ShastaClients.ForkTime
 		log.Info("Shasta fork timestamp", "time", s.ShastaForkTime)
-	case "realtime":
+	case fork.RealTime:
 		// No additional fork constants needed for RealTime
 	}
 
@@ -133,7 +134,7 @@ func (s *State) eventLoop(ctx context.Context) {
 	)
 
 	switch s.Fork {
-	case "pacaya":
+	case fork.Pacaya:
 		batchesProvedPacayaCh = make(chan *pacayaBindings.TaikoInboxClientBatchesProved, 10)
 		batchesVerifiedPacayaCh = make(chan *pacayaBindings.TaikoInboxClientBatchesVerified, 10)
 		l2BatchesVerifiedPacayaSub = rpc.SubscribeBatchesVerifiedPacaya(
@@ -141,12 +142,12 @@ func (s *State) eventLoop(ctx context.Context) {
 			batchesVerifiedPacayaCh,
 		)
 		l2BatchesProvedPacayaSub = rpc.SubscribeBatchesProvedPacaya(s.rpc.PacayaClients.TaikoInbox, batchesProvedPacayaCh)
-	case "shasta":
+	case fork.Shasta:
 		proposedShastaCh = make(chan *shastaBindings.ShastaInboxClientProposed, 10)
 		provedShastaCh = make(chan *shastaBindings.ShastaInboxClientProved, 10)
 		l2ProposedShastaSub = rpc.SubscribeProposedShasta(s.rpc.ShastaClients.Inbox, proposedShastaCh)
 		l2ProvedShastaSub = rpc.SubscribeProvedShasta(s.rpc.ShastaClients.Inbox, provedShastaCh)
-	case "realtime":
+	case fork.RealTime:
 		proposedAndProvedRealTimeCh = make(chan *realtimeBindings.RealTimeInboxClientProposedAndProved, 10)
 		l2ProposedAndProvedRealTimeSub = rpc.SubscribeProposedAndProvedRealTime(
 			s.rpc.RealTimeClients.Inbox,

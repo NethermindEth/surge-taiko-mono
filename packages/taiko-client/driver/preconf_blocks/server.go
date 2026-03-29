@@ -34,6 +34,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/fork"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/preconf"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
@@ -1051,11 +1052,11 @@ func (s *PreconfBlockAPIServer) LatestSeenProposalEventLoop(ctx context.Context)
 			return
 		case proposal := <-s.latestSeenProposalCh:
 			switch s.fork {
-			case "pacaya":
+			case fork.Pacaya:
 				s.recordLatestSeenProposalPacaya(proposal)
-			case "shasta":
+			case fork.Shasta:
 				s.recordLatestSeenProposalShasta(proposal)
-			case "realtime":
+			case fork.RealTime:
 				s.recordLatestSeenProposalRealTime(proposal)
 			}
 		case <-ticker.C:
@@ -1072,11 +1073,11 @@ func (s *PreconfBlockAPIServer) monitorLatestProposalOnChain(ctx context.Context
 	}
 
 	switch s.fork {
-	case "pacaya":
+	case fork.Pacaya:
 		s.monitorPacayaProposalOnChain(ctx, proposal)
-	case "shasta":
+	case fork.Shasta:
 		s.monitorShastaProposalOnChain(ctx, proposal)
-	case "realtime":
+	case fork.RealTime:
 		// No on-chain proposal monitoring needed for realtime fork
 	}
 }

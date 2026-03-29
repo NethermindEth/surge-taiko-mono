@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	pacayaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/pacaya"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/fork"
 )
 
 // GetL1Current reads the L1 current cursor concurrent safely.
@@ -57,13 +58,13 @@ func (s *State) ResetL1Current(ctx context.Context, blockID *big.Int) error {
 
 	var proposedIn *big.Int
 	switch s.Fork {
-	case "pacaya":
+	case fork.Pacaya:
 		batch, err := s.FindBatchForBlockID(ctx, blockID.Uint64())
 		if err != nil {
 			return fmt.Errorf("failed to find batch for block ID (%d): %w", blockID, err)
 		}
 		proposedIn = new(big.Int).SetUint64(batch.AnchorBlockId)
-	case "shasta", "realtime":
+	case fork.Shasta, fork.RealTime:
 		if block.Transactions().Len() == 0 {
 			return fmt.Errorf("no transactions found in block %d", blockID)
 		}
