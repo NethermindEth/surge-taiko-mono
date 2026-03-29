@@ -7,6 +7,8 @@ import { useTokenBalances } from '../hooks/useTokenBalances';
 import { useUserOp } from '../hooks/useUserOp';
 import { useSpendingLimit } from '../hooks/useSpendingLimit';
 import { ETH_TOKEN, USDC_TOKEN, L1_NATIVE_SYMBOL } from '../lib/constants';
+import { DisclaimerModal } from './DisclaimerModal';
+import { useDisclaimer } from '../hooks/useDisclaimer';
 
 interface LiquidityCardProps {
   onSetupWallet: () => void;
@@ -18,6 +20,7 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
   const { ethBalance, usdcBalance } = useTokenBalances(smartWallet);
   const { executeAddLiquidity, isPending } = useUserOp();
   const { hasExceededL2Limit, wouldExceed, recordSpending, remaining } = useSpendingLimit(smartWallet);
+  const { isDisclaimerOpen, requireDisclaimer, onAccept, onCancel } = useDisclaimer();
 
   const [ethInput, setEthInput] = useState('');
   const [tokenInput, setTokenInput] = useState('');
@@ -140,11 +143,11 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
           <h2 className="text-lg font-semibold text-white">Add Liquidity</h2>
           <span className="text-xs text-gray-400">L1 &rarr; L2 DEX</span>
         </div>
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-3 py-2 text-xs text-yellow-400 flex items-center gap-1.5">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-xs text-red-400 flex items-center gap-1.5">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
           </svg>
-          We limit swaps and deposits to $1 on this experimental alpha
+          Experimental Alpha - transaction limit of US $1. <a href="https://surge.wtf/alpha-disclaimer" target="_blank" rel="noopener noreferrer" className="underline hover:text-red-300">See disclaimer</a>
         </div>
 
         {/* ETH Input */}
@@ -171,7 +174,7 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
 
         {/* Add Liquidity Button */}
         <button
-          onClick={isConnected && !smartWallet ? onSetupWallet : handleAddLiquidity}
+          onClick={isConnected && !smartWallet ? onSetupWallet : () => requireDisclaimer(handleAddLiquidity)}
           disabled={isDisabled}
           className={`w-full py-3 rounded-xl font-semibold text-base transition-all duration-200 ${
             isDisabled
@@ -253,6 +256,7 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
           </div>
         )}
       </div>
+      <DisclaimerModal isOpen={isDisclaimerOpen} onAccept={onAccept} onCancel={onCancel} />
     </div>
   );
 }
