@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { type Address, keccak256, encodePacked, encodeAbiParameters, getContractAddress, decodeEventLog } from 'viem';
+import { type Address, type Hex, keccak256, encodePacked, encodeAbiParameters, getContractAddress, decodeEventLog, concat, toHex } from 'viem';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import toast from 'react-hot-toast';
 import { SafeProxyFactoryABI, SafeProxyFactoryFullABI } from '../lib/contracts';
@@ -7,9 +7,10 @@ import { SAFE_PROXY_FACTORY, SAFE_SINGLETON, SAFE_FALLBACK_HANDLER } from '../li
 import { buildSafeSetupCalldata } from '../lib/safeOp';
 import { l1PublicClient, l2PublicClient } from '../lib/config';
 import { useUserOp } from './useUserOp';
-import { concat, pad } from 'viem';
 
 const STORAGE_KEY = 'surge_safe_address_';
+
+let cachedProxyCreationCode: Hex | undefined;
 
 /**
  * Predict the CREATE2 address of a Safe proxy.
@@ -20,21 +21,20 @@ async function predictSafeAddress(owner: Address): Promise<Address> {
   const initializer = buildSafeSetupCalldata(owner, SAFE_FALLBACK_HANDLER);
   const saltNonce = BigInt(keccak256(encodePacked(['address'], [owner])));
 
-  // Fetch proxy creation code from factory
-  const proxyCreationCode = await l1PublicClient.readContract({
-    address: SAFE_PROXY_FACTORY,
-    abi: SafeProxyFactoryFullABI,
-    functionName: 'proxyCreationCode',
-  });
+  if (!cachedProxyCreationCode) {
+    cachedProxyCreationCode = await l1PublicClient.readContract({
+      address: SAFE_PROXY_FACTORY,
+      abi: SafeProxyFactoryFullABI,
+      functionName: 'proxyCreationCode',
+    });
+  }
 
-  // salt = keccak256(keccak256(initializer) ++ uint256(saltNonce))
   const salt = keccak256(
-    concat([keccak256(initializer), pad(`0x${saltNonce.toString(16)}`, { size: 32 })])
+    concat([keccak256(initializer), toHex(saltNonce, { size: 32 })])
   );
 
-  // deploymentData = proxyCreationCode ++ abi.encode(singleton)
   const deploymentData = concat([
-    proxyCreationCode,
+    cachedProxyCreationCode,
     encodeAbiParameters([{ type: 'address' }], [SAFE_SINGLETON]),
   ]);
 
@@ -91,34 +91,48 @@ export function useSmartWallet() {
       return;
     }
 
+    let cancelled = false;
+
     const detectWallet = async () => {
       // First try localStorage
       const saved = getSavedSafe(ownerAddress);
       if (saved) {
         try {
           const code = await l1PublicClient.getCode({ address: saved });
+          if (cancelled) return;
           if (code && code !== '0x') {
             setSmartWallet(saved);
             setIsInitializing(false);
             return;
           }
-        } catch {}
+          // Stale entry — remove it
+          localStorage.removeItem(STORAGE_KEY + ownerAddress.toLowerCase());
+        } catch (err) {
+          if (cancelled) return;
+          console.warn('Failed to verify saved Safe address:', err);
+        }
       }
 
       // If not in localStorage (or no code), predict the CREATE2 address and check
       try {
         const predicted = await predictSafeAddress(ownerAddress);
+        if (cancelled) return;
         const code = await l1PublicClient.getCode({ address: predicted });
+        if (cancelled) return;
         if (code && code !== '0x') {
           setSmartWallet(predicted);
           saveSafe(ownerAddress, predicted);
         }
-      } catch {}
+      } catch (err) {
+        if (cancelled) return;
+        console.warn('Failed to predict Safe address:', err);
+      }
 
-      setIsInitializing(false);
+      if (!cancelled) setIsInitializing(false);
     };
 
     detectWallet();
+    return () => { cancelled = true; };
   }, [isConnected, ownerAddress]);
 
   // After a successful creation tx, parse the ProxyCreation event to get the proxy address.
