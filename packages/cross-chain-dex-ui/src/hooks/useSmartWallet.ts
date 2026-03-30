@@ -92,6 +92,7 @@ export function useSmartWallet() {
     }
 
     let cancelled = false;
+    setIsInitializing(true);
 
     const detectWallet = async () => {
       // First try localStorage
@@ -172,12 +173,14 @@ export function useSmartWallet() {
       return;
     }
 
+    let cancelled = false;
     l2PublicClient
       .getCode({ address: smartWallet })
       .then((code) => {
-        setL2WalletExists(!!(code && code !== '0x'));
+        if (!cancelled) setL2WalletExists(!!(code && code !== '0x'));
       })
-      .catch(() => setL2WalletExists(false));
+      .catch(() => { if (!cancelled) setL2WalletExists(false); });
+    return () => { cancelled = true; };
   }, [smartWallet]);
 
   const createSmartWallet = useCallback(async () => {
