@@ -16,9 +16,10 @@ type BridgeToken = typeof L1_NATIVE_SYMBOL | "USDC";
 
 interface BridgeCardProps {
   onSetupWallet: () => void;
+  onFundWallet?: () => void;
 }
 
-export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
+export function BridgeCard({ onSetupWallet, onFundWallet }: BridgeCardProps) {
   const { smartWallet, isConnected, l2WalletExists } = useSmartWallet();
   const { ethBalance, usdcBalance } = useTokenBalances(smartWallet);
   const { ethBalance: l2EthBalance, usdcBalance: l2UsdcBalance } = useL2TokenBalances(smartWallet);
@@ -224,8 +225,14 @@ export function BridgeCard({ onSetupWallet }: BridgeCardProps) {
 
         {/* Bridge Button */}
         <button
-          onClick={isConnected && !smartWallet ? onSetupWallet : () => requireDisclaimer(handleBridge)}
-          disabled={isDisabled}
+          onClick={
+            isConnected && !smartWallet
+              ? onSetupWallet
+              : !isDeposit && !l2WalletExists && onFundWallet
+                ? onFundWallet
+                : () => requireDisclaimer(handleBridge)
+          }
+          disabled={isDisabled && !(!isDeposit && !l2WalletExists && onFundWallet)}
           className={`w-full py-3 rounded-xl font-semibold text-base transition-all duration-200 ${
             isDisabled
               ? "bg-surge-card/50 text-gray-500 cursor-not-allowed border border-surge-border/30"
