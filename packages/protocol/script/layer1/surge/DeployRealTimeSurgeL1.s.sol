@@ -231,9 +231,17 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         writeJson("zisk_plonk_verifier", address(ziskPlonkVerifier));
         console2.log("** Deployed Zisk PLONK verifier:", address(ziskPlonkVerifier));
 
+        // rootCVadcopFinal for Zisk v0.16.0
+        uint64[4] memory rootCVadcopFinal = [
+            uint64(9_211_010_158_316_595_036),
+            uint64(7_055_235_338_110_277_438),
+            uint64(2_391_371_252_028_311_145),
+            uint64(10_691_781_997_660_262_077)
+        ];
+
         // Deploy Zisk wrapper verifier
         ZiskVerifier ziskVerifier =
-            new ZiskVerifier(l2ChainId, address(ziskPlonkVerifier), msg.sender);
+            new ZiskVerifier(l2ChainId, address(ziskPlonkVerifier), rootCVadcopFinal, msg.sender);
         verifierContracts.ziskRethVerifier = address(ziskVerifier);
         writeJson("zisk_verifier", address(ziskVerifier));
         console2.log("** Deployed Zisk verifier:", address(ziskVerifier));

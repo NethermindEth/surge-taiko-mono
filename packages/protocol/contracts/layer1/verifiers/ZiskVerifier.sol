@@ -12,10 +12,12 @@ contract ZiskVerifier is IProofVerifier, Ownable2Step {
     uint64 public immutable taikoChainId;
     address public immutable ziskRemoteVerifier;
 
+    /// @notice Zisk protocol root constant (version-specific, e.g. Zisk v0.16.0).
+    /// @dev Must be updated when the Zisk proving system version changes.
+    uint64[4] public rootCVadcopFinal;
+
     /// @notice The verification keys mappings for the proving programs.
     mapping(bytes32 programVKey => bool trusted) public isProgramTrusted;
-
-    uint256[49] private __gap;
 
     /// @dev Emitted when a trusted program is set / unset.
     /// @param programVKey The verification key of the program.
@@ -28,11 +30,24 @@ contract ZiskVerifier is IProofVerifier, Ownable2Step {
     error ZISK_INVALID_PARAMS();
     error ZISK_INVALID_PROOF();
 
-    constructor(uint64 _taikoChainId, address _ziskRemoteVerifier, address _owner) {
+    error ZISK_INVALID_ROOT_CV();
+
+    constructor(
+        uint64 _taikoChainId,
+        address _ziskRemoteVerifier,
+        uint64[4] memory _rootCVadcopFinal,
+        address _owner
+    ) {
         require(_taikoChainId > 1, ZISK_INVALID_CHAIN_ID());
         require(_ziskRemoteVerifier != address(0), ZISK_INVALID_REMOTE_VERIFIER());
+        require(
+            _rootCVadcopFinal[0] | _rootCVadcopFinal[1] | _rootCVadcopFinal[2]
+                | _rootCVadcopFinal[3] != 0,
+            ZISK_INVALID_ROOT_CV()
+        );
         taikoChainId = _taikoChainId;
         ziskRemoteVerifier = _ziskRemoteVerifier;
+        rootCVadcopFinal = _rootCVadcopFinal;
 
         _transferOwnership(_owner);
     }
@@ -54,6 +69,8 @@ contract ZiskVerifier is IProofVerifier, Ownable2Step {
         external
         view
     {
+        // Minimum: 32 bytes (programVKey) + at least 1 byte of proof data.
+        // The remote verifier performs full proof validation; this is a basic sanity check.
         require(_proof.length > 32, ZISK_INVALID_PARAMS());
 
         // Extract the program VKey
@@ -68,14 +85,6 @@ contract ZiskVerifier is IProofVerifier, Ownable2Step {
 
         // Unpack program VKey from bytes32 to uint64[4]
         uint64[4] memory programVK = _unpackVKey(programVKey);
-
-        // rootCVadcopFinal for Zisk v0.16.0
-        uint64[4] memory rootCVadcopFinal = [
-            uint64(9_211_010_158_316_595_036),
-            uint64(7_055_235_338_110_277_438),
-            uint64(2_391_371_252_028_311_145),
-            uint64(10_691_781_997_660_262_077)
-        ];
 
         bytes32[] memory padding = new bytes32[](7);
 

@@ -82,6 +82,22 @@ contract RealTimeInboxProposeTest is RealTimeInboxTestBase {
         inbox.propose(data, checkpoint, bytes(""));
     }
 
+    function test_propose_RevertWhen_MaxAnchorBlockTooOld() public {
+        // Advance far enough that block 1 is > 256 blocks in the past
+        vm.roll(300);
+
+        IRealTimeInbox.ProposeInput memory input = _buildDefaultProposeInput();
+        input.maxAnchorBlockNumber = 1; // blockhash(1) == 0 when block.number >= 258
+
+        ICheckpointStore.Checkpoint memory checkpoint = _buildCheckpoint();
+        bytes memory data = abi.encode(input);
+        _setBlobHashes(1);
+
+        vm.expectRevert(RealTimeInbox.MaxAnchorBlockTooOld.selector);
+        vm.prank(proposer);
+        inbox.propose(data, checkpoint, bytes(""));
+    }
+
     function test_propose_emptySignalSlots_hashIsZero() public {
         IRealTimeInbox.ProposeInput memory input = _buildDefaultProposeInput();
         // signalSlots is already empty from _buildDefaultProposeInput()
