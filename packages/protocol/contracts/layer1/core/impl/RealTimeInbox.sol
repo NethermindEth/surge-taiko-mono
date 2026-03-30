@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.24;
 
 import { IInbox } from "../iface/IInbox.sol";
 import { IRealTimeInbox } from "../iface/IRealTimeInbox.sol";
@@ -52,6 +52,7 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     constructor(Config memory _config) {
         require(_config.proofVerifier != address(0), "config: proofVerifier");
         require(_config.signalService != address(0), "config: signalService");
+        require(_config.basefeeSharingPctg <= 100, "config: basefeeSharingPctg");
 
         _proofVerifier = SurgeVerifier(_config.proofVerifier);
         _signalService = ISignalService(_config.signalService);
@@ -245,7 +246,7 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
         );
 
         // Verify proof via SurgeVerifier
-        _proofVerifier.verifyProof(false, commitmentHash, _proof);
+        _proofVerifier.verifyProof(true, commitmentHash, _proof);
 
         // Save checkpoint to signal service
         _signalService.saveCheckpoint(_checkpoint);

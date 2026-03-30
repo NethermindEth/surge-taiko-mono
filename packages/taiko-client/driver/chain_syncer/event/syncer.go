@@ -480,6 +480,28 @@ func (s *Syncer) processRealTimeProposal(
 		return nil
 	}
 
+	// Check for L1 reorg if not just finishing P2P sync.
+	if !s.progressTracker.Triggered() {
+		reorgCheckResult, err := s.checkReorgRealTime(ctx)
+		if err != nil {
+			return err
+		}
+
+		if reorgCheckResult.IsReorged {
+			log.Info(
+				"Reset L1Current cursor due to L1 reorg (RealTime)",
+				"l1CurrentHeightOld", s.state.GetL1Current().Number,
+				"l1CurrentHashOld", s.state.GetL1Current().Hash(),
+			)
+			s.state.SetL1Current(reorgCheckResult.L1CurrentToReset)
+			s.lastInsertedProposalHash = common.Hash{}
+			s.reorgDetectedFlag = true
+			endIter()
+
+			return nil
+		}
+	}
+
 	// If the event's timestamp is in the future, we wait until the timestamp is reached, should
 	// only happen when testing.
 	if meta.GetTimestamp() > uint64(time.Now().Unix()) {
@@ -837,6 +859,52 @@ func (s *Syncer) checkReorgShasta(
 	}
 
 	return reorgCheckResult, nil
+}
+
+// checkReorgRealTime checks whether the L1 chain has been reorged by comparing the on-chain
+// lastFinalizedBlockHash with the corresponding L2 block. If the L2 block doesn't exist,
+// a reorg is detected and we reset to genesis.
+func (s *Syncer) checkReorgRealTime(ctx context.Context) (*rpc.ReorgCheckResult, error) {
+	// If the L2 chain is at genesis, we don't need to check L1 reorg.
+	if s.state.GetL1Current().Number == s.state.GenesisL1Height {
+		return new(rpc.ReorgCheckResult), nil
+	}
+
+	if s.rpc.RealTimeClients == nil {
+		return new(rpc.ReorgCheckResult), nil
+	}
+
+	// Get the on-chain lastFinalizedBlockHash from RealTimeInbox.
+	lastFinalizedBlockHash, err := s.rpc.RealTimeClients.Inbox.GetLastFinalizedBlockHash(
+		&bind.CallOpts{Context: ctx},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get lastFinalizedBlockHash: %w", err)
+	}
+
+	hash := common.BytesToHash(lastFinalizedBlockHash[:])
+	if hash == (common.Hash{}) {
+		return new(rpc.ReorgCheckResult), nil
+	}
+
+	// Check if this finalized block exists in the L2 chain.
+	header, err := s.rpc.L2.HeaderByHash(ctx, hash)
+	if err != nil || header == nil {
+		log.Info(
+			"RealTime finalized block not found in L2, reorg detected",
+			"lastFinalizedBlockHash", hash,
+		)
+
+		reorgCheckResult := &rpc.ReorgCheckResult{IsReorged: true}
+		reorgCheckResult.L1CurrentToReset, err = s.rpc.L1.HeaderByNumber(ctx, common.Big0)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch L1 genesis header: %w", err)
+		}
+		reorgCheckResult.LastHandledBatchIDToReset = common.Big0
+		return reorgCheckResult, nil
+	}
+
+	return new(rpc.ReorgCheckResult), nil
 }
 
 // BlocksInserter returns the active blocks inserter for the configured fork.

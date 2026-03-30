@@ -71,7 +71,7 @@ interface IRealTimeInbox {
     /// @param checkpoint The checkpoint data saved.
     event ProposedAndProved(
         bytes32 indexed proposalHash,
-        bytes32 lastFinalizedBlockHash,
+        bytes32 indexed lastFinalizedBlockHash,
         uint48 maxAnchorBlockNumber,
         uint8 basefeeSharingPctg,
         IInbox.DerivationSource[] sources,

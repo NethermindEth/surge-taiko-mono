@@ -134,7 +134,7 @@ contract DeploySurgeL1 is DeployCapability {
     }
 
     function run() external broadcast {
-        require(l2ChainId != block.chainid || l2ChainId != 0, "config: L2_CHAIN_ID");
+        require(l2ChainId != block.chainid && l2ChainId != 0, "config: L2_CHAIN_ID");
         require(contractOwner != address(0), "config: CONTRACT_OWNER");
 
         console2.log("** Contract owner: ", contractOwner);
