@@ -1,0 +1,21 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+test = "test"
+script = "script"
+cache_path = "cache"
+solc = "0.8.27"
+optimizer = false
+optimizer_runs = 0
+evm_version = "cancun"
+
+[rpc_endpoints]
+nethermind = "http://localhost:8545"
+alethia = "http://localhost:8547"
+
+[profile.nethermind]
+eth_rpc_url = "http://localhost:8545"
+
+[profile.alethia]
+eth_rpc_url = "http://localhost:8547"

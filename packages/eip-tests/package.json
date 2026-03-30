@@ -1,0 +1,28 @@
+{
+  "name": "@surge/eip-tests",
+  "version": "1.0.0",
+  "description": "EIP implementation tests for Nethermind and Alethia-Reth clients",
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test -vvv",
+    "test:nethermind": "forge test --rpc-url http://localhost:8545 -vvv",
+    "test:alethia": "forge test --rpc-url http://localhost:8547 -vvv",
+    "test:compare": "./scripts/compare-clients.sh",
+    "deploy:nethermind": "forge script script/DeployTests.s.sol --rpc-url http://localhost:8545 --broadcast",
+    "deploy:alethia": "forge script script/DeployTests.s.sol --rpc-url http://localhost:8547 --broadcast",
+    "clean": "forge clean",
+    "fmt": "forge fmt"
+  },
+  "keywords": [
+    "ethereum",
+    "eip",
+    "foundry",
+    "testing",
+    "cancun",
+    "eip-1153",
+    "eip-5656",
+    "eip-6780"
+  ],
+  "author": "Nethermind",
+  "license": "MIT"
+}

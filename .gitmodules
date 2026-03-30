@@ -1,0 +1,3 @@
+[submodule "packages/eip-tests/lib/forge-std"]
+	path = packages/eip-tests/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
