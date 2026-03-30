@@ -45,7 +45,7 @@ Learn more at [surge.wtf](https://www.surge.wtf) or check out the official docs 
 
 ## Issues
 
-If you find a bug or have a feature request, please [open an issue](https://github.com/NethermindEth/surge-taiko-mono/issues/new/choose).
+If you find a bug or have a feature request, please [open an issue](https://github.com/NethermindEth/surge-taiko-mono/issues/).
 
 ## Contributing
 
