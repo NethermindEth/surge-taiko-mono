@@ -43,6 +43,14 @@ Learn more at [surge.wtf](https://www.surge.wtf) or check out the official docs 
 | [taiko-client-rs](./packages/taiko-client-rs)                 | Client implementation in Rust.                                     |
 | [ui-lib](./packages/ui-lib)                                   | UI library.                                                        |
 
+## Related Repositories
+
+- [Nethermind](https://github.com/NethermindEth/nethermind): The Nethermind execution client.
+- [Raiko](https://github.com/NethermindEth/raiko): Surge's prover client.
+- [Surge Documentation](https://github.com/NethermindEth/surge-docs): Comprehensive documentation for Surge, including setup guides and technical details.
+- [Simple Surge Node](https://github.com/NethermindEth/simple-surge-node): A simplified presetup docker compose of a Surge node for developers.
+- [Alethia Reth](https://github.com/NethermindEth/alethia-reth): A high-performance Rust execution client for the Surge framework.
+
 ## Issues
 
 If you find a bug or have a feature request, please [open an issue](https://github.com/NethermindEth/surge-taiko-mono/issues/).
