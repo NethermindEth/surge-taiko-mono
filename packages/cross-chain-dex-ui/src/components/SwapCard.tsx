@@ -4,7 +4,7 @@ import { TokenInput } from './TokenInput';
 import { SwapDetails } from './SwapDetails';
 import { SwapPath } from './SwapPath';
 import { SwapButton } from './SwapButton';
-import { useSmartWallet } from '../hooks/useSmartWallet';
+import { useSmartWallet } from '../context/SmartWalletContext';
 import { useDexReserves } from '../hooks/useDexReserves';
 import { useSwapQuote } from '../hooks/useSwapQuote';
 import { useTokenBalances } from '../hooks/useTokenBalances';

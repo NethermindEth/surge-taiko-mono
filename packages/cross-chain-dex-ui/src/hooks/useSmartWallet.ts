@@ -86,7 +86,9 @@ function clearMode(owner: string): void {
   } catch {}
 }
 
-export function useSmartWallet() {
+export type SmartWalletState = ReturnType<typeof useSmartWalletInternal>;
+
+export function useSmartWalletInternal() {
   const { address: ownerAddress, isConnected } = useAccount();
   const [isInitializing, setIsInitializing] = useState(true);
   const [smartWallet, setSmartWallet] = useState<Address | null>(null);

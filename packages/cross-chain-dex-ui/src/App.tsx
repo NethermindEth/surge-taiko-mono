@@ -14,7 +14,7 @@ import { NetworkSetup } from './components/NetworkSetup';
 import { FundWallet } from './components/FundWallet';
 import { TxStatusOverlay } from './components/TxStatusOverlay';
 import { TxStatusProvider, useTxStatus } from './context/TxStatusContext';
-import { useSmartWallet } from './hooks/useSmartWallet';
+import { useSmartWallet, SmartWalletProvider } from './context/SmartWalletContext';
 import { useTokenBalances } from './hooks/useTokenBalances';
 import { AccountModeSelector } from './components/AccountModeSelector';
 import { ActiveTab } from './types';
@@ -62,7 +62,7 @@ function AppContent() {
     }
   }, [activeTab, chainId, isConnected, switchChainAsync]);
 
-  // Reset dismissed flag when wallet connects/disconnects or smart wallet changes
+  // Reset dismissed flag when wallet connects/disconnects
   useEffect(() => {
     setDismissedWalletSetup(false);
   }, [isConnected, ownerAddress]);
@@ -215,7 +215,9 @@ function App() {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <TxStatusProvider>
-          <AppContent />
+          <SmartWalletProvider>
+            <AppContent />
+          </SmartWalletProvider>
         </TxStatusProvider>
       </QueryClientProvider>
     </WagmiProvider>

@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { parseUnits, formatUnits, Address } from "viem";
 import { TokenInput } from "./TokenInput";
-import { useSmartWallet } from "../hooks/useSmartWallet";
+import { useSmartWallet } from "../context/SmartWalletContext";
 import { useTokenBalances } from "../hooks/useTokenBalances";
 import { useL2TokenBalances } from "../hooks/useL2TokenBalances";
 import { useUserOp } from "../hooks/useUserOp";

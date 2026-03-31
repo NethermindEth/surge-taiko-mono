@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAccount, useConnect, useDisconnect, useBalance } from 'wagmi';
 import { formatEther } from 'viem';
 import toast from 'react-hot-toast';
-import { useSmartWallet } from '../hooks/useSmartWallet';
+import { useSmartWallet } from '../context/SmartWalletContext';
 import { useTokenBalances } from '../hooks/useTokenBalances';
 import { useUserOp } from '../hooks/useUserOp';
 import { surgeL1Chain } from '../lib/config';
