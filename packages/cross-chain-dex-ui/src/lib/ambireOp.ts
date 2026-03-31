@@ -7,7 +7,6 @@ import {
   concat,
   toHex,
   encodeFunctionData,
-  hashTypedData,
 } from 'viem';
 import { AmbireAccountABI } from './contracts';
 import { UserOp } from '../types';
@@ -55,6 +54,7 @@ export async function isAmbireAccount(
   try {
     const code = await client.getCode({ address: delegationTarget });
     if (!code || code === '0x') return false;
+    // Selector for execute((address,uint256,bytes)[],bytes) = 0x6171d1c9
     return code.toLowerCase().includes('6171d1c9');
   } catch {
     return false;
@@ -126,17 +126,15 @@ export function appendEIP712Mode(signature: Hex): Hex {
 }
 
 /**
- * AmbireAccount v2 uses a two-level EIP-712 wrapping for execute() signatures:
+ * AmbireAccount v2 EIP-712 signing with mode 0x00 (EIP712 direct).
  *
- * Level 1: AmbireExecuteAccountOp — encodes the full operation including typed transactions
+ * The deployed contract verifies signatures against the AmbireExecuteAccountOp
+ * EIP-712 hash, which includes full typed transaction data:
  *   AmbireExecuteAccountOp(address account, uint256 chainId, uint256 nonce, Transaction[] calls, bytes32 hash)
  *   Transaction(address to, uint256 value, bytes data)
  *
- * Level 2: AmbireOperation — wraps the Level 1 EIP-712 hash
- *   AmbireOperation(address account, bytes32 hash)
- *
- * The contract computes Level 1 hash, then wraps it in Level 2 to produce
- * the final EIP-712 hash that is verified via ecrecover.
+ * The user signs this via signTypedData, and the contract does direct ecrecover
+ * (mode 0x00) against the same EIP-712 hash it computes internally.
  */
 
 const AMBIRE_DOMAIN = {

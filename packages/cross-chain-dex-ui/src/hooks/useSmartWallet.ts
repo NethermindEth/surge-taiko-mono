@@ -164,18 +164,7 @@ export function useSmartWalletInternal() {
     setIsInitializing(true);
 
     const detect = async () => {
-      // Check saved preference (only set when user didn't explicitly disconnect)
-      const savedMode = getSavedMode(ownerAddress);
-      if (savedMode === 'ambire') {
-        setAccountMode('ambire');
-        setHas7702Delegation(true);
-        setSmartWallet(ownerAddress);
-        setL2WalletExists(true);
-        setIsInitializing(false);
-        return;
-      }
-
-      // Check for 7702 delegation on-chain
+      // Check for 7702 delegation on-chain first (always verify, even with saved mode)
       const delegationTarget = await detect7702Delegation(l1PublicClient, ownerAddress);
       if (cancelled) return;
 
@@ -185,14 +174,26 @@ export function useSmartWalletInternal() {
 
         if (isAmbire) {
           setHas7702Delegation(true);
+
+          // If saved preference exists, restore silently; otherwise show selector
+          const savedMode = getSavedMode(ownerAddress);
+          if (savedMode === 'ambire') {
+            setAccountMode('ambire');
+            setSmartWallet(ownerAddress);
+            setL2WalletExists(true);
+            setIsInitializing(false);
+            return;
+          }
+
           setShowModeSelector(true);
           return;
         }
       }
 
-      // No 7702 or not AmbireAccount — proceed with Safe detection
+      // No 7702 or not AmbireAccount — clear stale saved mode and proceed with Safe
       setHas7702Delegation(false);
       setAccountMode('safe');
+      clearMode(ownerAddress);
       await detectSafeWallet(ownerAddress, () => cancelled);
     };
 

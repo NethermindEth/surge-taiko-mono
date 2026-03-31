@@ -19,7 +19,7 @@ export function Header({ onSetupWallet }: HeaderProps) {
   const { address, chainId } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
-  const { executeWithdraw, isPending } = useUserOp();
+  const { executeWithdraw, isPending } = useUserOp(accountMode);
   const { isDisclaimerOpen, requireDisclaimer, onAccept, onCancel } = useDisclaimer();
 
   // EOA balance (refresh every 3 seconds)

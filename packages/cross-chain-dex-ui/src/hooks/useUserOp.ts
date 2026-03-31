@@ -176,6 +176,7 @@ export function useUserOp(accountMode: AccountMode = 'safe'): UseUserOpReturn {
 
         if (accountMode === 'ambire' && targetChainId === L2_CHAIN_ID) {
           // Ambire mode on L2: no 7702 delegation, send as direct EOA transaction
+          if (ops.length > 1) throw new Error('Ambire L2 mode only supports single-op transactions');
           const op = ops[0];
           await walletClient.sendTransaction({
             to: op.target,
