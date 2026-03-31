@@ -7,6 +7,7 @@ import {
   concat,
   toHex,
   encodeFunctionData,
+  hashTypedData,
 } from 'viem';
 import { AmbireAccountABI } from './contracts';
 import { UserOp } from '../types';
@@ -34,7 +35,7 @@ export async function detect7702Delegation(
   try {
     const code = await client.getCode({ address });
     if (!code || code === '0x') return null;
-    if (code.toLowerCase().startsWith(DELEGATION_PREFIX) && code.length === 46) {
+    if (code.toLowerCase().startsWith(DELEGATION_PREFIX) && code.length === 48) {
       return `0x${code.slice(8)}` as Address;
     }
     return null;
@@ -115,6 +116,78 @@ export function computeExecuteHash(
  */
 export function appendEthSignMode(signature: Hex): Hex {
   return concat([signature, toHex(1, { size: 1 })]) as Hex;
+}
+
+/**
+ * Append EIP-712 mode byte (0x00) to a signature for SignatureValidatorV2.
+ */
+export function appendEIP712Mode(signature: Hex): Hex {
+  return concat([signature, toHex(0, { size: 1 })]) as Hex;
+}
+
+/**
+ * AmbireAccount v2 uses a two-level EIP-712 wrapping for execute() signatures:
+ *
+ * Level 1: AmbireExecuteAccountOp — encodes the full operation including typed transactions
+ *   AmbireExecuteAccountOp(address account, uint256 chainId, uint256 nonce, Transaction[] calls, bytes32 hash)
+ *   Transaction(address to, uint256 value, bytes data)
+ *
+ * Level 2: AmbireOperation — wraps the Level 1 EIP-712 hash
+ *   AmbireOperation(address account, bytes32 hash)
+ *
+ * The contract computes Level 1 hash, then wraps it in Level 2 to produce
+ * the final EIP-712 hash that is verified via ecrecover.
+ */
+
+const AMBIRE_DOMAIN = {
+  name: 'Ambire' as const,
+  version: '1' as const,
+  salt: '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex,
+};
+
+/**
+ * Build the AmbireExecuteAccountOp EIP-712 typed data for signTypedData.
+ *
+ * The deployed AmbireAccount v2 contract verifies signatures against
+ * the AmbireExecuteAccountOp EIP-712 hash (when using mode 0x00 = EIP712 direct).
+ * This includes the full typed transaction data for readable signing prompts.
+ */
+export function buildAmbireExecuteTypedData(
+  account: Address,
+  chainId: number,
+  nonce: bigint,
+  txns: AmbireTransaction[],
+  executeHash: Hex,
+) {
+  return {
+    domain: {
+      ...AMBIRE_DOMAIN,
+      chainId,
+      verifyingContract: account,
+    },
+    types: {
+      AmbireExecuteAccountOp: [
+        { name: 'account', type: 'address' },
+        { name: 'chainId', type: 'uint256' },
+        { name: 'nonce', type: 'uint256' },
+        { name: 'calls', type: 'Transaction[]' },
+        { name: 'hash', type: 'bytes32' },
+      ],
+      Transaction: [
+        { name: 'to', type: 'address' },
+        { name: 'value', type: 'uint256' },
+        { name: 'data', type: 'bytes' },
+      ],
+    },
+    primaryType: 'AmbireExecuteAccountOp' as const,
+    message: {
+      account,
+      chainId: BigInt(chainId),
+      nonce,
+      calls: txns.map((t) => ({ to: t.to, value: t.value, data: t.data })),
+      hash: executeHash,
+    },
+  };
 }
 
 /**

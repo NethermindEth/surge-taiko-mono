@@ -29,7 +29,6 @@ export function AccountModeSelector({ isOpen, onSelect, onClose }: AccountModeSe
                 </svg>
               </div>
               <span className="text-white font-medium group-hover:text-surge-primary transition-colors">Safe Wallet</span>
-              <span className="ml-auto text-xs text-gray-500 bg-surge-card px-2 py-0.5 rounded">Default</span>
             </div>
             <p className="text-xs text-gray-500 ml-11">
               Creates a dedicated Safe. Works with any wallet.

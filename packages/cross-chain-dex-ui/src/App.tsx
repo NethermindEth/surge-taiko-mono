@@ -27,7 +27,7 @@ function AppContent() {
   smartWallet, isConnected, isLoading, ownerAddress,
   createSmartWallet, isCreating,
   l2WalletExists, createL2Wallet, isCreatingL2Wallet,
-  accountMode, showModeSelector, selectAccountMode, setShowModeSelector,
+  accountMode, has7702Delegation, showModeSelector, selectAccountMode, setShowModeSelector,
 } = useSmartWallet();
   const { chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
@@ -43,14 +43,17 @@ function AppContent() {
   const isWrongNetwork = isConnected && chainId !== surgeL1Chain.id && chainId !== surgeL2Chain.id;
   const hasInsufficientFunds = smartWallet && ethBalance === 0n && usdcBalance === 0n;
 
-  // Auto-show network setup if on wrong network
+  // Auto-switch to L1 if on wrong network (no modal prompt)
   useEffect(() => {
     if (isWrongNetwork) {
-      setShowNetworkSetup(true);
+      switchChainAsync({ chainId: surgeL1Chain.id }).catch(() => {
+        // If auto-switch fails, show manual network setup
+        setShowNetworkSetup(true);
+      });
     } else {
       setShowNetworkSetup(false);
     }
-  }, [isWrongNetwork]);
+  }, [isWrongNetwork, switchChainAsync]);
 
   // Auto-switch to L1 when on swap/liquidity tabs
   useEffect(() => {
@@ -79,6 +82,8 @@ function AppContent() {
   // 2. Wallet has funds but L2 wallet doesn't exist (needs L2 creation)
   // Only once per session
   useEffect(() => {
+    // Skip fund wallet modal entirely in ambire mode — the EOA already has funds
+    if (accountMode === 'ambire') return;
     if (!smartWallet || hasShownFundModal || balancesLoading || isLoading || showNetworkSetup || showWalletSetup) return;
     const needsFunding = ethBalance === 0n && usdcBalance === 0n;
     const needsL2 = accountMode === 'safe' && !l2WalletExists;
@@ -90,7 +95,7 @@ function AppContent() {
 
   return (
     <div className="h-screen overflow-hidden bg-surge-dark flex flex-col">
-      <Header onSetupWallet={() => setShowWalletSetup(true)} />
+      <Header onSetupWallet={() => has7702Delegation ? setShowModeSelector(true) : setShowWalletSetup(true)} />
 
       <main className="flex-1 min-h-0 relative flex items-center justify-center px-4">
         {/* Tab Navigation — absolutely positioned near header, independent of card */}

@@ -15,7 +15,7 @@ interface HeaderProps {
 }
 
 export function Header({ onSetupWallet }: HeaderProps) {
-  const { smartWallet, isConnected, ownerAddress } = useSmartWallet();
+  const { smartWallet, isConnected, ownerAddress, accountMode, clearAccountMode } = useSmartWallet();
   const { address, chainId } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
@@ -102,19 +102,21 @@ export function Header({ onSetupWallet }: HeaderProps) {
                 {parseFloat(usdcFormatted).toFixed(2)} USDC
               </span>
               <span className="text-xs text-gray-500">|</span>
-              <button
-                onClick={() => setDropdownOpen((prev) => !prev)}
-                className="text-gray-400 hover:text-white transition-colors p-0.5"
-                title="Wallet actions"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
+              {accountMode === 'safe' && (
+                <button
+                  onClick={() => setDropdownOpen((prev) => !prev)}
+                  className="text-gray-400 hover:text-white transition-colors p-0.5"
+                  title="Wallet actions"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              )}
             </div>
 
-            {/* Dropdown */}
-            {dropdownOpen && (
+            {/* Dropdown — hide withdraw in ambire mode (smart wallet IS the EOA) */}
+            {dropdownOpen && accountMode === 'safe' && (
               <div className="absolute right-0 top-full mt-1 bg-surge-card border border-surge-border/50 rounded-lg shadow-xl shadow-black/30 overflow-hidden min-w-[240px] z-50">
                 <button
                   onClick={() => requireDisclaimer(handleWithdraw)}
@@ -143,7 +145,7 @@ export function Header({ onSetupWallet }: HeaderProps) {
         {/* EOA Wallet with balance */}
         {isConnected ? (
           <button
-            onClick={() => disconnect()}
+            onClick={() => { clearAccountMode(); disconnect(); }}
             className="px-4 py-2 bg-surge-card hover:bg-surge-border text-white rounded-lg text-sm font-medium transition-colors border border-surge-border flex items-center gap-2"
           >
             <span>{address?.slice(0, 6)}...{address?.slice(-4)}</span>

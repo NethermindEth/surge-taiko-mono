@@ -80,6 +80,12 @@ function saveMode(owner: string, mode: AccountMode): void {
   } catch {}
 }
 
+function clearMode(owner: string): void {
+  try {
+    localStorage.removeItem(MODE_STORAGE_KEY + owner.toLowerCase());
+  } catch {}
+}
+
 export function useSmartWallet() {
   const { address: ownerAddress, isConnected } = useAccount();
   const [isInitializing, setIsInitializing] = useState(true);
@@ -105,10 +111,49 @@ export function useSmartWallet() {
     };
   }, []);
 
-  // On connect: check localStorage or predict the deterministic Safe address and verify on-chain.
+  // Detect existing Safe wallet for a given owner. Used by both the main
+  // detection effect and selectAccountMode('safe').
+  const detectSafeWallet = useCallback(async (owner: Address, cancelled?: () => boolean): Promise<void> => {
+    const saved = getSavedSafe(owner);
+    if (saved) {
+      try {
+        const code = await l1PublicClient.getCode({ address: saved });
+        if (cancelled?.()) return;
+        if (code && code !== '0x') {
+          setSmartWallet(saved);
+          setIsInitializing(false);
+          return;
+        }
+        localStorage.removeItem(STORAGE_KEY + owner.toLowerCase());
+      } catch (err) {
+        if (cancelled?.()) return;
+        console.warn('Failed to verify saved Safe address:', err);
+      }
+    }
+
+    try {
+      const predicted = await predictSafeAddress(owner);
+      if (cancelled?.()) return;
+      const code = await l1PublicClient.getCode({ address: predicted });
+      if (cancelled?.()) return;
+      if (code && code !== '0x') {
+        setSmartWallet(predicted);
+        saveSafe(owner, predicted);
+      }
+    } catch (err) {
+      if (cancelled?.()) return;
+      console.warn('Failed to predict Safe address:', err);
+    }
+
+    if (!cancelled?.()) setIsInitializing(false);
+  }, []);
+
+  // On connect: detect 7702 delegation first, then fall through to Safe detection if needed.
   useEffect(() => {
     if (!isConnected || !ownerAddress) {
       setSmartWallet(null);
+      setHas7702Delegation(false);
+      setShowModeSelector(false);
       setIsInitializing(false);
       return;
     }
@@ -116,79 +161,19 @@ export function useSmartWallet() {
     let cancelled = false;
     setIsInitializing(true);
 
-    const detectWallet = async () => {
-      // Skip Safe detection in ambire mode
-      if (accountMode === 'ambire') {
+    const detect = async () => {
+      // Check saved preference (only set when user didn't explicitly disconnect)
+      const savedMode = getSavedMode(ownerAddress);
+      if (savedMode === 'ambire') {
+        setAccountMode('ambire');
+        setHas7702Delegation(true);
+        setSmartWallet(ownerAddress);
+        setL2WalletExists(true);
         setIsInitializing(false);
         return;
       }
 
-      // First try localStorage
-      const saved = getSavedSafe(ownerAddress);
-      if (saved) {
-        try {
-          const code = await l1PublicClient.getCode({ address: saved });
-          if (cancelled) return;
-          if (code && code !== '0x') {
-            setSmartWallet(saved);
-            setIsInitializing(false);
-            return;
-          }
-          // Stale entry — remove it
-          localStorage.removeItem(STORAGE_KEY + ownerAddress.toLowerCase());
-        } catch (err) {
-          if (cancelled) return;
-          console.warn('Failed to verify saved Safe address:', err);
-        }
-      }
-
-      // If not in localStorage (or no code), predict the CREATE2 address and check
-      try {
-        const predicted = await predictSafeAddress(ownerAddress);
-        if (cancelled) return;
-        const code = await l1PublicClient.getCode({ address: predicted });
-        if (cancelled) return;
-        if (code && code !== '0x') {
-          setSmartWallet(predicted);
-          saveSafe(ownerAddress, predicted);
-        }
-      } catch (err) {
-        if (cancelled) return;
-        console.warn('Failed to predict Safe address:', err);
-      }
-
-      if (!cancelled) setIsInitializing(false);
-    };
-
-    detectWallet();
-    return () => { cancelled = true; };
-  }, [isConnected, ownerAddress, accountMode]);
-
-  // Detect 7702 delegation and determine account mode
-  useEffect(() => {
-    if (!isConnected || !ownerAddress) {
-      setHas7702Delegation(false);
-      setShowModeSelector(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    const detectMode = async () => {
-      // Check saved preference first
-      const savedMode = getSavedMode(ownerAddress);
-      if (savedMode) {
-        setAccountMode(savedMode);
-        if (savedMode === 'ambire') {
-          setHas7702Delegation(true);
-          setSmartWallet(ownerAddress);
-          setL2WalletExists(true);
-          setIsInitializing(false);
-        }
-        return;
-      }
-
-      // No saved preference — check for 7702 delegation
+      // Check for 7702 delegation on-chain
       const delegationTarget = await detect7702Delegation(l1PublicClient, ownerAddress);
       if (cancelled) return;
 
@@ -203,14 +188,15 @@ export function useSmartWallet() {
         }
       }
 
-      // No 7702 or not AmbireAccount — default to safe mode
+      // No 7702 or not AmbireAccount — proceed with Safe detection
       setHas7702Delegation(false);
       setAccountMode('safe');
+      await detectSafeWallet(ownerAddress, () => cancelled);
     };
 
-    detectMode();
+    detect();
     return () => { cancelled = true; };
-  }, [isConnected, ownerAddress]);
+  }, [isConnected, ownerAddress, detectSafeWallet]);
 
   // After a successful creation tx, parse the ProxyCreation event to get the proxy address.
   useEffect(() => {
@@ -313,7 +299,7 @@ export function useSmartWallet() {
     }
   }, [ownerAddress, smartWallet, executeCreateL2Wallet]);
 
-  const selectAccountMode = useCallback((mode: AccountMode) => {
+  const selectAccountMode = useCallback(async (mode: AccountMode) => {
     if (!ownerAddress) return;
     saveMode(ownerAddress, mode);
     setAccountMode(mode);
@@ -323,7 +309,14 @@ export function useSmartWallet() {
       setSmartWallet(ownerAddress);
       setL2WalletExists(true);
       setIsInitializing(false);
+    } else {
+      setIsInitializing(true);
+      await detectSafeWallet(ownerAddress);
     }
+  }, [ownerAddress, detectSafeWallet]);
+
+  const clearAccountMode = useCallback(() => {
+    if (ownerAddress) clearMode(ownerAddress);
   }, [ownerAddress]);
 
   return {
@@ -342,5 +335,6 @@ export function useSmartWallet() {
     showModeSelector,
     selectAccountMode,
     setShowModeSelector,
+    clearAccountMode,
   };
 }

@@ -5,9 +5,10 @@ import { SwapDirection, AccountMode } from '../types';
 import {
   getAmbireNonce,
   computeExecuteHash,
-  appendEthSignMode,
+  appendEIP712Mode,
   userOpsToAmbireTransactions,
   buildAmbireExecuteCalldata,
+  buildAmbireExecuteTypedData,
 } from '../lib/ambireOp';
 import {
   buildSwapUserOps,
@@ -191,11 +192,11 @@ export function useUserOp(accountMode: AccountMode = 'safe'): UseUserOpReturn {
           const nonce = await getAmbireNonce(publicClient, smartWallet);
           const executeHash = computeExecuteHash(smartWallet, targetChainId, nonce, txns);
 
-          const rawSignature = await walletClient.signMessage({
-            message: { raw: executeHash },
-          });
+          // Sign using AmbireExecuteAccountOp EIP-712 typed data (mode 0x00 = EIP712 direct)
+          const typedData = buildAmbireExecuteTypedData(smartWallet, targetChainId, nonce, txns, executeHash);
+          const rawSignature = await walletClient.signTypedData(typedData);
 
-          const signature = appendEthSignMode(rawSignature as Hex);
+          const signature = appendEIP712Mode(rawSignature as Hex);
           calldata = buildAmbireExecuteCalldata(txns, signature);
         } else {
           // Safe path: signTypedData + execTransaction()
@@ -304,10 +305,9 @@ export function useUserOp(accountMode: AccountMode = 'safe'): UseUserOpReturn {
           const txns = userOpsToAmbireTransactions(ops);
           const nonce = await getAmbireNonce(l1PublicClient, smartWallet);
           const executeHash = computeExecuteHash(smartWallet, CHAIN_ID, nonce, txns);
-          const rawSignature = await walletClient.signMessage({
-            message: { raw: executeHash },
-          });
-          const signature = appendEthSignMode(rawSignature as Hex);
+          const typedData = buildAmbireExecuteTypedData(smartWallet, CHAIN_ID, nonce, txns, executeHash);
+          const rawSignature = await walletClient.signTypedData(typedData);
+          const signature = appendEIP712Mode(rawSignature as Hex);
           calldata = buildAmbireExecuteCalldata(txns, signature);
         } else {
           const nonce = await getSafeNonce(l1PublicClient, smartWallet);
