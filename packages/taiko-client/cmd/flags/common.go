@@ -174,7 +174,7 @@ var (
 	}
 	GenesisL1Height = &cli.Uint64Flag{
 		Name:     "genesis.l1Height",
-		Usage:    "L1 block height of the L2 genesis (required for shasta and realtime forks)",
+		Usage:    "L1 block height of the L2 genesis (required for shasta fork; realtime discovers it from the Activated event)",
 		Value:    0,
 		Category: commonCategory,
 		EnvVars:  []string{"GENESIS_L1_HEIGHT"},
