@@ -16,13 +16,19 @@ import { TxStatusOverlay } from './components/TxStatusOverlay';
 import { TxStatusProvider, useTxStatus } from './context/TxStatusContext';
 import { useSmartWallet } from './hooks/useSmartWallet';
 import { useTokenBalances } from './hooks/useTokenBalances';
+import { AccountModeSelector } from './components/AccountModeSelector';
 import { ActiveTab } from './types';
 
 const queryClient = new QueryClient();
 
 function AppContent() {
   const { txStatus, setTxStatus } = useTxStatus();
-  const { smartWallet, isConnected, isLoading, ownerAddress, createSmartWallet, isCreating, l2WalletExists, createL2Wallet, isCreatingL2Wallet } = useSmartWallet();
+  const {
+  smartWallet, isConnected, isLoading, ownerAddress,
+  createSmartWallet, isCreating,
+  l2WalletExists, createL2Wallet, isCreatingL2Wallet,
+  accountMode, showModeSelector, selectAccountMode, setShowModeSelector,
+} = useSmartWallet();
   const { chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const { ethBalance, usdcBalance, ethFormatted, usdcFormatted, isLoading: balancesLoading } = useTokenBalances(smartWallet);
@@ -61,12 +67,12 @@ function AppContent() {
   // Auto-show wallet setup if connected, on correct network, but no smart wallet
   // Auto-close when wallet is created
   useEffect(() => {
-    if (isConnected && !isWrongNetwork && !smartWallet && !isLoading && !dismissedWalletSetup) {
+    if (isConnected && !isWrongNetwork && !smartWallet && !isLoading && !dismissedWalletSetup && accountMode === 'safe') {
       setShowWalletSetup(true);
     } else if (smartWallet && showWalletSetup) {
       setShowWalletSetup(false);
     }
-  }, [isConnected, isWrongNetwork, smartWallet, isLoading, showWalletSetup, dismissedWalletSetup]);
+  }, [isConnected, isWrongNetwork, smartWallet, isLoading, showWalletSetup, dismissedWalletSetup, accountMode]);
 
   // Auto-show fund wallet modal when:
   // 1. Wallet has no funds (needs funding), OR
@@ -75,12 +81,12 @@ function AppContent() {
   useEffect(() => {
     if (!smartWallet || hasShownFundModal || balancesLoading || isLoading || showNetworkSetup || showWalletSetup) return;
     const needsFunding = ethBalance === 0n && usdcBalance === 0n;
-    const needsL2 = !l2WalletExists;
+    const needsL2 = accountMode === 'safe' && !l2WalletExists;
     if (needsFunding || needsL2) {
       setShowFundWallet(true);
       setHasShownFundModal(true);
     }
-  }, [smartWallet, ethBalance, usdcBalance, balancesLoading, hasShownFundModal, isLoading, l2WalletExists, showNetworkSetup, showWalletSetup]);
+  }, [smartWallet, ethBalance, usdcBalance, balancesLoading, hasShownFundModal, isLoading, l2WalletExists, showNetworkSetup, showWalletSetup, accountMode]);
 
   return (
     <div className="h-screen overflow-hidden bg-surge-dark flex flex-col">
@@ -137,6 +143,12 @@ function AppContent() {
         onClose={() => setShowNetworkSetup(false)}
       />
 
+      <AccountModeSelector
+        isOpen={showModeSelector}
+        onSelect={selectAccountMode}
+        onClose={() => setShowModeSelector(false)}
+      />
+
       <SmartWalletSetup
         isOpen={showWalletSetup && !isWrongNetwork}
         onClose={() => {
@@ -155,8 +167,8 @@ function AppContent() {
           smartWallet={smartWallet}
           ethBalance={ethFormatted}
           usdcBalance={usdcFormatted}
-          l2WalletExists={l2WalletExists}
-          onCreateL2Wallet={createL2Wallet}
+          l2WalletExists={accountMode === 'ambire' ? true : l2WalletExists}
+          onCreateL2Wallet={accountMode === 'ambire' ? undefined : createL2Wallet}
           isCreatingL2Wallet={isCreatingL2Wallet}
         />
       )}

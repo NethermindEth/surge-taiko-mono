@@ -19,10 +19,10 @@ interface LiquidityCardProps {
 }
 
 export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
-  const { smartWallet, isConnected } = useSmartWallet();
+  const { smartWallet, isConnected, accountMode } = useSmartWallet();
   const { ethReserve, tokenReserve } = useDexReserves();
   const { ethBalance, usdcBalance } = useTokenBalances(smartWallet);
-  const { executeAddLiquidity, executeRemoveLiquidity, isPending } = useUserOp();
+  const { executeAddLiquidity, executeRemoveLiquidity, isPending } = useUserOp(accountMode);
   const { hasExceededL2Limit, wouldExceed, recordSpending, remaining } = useSpendingLimit(smartWallet);
   const { isDisclaimerOpen, requireDisclaimer, onAccept, onCancel } = useDisclaimer();
   const position = useLiquidityPosition(smartWallet);

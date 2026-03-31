@@ -1,7 +1,14 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Address, Hex } from 'viem';
 import { useWalletClient, useSwitchChain } from 'wagmi';
-import { SwapDirection } from '../types';
+import { SwapDirection, AccountMode } from '../types';
+import {
+  getAmbireNonce,
+  computeExecuteHash,
+  appendEthSignMode,
+  userOpsToAmbireTransactions,
+  buildAmbireExecuteCalldata,
+} from '../lib/ambireOp';
 import {
   buildSwapUserOps,
   buildBridgeUserOps,
@@ -60,7 +67,7 @@ interface ExecuteAddLiquidityParams {
   smartWallet: Address;
 }
 
-export function useUserOp(): UseUserOpReturn {
+export function useUserOp(accountMode: AccountMode = 'safe'): UseUserOpReturn {
   const { data: walletClient } = useWalletClient();
   const { switchChainAsync } = useSwitchChain();
   const { setTxStatus } = useTxStatus();
@@ -156,28 +163,48 @@ export function useUserOp(): UseUserOpReturn {
       try {
         setTxStatus({ phase: 'signing' });
 
-        // Determine which chain this Safe lives on
         const targetChainId = chainId ?? CHAIN_ID;
         const publicClient = targetChainId === L2_CHAIN_ID ? l2PublicClient : l1PublicClient;
 
-        // Switch chain if needed (e.g. bridge-out: signing on L2)
         if (chainId !== undefined && chainId !== walletClient.chain?.id) {
           await switchChainAsync({ chainId });
         }
 
-        // Fetch nonce from the Safe on the correct chain
-        const nonce = await getSafeNonce(publicClient, smartWallet);
+        let calldata: Hex;
 
-        // Convert ops to a single SafeTxParams
-        const safeTx = userOpsToSafeTx(ops);
+        if (accountMode === 'ambire' && targetChainId === L2_CHAIN_ID) {
+          // Ambire mode on L2: no 7702 delegation, send as direct EOA transaction
+          const op = ops[0];
+          await walletClient.sendTransaction({
+            to: op.target,
+            value: op.value,
+            data: op.data,
+            chain: walletClient.chain,
+            account: walletClient.account,
+          });
+          setTxStatus({ phase: 'complete' });
+          setIsPending(false);
+          return true;
+        } else if (accountMode === 'ambire') {
+          // AmbireAccount path on L1: personal_sign + execute()
+          const txns = userOpsToAmbireTransactions(ops);
+          const nonce = await getAmbireNonce(publicClient, smartWallet);
+          const executeHash = computeExecuteHash(smartWallet, targetChainId, nonce, txns);
 
-        // Build Safe EIP-712 typed data
-        const typedData = buildSafeTxTypedData(smartWallet, targetChainId, nonce, safeTx);
+          const rawSignature = await walletClient.signMessage({
+            message: { raw: executeHash },
+          });
 
-        const signature = await walletClient.signTypedData(typedData);
-
-        // Encode execTransaction calldata
-        const calldata = buildExecTransactionCalldata(safeTx, signature as Hex);
+          const signature = appendEthSignMode(rawSignature as Hex);
+          calldata = buildAmbireExecuteCalldata(txns, signature);
+        } else {
+          // Safe path: signTypedData + execTransaction()
+          const nonce = await getSafeNonce(publicClient, smartWallet);
+          const safeTx = userOpsToSafeTx(ops);
+          const typedData = buildSafeTxTypedData(smartWallet, targetChainId, nonce, safeTx);
+          const signature = await walletClient.signTypedData(typedData);
+          calldata = buildExecTransactionCalldata(safeTx, signature as Hex);
+        }
 
         const result = await sendUserOpToBuilder(smartWallet, calldata, chainId);
 
@@ -202,7 +229,7 @@ export function useUserOp(): UseUserOpReturn {
         return false;
       }
     },
-    [walletClient, switchChainAsync, pollStatus, setTxStatus]
+    [walletClient, switchChainAsync, pollStatus, setTxStatus, accountMode]
   );
 
   const executeSwap = useCallback(
@@ -271,21 +298,39 @@ export function useUserOp(): UseUserOpReturn {
       setError(null);
 
       try {
-        const nonce = await getSafeNonce(l1PublicClient, smartWallet);
-        const safeTx = userOpsToSafeTx(ops);
-        const typedData = buildSafeTxTypedData(smartWallet, CHAIN_ID, nonce, safeTx);
-        const signature = await walletClient.signTypedData(typedData);
-        const calldata = buildExecTransactionCalldata(safeTx, signature as Hex);
+        let calldata: Hex;
 
-        await walletClient.sendTransaction({
-          to: smartWallet,
-          data: calldata,
-          chain: walletClient.chain,
-          account: walletClient.account,
-        });
+        if (accountMode === 'ambire') {
+          const txns = userOpsToAmbireTransactions(ops);
+          const nonce = await getAmbireNonce(l1PublicClient, smartWallet);
+          const executeHash = computeExecuteHash(smartWallet, CHAIN_ID, nonce, txns);
+          const rawSignature = await walletClient.signMessage({
+            message: { raw: executeHash },
+          });
+          const signature = appendEthSignMode(rawSignature as Hex);
+          calldata = buildAmbireExecuteCalldata(txns, signature);
+        } else {
+          const nonce = await getSafeNonce(l1PublicClient, smartWallet);
+          const safeTx = userOpsToSafeTx(ops);
+          const typedData = buildSafeTxTypedData(smartWallet, CHAIN_ID, nonce, safeTx);
+          const signature = await walletClient.signTypedData(typedData);
+          calldata = buildExecTransactionCalldata(safeTx, signature as Hex);
+        }
 
-        setIsPending(false);
-        return true;
+        if (accountMode === 'ambire') {
+          const result = await sendUserOpToBuilder(smartWallet, calldata);
+          setIsPending(false);
+          return result.success;
+        } else {
+          await walletClient.sendTransaction({
+            to: smartWallet,
+            data: calldata,
+            chain: walletClient.chain,
+            account: walletClient.account,
+          });
+          setIsPending(false);
+          return true;
+        }
       } catch (err) {
         console.error('Withdraw failed:', err);
         setError(err instanceof Error ? err : new Error('Withdraw failed'));
@@ -293,7 +338,7 @@ export function useUserOp(): UseUserOpReturn {
         return false;
       }
     },
-    [walletClient]
+    [walletClient, accountMode]
   );
 
   const executeCreateL2Wallet = useCallback(

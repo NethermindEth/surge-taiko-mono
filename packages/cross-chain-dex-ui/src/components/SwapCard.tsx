@@ -23,10 +23,10 @@ interface SwapCardProps {
 }
 
 export function SwapCard({ onSetupWallet, onFundWallet }: SwapCardProps) {
-  const { smartWallet, isConnected } = useSmartWallet();
+  const { smartWallet, isConnected, accountMode } = useSmartWallet();
   const { ethReserve, tokenReserve, isLoading: reservesLoading } = useDexReserves();
   const { ethBalance, usdcBalance } = useTokenBalances(smartWallet);
-  const { executeSwap, isPending } = useUserOp();
+  const { executeSwap, isPending } = useUserOp(accountMode);
   const { isDisclaimerOpen, requireDisclaimer, onAccept, onCancel } = useDisclaimer();
 
   const [direction, setDirection] = useState<SwapDirection>('ETH_TO_USDC');
