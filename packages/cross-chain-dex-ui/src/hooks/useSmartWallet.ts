@@ -237,8 +237,13 @@ export function useSmartWalletInternal() {
     }
   }, [isSuccess, receipt, ownerAddress, reset]);
 
-  // After L1 Safe is known, check if the same address has code on L2
+  // After L1 Safe is known, check if the same address has code on L2.
+  // Skip in Ambire mode — L2 uses raw EOA, no wallet contract needed.
   useEffect(() => {
+    if (accountMode === 'ambire') {
+      setL2WalletExists(true);
+      return;
+    }
     if (!smartWallet) {
       setL2WalletExists(false);
       return;
@@ -252,7 +257,7 @@ export function useSmartWalletInternal() {
       })
       .catch(() => { if (!cancelled) setL2WalletExists(false); });
     return () => { cancelled = true; };
-  }, [smartWallet]);
+  }, [smartWallet, accountMode]);
 
   const createSmartWallet = useCallback(async () => {
     if (!ownerAddress) throw new Error('Wallet not connected');
