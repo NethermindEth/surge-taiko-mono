@@ -184,7 +184,13 @@ export function useSmartWalletInternal() {
             setIsInitializing(false);
             return;
           }
+          if (savedMode === 'safe') {
+            setAccountMode('safe');
+            await detectSafeWallet(ownerAddress, () => cancelled);
+            return;
+          }
 
+          setIsInitializing(false);
           setShowModeSelector(true);
           return;
         }
