@@ -89,7 +89,7 @@ function clearMode(owner: string): void {
 export type SmartWalletState = ReturnType<typeof useSmartWalletInternal>;
 
 export function useSmartWalletInternal() {
-  const { address: ownerAddress, isConnected } = useAccount();
+  const { address: ownerAddress, isConnected, connector } = useAccount();
   const [isInitializing, setIsInitializing] = useState(true);
   const [smartWallet, setSmartWallet] = useState<Address | null>(null);
   const [l2WalletExists, setL2WalletExists] = useState(false);
@@ -168,7 +168,13 @@ export function useSmartWalletInternal() {
       // Other wallets reject with "External signature requests cannot
       // use internal accounts as the verifying contract".
       // Skip on-chain delegation checks entirely for non-Ambire wallets.
-      const isAmbireWallet = !!window.ethereum?.isAmbire;
+      // Wait for connector to be available before making provider decisions.
+      // On page refresh, wagmi hydrates the connector asynchronously.
+      if (!connector) return;
+
+      // Use connector ID (persisted by wagmi, available immediately on hydration)
+      // rather than getProvider() which may return a wrapped provider missing flags.
+      const isAmbireWallet = connector.id === 'com.ambire.wallet';
 
       if (isAmbireWallet) {
         const delegationTarget = await detect7702Delegation(l1PublicClient, ownerAddress);
@@ -212,7 +218,7 @@ export function useSmartWalletInternal() {
 
     detect();
     return () => { cancelled = true; };
-  }, [isConnected, ownerAddress, detectSafeWallet]);
+  }, [isConnected, ownerAddress, connector, detectSafeWallet]);
 
   // After a successful creation tx, parse the ProxyCreation event to get the proxy address.
   useEffect(() => {
@@ -320,8 +326,11 @@ export function useSmartWalletInternal() {
     }
   }, [ownerAddress, smartWallet, executeCreateL2Wallet]);
 
+  const selectModeRef = useRef(0);
+
   const selectAccountMode = useCallback(async (mode: AccountMode) => {
     if (!ownerAddress) return;
+    const callId = ++selectModeRef.current;
     saveMode(ownerAddress, mode);
     setAccountMode(mode);
     setShowModeSelector(false);
@@ -332,7 +341,7 @@ export function useSmartWalletInternal() {
       setIsInitializing(false);
     } else {
       setIsInitializing(true);
-      await detectSafeWallet(ownerAddress);
+      await detectSafeWallet(ownerAddress, () => callId !== selectModeRef.current);
     }
   }, [ownerAddress, detectSafeWallet]);
 

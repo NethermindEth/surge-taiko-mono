@@ -3,7 +3,7 @@ import { useAccount, useDisconnect } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import toast from 'react-hot-toast';
 import { useSmartWallet } from '../context/SmartWalletContext';
-import { useTokenBalances } from '../hooks/useTokenBalances';
+import { useSharedTokenBalances } from '../context/SmartWalletContext';
 import { useUserOp } from '../hooks/useUserOp';
 import { surgeL1Chain } from '../lib/config';
 import { ETH_TOKEN } from '../lib/constants';
@@ -22,7 +22,7 @@ export function Header({ onSetupWallet }: HeaderProps) {
   const { isDisclaimerOpen, requireDisclaimer, onAccept, onCancel } = useDisclaimer();
 
   // Smart wallet balances
-  const { ethBalance, usdcBalance, ethFormatted, usdcFormatted } = useTokenBalances(smartWallet);
+  const { ethBalance, usdcBalance, ethFormatted, usdcFormatted } = useSharedTokenBalances();
 
   const isWrongNetwork = isConnected && chainId !== surgeL1Chain.id;
 

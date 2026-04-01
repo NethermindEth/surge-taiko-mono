@@ -17,7 +17,7 @@ import { FundWallet } from './components/FundWallet';
 import { TxStatusOverlay } from './components/TxStatusOverlay';
 import { TxStatusProvider, useTxStatus } from './context/TxStatusContext';
 import { useSmartWallet, SmartWalletProvider } from './context/SmartWalletContext';
-import { useTokenBalances } from './hooks/useTokenBalances';
+import { useSharedTokenBalances } from './context/SmartWalletContext';
 import { AccountModeSelector } from './components/AccountModeSelector';
 import { ActiveTab } from './types';
 
@@ -33,7 +33,7 @@ function AppContent() {
 } = useSmartWallet();
   const { chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
-  const { ethBalance, usdcBalance, ethFormatted, usdcFormatted, isLoading: balancesLoading } = useTokenBalances(smartWallet);
+  const { ethBalance, usdcBalance, ethFormatted, usdcFormatted, isLoading: balancesLoading } = useSharedTokenBalances();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('swap');
   const [showWalletSetup, setShowWalletSetup] = useState(false);
