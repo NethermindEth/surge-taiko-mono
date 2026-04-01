@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { WagmiProvider } from 'wagmi';
 import { useAccount, useSwitchChain } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
+import '@rainbow-me/rainbowkit/styles.css';
 import { Toaster } from 'react-hot-toast';
 
 import { config, surgeL1Chain, surgeL2Chain } from './lib/config';
@@ -69,12 +71,12 @@ function AppContent() {
   // Auto-show wallet setup if connected, on correct network, but no smart wallet
   // Auto-close when wallet is created
   useEffect(() => {
-    if (isConnected && !isWrongNetwork && !smartWallet && !isLoading && !dismissedWalletSetup && accountMode === 'safe') {
+    if (isConnected && !isWrongNetwork && !smartWallet && !isLoading && !dismissedWalletSetup && accountMode === 'safe' && !showModeSelector) {
       setShowWalletSetup(true);
     } else if (smartWallet && showWalletSetup) {
       setShowWalletSetup(false);
     }
-  }, [isConnected, isWrongNetwork, smartWallet, isLoading, showWalletSetup, dismissedWalletSetup, accountMode]);
+  }, [isConnected, isWrongNetwork, smartWallet, isLoading, showWalletSetup, dismissedWalletSetup, accountMode, showModeSelector]);
 
   // Auto-show fund wallet modal when:
   // 1. Wallet has no funds (needs funding), OR
@@ -154,7 +156,7 @@ function AppContent() {
       />
 
       <SmartWalletSetup
-        isOpen={showWalletSetup && !isWrongNetwork}
+        isOpen={showWalletSetup && !isWrongNetwork && !showModeSelector}
         onClose={() => {
           setShowWalletSetup(false);
           setDismissedWalletSetup(true);
@@ -213,11 +215,13 @@ function App() {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <TxStatusProvider>
-          <SmartWalletProvider>
-            <AppContent />
-          </SmartWalletProvider>
-        </TxStatusProvider>
+        <RainbowKitProvider theme={darkTheme({ accentColor: '#10b981' })}>
+          <TxStatusProvider>
+            <SmartWalletProvider>
+              <AppContent />
+            </SmartWalletProvider>
+          </TxStatusProvider>
+        </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

@@ -164,39 +164,46 @@ export function useSmartWalletInternal() {
     setIsInitializing(true);
 
     const detect = async () => {
-      // Check for 7702 delegation on-chain first (always verify, even with saved mode)
-      const delegationTarget = await detect7702Delegation(l1PublicClient, ownerAddress);
-      if (cancelled) return;
+      // Only the Ambire wallet can sign for Ambire smart accounts.
+      // Other wallets reject with "External signature requests cannot
+      // use internal accounts as the verifying contract".
+      // Skip on-chain delegation checks entirely for non-Ambire wallets.
+      const isAmbireWallet = !!window.ethereum?.isAmbire;
 
-      if (delegationTarget) {
-        const isAmbire = await isAmbireAccount(l1PublicClient, delegationTarget);
+      if (isAmbireWallet) {
+        const delegationTarget = await detect7702Delegation(l1PublicClient, ownerAddress);
         if (cancelled) return;
 
-        if (isAmbire) {
-          setHas7702Delegation(true);
+        if (delegationTarget) {
+          const isAmbire = await isAmbireAccount(l1PublicClient, delegationTarget);
+          if (cancelled) return;
 
-          // If saved preference exists, restore silently; otherwise show selector
-          const savedMode = getSavedMode(ownerAddress);
-          if (savedMode === 'ambire') {
-            setAccountMode('ambire');
-            setSmartWallet(ownerAddress);
-            setL2WalletExists(true);
+          if (isAmbire) {
+            setHas7702Delegation(true);
+
+            // If saved preference exists, restore silently; otherwise show selector
+            const savedMode = getSavedMode(ownerAddress);
+            if (savedMode === 'ambire') {
+              setAccountMode('ambire');
+              setSmartWallet(ownerAddress);
+              setL2WalletExists(true);
+              setIsInitializing(false);
+              return;
+            }
+            if (savedMode === 'safe') {
+              setAccountMode('safe');
+              await detectSafeWallet(ownerAddress, () => cancelled);
+              return;
+            }
+
             setIsInitializing(false);
+            setShowModeSelector(true);
             return;
           }
-          if (savedMode === 'safe') {
-            setAccountMode('safe');
-            await detectSafeWallet(ownerAddress, () => cancelled);
-            return;
-          }
-
-          setIsInitializing(false);
-          setShowModeSelector(true);
-          return;
         }
       }
 
-      // No 7702 or not AmbireAccount — clear stale saved mode and proceed with Safe
+      // Not Ambire wallet, no delegation, or not AmbireAccount — proceed with Safe
       setHas7702Delegation(false);
       setAccountMode('safe');
       clearMode(ownerAddress);
