@@ -30,6 +30,17 @@ import { CHAIN_ID, L2_CHAIN_ID, DEFAULT_SLIPPAGE } from '../lib/constants';
 import { l1PublicClient, l2PublicClient } from '../lib/config';
 import { useTxStatus } from '../context/TxStatusContext';
 
+function parseWalletError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : 'Operation failed';
+  if (raw.includes('rejected') || raw.includes('denied')) return 'Transaction rejected by user';
+  // Strip verbose viem details (Request Arguments, Details, Version)
+  const detailsMatch = raw.match(/Details:\s*(.+?)(?:\.|$)/);
+  if (detailsMatch) return detailsMatch[1].trim();
+  // Fallback: take first sentence
+  const firstSentence = raw.split(/[.\n]/)[0].trim();
+  return firstSentence.length > 120 ? firstSentence.slice(0, 120) + '...' : firstSentence;
+}
+
 interface UseUserOpReturn {
   executeSwap: (params: ExecuteSwapParams) => Promise<boolean>;
   executeBridge: (params: ExecuteBridgeParams) => Promise<boolean>;
@@ -225,7 +236,7 @@ export function useUserOp(accountMode: AccountMode = 'safe'): UseUserOpReturn {
         }
       } catch (err) {
         console.error('Operation failed:', err);
-        const msg = err instanceof Error ? err.message : 'Operation failed';
+        const msg = parseWalletError(err);
         setTxStatus({ phase: 'rejected', errorMessage: msg });
         setError(err instanceof Error ? err : new Error(msg));
         setIsPending(false);
