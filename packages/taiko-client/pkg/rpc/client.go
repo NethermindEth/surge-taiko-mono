@@ -333,21 +333,45 @@ func (c *Client) initRealTimeClients(ctx context.Context, cfg *ClientConfig) err
 		return fmt.Errorf("failed to create RealTimeAnchor client: %w", err)
 	}
 
-	// Discover genesis L1 height from the Activated event.
-	iter, err := realTimeInbox.FilterActivated(&bind.FilterOpts{Context: ctx, Start: 0})
-	if err != nil {
-		return fmt.Errorf("failed to filter Activated event: %w", err)
+	// Use provided genesis L1 height if set; otherwise scan backwards for the
+	// Activated event in chunks to stay within RPC provider eth_getLogs range limits.
+	if cfg.GenesisL1Height != 0 {
+		c.GenesisL1Height = cfg.GenesisL1Height
+		log.Info("Using provided RealTime genesis L1 height", "height", c.GenesisL1Height)
+	} else {
+		const chunkSize = uint64(9000)
+		head, err := c.L1.HeaderByNumber(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("failed to get L1 head block: %w", err)
+		}
+		current := head.Number.Uint64()
+		found := false
+		for !found && current > 0 {
+			start := uint64(0)
+			if current > chunkSize {
+				start = current - chunkSize
+			}
+			iter, err := realTimeInbox.FilterActivated(&bind.FilterOpts{Context: ctx, Start: start, End: &current})
+			if err != nil {
+				return fmt.Errorf("failed to filter Activated event: %w", err)
+			}
+			if iter.Next() {
+				c.GenesisL1Height = iter.Event.Raw.BlockNumber
+				log.Info("Discovered RealTime genesis L1 height from Activated event",
+					"height", c.GenesisL1Height,
+					"genesisBlockHash", common.Hash(iter.Event.GenesisBlockHash),
+				)
+				iter.Close()
+				found = true
+			} else {
+				iter.Close()
+				current = start
+			}
+		}
+		if !found {
+			return fmt.Errorf("RealTimeInbox at %s has not been activated (no Activated event found)", cfg.RealTimeInboxAddress.Hex())
+		}
 	}
-	defer iter.Close()
-
-	if !iter.Next() {
-		return fmt.Errorf("RealTimeInbox at %s has not been activated (no Activated event found)", cfg.RealTimeInboxAddress.Hex())
-	}
-	c.GenesisL1Height = iter.Event.Raw.BlockNumber
-	log.Info("Discovered RealTime genesis L1 height from Activated event",
-		"height", c.GenesisL1Height,
-		"genesisBlockHash", common.Hash(iter.Event.GenesisBlockHash),
-	)
 
 	c.RealTimeClients = &RealTimeClients{
 		Inbox:        realTimeInbox,

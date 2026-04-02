@@ -482,7 +482,7 @@ func (s *Syncer) processRealTimeProposal(
 
 	// Check for L1 reorg if not just finishing P2P sync.
 	if !s.progressTracker.Triggered() {
-		reorgCheckResult, err := s.checkReorgRealTime(ctx)
+		reorgCheckResult, err := s.checkReorgRealTime(ctx, lastFinalizedBlockHash)
 		if err != nil {
 			return err
 		}
@@ -861,44 +861,33 @@ func (s *Syncer) checkReorgShasta(
 	return reorgCheckResult, nil
 }
 
-// checkReorgRealTime checks whether the L1 chain has been reorged by comparing the on-chain
-// lastFinalizedBlockHash with the corresponding L2 block. If the L2 block doesn't exist,
-// a reorg is detected and we reset to genesis.
-func (s *Syncer) checkReorgRealTime(ctx context.Context) (*rpc.ReorgCheckResult, error) {
-	// If the L2 chain is at genesis, we don't need to check L1 reorg.
-	if s.state.GetL1Current().Number == s.state.GenesisL1Height {
-		return new(rpc.ReorgCheckResult), nil
-	}
-
+// checkReorgRealTime checks whether the L1 chain has been reorged by verifying that the
+// proposal event's lastFinalizedBlockHash exists in the L2 chain. Using the event's value
+// (rather than the current on-chain state) is correct during historical replay: the contract
+// may already be far ahead, so the current on-chain hash won't exist in L2 yet and would
+// falsely trigger a reorg on every proposal.
+func (s *Syncer) checkReorgRealTime(ctx context.Context, eventLastFinalizedBlockHash common.Hash) (*rpc.ReorgCheckResult, error) {
 	if s.rpc.RealTimeClients == nil {
 		return new(rpc.ReorgCheckResult), nil
 	}
 
-	// Get the on-chain lastFinalizedBlockHash from RealTimeInbox.
-	lastFinalizedBlockHash, err := s.rpc.RealTimeClients.Inbox.GetLastFinalizedBlockHash(
-		&bind.CallOpts{Context: ctx},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get lastFinalizedBlockHash: %w", err)
-	}
-
-	hash := common.BytesToHash(lastFinalizedBlockHash[:])
-	if hash == (common.Hash{}) {
+	if eventLastFinalizedBlockHash == (common.Hash{}) {
 		return new(rpc.ReorgCheckResult), nil
 	}
 
-	// Check if this finalized block exists in the L2 chain.
-	header, err := s.rpc.L2.HeaderByHash(ctx, hash)
+	// Check if the proposal's parent block exists in the L2 chain.
+	header, err := s.rpc.L2.HeaderByHash(ctx, eventLastFinalizedBlockHash)
 	if err != nil || header == nil {
 		log.Info(
-			"RealTime finalized block not found in L2, reorg detected",
-			"lastFinalizedBlockHash", hash,
+			"RealTime proposal parent not found in L2, reorg detected — resetting to genesis L1 height",
+			"eventLastFinalizedBlockHash", eventLastFinalizedBlockHash,
+			"genesisL1Height", s.state.GenesisL1Height,
 		)
 
 		reorgCheckResult := &rpc.ReorgCheckResult{IsReorged: true}
-		reorgCheckResult.L1CurrentToReset, err = s.rpc.L1.HeaderByNumber(ctx, common.Big0)
+		reorgCheckResult.L1CurrentToReset, err = s.rpc.L1.HeaderByNumber(ctx, s.state.GenesisL1Height)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch L1 genesis header: %w", err)
+			return nil, fmt.Errorf("failed to fetch genesis L1 header: %w", err)
 		}
 		reorgCheckResult.LastHandledBatchIDToReset = common.Big0
 		return reorgCheckResult, nil
