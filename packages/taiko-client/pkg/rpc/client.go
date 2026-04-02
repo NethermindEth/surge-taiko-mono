@@ -324,7 +324,10 @@ func (c *Client) initRealTimeClients(cfg *ClientConfig) error {
 		return nil
 	}
 	if cfg.GenesisL1Height == 0 {
-		return fmt.Errorf("--genesis.l1Height is required for the realtime fork (set it to the L1 block where the RealTimeInbox was activated)")
+		return fmt.Errorf(
+			"--genesis.l1Height is required for the realtime fork " +
+				"(set it to the L1 block where the RealTimeInbox was activated)",
+		)
 	}
 	realTimeInbox, err := realtimeBindings.NewRealTimeInboxClient(cfg.RealTimeInboxAddress, c.L1)
 	if err != nil {
