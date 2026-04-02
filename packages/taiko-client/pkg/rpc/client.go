@@ -191,10 +191,9 @@ func NewClient(ctx context.Context, cfg *ClientConfig) (*Client, error) {
 		}
 		c.GenesisL1Height = cfg.GenesisL1Height
 	case fork.RealTime:
-		if err := c.initRealTimeClients(cfg); err != nil {
+		if err := c.initRealTimeClients(ctxWithTimeout, cfg); err != nil {
 			return nil, fmt.Errorf("failed to initialize RealTime clients: %w", err)
 		}
-		c.GenesisL1Height = cfg.GenesisL1Height
 	default:
 		// Backwards compat (no fork set): initialize all clients.
 		if err := c.initPacayaClients(cfg); err != nil {
@@ -206,7 +205,7 @@ func NewClient(ctx context.Context, cfg *ClientConfig) (*Client, error) {
 		if err := c.initShastaClients(ctxWithTimeout, cfg); err != nil {
 			return nil, fmt.Errorf("failed to initialize Shasta clients: %w", err)
 		}
-		if err := c.initRealTimeClients(cfg); err != nil {
+		if err := c.initRealTimeClients(ctxWithTimeout, cfg); err != nil {
 			return nil, fmt.Errorf("failed to initialize RealTime clients: %w", err)
 		}
 		stateVars, err := c.GetProtocolStateVariablesPacaya(&bind.CallOpts{Context: ctxWithTimeout})
@@ -319,8 +318,9 @@ func (c *Client) initPacayaClients(cfg *ClientConfig) error {
 	return nil
 }
 
-// initRealTimeClients initializes all RealTime smart contract clients.
-func (c *Client) initRealTimeClients(cfg *ClientConfig) error {
+// initRealTimeClients initializes all RealTime smart contract clients and
+// discovers the genesis L1 height from the Activated event emitted by the inbox.
+func (c *Client) initRealTimeClients(ctx context.Context, cfg *ClientConfig) error {
 	if cfg.RealTimeInboxAddress == (common.Address{}) {
 		return nil
 	}
@@ -332,6 +332,23 @@ func (c *Client) initRealTimeClients(cfg *ClientConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create RealTimeAnchor client: %w", err)
 	}
+
+	// Discover genesis L1 height from the Activated event.
+	iter, err := realTimeInbox.FilterActivated(&bind.FilterOpts{Context: ctx, Start: 0})
+	if err != nil {
+		return fmt.Errorf("failed to filter Activated event: %w", err)
+	}
+	defer iter.Close()
+
+	if !iter.Next() {
+		return fmt.Errorf("RealTimeInbox at %s has not been activated (no Activated event found)", cfg.RealTimeInboxAddress.Hex())
+	}
+	c.GenesisL1Height = iter.Event.Raw.BlockNumber
+	log.Info("Discovered RealTime genesis L1 height from Activated event",
+		"height", c.GenesisL1Height,
+		"genesisBlockHash", common.Hash(iter.Event.GenesisBlockHash),
+	)
+
 	c.RealTimeClients = &RealTimeClients{
 		Inbox:        realTimeInbox,
 		Anchor:       realTimeAnchor,

@@ -274,7 +274,8 @@ func (s *State) IsPacaya(num *big.Int) bool {
 }
 
 // initGenesisHeight reads the genesis L1 height from the RPC client, which was
-// set during client initialization (from contract for pacaya, from config for shasta/realtime).
+// set during client initialization (from contract for pacaya, from Activated event for realtime,
+// from config for shasta).
 func (s *State) initGenesisHeight() {
 	s.GenesisL1Height = new(big.Int).SetUint64(s.rpc.GenesisL1Height)
 }
