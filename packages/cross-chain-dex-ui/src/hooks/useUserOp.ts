@@ -361,13 +361,15 @@ export function useUserOp(accountMode: AccountMode = 'safe'): UseUserOpReturn {
             return false;
           }
         } else {
-          await activeClient.sendTransaction({
+          const txHash = await activeClient.sendTransaction({
             to: smartWallet,
             data: calldata,
             chain: activeClient.chain,
             account: activeClient.account,
           });
-          setTxStatus({ phase: 'complete' });
+          setTxStatus({ phase: 'sequencing' });
+          await l1PublicClient.waitForTransactionReceipt({ hash: txHash });
+          setTxStatus({ phase: 'complete', txHash });
           setIsPending(false);
           return true;
         }
