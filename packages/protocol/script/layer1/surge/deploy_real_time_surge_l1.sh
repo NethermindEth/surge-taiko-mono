@@ -20,6 +20,13 @@ export L2_CHAIN_ID=${L2_CHAIN_ID:-167004}
 # Trusted program VKey (bytes32, packed uint64[4] big-endian)
 export ZISK_PROGRAM_VKEY=${ZISK_PROGRAM_VKEY:-"0x0000000000000000000000000000000000000000000000000000000000000000"}
 
+# Mock proof mode configuration
+# ---------------------------------------------------------------
+# When true, deploys ProofVerifierDummy instead of SurgeVerifier (for testing)
+export MOCK_PROOF_MODE=${MOCK_PROOF_MODE:-false}
+# Trusted signer address for ProofVerifierDummy (required when MOCK_PROOF_MODE=true)
+export MOCK_PROOF_SIGNER=${MOCK_PROOF_SIGNER:-"0x0000000000000000000000000000000000000000"}
+
 # SurgeVerifier configuration
 # ---------------------------------------------------------------
 # Minimum number of distinct proofs required for a transition to finalize
