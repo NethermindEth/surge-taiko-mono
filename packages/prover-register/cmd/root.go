@@ -33,6 +33,8 @@ var (
 	dryRunAsOwner    bool
 	logJSON          bool
 	logDebug         bool
+	useNethermind    bool
+	guestDataFile    string
 )
 
 var rootCmd = &cobra.Command{
@@ -61,6 +63,8 @@ func init() {
 	rootCmd.Flags().BoolVar(&dryRunAsOwner, "dry-as-owner", false, "Dry run mode simulating as contract owner")
 	rootCmd.Flags().BoolVar(&logJSON, "log.json", false, "Output logs in JSON format")
 	rootCmd.Flags().BoolVar(&logDebug, "log.debug", false, "Enable debug logging")
+	rootCmd.Flags().BoolVar(&useNethermind, "nethermind", false, "Use Nethermind JSON-RPC endpoint for guest data")
+	rootCmd.Flags().StringVar(&guestDataFile, "guest-data-file", "", "Read guest data from a local file instead of fetching from prover")
 
 	rootCmd.MarkFlagRequired("verifier")
 	rootCmd.MarkFlagRequired("type")
@@ -101,7 +105,8 @@ func runRegister(cmd *cobra.Command, args []string) error {
 		"type", verifierType,
 		"prover", proverAddress,
 		"dryRun", dryRun,
-		"dryRunAsOwner", dryRunAsOwner)
+		"dryRunAsOwner", dryRunAsOwner,
+		"useNethermind", useNethermind)
 
 	// Validate inputs
 	if !trustCollateral && !registerInstance {
@@ -132,9 +137,16 @@ func runRegister(cmd *cobra.Command, args []string) error {
 	// Create prover client
 	proverClient := prover.NewClient(proverAddress, log)
 
-	// Fetch guest data
-	log.Info("fetching guest data from prover")
-	guestData, err := proverClient.GetGuestData(ctx)
+	// Fetch guest data based on source
+	log.Info("fetching guest data")
+	var guestData prover.GuestData
+	if guestDataFile != "" {
+		guestData, err = proverClient.GetGuestDataFromFile(guestDataFile)
+	} else if useNethermind {
+		guestData, err = proverClient.GetGuestDataFromNethermind(ctx)
+	} else {
+		guestData, err = proverClient.GetGuestData(ctx)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to get guest data: %w", err)
 	}
