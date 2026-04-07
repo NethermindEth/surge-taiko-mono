@@ -95,6 +95,7 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
     function run() external broadcast {
         require(l2ChainId != block.chainid && l2ChainId != 0, "config: L2_CHAIN_ID");
         require(contractOwner != address(0), "config: CONTRACT_OWNER");
+        require(!mockProofMode || mockProofSigner != address(0), "config: MOCK_PROOF_SIGNER required in mock mode");
 
         console2.log("** Contract owner: ", contractOwner);
 
@@ -225,7 +226,6 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         // Deploy proof verifier
         // ---------------------------------------------------------------
         if (mockProofMode) {
-            require(mockProofSigner != address(0), "config: MOCK_PROOF_SIGNER required");
             rollupContracts.proofVerifier = address(new ProofVerifierDummy(mockProofSigner));
             console2.log("** Deployed ProofVerifierDummy:", rollupContracts.proofVerifier);
             console2.log("** Mock proof signer:", mockProofSigner);
