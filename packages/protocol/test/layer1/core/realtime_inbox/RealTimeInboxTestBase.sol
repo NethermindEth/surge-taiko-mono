@@ -2,14 +2,14 @@
 pragma solidity ^0.8.24;
 
 import { MockSurgeVerifier } from "./mocks/MockSurgeVerifier.sol";
-import { MockSignalService } from "test/layer1/core/inbox/mocks/MockContracts.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { Vm } from "forge-std/src/Vm.sol";
-import { IRealTimeInbox } from "src/layer1/core/iface/IRealTimeInbox.sol";
 import { IInbox } from "src/layer1/core/iface/IInbox.sol";
-import { ICheckpointStore } from "src/shared/signal/ICheckpointStore.sol";
+import { IRealTimeInbox } from "src/layer1/core/iface/IRealTimeInbox.sol";
 import { RealTimeInbox } from "src/layer1/core/impl/RealTimeInbox.sol";
 import { LibBlobs } from "src/layer1/core/libs/LibBlobs.sol";
+import { ICheckpointStore } from "src/shared/signal/ICheckpointStore.sol";
+import { MockSignalService } from "test/layer1/core/inbox/mocks/MockContracts.sol";
 import { CommonTest } from "test/shared/CommonTest.sol";
 
 /// @title RealTimeInboxTestBase
@@ -54,9 +54,7 @@ abstract contract RealTimeInboxTestBase is CommonTest {
     function _deployInbox(IRealTimeInbox.Config memory _config) internal returns (RealTimeInbox) {
         address impl = address(new RealTimeInbox(_config));
         return RealTimeInbox(
-            address(
-                new ERC1967Proxy(impl, abi.encodeCall(RealTimeInbox.init, (address(this))))
-            )
+            address(new ERC1967Proxy(impl, abi.encodeCall(RealTimeInbox.init, (address(this)))))
         );
     }
 
@@ -118,9 +116,7 @@ abstract contract RealTimeInboxTestBase is CommonTest {
         returns (ICheckpointStore.Checkpoint memory)
     {
         return ICheckpointStore.Checkpoint({
-            blockNumber: _blockNumber,
-            blockHash: _blockHash,
-            stateRoot: _stateRoot
+            blockNumber: _blockNumber, blockHash: _blockHash, stateRoot: _stateRoot
         });
     }
 

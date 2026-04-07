@@ -76,7 +76,13 @@ contract CrossChainSwapVaultL2 {
     // Constructor
     // ---------------------------------------------------------------
 
-    constructor(address _bridge, uint64 _l1ChainId, address _dex, address _swapToken, address _admin) {
+    constructor(
+        address _bridge,
+        uint64 _l1ChainId,
+        address _dex,
+        address _swapToken,
+        address _admin
+    ) {
         bridge = _bridge;
         l1ChainId = _l1ChainId;
         dex = ISimpleDEX(_dex);

@@ -55,9 +55,7 @@ contract RealTimeInboxActivationTest is RealTimeInboxTestBase {
 
     function test_constructor_RevertWhen_ProofVerifierZero() public {
         IRealTimeInbox.Config memory cfg = IRealTimeInbox.Config({
-            proofVerifier: address(0),
-            signalService: address(signalService),
-            basefeeSharingPctg: 0
+            proofVerifier: address(0), signalService: address(signalService), basefeeSharingPctg: 0
         });
 
         vm.expectRevert("config: proofVerifier");
@@ -66,9 +64,7 @@ contract RealTimeInboxActivationTest is RealTimeInboxTestBase {
 
     function test_constructor_RevertWhen_SignalServiceZero() public {
         IRealTimeInbox.Config memory cfg = IRealTimeInbox.Config({
-            proofVerifier: address(verifier),
-            signalService: address(0),
-            basefeeSharingPctg: 0
+            proofVerifier: address(verifier), signalService: address(0), basefeeSharingPctg: 0
         });
 
         vm.expectRevert("config: signalService");

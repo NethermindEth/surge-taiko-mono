@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import { SwapToken } from
-    "../../../../contracts/layer1/surge/cross-chain-dex/SwapToken.sol";
-import { CrossChainSwapVaultL1 } from
-    "../../../../contracts/layer1/surge/cross-chain-dex/CrossChainSwapVaultL1.sol";
+import {
+    CrossChainSwapVaultL1
+} from "../../../../contracts/layer1/surge/cross-chain-dex/CrossChainSwapVaultL1.sol";
+import { SwapToken } from "../../../../contracts/layer1/surge/cross-chain-dex/SwapToken.sol";
 import { Script } from "forge-std/src/Script.sol";
 import { console2 } from "forge-std/src/console2.sol";
 
@@ -24,11 +24,7 @@ contract DeployCrossChainDexL1 is Script {
         vm.stopBroadcast();
     }
 
-    function run()
-        external
-        broadcast
-        returns (address swapToken_, address l1Vault_)
-    {
+    function run() external broadcast returns (address swapToken_, address l1Vault_) {
         address deployer = msg.sender;
 
         console2.log("=====================================");

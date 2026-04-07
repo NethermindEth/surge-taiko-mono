@@ -83,8 +83,7 @@ contract UserOpsSubmitter is EIP712 {
                 ++i;
             }
         }
-        return
-            keccak256(abi.encode(_EXECUTEBATCH_TYPEHASH, keccak256(abi.encodePacked(opHashes))));
+        return keccak256(abi.encode(_EXECUTEBATCH_TYPEHASH, keccak256(abi.encodePacked(opHashes))));
     }
 
     error INVALID_OWNER();

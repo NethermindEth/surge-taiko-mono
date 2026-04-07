@@ -50,8 +50,12 @@ contract SimpleDEX {
     // Events
     // ---------------------------------------------------------------
 
-    event LiquidityAdded(address indexed provider, uint256 ethAmount, uint256 tokenAmount, uint256 shares);
-    event LiquidityRemoved(address indexed provider, uint256 ethAmount, uint256 tokenAmount, uint256 shares);
+    event LiquidityAdded(
+        address indexed provider, uint256 ethAmount, uint256 tokenAmount, uint256 shares
+    );
+    event LiquidityRemoved(
+        address indexed provider, uint256 ethAmount, uint256 tokenAmount, uint256 shares
+    );
     event LiquidityProviderSet(address indexed provider);
     event SwapETHForToken(address indexed user, uint256 ethIn, uint256 tokenOut);
     event SwapTokenForETH(address indexed user, uint256 tokenIn, uint256 ethOut);
@@ -181,7 +185,13 @@ contract SimpleDEX {
     /// @param _tokenIn Amount of tokens to swap
     /// @param _minETHOut Minimum ETH expected (slippage protection)
     /// @return ethOut_ Actual ETH received
-    function swapTokenForETH(uint256 _tokenIn, uint256 _minETHOut) external returns (uint256 ethOut_) {
+    function swapTokenForETH(
+        uint256 _tokenIn,
+        uint256 _minETHOut
+    )
+        external
+        returns (uint256 ethOut_)
+    {
         if (_tokenIn == 0) revert ZERO_AMOUNT();
 
         ethOut_ = getAmountOut(_tokenIn, reserveToken, reserveETH);

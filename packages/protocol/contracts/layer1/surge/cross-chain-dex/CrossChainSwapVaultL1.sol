@@ -42,12 +42,22 @@ contract CrossChainSwapVaultL1 {
     // ---------------------------------------------------------------
 
     event L2VaultSet(address indexed l2Vault);
-    event TokensBridgedToL2(address indexed from, address indexed recipient, uint256 amount, bytes32 msgHash);
-    event SwapETHForTokenInitiated(address indexed user, uint256 ethAmount, uint256 minTokenOut, bytes32 msgHash);
-    event SwapTokenForETHInitiated(address indexed user, uint256 tokenAmount, uint256 minETHOut, bytes32 msgHash);
-    event LiquidityAddedToL2(address indexed user, uint256 ethAmount, uint256 tokenAmount, bytes32 msgHash);
+    event TokensBridgedToL2(
+        address indexed from, address indexed recipient, uint256 amount, bytes32 msgHash
+    );
+    event SwapETHForTokenInitiated(
+        address indexed user, uint256 ethAmount, uint256 minTokenOut, bytes32 msgHash
+    );
+    event SwapTokenForETHInitiated(
+        address indexed user, uint256 tokenAmount, uint256 minETHOut, bytes32 msgHash
+    );
+    event LiquidityAddedToL2(
+        address indexed user, uint256 ethAmount, uint256 tokenAmount, bytes32 msgHash
+    );
     event LiquidityRemovedFromL2(address indexed user, bytes32 msgHash);
-    event LiquidityRemovalCompleted(address indexed recipient, uint256 ethAmount, uint256 tokenAmount);
+    event LiquidityRemovalCompleted(
+        address indexed recipient, uint256 ethAmount, uint256 tokenAmount
+    );
     event SwapETHForTokenCompleted(address indexed recipient, uint256 tokenAmount);
     event SwapTokenForETHCompleted(address indexed recipient, uint256 ethAmount);
 
@@ -115,13 +125,8 @@ contract CrossChainSwapVaultL1 {
         if (l2Vault == address(0)) revert L2_VAULT_NOT_SET();
         if (msg.value == 0) revert ZERO_AMOUNT();
 
-        bytes memory data = abi.encode(
-            Action.SWAP_ETH_TO_TOKEN,
-            msg.sender,
-            _recipient,
-            msg.value,
-            _minTokenOut
-        );
+        bytes memory data =
+            abi.encode(Action.SWAP_ETH_TO_TOKEN, msg.sender, _recipient, msg.value, _minTokenOut);
         bytes32 msgHash = _sendMessageToL2(data, msg.value);
 
         emit SwapETHForTokenInitiated(msg.sender, msg.value, _minTokenOut, msgHash);
@@ -135,7 +140,13 @@ contract CrossChainSwapVaultL1 {
     /// @param _tokenAmount Amount of tokens to swap
     /// @param _minETHOut Minimum ETH expected (slippage protection)
     /// @param _recipient Recipient for ETH on L1
-    function swapTokenForETH(uint256 _tokenAmount, uint256 _minETHOut, address _recipient) external {
+    function swapTokenForETH(
+        uint256 _tokenAmount,
+        uint256 _minETHOut,
+        address _recipient
+    )
+        external
+    {
         if (l2Vault == address(0)) revert L2_VAULT_NOT_SET();
         if (_tokenAmount == 0) revert ZERO_AMOUNT();
 
@@ -143,11 +154,7 @@ contract CrossChainSwapVaultL1 {
         swapToken.safeTransferFrom(msg.sender, address(this), _tokenAmount);
 
         bytes memory data = abi.encode(
-            Action.SWAP_TOKEN_TO_ETH,
-            msg.sender,
-            _recipient,
-            _tokenAmount,
-            _minETHOut
+            Action.SWAP_TOKEN_TO_ETH, msg.sender, _recipient, _tokenAmount, _minETHOut
         );
         bytes32 msgHash = _sendMessageToL2(data, 0);
 
@@ -198,8 +205,11 @@ contract CrossChainSwapVaultL1 {
 
         if (action == Action.SWAP_ETH_TO_TOKEN) {
             // Completion: L2 swapped ETH for tokens, release canonical tokens to recipient
-            (, address recipient, uint256 tokenAmount) = abi.decode(_data, (Action, address, uint256));
-            if (swapToken.balanceOf(address(this)) < tokenAmount) revert INSUFFICIENT_TOKEN_BALANCE();
+            (, address recipient, uint256 tokenAmount) =
+                abi.decode(_data, (Action, address, uint256));
+            if (swapToken.balanceOf(address(this)) < tokenAmount) {
+                revert INSUFFICIENT_TOKEN_BALANCE();
+            }
             swapToken.safeTransfer(recipient, tokenAmount);
             emit SwapETHForTokenCompleted(recipient, tokenAmount);
         } else if (action == Action.SWAP_TOKEN_TO_ETH) {
@@ -212,9 +222,12 @@ contract CrossChainSwapVaultL1 {
             emit SwapTokenForETHCompleted(recipient, msg.value);
         } else if (action == Action.REMOVE_LIQUIDITY) {
             // Completion: L2 removed liquidity, forward ETH + release tokens to recipient
-            (, address recipient, uint256 tokenAmount) = abi.decode(_data, (Action, address, uint256));
+            (, address recipient, uint256 tokenAmount) =
+                abi.decode(_data, (Action, address, uint256));
             if (tokenAmount > 0) {
-                if (swapToken.balanceOf(address(this)) < tokenAmount) revert INSUFFICIENT_TOKEN_BALANCE();
+                if (swapToken.balanceOf(address(this)) < tokenAmount) {
+                    revert INSUFFICIENT_TOKEN_BALANCE();
+                }
                 swapToken.safeTransfer(recipient, tokenAmount);
             }
             if (msg.value > 0) {
@@ -230,7 +243,13 @@ contract CrossChainSwapVaultL1 {
     // Internal
     // ---------------------------------------------------------------
 
-    function _sendMessageToL2(bytes memory _innerData, uint256 _ethValue) internal returns (bytes32) {
+    function _sendMessageToL2(
+        bytes memory _innerData,
+        uint256 _ethValue
+    )
+        internal
+        returns (bytes32)
+    {
         bytes memory msgData = abi.encodeWithSignature("onMessageInvocation(bytes)", _innerData);
 
         IBridge.Message memory message = IBridge.Message({
