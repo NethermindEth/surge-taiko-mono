@@ -43,18 +43,18 @@ contract ZiskVerifierImpl is PlonkVerifier, IZiskVerifier {
     {
         return uint256(
             sha256(
-                abi.encodePacked(
-                    bytes8(programVK[0]),
-                    bytes8(programVK[1]),
-                    bytes8(programVK[2]),
-                    bytes8(programVK[3]),
-                    publicValues,
-                    bytes8(rootCVadcopFinal[0]),
-                    bytes8(rootCVadcopFinal[1]),
-                    bytes8(rootCVadcopFinal[2]),
-                    bytes8(rootCVadcopFinal[3])
-                )
-            )
+            abi.encodePacked(
+            bytes8(programVK[0]),
+            bytes8(programVK[1]),
+            bytes8(programVK[2]),
+            bytes8(programVK[3]),
+            publicValues,
+            bytes8(rootCVadcopFinal[0]),
+            bytes8(rootCVadcopFinal[1]),
+            bytes8(rootCVadcopFinal[2]),
+            bytes8(rootCVadcopFinal[3])
+        )
+        )
         ) % _RFIELD;
     }
 

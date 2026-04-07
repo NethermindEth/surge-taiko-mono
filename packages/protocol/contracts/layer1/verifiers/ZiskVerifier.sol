@@ -42,7 +42,7 @@ contract ZiskVerifier is IProofVerifier, Ownable2Step {
         require(_ziskRemoteVerifier != address(0), ZISK_INVALID_REMOTE_VERIFIER());
         require(
             _rootCVadcopFinal[0] | _rootCVadcopFinal[1] | _rootCVadcopFinal[2]
-                | _rootCVadcopFinal[3] != 0,
+                    | _rootCVadcopFinal[3] != 0,
             ZISK_INVALID_ROOT_CV()
         );
         taikoChainId = _taikoChainId;

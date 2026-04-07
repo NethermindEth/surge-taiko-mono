@@ -142,7 +142,13 @@ contract CrossChainSwapHandlerL1 {
     /// @param _tokenAmount Amount of tokens to swap
     /// @param _minETHOut Minimum ETH expected (slippage protection)
     /// @param _recipient The recipient on L1 (user's UserOpsSubmitter)
-    function swapERC20ForETH(uint256 _tokenAmount, uint256 _minETHOut, address _recipient) external {
+    function swapERC20ForETH(
+        uint256 _tokenAmount,
+        uint256 _minETHOut,
+        address _recipient
+    )
+        external
+    {
         if (l2Handler == address(0)) revert L2_HANDLER_NOT_SET();
         if (_tokenAmount == 0) revert ZERO_AMOUNT();
 

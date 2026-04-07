@@ -95,7 +95,10 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
     function run() external broadcast {
         require(l2ChainId != block.chainid && l2ChainId != 0, "config: L2_CHAIN_ID");
         require(contractOwner != address(0), "config: CONTRACT_OWNER");
-        require(!mockProofMode || mockProofSigner != address(0), "config: MOCK_PROOF_SIGNER required in mock mode");
+        require(
+            !mockProofMode || mockProofSigner != address(0),
+            "config: MOCK_PROOF_SIGNER required in mock mode"
+        );
 
         console2.log("** Contract owner: ", contractOwner);
 
@@ -284,12 +287,7 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         console2.logBytes32(ziskProgramVKey);
     }
 
-    function setupSharedResolver(
-        SharedContracts memory _sharedContracts,
-        address _owner
-    )
-        internal
-    {
+    function setupSharedResolver(SharedContracts memory _sharedContracts, address _owner) internal {
         // Register L2 addresses
         // ---------------------------------------------------------------
         register(

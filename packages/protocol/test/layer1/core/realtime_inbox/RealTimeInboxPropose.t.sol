@@ -4,11 +4,11 @@ pragma solidity ^0.8.24;
 /// forge-config: default.isolate = true
 
 import { RealTimeInboxTestBase } from "./RealTimeInboxTestBase.sol";
-import { IRealTimeInbox } from "src/layer1/core/iface/IRealTimeInbox.sol";
-import { ICheckpointStore } from "src/shared/signal/ICheckpointStore.sol";
-import { RealTimeInbox } from "src/layer1/core/impl/RealTimeInbox.sol";
-import { IInbox } from "src/layer1/core/iface/IInbox.sol";
 import { Vm } from "forge-std/src/Vm.sol";
+import { IInbox } from "src/layer1/core/iface/IInbox.sol";
+import { IRealTimeInbox } from "src/layer1/core/iface/IRealTimeInbox.sol";
+import { RealTimeInbox } from "src/layer1/core/impl/RealTimeInbox.sol";
+import { ICheckpointStore } from "src/shared/signal/ICheckpointStore.sol";
 
 /// @notice Tests for RealTimeInbox.propose() and hashing helpers.
 contract RealTimeInboxProposeTest is RealTimeInboxTestBase {

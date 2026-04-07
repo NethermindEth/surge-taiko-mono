@@ -128,10 +128,7 @@ contract PreconfWhitelist is EssentialContract, IPreconfWhitelist, IProposerChec
     /// @param _proposer The proposer address of the operator to check.
     /// @param _epochTimestamp The timestamp of the epoch to check.
     /// @return _ True if the operator is active in the given epoch, false otherwise.
-    function isOperatorActive(
-        address _proposer,
-        uint32 _epochTimestamp
-    )
+    function isOperatorActive(address _proposer, uint32 _epochTimestamp)
         public
         view
         returns (bool)

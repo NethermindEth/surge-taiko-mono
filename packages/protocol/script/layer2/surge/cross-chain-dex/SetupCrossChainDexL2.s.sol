@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import { CrossChainSwapVaultL2 } from
-    "../../../../contracts/layer2/surge/cross-chain-dex/CrossChainSwapVaultL2.sol";
+import {
+    CrossChainSwapVaultL2
+} from "../../../../contracts/layer2/surge/cross-chain-dex/CrossChainSwapVaultL2.sol";
 import { Script } from "forge-std/src/Script.sol";
 import { console2 } from "forge-std/src/console2.sol";
 
