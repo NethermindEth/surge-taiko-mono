@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import { EmptyImpl } from "./common/EmptyImpl.sol";
+import { ProofVerifierDummy } from "./common/ProofVerifierDummy.sol";
 import {
     Ownable2StepUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
@@ -48,6 +49,11 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
     // Zisk Verifier Configuration
     // ---------------------------------------------------------------
     bytes32 internal immutable ziskProgramVKey = vm.envOr("ZISK_PROGRAM_VKEY", bytes32(0));
+
+    // Mock proof mode configuration
+    // ---------------------------------------------------------------
+    bool internal immutable mockProofMode = vm.envOr("MOCK_PROOF_MODE", false);
+    address internal immutable mockProofSigner = vm.envOr("MOCK_PROOF_SIGNER", address(0));
 
     // SurgeVerifier configuration
     // ---------------------------------------------------------------
@@ -100,9 +106,12 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         // ---------------------------------------------------------------
         RollupContracts memory rollupContracts = deployRollupContracts(emptyImpl);
 
-        // Deploy internal verifiers (needed for SurgeVerifier)
+        // Deploy internal verifiers (needed for SurgeVerifier, skipped in mock mode)
         // ---------------------------------------------------------------
-        VerifierContracts memory verifierContracts = deployInternalVerifiers(contractOwner);
+        VerifierContracts memory verifierContracts;
+        if (!mockProofMode) {
+            verifierContracts = deployInternalVerifiers(contractOwner);
+        }
 
         // Deploy shared contracts
         // ---------------------------------------------------------------
@@ -112,9 +121,11 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         // Register L2 addresses in the resolver
         setupSharedResolver(sharedContracts, contractOwner);
 
-        // Setup proof verifier with internal verifiers
+        // Setup proof verifier with internal verifiers (skipped in mock mode)
         // ---------------------------------------------------------------
-        setupProofVerifier(rollupContracts, verifierContracts, contractOwner);
+        if (!mockProofMode) {
+            setupProofVerifier(rollupContracts, verifierContracts, contractOwner);
+        }
 
         // Deploy inbox implementation and activate
         // ---------------------------------------------------------------
@@ -209,15 +220,22 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
     {
         // Deploy inbox proxy
         // ---------------------------------------------------------------
-        rollupContracts.inbox =
-            deployProxy({ name: "real_time_inbox", impl: _emptyImpl, data: "" });
+        rollupContracts.inbox = deployProxy({ name: "real_time_inbox", impl: _emptyImpl, data: "" });
 
-        // Deploy proof verifier (SurgeVerifier)
+        // Deploy proof verifier
         // ---------------------------------------------------------------
-        rollupContracts.proofVerifier =
-            address(new SurgeVerifier(rollupContracts.inbox, numProofsThreshold, msg.sender));
-        console2.log("** Deployed SurgeVerifier:", rollupContracts.proofVerifier);
-        writeJson("surge_verifier", rollupContracts.proofVerifier);
+        if (mockProofMode) {
+            require(mockProofSigner != address(0), "config: MOCK_PROOF_SIGNER required");
+            rollupContracts.proofVerifier = address(new ProofVerifierDummy(mockProofSigner));
+            console2.log("** Deployed ProofVerifierDummy:", rollupContracts.proofVerifier);
+            console2.log("** Mock proof signer:", mockProofSigner);
+            writeJson("proof_verifier_dummy", rollupContracts.proofVerifier);
+        } else {
+            rollupContracts.proofVerifier =
+                address(new SurgeVerifier(rollupContracts.inbox, numProofsThreshold, msg.sender));
+            console2.log("** Deployed SurgeVerifier:", rollupContracts.proofVerifier);
+            writeJson("surge_verifier", rollupContracts.proofVerifier);
+        }
     }
 
     /// @dev The deployer is the initial owner of the Zisk verifier.
@@ -384,11 +402,12 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         ownerContracts[4] = _sharedContracts.erc1155Vault;
 
         // Build list of contracts with pending ownership transfer
+        // In mock mode, proofVerifier and ziskRethVerifier are not ownable
         address[] memory pendingOwnerContracts = new address[](4);
-        pendingOwnerContracts[0] = _rollupContracts.proofVerifier;
+        pendingOwnerContracts[0] = mockProofMode ? address(0) : _rollupContracts.proofVerifier;
         pendingOwnerContracts[1] = _rollupContracts.inbox;
         pendingOwnerContracts[2] = _sharedContracts.sharedResolver;
-        pendingOwnerContracts[3] = _verifierContracts.ziskRethVerifier;
+        pendingOwnerContracts[3] = mockProofMode ? address(0) : _verifierContracts.ziskRethVerifier;
 
         // Verify ownership
         verifyOwnership(ownerContracts, pendingOwnerContracts, _expectedOwner);
@@ -408,9 +427,11 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         sharedNames[7] = bytes32("bridged_erc1155");
 
         for (uint256 i = 0; i < sharedNames.length; i++) {
-            try DefaultResolver(_sharedResolver).resolve(
-                block.chainid, sharedNames[i], false
-            ) returns (address) { } catch {
+            try DefaultResolver(_sharedResolver)
+                .resolve(block.chainid, sharedNames[i], false) returns (
+                address
+            ) { }
+            catch {
                 revert(
                     string.concat(
                         "verifyL1Registrations: missing registration for ",
@@ -474,8 +495,7 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         for (uint256 i; i < _pendingOwnerContracts.length; ++i) {
             if (_pendingOwnerContracts[i] == address(0)) continue;
 
-            address pendingOwner =
-                Ownable2StepUpgradeable(_pendingOwnerContracts[i]).pendingOwner();
+            address pendingOwner = Ownable2StepUpgradeable(_pendingOwnerContracts[i]).pendingOwner();
             require(
                 pendingOwner == _expectedOwner,
                 string.concat(
