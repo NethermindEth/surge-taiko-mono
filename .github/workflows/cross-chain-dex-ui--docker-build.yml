@@ -1,0 +1,304 @@
+name: "[Nethermind] Cross-chain DEX UI - Docker build and push"
+
+on:
+  workflow_dispatch:
+    inputs:
+      viteL1RpcUrl:
+        description: "L1 RPC URL (VITE_L1_RPC_URL)"
+        required: false
+        default: ""
+        type: string
+      viteL2RpcUrl:
+        description: "L2 RPC URL (VITE_L2_RPC_URL)"
+        required: false
+        default: ""
+        type: string
+      viteBuilderRpcUrl:
+        description: "Builder RPC URL (VITE_BUILDER_RPC_URL)"
+        required: false
+        default: ""
+        type: string
+      viteBuilderApiUrl:
+        description: "Builder API URL (VITE_BUILDER_API_URL)"
+        required: false
+        default: ""
+        type: string
+      viteChainId:
+        description: "L1 chain ID (VITE_CHAIN_ID)"
+        required: false
+        default: "11155111"
+        type: string
+      viteL1ChainName:
+        description: "L1 chain display name (VITE_L1_CHAIN_NAME)"
+        required: false
+        default: ""
+        type: string
+      viteL1NativeSymbol:
+        description: "L1 native token symbol (VITE_L1_NATIVE_SYMBOL)"
+        required: false
+        default: "ETH"
+        type: string
+      viteL1NativeName:
+        description: "L1 native token name (VITE_L1_NATIVE_NAME)"
+        required: false
+        default: "Ether"
+        type: string
+      viteL1NativeLogo:
+        description: "L1 native token logo path (VITE_L1_NATIVE_LOGO)"
+        required: false
+        default: ""
+        type: string
+      viteSafeProxyFactory:
+        description: "Safe proxy factory address (VITE_SAFE_PROXY_FACTORY)"
+        required: false
+        default: "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
+        type: string
+      viteSafeSingleton:
+        description: "Safe singleton address (VITE_SAFE_SINGLETON)"
+        required: false
+        default: "0x29fcB43b46531BcA003ddC8FCB67FFE91900C762"
+        type: string
+      viteSafeMultisend:
+        description: "Safe multisend address (VITE_SAFE_MULTISEND)"
+        required: false
+        default: "0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526"
+        type: string
+      viteSafeFallbackHandler:
+        description: "Safe fallback handler address (VITE_SAFE_FALLBACK_HANDLER)"
+        required: false
+        default: "0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99"
+        type: string
+      viteUserOpsFactory:
+        description: "UserOpsFactory contract address (VITE_USER_OPS_FACTORY)"
+        required: false
+        default: "0x0000000000000000000000000000000000000000"
+        type: string
+      viteL1Vault:
+        description: "L1Vault contract address (VITE_L1_VAULT)"
+        required: false
+        default: "0x0000000000000000000000000000000000000000"
+        type: string
+      viteUsdcToken:
+        description: "USDC token address (VITE_USDC_TOKEN)"
+        required: false
+        default: "0x0000000000000000000000000000000000000000"
+        type: string
+      viteUsdcDecimals:
+        description: "USDC token decimals (VITE_USDC_DECIMALS)"
+        required: false
+        default: "18"
+        type: string
+      viteSimpleDex:
+        description: "SimpleDEX contract address (VITE_SIMPLE_DEX)"
+        required: false
+        default: "0x0000000000000000000000000000000000000000"
+        type: string
+      viteL1Bridge:
+        description: "L1 bridge contract address (VITE_L1_BRIDGE)"
+        required: false
+        default: "0x0000000000000000000000000000000000000000"
+        type: string
+      viteL2ChainId:
+        description: "L2 chain ID (VITE_L2_CHAIN_ID)"
+        required: false
+        default: ""
+        type: string
+      viteL2Relay:
+        description: "L2 relay contract address (VITE_L2_RELAY)"
+        required: false
+        default: "0x0000000000000000000000000000000000000000"
+        type: string
+      viteWalletConnectProjectId:
+        description: "WalletConnect Project ID (VITE_WALLETCONNECT_PROJECT_ID)"
+        required: false
+        default: ""
+        type: string
+  pull_request:
+    branches: [main]
+    paths:
+      - "packages/cross-chain-dex-ui/**"
+      - ".github/workflows/cross-chain-dex-ui--docker-build.yml"
+  push:
+    branches: [main]
+    tags:
+      - "cross-chain-dex-ui-v*"
+    paths:
+      - "packages/cross-chain-dex-ui/**"
+      - ".github/workflows/cross-chain-dex-ui--docker-build.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  attestations: write
+  contents: read
+
+env:
+  DOCKER_REGISTRY: docker.io
+  DOCKER_REPOSITORY: nethermind/surge-cross-chain-dex-ui
+  DOCKER_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
+jobs:
+  build:
+    name: Build and push docker image
+    runs-on: ${{ matrix.os }}
+    if: github.repository == 'NethermindEth/surge-taiko-mono'
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux/amd64
+          - os: ubuntu-24.04-arm
+            platform: linux/arm64
+    steps:
+      - name: Prepare Environment
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.11.1
+        with:
+          version: v0.29.1
+          cache-binary: false
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}
+          tags: |
+            type=sha
+            type=ref,event=pr
+            type=ref,event=branch
+            type=ref,event=tag
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          platforms: ${{ matrix.platform }}
+          context: packages/cross-chain-dex-ui
+          target: builder
+          push: true
+          tags: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }},push-by-digest=true,name-canonical=true,push=true
+          # All values come from workflow_dispatch inputs (with .env.example defaults).
+          build-args: |
+            VITE_L1_RPC_URL=${{ inputs.viteL1RpcUrl }}
+            VITE_L2_RPC_URL=${{ inputs.viteL2RpcUrl }}
+            VITE_BUILDER_RPC_URL=${{ inputs.viteBuilderRpcUrl || 'http://localhost:4545' }}
+            VITE_BUILDER_API_URL=${{ inputs.viteBuilderApiUrl }}
+            VITE_CHAIN_ID=${{ inputs.viteChainId || '11155111' }}
+            VITE_L1_CHAIN_NAME=${{ inputs.viteL1ChainName || '' }}
+            VITE_L1_NATIVE_SYMBOL=${{ inputs.viteL1NativeSymbol || '' }}
+            VITE_L1_NATIVE_NAME=${{ inputs.viteL1NativeName || '' }}
+            VITE_L1_NATIVE_LOGO=${{ inputs.viteL1NativeLogo || '' }}
+            VITE_SAFE_PROXY_FACTORY=${{ inputs.viteSafeProxyFactory || '0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67' }}
+            VITE_SAFE_SINGLETON=${{ inputs.viteSafeSingleton || '0x29fcB43b46531BcA003ddC8FCB67FFE91900C762' }}
+            VITE_SAFE_MULTISEND=${{ inputs.viteSafeMultisend || '0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526' }}
+            VITE_SAFE_FALLBACK_HANDLER=${{ inputs.viteSafeFallbackHandler || '0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99' }}
+            VITE_USER_OPS_FACTORY=${{ inputs.viteUserOpsFactory || '0x0000000000000000000000000000000000000000' }}
+            VITE_L1_VAULT=${{ inputs.viteL1Vault || '0x0000000000000000000000000000000000000000' }}
+            VITE_USDC_TOKEN=${{ inputs.viteUsdcToken || '0x0000000000000000000000000000000000000000' }}
+            VITE_USDC_DECIMALS=${{ inputs.viteUsdcDecimals || '18' }}
+            VITE_SIMPLE_DEX=${{ inputs.viteSimpleDex || '0x0000000000000000000000000000000000000000' }}
+            VITE_L1_BRIDGE=${{ inputs.viteL1Bridge || '0x0000000000000000000000000000000000000000' }}
+            VITE_L2_CHAIN_ID=${{ inputs.viteL2ChainId || '' }}
+            VITE_L2_RELAY=${{ inputs.viteL2Relay || '0x0000000000000000000000000000000000000000' }}
+            VITE_WALLETCONNECT_PROJECT_ID=${{ inputs.viteWalletConnectProjectId }}
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v5
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v6
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.11.1
+        with:
+          version: v0.29.1
+          cache-binary: false
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}
+          tags: |
+            type=raw,value=latest
+            type=ref,event=branch
+            type=ref,event=pr
+            type=ref,event=tag
+            type=sha
+
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+            docker buildx imagetools inspect ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}:$VERSION
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            docker buildx imagetools inspect ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}:latest
+          else
+            echo "Skipping inspect for PR builds"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## Docker build completed :green_circle:" >> $GITHUB_STEP_SUMMARY
+          echo "### Tags" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" | while IFS= read -r TAG; do
+            echo "- $TAG" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "### Notes" >> $GITHUB_STEP_SUMMARY
+          echo "- Image: \`${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}\`" >> $GITHUB_STEP_SUMMARY
