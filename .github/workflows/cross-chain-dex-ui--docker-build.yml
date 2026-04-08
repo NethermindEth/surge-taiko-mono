@@ -6,22 +6,22 @@ on:
       viteL1RpcUrl:
         description: "L1 RPC URL (VITE_L1_RPC_URL)"
         required: false
-        default: ""
+        default: "http://localhost:8545"
         type: string
       viteL2RpcUrl:
         description: "L2 RPC URL (VITE_L2_RPC_URL)"
         required: false
-        default: ""
+        default: "http://localhost:8547"
         type: string
       viteBuilderRpcUrl:
         description: "Builder RPC URL (VITE_BUILDER_RPC_URL)"
         required: false
-        default: ""
+        default: "http://localhost:4545"
         type: string
       viteBuilderApiUrl:
         description: "Builder API URL (VITE_BUILDER_API_URL)"
         required: false
-        default: ""
+        default: "http://localhost:8545"
         type: string
       viteChainId:
         description: "L1 chain ID (VITE_CHAIN_ID)"
@@ -31,7 +31,7 @@ on:
       viteL1ChainName:
         description: "L1 chain display name (VITE_L1_CHAIN_NAME)"
         required: false
-        default: ""
+        default: "Surge"
         type: string
       viteL1NativeSymbol:
         description: "L1 native token symbol (VITE_L1_NATIVE_SYMBOL)"
@@ -46,7 +46,7 @@ on:
       viteL1NativeLogo:
         description: "L1 native token logo path (VITE_L1_NATIVE_LOGO)"
         required: false
-        default: ""
+        default: "/eth-logo.svg"
         type: string
       viteSafeProxyFactory:
         description: "Safe proxy factory address (VITE_SAFE_PROXY_FACTORY)"
@@ -101,7 +101,7 @@ on:
       viteL2ChainId:
         description: "L2 chain ID (VITE_L2_CHAIN_ID)"
         required: false
-        default: ""
+        default: "763374"
         type: string
       viteL2Relay:
         description: "L2 relay contract address (VITE_L2_RELAY)"
@@ -202,15 +202,15 @@ jobs:
           outputs: type=image,name=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }},push-by-digest=true,name-canonical=true,push=true
           # All values come from workflow_dispatch inputs (with .env.example defaults).
           build-args: |
-            VITE_L1_RPC_URL=${{ inputs.viteL1RpcUrl }}
-            VITE_L2_RPC_URL=${{ inputs.viteL2RpcUrl }}
+            VITE_L1_RPC_URL=${{ inputs.viteL1RpcUrl || 'http://localhost:8545' }}
+            VITE_L2_RPC_URL=${{ inputs.viteL2RpcUrl || 'http://localhost:8547' }}
             VITE_BUILDER_RPC_URL=${{ inputs.viteBuilderRpcUrl || 'http://localhost:4545' }}
-            VITE_BUILDER_API_URL=${{ inputs.viteBuilderApiUrl }}
+            VITE_BUILDER_API_URL=${{ inputs.viteBuilderApiUrl || 'http://localhost:8545' }}
             VITE_CHAIN_ID=${{ inputs.viteChainId || '11155111' }}
-            VITE_L1_CHAIN_NAME=${{ inputs.viteL1ChainName || '' }}
-            VITE_L1_NATIVE_SYMBOL=${{ inputs.viteL1NativeSymbol || '' }}
-            VITE_L1_NATIVE_NAME=${{ inputs.viteL1NativeName || '' }}
-            VITE_L1_NATIVE_LOGO=${{ inputs.viteL1NativeLogo || '' }}
+            VITE_L1_CHAIN_NAME=${{ inputs.viteL1ChainName || 'Surge' }}
+            VITE_L1_NATIVE_SYMBOL=${{ inputs.viteL1NativeSymbol || 'ETH' }}
+            VITE_L1_NATIVE_NAME=${{ inputs.viteL1NativeName || 'Ether' }}
+            VITE_L1_NATIVE_LOGO=${{ inputs.viteL1NativeLogo || '/eth-logo.svg' }}
             VITE_SAFE_PROXY_FACTORY=${{ inputs.viteSafeProxyFactory || '0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67' }}
             VITE_SAFE_SINGLETON=${{ inputs.viteSafeSingleton || '0x29fcB43b46531BcA003ddC8FCB67FFE91900C762' }}
             VITE_SAFE_MULTISEND=${{ inputs.viteSafeMultisend || '0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526' }}
@@ -221,9 +221,9 @@ jobs:
             VITE_USDC_DECIMALS=${{ inputs.viteUsdcDecimals || '18' }}
             VITE_SIMPLE_DEX=${{ inputs.viteSimpleDex || '0x0000000000000000000000000000000000000000' }}
             VITE_L1_BRIDGE=${{ inputs.viteL1Bridge || '0x0000000000000000000000000000000000000000' }}
-            VITE_L2_CHAIN_ID=${{ inputs.viteL2ChainId || '' }}
+            VITE_L2_CHAIN_ID=${{ inputs.viteL2ChainId || '763374' }}
             VITE_L2_RELAY=${{ inputs.viteL2Relay || '0x0000000000000000000000000000000000000000' }}
-            VITE_WALLETCONNECT_PROJECT_ID=${{ inputs.viteWalletConnectProjectId }}
+            VITE_WALLETCONNECT_PROJECT_ID=${{ inputs.viteWalletConnectProjectId || '' }}
 
       - name: Export digest
         run: |
