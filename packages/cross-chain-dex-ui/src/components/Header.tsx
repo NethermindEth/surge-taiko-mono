@@ -16,7 +16,7 @@ interface HeaderProps {
 
 export function Header({ onSetupWallet }: HeaderProps) {
   const { smartWallet, isConnected, ownerAddress, accountMode, clearAccountMode } = useSmartWallet();
-  const { address, chainId } = useAccount();
+  const { chainId } = useAccount();
   const { disconnect } = useDisconnect();
   const { executeWithdraw, isPending } = useUserOp(accountMode);
   const { isDisclaimerOpen, requireDisclaimer, onAccept, onCancel } = useDisclaimer();

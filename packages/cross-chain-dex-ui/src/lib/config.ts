@@ -1,7 +1,7 @@
 import { http } from 'wagmi';
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { createPublicClient, defineChain } from 'viem';
-import { L1_RPC_URL, L2_RPC_URL, CHAIN_ID, L1_CHAIN_NAME, L1_NATIVE_SYMBOL, L1_NATIVE_NAME } from './constants';
+import { L1_RPC_URL, L2_RPC_URL, CHAIN_ID, L1_CHAIN_NAME, L1_NATIVE_SYMBOL, L1_NATIVE_NAME, L2_CHAIN_ID } from './constants';
 
 // Define custom chain for L1
 export const surgeL1Chain = defineChain({
@@ -19,7 +19,7 @@ export const surgeL1Chain = defineChain({
 
 // Define L2 chain
 export const surgeL2Chain = defineChain({
-  id: Number(import.meta.env.VITE_L2_CHAIN_ID || '763374'),
+  id: L2_CHAIN_ID,
   name: 'Surge L2',
   nativeCurrency: { decimals: 18, name: L1_NATIVE_NAME, symbol: L1_NATIVE_SYMBOL },
   rpcUrls: {
