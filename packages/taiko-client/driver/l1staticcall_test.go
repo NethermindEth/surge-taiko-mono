@@ -313,7 +313,7 @@ func (s *DriverTestSuite) TestL1STATICCALLGasIncludesL1Cost() {
 	s.ProposeAndInsertValidBlock(s.p, s.d.ChainSyncer().EventSyncer())
 
 	calldata := buildL1STATICCALLCalldata(l1TestContractAddr, l1Head.Number, nil)
-	tx, err := testutils.SendDynamicFeeTx(
+	_, err = testutils.SendDynamicFeeTx(
 		s.RPCClient.L2,
 		s.TestAddrPrivKey,
 		&l1STATICCALLPrecompileAddr,
@@ -328,15 +328,35 @@ func (s *DriverTestSuite) TestL1STATICCALLGasIncludesL1Cost() {
 	}, backoff.NewExponentialBackOff()))
 	s.Nil(s.RPCClient.WaitTillL2ExecutionEngineSynced(context.Background()))
 
-	receipt, err := s.RPCClient.L2.TransactionReceipt(context.Background(), tx.Hash())
+	// Use TransactionInBlock rather than tx.Hash() because the proposer re-encodes
+	// txs via blob tx lists, which can change the hash.
+	l2Head, err := s.RPCClient.L2.HeaderByNumber(context.Background(), nil)
+	s.Nil(err)
+
+	txCount, err := s.RPCClient.L2.TransactionCount(context.Background(), l2Head.Hash())
+	s.Nil(err)
+	s.GreaterOrEqual(txCount, uint(2), "block should have anchor tx + L1STATICCALL tx")
+
+	var userTx *types.Transaction
+	for idx := uint(0); idx < txCount; idx++ {
+		t, err := s.RPCClient.L2.TransactionInBlock(context.Background(), l2Head.Hash(), idx)
+		s.Nil(err)
+		if t.To() != nil && *t.To() == l1STATICCALLPrecompileAddr {
+			userTx = t
+			break
+		}
+	}
+	s.NotNil(userTx, "L1STATICCALL tx not found in block")
+
+	receipt, err := s.RPCClient.L2.TransactionReceipt(context.Background(), userTx.Hash())
 	s.Nil(err)
 	s.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 
-	// Static overhead alone is ~14,000 (base 2000 + per-call 10000 + intrinsic tx gas).
+	// Static overhead alone is ~33,000 (intrinsic 21000 + base 2000 + per-call 10000).
 	// With dynamic L1 gas charging, the minimal view contract's SLOAD (~2100 gas on L1)
-	// should push gasUsed noticeably above the old fixed model.
+	// should push gasUsed above this baseline.
 	s.T().Logf("L1STATICCALL gasUsed=%d (should include L1 consumed gas)", receipt.GasUsed)
-	s.Greater(receipt.GasUsed, uint64(14_000),
+	s.Greater(receipt.GasUsed, uint64(33_000),
 		"gasUsed should exceed static overhead, proving L1 gas is charged")
 }
 
