@@ -352,12 +352,12 @@ func (s *DriverTestSuite) TestL1STATICCALLGasIncludesL1Cost() {
 	s.Nil(err)
 	s.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 
-	// Static overhead alone is ~33,000 (intrinsic 21000 + base 2000 + per-call 10000).
+	// Static overhead alone is ~33,460 (intrinsic 21000 + ~460 calldata gas + base 2000 + per-call 10000).
 	// With dynamic L1 gas charging, the minimal view contract's SLOAD (~2100 gas on L1)
-	// should push gasUsed above this baseline.
+	// should push gasUsed well above this baseline.
 	s.T().Logf("L1STATICCALL gasUsed=%d (should include L1 consumed gas)", receipt.GasUsed)
-	s.Greater(receipt.GasUsed, uint64(33_000),
-		"gasUsed should exceed static overhead, proving L1 gas is charged")
+	s.Greater(receipt.GasUsed, uint64(34_000),
+		"gasUsed should exceed static overhead (~33,460), proving L1 gas is charged")
 }
 
 // TestL1STATICCALLExpensiveContractHigherGas verifies that calling a more expensive L1 contract
@@ -386,7 +386,7 @@ func (s *DriverTestSuite) TestL1STATICCALLExpensiveContractHigherGas() {
 	s.Nil(err)
 	s.ProposeAndInsertValidBlock(s.p, s.d.ChainSyncer().EventSyncer())
 
-	// eth_call with cheap contract.
+	// EstimateGas with cheap contract.
 	cheapCalldata := buildL1STATICCALLCalldata(l1TestContractAddr, l1Head.Number, nil)
 	cheapGas, err := s.RPCClient.L2.EstimateGas(context.Background(), ethereum.CallMsg{
 		From: common.Address{},
@@ -396,7 +396,7 @@ func (s *DriverTestSuite) TestL1STATICCALLExpensiveContractHigherGas() {
 	})
 	s.Nil(err)
 
-	// eth_call with expensive contract.
+	// EstimateGas with expensive contract.
 	expensiveCalldata := buildL1STATICCALLCalldata(l1ExpensiveContractAddr, l1Head.Number, nil)
 	expensiveGas, err := s.RPCClient.L2.EstimateGas(context.Background(), ethereum.CallMsg{
 		From: common.Address{},
@@ -431,9 +431,9 @@ func (s *DriverTestSuite) TestL1STATICCALLLowGasLimitFails() {
 
 	calldata := buildL1STATICCALLCalldata(l1ExpensiveContractAddr, l1Head.Number, nil)
 
-	// With only 13,000 gas total: after base (2000) + static overhead (10000),
-	// only ~1,000 gas remains for the L1 call. The 10-SLOAD contract needs ~21,000.
-	// The L1 call should OOG, causing precompile failure.
+	// With only 13,000 gas in eth_call (no intrinsic tx gas): after base (2000) +
+	// static overhead (10000), only ~1,000 gas remains for the L1 call.
+	// The 10-SLOAD contract needs ~21,000 — the L1 call should OOG.
 	_, err = s.RPCClient.L2.CallContract(context.Background(), ethereum.CallMsg{
 		To:   &l1STATICCALLPrecompileAddr,
 		Data: calldata,
