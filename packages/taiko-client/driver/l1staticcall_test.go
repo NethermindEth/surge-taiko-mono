@@ -288,6 +288,171 @@ func (s *DriverTestSuite) TestL1STATICCALLWithCalldataPassthrough() {
 	s.T().Logf("Calldata passthrough: slot1→0x%x, slot2→0x%x", result1, result2)
 }
 
+// l1ExpensiveContractAddr is the address for the expensive (multi-SLOAD) contract.
+var l1ExpensiveContractAddr = common.HexToAddress("0x7777777777777777777777777777777777777777")
+
+// expensiveViewContractCode does 10 cold SLOADs (slots 0-9), returns slot 9 value.
+// Each cold SLOAD costs 2100 gas on L1 → total ~21,000+ gas.
+// Assembly: (PUSH1 n SLOAD POP) × 9, then PUSH1 9 SLOAD PUSH0 MSTORE PUSH1 0x20 PUSH0 RETURN
+var expensiveViewContractCode = common.FromHex(
+	"0x6000545060015450600254506003545060045450600554506006545060075450600854506009545F5260205FF3",
+)
+
+// TestL1STATICCALLGasIncludesL1Cost verifies that a transaction calling L1STATICCALL
+// is charged more than just the static overhead, proving L1 consumed gas is included.
+func (s *DriverTestSuite) TestL1STATICCALLGasIncludesL1Cost() {
+	if os.Getenv("L2_NODE") != testutils.L2NodeNMC {
+		s.T().Skip("L1STATICCALL only supported on NMC")
+	}
+
+	expectedValue := common.BigToHash(big.NewInt(0xfeedface))
+	s.setupL1ViewContract(expectedValue)
+
+	l1Head, err := s.RPCClient.L1.HeaderByNumber(context.Background(), nil)
+	s.Nil(err)
+	s.ProposeAndInsertValidBlock(s.p, s.d.ChainSyncer().EventSyncer())
+
+	calldata := buildL1STATICCALLCalldata(l1TestContractAddr, l1Head.Number, nil)
+	_, err = testutils.SendDynamicFeeTx(
+		s.RPCClient.L2,
+		s.TestAddrPrivKey,
+		&l1STATICCALLPrecompileAddr,
+		common.Big0,
+		calldata,
+	)
+	s.Nil(err)
+
+	s.ProposeValidBlock(s.p)
+	s.Nil(backoff.Retry(func() error {
+		return s.d.ChainSyncer().EventSyncer().ProcessL1Blocks(context.Background())
+	}, backoff.NewExponentialBackOff()))
+	s.Nil(s.RPCClient.WaitTillL2ExecutionEngineSynced(context.Background()))
+
+	// Use TransactionInBlock rather than tx.Hash() because the proposer re-encodes
+	// txs via blob tx lists, which can change the hash.
+	l2Head, err := s.RPCClient.L2.HeaderByNumber(context.Background(), nil)
+	s.Nil(err)
+
+	txCount, err := s.RPCClient.L2.TransactionCount(context.Background(), l2Head.Hash())
+	s.Nil(err)
+	s.GreaterOrEqual(txCount, uint(2), "block should have anchor tx + L1STATICCALL tx")
+
+	var userTx *types.Transaction
+	for idx := uint(0); idx < txCount; idx++ {
+		t, err := s.RPCClient.L2.TransactionInBlock(context.Background(), l2Head.Hash(), idx)
+		s.Nil(err)
+		if t.To() != nil && *t.To() == l1STATICCALLPrecompileAddr {
+			userTx = t
+			break
+		}
+	}
+	s.NotNil(userTx, "L1STATICCALL tx not found in block")
+
+	receipt, err := s.RPCClient.L2.TransactionReceipt(context.Background(), userTx.Hash())
+	s.Nil(err)
+	s.Equal(types.ReceiptStatusSuccessful, receipt.Status)
+
+	// Static overhead alone is ~33,460 (intrinsic 21000 + ~460 calldata gas + base 2000 + per-call 10000).
+	// With dynamic L1 gas charging, the minimal view contract's SLOAD (~2100 gas on L1)
+	// should push gasUsed well above this baseline.
+	s.T().Logf("L1STATICCALL gasUsed=%d (should include L1 consumed gas)", receipt.GasUsed)
+	s.Greater(receipt.GasUsed, uint64(34_000),
+		"gasUsed should exceed static overhead (~33,460), proving L1 gas is charged")
+}
+
+// TestL1STATICCALLExpensiveContractHigherGas verifies that calling a more expensive L1 contract
+// (10 SLOADs) results in higher gas consumption than a cheap one (1 SLOAD).
+func (s *DriverTestSuite) TestL1STATICCALLExpensiveContractHigherGas() {
+	if os.Getenv("L2_NODE") != testutils.L2NodeNMC {
+		s.T().Skip("L1STATICCALL only supported on NMC")
+	}
+
+	// Deploy cheap contract (1 SLOAD).
+	storageVal := common.BigToHash(big.NewInt(42))
+	s.setupL1ViewContract(storageVal)
+
+	// Deploy expensive contract (10 SLOADs).
+	s.Nil(s.RPCClient.L1.CallContext(
+		context.Background(), nil, "anvil_setCode",
+		l1ExpensiveContractAddr, common.Bytes2Hex(expensiveViewContractCode),
+	))
+	s.Nil(s.RPCClient.L1.CallContext(
+		context.Background(), nil, "anvil_setStorageAt",
+		l1ExpensiveContractAddr, common.BigToHash(big.NewInt(9)), storageVal,
+	))
+	s.L1Mine()
+
+	l1Head, err := s.RPCClient.L1.HeaderByNumber(context.Background(), nil)
+	s.Nil(err)
+	s.ProposeAndInsertValidBlock(s.p, s.d.ChainSyncer().EventSyncer())
+
+	// EstimateGas with cheap contract.
+	cheapCalldata := buildL1STATICCALLCalldata(l1TestContractAddr, l1Head.Number, nil)
+	cheapGas, err := s.RPCClient.L2.EstimateGas(context.Background(), ethereum.CallMsg{
+		From: common.Address{},
+		To:   &l1STATICCALLPrecompileAddr,
+		Data: cheapCalldata,
+		Gas:  500_000,
+	})
+	s.Nil(err)
+
+	// EstimateGas with expensive contract.
+	expensiveCalldata := buildL1STATICCALLCalldata(l1ExpensiveContractAddr, l1Head.Number, nil)
+	expensiveGas, err := s.RPCClient.L2.EstimateGas(context.Background(), ethereum.CallMsg{
+		From: common.Address{},
+		To:   &l1STATICCALLPrecompileAddr,
+		Data: expensiveCalldata,
+		Gas:  500_000,
+	})
+	s.Nil(err)
+
+	s.T().Logf("Gas estimates: cheap=%d, expensive=%d", cheapGas, expensiveGas)
+	s.Greater(expensiveGas, cheapGas,
+		"Expensive L1 contract (10 SLOADs) should cost more gas than cheap one (1 SLOAD)")
+}
+
+// TestL1STATICCALLLowGasLimitFails verifies that calling an expensive L1 contract with
+// insufficient gas fails — the remaining L2 gas bounds the L1 call's gas limit.
+func (s *DriverTestSuite) TestL1STATICCALLLowGasLimitFails() {
+	if os.Getenv("L2_NODE") != testutils.L2NodeNMC {
+		s.T().Skip("L1STATICCALL only supported on NMC")
+	}
+
+	// Deploy expensive contract (10 SLOADs, ~21,000 L1 gas).
+	s.Nil(s.RPCClient.L1.CallContext(
+		context.Background(), nil, "anvil_setCode",
+		l1ExpensiveContractAddr, common.Bytes2Hex(expensiveViewContractCode),
+	))
+	s.L1Mine()
+
+	l1Head, err := s.RPCClient.L1.HeaderByNumber(context.Background(), nil)
+	s.Nil(err)
+	s.ProposeAndInsertValidBlock(s.p, s.d.ChainSyncer().EventSyncer())
+
+	calldata := buildL1STATICCALLCalldata(l1ExpensiveContractAddr, l1Head.Number, nil)
+
+	// With only 13,000 gas in eth_call (no intrinsic tx gas): after base (2000) +
+	// static overhead (10000), only ~1,000 gas remains for the L1 call.
+	// The 10-SLOAD contract needs ~21,000 — the L1 call should OOG.
+	_, err = s.RPCClient.L2.CallContract(context.Background(), ethereum.CallMsg{
+		To:   &l1STATICCALLPrecompileAddr,
+		Data: calldata,
+		Gas:  13_000,
+	}, nil)
+	s.NotNil(err, "Expensive L1 call with insufficient gas should fail")
+	s.T().Logf("Low gas error (expected): %v", err)
+
+	// Same call with plenty of gas should succeed.
+	result, err := s.RPCClient.L2.CallContract(context.Background(), ethereum.CallMsg{
+		To:   &l1STATICCALLPrecompileAddr,
+		Data: calldata,
+		Gas:  500_000,
+	}, nil)
+	s.Nil(err, "Same L1 call with sufficient gas should succeed")
+	s.NotEmpty(result)
+	s.T().Logf("High gas success: returned %d bytes", len(result))
+}
+
 // TestL1STATICCALLZeroBlockNumber verifies behavior when block number 0 is requested.
 func (s *DriverTestSuite) TestL1STATICCALLZeroBlockNumber() {
 	if os.Getenv("L2_NODE") != testutils.L2NodeNMC {

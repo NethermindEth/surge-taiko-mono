@@ -73,9 +73,9 @@ services:
 
   l2_nmc:
     container_name: l2_nmc
-    image: nethermindeth/nethermind:master
+    image: ${NMC_IMAGE:-nethermindeth/nethermind:master}
     restart: unless-stopped
-    pull_policy: always
+    pull_policy: ${NMC_PULL_POLICY:-always}
     volumes:
       - .:/host
       - ./nmc:/nethermind/configs
