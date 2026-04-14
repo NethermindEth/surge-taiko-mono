@@ -110,10 +110,12 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         // ---------------------------------------------------------------
         RollupContracts memory rollupContracts = deployRollupContracts(emptyImpl);
 
-        // Deploy internal verifiers (needed for SurgeVerifier, skipped in mock mode)
+        // Deploy internal verifiers
         // ---------------------------------------------------------------
         VerifierContracts memory verifierContracts;
-        if (!mockProofMode) {
+        if (mockProofMode) {
+            verifierContracts = deployMockVerifier(rollupContracts);
+        } else {
             verifierContracts = deployInternalVerifiers(contractOwner);
         }
 
@@ -125,10 +127,15 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         // Register L2 addresses in the resolver
         setupSharedResolver(sharedContracts, contractOwner);
 
-        // Setup proof verifier with internal verifiers (skipped in mock mode)
+        // Setup proof verifier with internal verifiers
+        // (mock mode already registered the dummy in deployMockVerifier)
         // ---------------------------------------------------------------
         if (!mockProofMode) {
             setupProofVerifier(rollupContracts, verifierContracts, contractOwner);
+        } else {
+            // Transfer SurgeVerifier ownership
+            SurgeVerifier(rollupContracts.proofVerifier).transferOwnership(contractOwner);
+            console2.log("** SurgeVerifier ownership transfer initiated to:", contractOwner);
         }
 
         // Deploy inbox implementation and activate
@@ -226,19 +233,32 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         // ---------------------------------------------------------------
         rollupContracts.inbox = deployProxy({ name: "real_time_inbox", impl: _emptyImpl, data: "" });
 
-        // Deploy proof verifier
+        // Deploy proof verifier — always SurgeVerifier so the inbox type cast works.
+        // In mock mode the dummy is registered as a sub-verifier below.
         // ---------------------------------------------------------------
-        if (mockProofMode) {
-            rollupContracts.proofVerifier = address(new ProofVerifierDummy(mockProofSigner));
-            console2.log("** Deployed ProofVerifierDummy:", rollupContracts.proofVerifier);
-            console2.log("** Mock proof signer:", mockProofSigner);
-            writeJson("proof_verifier_dummy", rollupContracts.proofVerifier);
-        } else {
-            rollupContracts.proofVerifier =
-                address(new SurgeVerifier(rollupContracts.inbox, numProofsThreshold, msg.sender));
-            console2.log("** Deployed SurgeVerifier:", rollupContracts.proofVerifier);
-            writeJson("surge_verifier", rollupContracts.proofVerifier);
-        }
+        rollupContracts.proofVerifier =
+            address(new SurgeVerifier(rollupContracts.inbox, numProofsThreshold, msg.sender));
+        console2.log("** Deployed SurgeVerifier:", rollupContracts.proofVerifier);
+        writeJson("surge_verifier", rollupContracts.proofVerifier);
+    }
+
+    /// @dev Deploys the ECDSA dummy verifier and registers it in SurgeVerifier
+    ///      under the configured proof bit flag so the offchain pipeline works unchanged.
+    function deployMockVerifier(RollupContracts memory _rollupContracts)
+        private
+        returns (VerifierContracts memory verifierContracts)
+    {
+        ProofVerifierDummy dummy = new ProofVerifierDummy(mockProofSigner, l2ChainId);
+        console2.log("** Deployed ProofVerifierDummy:", address(dummy));
+        console2.log("** Mock proof signer:", mockProofSigner);
+        writeJson("proof_verifier_dummy", address(dummy));
+
+        // Register in SurgeVerifier under the MOCK_ECDSA bit flag
+        SurgeVerifier surgeVerifier = SurgeVerifier(_rollupContracts.proofVerifier);
+        surgeVerifier.setVerifier(
+            LibProofBitmap.ProofBitmap.wrap(surgeVerifier.MOCK_ECDSA()), address(dummy)
+        );
+        console2.log("** Registered dummy verifier in SurgeVerifier (MOCK_ECDSA)");
     }
 
     /// @dev The deployer is the initial owner of the Zisk verifier.
@@ -400,9 +420,8 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         ownerContracts[4] = _sharedContracts.erc1155Vault;
 
         // Build list of contracts with pending ownership transfer
-        // In mock mode, proofVerifier and ziskRethVerifier are not ownable
         address[] memory pendingOwnerContracts = new address[](4);
-        pendingOwnerContracts[0] = mockProofMode ? address(0) : _rollupContracts.proofVerifier;
+        pendingOwnerContracts[0] = _rollupContracts.proofVerifier;
         pendingOwnerContracts[1] = _rollupContracts.inbox;
         pendingOwnerContracts[2] = _sharedContracts.sharedResolver;
         pendingOwnerContracts[3] = mockProofMode ? address(0) : _verifierContracts.ziskRethVerifier;
