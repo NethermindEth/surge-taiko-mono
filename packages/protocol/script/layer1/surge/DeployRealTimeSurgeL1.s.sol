@@ -54,9 +54,6 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
     // ---------------------------------------------------------------
     bool internal immutable mockProofMode = vm.envOr("MOCK_PROOF_MODE", false);
     address internal immutable mockProofSigner = vm.envOr("MOCK_PROOF_SIGNER", address(0));
-    /// @dev Bit flag to register the dummy verifier under (default: ZISK_RETH = 4).
-    ///      Must match PROOF_TYPE in the Catalyst .env.
-    uint8 internal immutable mockProofBitFlag = uint8(vm.envOr("MOCK_PROOF_BIT_FLAG", uint256(4)));
 
     // SurgeVerifier configuration
     // ---------------------------------------------------------------
@@ -254,14 +251,14 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         ProofVerifierDummy dummy = new ProofVerifierDummy(mockProofSigner, l2ChainId);
         console2.log("** Deployed ProofVerifierDummy:", address(dummy));
         console2.log("** Mock proof signer:", mockProofSigner);
-        console2.log("** Mock proof bit flag:", mockProofBitFlag);
         writeJson("proof_verifier_dummy", address(dummy));
 
-        // Register in SurgeVerifier under the configured bit flag
-        SurgeVerifier(_rollupContracts.proofVerifier).setVerifier(
-            LibProofBitmap.ProofBitmap.wrap(mockProofBitFlag), address(dummy)
+        // Register in SurgeVerifier under the MOCK_ECDSA bit flag
+        SurgeVerifier surgeVerifier = SurgeVerifier(_rollupContracts.proofVerifier);
+        surgeVerifier.setVerifier(
+            LibProofBitmap.ProofBitmap.wrap(surgeVerifier.MOCK_ECDSA()), address(dummy)
         );
-        console2.log("** Registered dummy verifier in SurgeVerifier");
+        console2.log("** Registered dummy verifier in SurgeVerifier (MOCK_ECDSA)");
     }
 
     /// @dev The deployer is the initial owner of the Zisk verifier.

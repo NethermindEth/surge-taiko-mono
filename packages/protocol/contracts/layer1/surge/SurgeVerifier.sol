@@ -15,9 +15,10 @@ contract SurgeVerifier is Ownable2Step {
     // Proof bitflags for LibProofBitmap
     // ---------------------------------------------------------------
 
-    uint8 public constant RISC0_RETH = 1; // 0b00000001
-    uint8 public constant SP1_RETH = 1 << 1; // 0b00000010
-    uint8 public constant ZISK_RETH = 1 << 2; // 0b00000100
+    uint8 public constant MOCK_ECDSA = 1; // 0b00000001
+    uint8 public constant RISC0_RETH = 1 << 1; // 0b00000010
+    uint8 public constant SP1_RETH = 1 << 2; // 0b00000100
+    uint8 public constant ZISK_RETH = 1 << 3; // 0b00001000
 
     // ---------------------------------------------------------------
     // Types and storage
