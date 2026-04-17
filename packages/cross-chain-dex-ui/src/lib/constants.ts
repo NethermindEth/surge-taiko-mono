@@ -21,6 +21,15 @@ export const USDC_TOKEN: Token = {
   logo: '/usdc-logo.svg',
 };
 
+/// L2 bridged USDC (bUSDC) — different contract address from the L1 canonical token.
+export const L2_USDC_TOKEN: Token = {
+  symbol: 'bUSDC',
+  name: 'Bridged USDC',
+  decimals: Number(import.meta.env.VITE_USDC_DECIMALS || '18'),
+  address: (import.meta.env.VITE_L2_USDC_TOKEN || import.meta.env.VITE_USDC_TOKEN) as `0x${string}`,
+  logo: '/usdc-logo.svg',
+};
+
 export const TOKENS = [ETH_TOKEN, USDC_TOKEN];
 
 // Fee constants (matching SimpleDEX contract)
@@ -38,6 +47,12 @@ export const SAFE_FALLBACK_HANDLER = (import.meta.env.VITE_SAFE_FALLBACK_HANDLER
 export const L1_VAULT = import.meta.env.VITE_L1_VAULT as `0x${string}`;
 export const SIMPLE_DEX = import.meta.env.VITE_SIMPLE_DEX as `0x${string}`;
 
+// L2→L1→L2 swap-venue addresses
+export const L2_VAULT = import.meta.env.VITE_L2_VAULT as `0x${string}`;
+export const L1_ROUTER = import.meta.env.VITE_L1_ROUTER as `0x${string}`;
+export const L1_DEX_WETH = import.meta.env.VITE_L1_DEX_WETH as `0x${string}`;
+export const L1_DEX_NAME = (import.meta.env.VITE_L1_DEX_NAME as string) || 'L1 DEX';
+
 // Bridge
 export const L1_BRIDGE = import.meta.env.VITE_L1_BRIDGE as `0x${string}`;
 export const L2_BRIDGE = (import.meta.env.VITE_L2_BRIDGE as `0x${string}`) || '0x7633740000000000000000000000000000000001';
@@ -48,9 +63,15 @@ export const L2_RELAY = (import.meta.env.VITE_L2_RELAY as `0x${string}`) || '0xF
 export const L1_RPC_URL = import.meta.env.VITE_L1_RPC_URL as string;
 export const L2_RPC_URL = import.meta.env.VITE_L2_RPC_URL as string;
 export const BUILDER_RPC_URL = import.meta.env.VITE_BUILDER_RPC_URL as string;
+/// Catalyst JSON-RPC for `surge_simulateReturnMessage`. Used only on the L2→L1→L2 venue.
+export const CATALYST_RPC_URL = import.meta.env.VITE_CATALYST_RPC_URL as string;
 
 // Chain ID
 export const CHAIN_ID = Number(import.meta.env.VITE_CHAIN_ID || '31337');
+
+/// Gas limit forced on L2-initiated cross-chain swaps. Estimation would fail because
+/// the Catalyst-injected fast signal isn't present at eth_estimateGas time.
+export const L2_SWAP_GAS_LIMIT = 3_000_000n;
 
 // Slippage tolerance (0.5%)
 export const DEFAULT_SLIPPAGE = 0.5;

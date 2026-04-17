@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Address, formatEther, formatUnits } from 'viem';
 import { ERC20ABI } from '../lib/contracts';
-import { USDC_TOKEN } from '../lib/constants';
+import { L2_USDC_TOKEN } from '../lib/constants';
 import { l2PublicClient } from '../lib/config';
 import { usePageVisible } from './usePageVisible';
 
@@ -39,10 +39,10 @@ export function useL2TokenBalances(smartWallet: Address | null): TokenBalances {
       setEthBalance(ethBal);
 
       // Fetch USDC balance on L2 (may not exist if token isn't bridged)
-      if (USDC_TOKEN.address && USDC_TOKEN.address !== '0x0000000000000000000000000000000000000000') {
+      if (L2_USDC_TOKEN.address && L2_USDC_TOKEN.address !== '0x0000000000000000000000000000000000000000') {
         try {
           const usdcBal = await l2PublicClient.readContract({
-            address: USDC_TOKEN.address,
+            address: L2_USDC_TOKEN.address,
             abi: ERC20ABI,
             functionName: 'balanceOf',
             args: [smartWallet],
@@ -73,7 +73,7 @@ export function useL2TokenBalances(smartWallet: Address | null): TokenBalances {
     ethBalance,
     usdcBalance,
     ethFormatted: formatEther(ethBalance),
-    usdcFormatted: formatUnits(usdcBalance, USDC_TOKEN.decimals),
+    usdcFormatted: formatUnits(usdcBalance, L2_USDC_TOKEN.decimals),
     isLoading,
     error,
     refetch: fetchBalances,

@@ -9,48 +9,54 @@ interface SwapDetailsProps {
 }
 
 export function SwapDetails({ quote, direction, amountIn }: SwapDetailsProps) {
-  if (amountIn === 0n) return null;
-
   const inputToken = direction === 'ETH_TO_USDC' ? ETH_TOKEN : USDC_TOKEN;
   const outputToken = direction === 'ETH_TO_USDC' ? USDC_TOKEN : ETH_TOKEN;
   const inputSymbol = inputToken.symbol;
   const outputSymbol = outputToken.symbol;
+
+  const hasInput = amountIn > 0n;
 
   return (
     <div className="bg-surge-dark rounded-xl p-4 space-y-3">
       <div className="flex justify-between items-center text-sm">
         <span className="text-gray-400">Rate</span>
         <span className="text-white">
-          1 {inputSymbol} = {quote.rate.toFixed(6)} {outputSymbol}
+          {hasInput ? `1 ${inputSymbol} = ${quote.rate.toFixed(6)} ${outputSymbol}` : '-'}
         </span>
       </div>
 
       <div className="flex justify-between items-center text-sm">
         <span className="text-gray-400">Fee ({FEE_PERCENT}%)</span>
         <span className="text-white">
-          {Number(formatUnits(quote.fee, inputToken.decimals)).toFixed(6)} {inputSymbol}
+          {hasInput
+            ? `${Number(formatUnits(quote.fee, inputToken.decimals)).toFixed(6)} ${inputSymbol}`
+            : '-'}
         </span>
       </div>
 
       <div className="flex justify-between items-center text-sm">
         <span className="text-gray-400">Price Impact</span>
         <span
-          className={`${
-            quote.priceImpact > 5
-              ? 'text-red-500'
-              : quote.priceImpact > 1
-              ? 'text-yellow-500'
-              : 'text-green-500'
-          }`}
+          className={
+            hasInput
+              ? quote.priceImpact > 5
+                ? 'text-red-500'
+                : quote.priceImpact > 1
+                ? 'text-yellow-500'
+                : 'text-green-500'
+              : 'text-white'
+          }
         >
-          {quote.priceImpact.toFixed(2)}%
+          {hasInput ? `${quote.priceImpact.toFixed(2)}%` : '-'}
         </span>
       </div>
 
       <div className="flex justify-between items-center text-sm">
         <span className="text-gray-400">Expected Output</span>
         <span className="text-white font-medium">
-          {Number(formatUnits(quote.amountOut, outputToken.decimals)).toFixed(6)} {outputSymbol}
+          {hasInput
+            ? `${Number(formatUnits(quote.amountOut, outputToken.decimals)).toFixed(6)} ${outputSymbol}`
+            : '-'}
         </span>
       </div>
     </div>

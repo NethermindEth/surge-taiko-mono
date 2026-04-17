@@ -5,8 +5,7 @@ import toast from 'react-hot-toast';
 import { useSmartWallet } from '../context/SmartWalletContext';
 import { useSharedTokenBalances } from '../context/SmartWalletContext';
 import { useUserOp } from '../hooks/useUserOp';
-import { surgeL1Chain } from '../lib/config';
-import { ETH_TOKEN } from '../lib/constants';
+import { ETH_TOKEN, L1_CHAIN_NAME } from '../lib/constants';
 import { DisclaimerModal } from './DisclaimerModal';
 import { useDisclaimer } from '../hooks/useDisclaimer';
 
@@ -15,25 +14,30 @@ interface HeaderProps {
 }
 
 export function Header({ onSetupWallet }: HeaderProps) {
-  const { smartWallet, isConnected, ownerAddress, accountMode, clearAccountMode } = useSmartWallet();
-  const { chainId } = useAccount();
+  const { smartWallet, isConnected, ownerAddress, accountMode, clearAccountMode, selectedNetwork, setSelectedNetwork, l2WalletExists } = useSmartWallet();
+  const { address: eoaAddress } = useAccount();
   const { disconnect } = useDisconnect();
   const { executeWithdraw, isPending } = useUserOp(accountMode);
   const { isDisclaimerOpen, requireDisclaimer, onAccept, onCancel } = useDisclaimer();
-
-  // Smart wallet balances
   const { ethBalance, usdcBalance, ethFormatted, usdcFormatted } = useSharedTokenBalances();
 
-  const isWrongNetwork = isConnected && chainId !== surgeL1Chain.id;
+  const [swDropdownOpen, setSwDropdownOpen] = useState(false);
+  const [eoaDropdownOpen, setEoaDropdownOpen] = useState(false);
+  const [networkDropdownOpen, setNetworkDropdownOpen] = useState(false);
+  const swDropdownRef = useRef<HTMLDivElement>(null);
+  const eoaDropdownRef = useRef<HTMLDivElement>(null);
+  const networkDropdownRef = useRef<HTMLDivElement>(null);
 
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
+      if (swDropdownRef.current && !swDropdownRef.current.contains(e.target as Node)) {
+        setSwDropdownOpen(false);
+      }
+      if (eoaDropdownRef.current && !eoaDropdownRef.current.contains(e.target as Node)) {
+        setEoaDropdownOpen(false);
+      }
+      if (networkDropdownRef.current && !networkDropdownRef.current.contains(e.target as Node)) {
+        setNetworkDropdownOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClick);
@@ -46,7 +50,7 @@ export function Header({ onSetupWallet }: HeaderProps) {
       toast.error('No funds to withdraw');
       return;
     }
-    setDropdownOpen(false);
+    setSwDropdownOpen(false);
     const success = await executeWithdraw({ owner: ownerAddress, smartWallet, ethBalance, usdcBalance });
     if (success) {
       toast.success('Withdrawal submitted');
@@ -56,15 +60,63 @@ export function Header({ onSetupWallet }: HeaderProps) {
   return (
     <>
     <header className="w-full px-6 py-3 flex items-center justify-between border-b border-surge-border/30 bg-surge-dark/50 backdrop-blur-sm relative z-10">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 bg-gradient-to-br from-surge-primary to-surge-secondary rounded-lg shadow-lg shadow-surge-primary/20" />
-        <h1 className="text-xl font-bold text-white">Surge DEX</h1>
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-gradient-to-br from-surge-primary to-surge-secondary rounded-lg shadow-lg shadow-surge-primary/20" />
+          <h1 className="text-xl font-bold text-white">Surge DEX</h1>
+        </div>
+
+        {/* Network dropdown */}
+        <div className="relative" ref={networkDropdownRef}>
+          <button
+            onClick={() => { setNetworkDropdownOpen((p) => !p); setSwDropdownOpen(false); setEoaDropdownOpen(false); }}
+            className="flex items-center gap-2 px-3 py-1.5 bg-surge-card rounded-lg border border-surge-border/50 text-sm font-medium transition-colors hover:bg-surge-border/30"
+          >
+            <div className={`w-2 h-2 rounded-full ${selectedNetwork === 'l1' ? 'bg-emerald-400' : 'bg-cyan-400'}`} />
+            <span className="text-white">{selectedNetwork === 'l1' ? L1_CHAIN_NAME : 'Surge L2'}</span>
+            <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {networkDropdownOpen && (
+            <div className="absolute left-0 top-full mt-1 bg-surge-card border border-surge-border/50 rounded-lg shadow-xl shadow-black/30 overflow-hidden min-w-[180px] z-50">
+              <button
+                onClick={() => { setSelectedNetwork('l1'); setNetworkDropdownOpen(false); }}
+                className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 transition-colors ${
+                  selectedNetwork === 'l1' ? 'text-emerald-400 bg-emerald-500/10' : 'text-gray-300 hover:bg-surge-dark/50 hover:text-white'
+                }`}
+              >
+                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                {L1_CHAIN_NAME}
+              </button>
+              <button
+                onClick={() => { setSelectedNetwork('l2'); setNetworkDropdownOpen(false); }}
+                className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 transition-colors border-t border-surge-border/20 ${
+                  selectedNetwork === 'l2' ? 'text-cyan-400 bg-cyan-500/10' : 'text-gray-300 hover:bg-surge-dark/50 hover:text-white'
+                }`}
+              >
+                <div className="w-2 h-2 rounded-full bg-cyan-400" />
+                Surge L2
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        {/* Smart Wallet with balances + dropdown */}
-        {isConnected && !isWrongNetwork && smartWallet && (
-          <div className="hidden md:flex items-center relative" ref={dropdownRef}>
+      <div className="flex items-center gap-3">
+        {/* Smart Wallet: show "Setup on L2" button when on L2 network and L2 wallet doesn't exist */}
+        {isConnected && smartWallet && selectedNetwork === 'l2' && !l2WalletExists && (
+          <button
+            onClick={onSetupWallet}
+            className="px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded-lg text-sm font-medium transition-colors border border-cyan-500/30"
+          >
+            Setup Smart Wallet on L2
+          </button>
+        )}
+
+        {/* Smart Wallet display — show when wallet exists on the selected network */}
+        {isConnected && smartWallet && (selectedNetwork === 'l1' || l2WalletExists) && (
+          <div className="hidden md:flex items-center relative" ref={swDropdownRef}>
             <div className="flex items-center gap-2 px-3 py-2 bg-surge-card rounded-lg border border-surge-border/50">
               <div className="w-2 h-2 bg-green-500 rounded-full" />
               <button
@@ -73,7 +125,7 @@ export function Header({ onSetupWallet }: HeaderProps) {
                   toast.success('Smart wallet address copied!');
                 }}
                 className="text-sm text-gray-300 hover:text-white transition-colors flex items-center gap-1"
-                title="Click to copy address"
+                title="Click to copy"
               >
                 Smart Wallet: {smartWallet.slice(0, 6)}...{smartWallet.slice(-4)}
                 <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -87,22 +139,22 @@ export function Header({ onSetupWallet }: HeaderProps) {
               <span className="text-xs text-gray-400">
                 {parseFloat(usdcFormatted).toFixed(2)} USDC
               </span>
-              <span className="text-xs text-gray-500">|</span>
               {accountMode === 'safe' && (
-                <button
-                  onClick={() => setDropdownOpen((prev) => !prev)}
-                  className="text-gray-400 hover:text-white transition-colors p-0.5"
-                  title="Wallet actions"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
+                <>
+                  <span className="text-xs text-gray-500">|</span>
+                  <button
+                    onClick={() => { setSwDropdownOpen((p) => !p); setEoaDropdownOpen(false); }}
+                    className="text-gray-400 hover:text-white transition-colors p-0.5"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </>
               )}
             </div>
 
-            {/* Dropdown — hide withdraw in ambire mode (smart wallet IS the EOA) */}
-            {dropdownOpen && accountMode === 'safe' && (
+            {swDropdownOpen && accountMode === 'safe' && (
               <div className="absolute right-0 top-full mt-1 bg-surge-card border border-surge-border/50 rounded-lg shadow-xl shadow-black/30 overflow-hidden min-w-[240px] z-50">
                 <button
                   onClick={() => requireDisclaimer(handleWithdraw)}
@@ -119,7 +171,7 @@ export function Header({ onSetupWallet }: HeaderProps) {
           </div>
         )}
 
-        {isConnected && !smartWallet && !isWrongNetwork && (
+        {isConnected && !smartWallet && (
           <button
             onClick={onSetupWallet}
             className="px-4 py-2 bg-surge-primary hover:bg-surge-secondary text-white rounded-lg text-sm font-medium transition-colors"
@@ -128,22 +180,55 @@ export function Header({ onSetupWallet }: HeaderProps) {
           </button>
         )}
 
-        {/* EOA Wallet — RainbowKit handles connect/disconnect UI */}
+        {/* EOA Wallet */}
         <ConnectButton.Custom>
           {({ account, chain, openConnectModal, mounted }) => {
             const connected = mounted && account && chain;
             return (
               <div {...(!mounted && { 'aria-hidden': true, style: { opacity: 0, pointerEvents: 'none' as const, userSelect: 'none' as const } })}>
                 {connected ? (
-                  <button
-                    onClick={() => { clearAccountMode(); disconnect(); }}
-                    className="px-4 py-2 bg-surge-card hover:bg-surge-border text-white rounded-lg text-sm font-medium transition-colors border border-surge-border flex items-center gap-2"
-                  >
-                    <span>{account.displayName}</span>
-                    {account.displayBalance && (
-                      <span className="text-xs text-gray-400">({account.displayBalance})</span>
+                  <div className="relative" ref={eoaDropdownRef}>
+                    <button
+                      onClick={() => { setEoaDropdownOpen((p) => !p); setSwDropdownOpen(false); }}
+                      className="px-4 py-2 bg-surge-card hover:bg-surge-border text-white rounded-lg text-sm font-medium transition-colors border border-surge-border flex items-center gap-2"
+                    >
+                      <span>{account.displayName}</span>
+                      {account.displayBalance && (
+                        <span className="text-xs text-gray-400">({account.displayBalance})</span>
+                      )}
+                      <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {eoaDropdownOpen && (
+                      <div className="absolute right-0 top-full mt-1 bg-surge-card border border-surge-border/50 rounded-lg shadow-xl shadow-black/30 overflow-hidden min-w-[180px] z-50">
+                        <button
+                          onClick={() => {
+                            if (eoaAddress) {
+                              navigator.clipboard.writeText(eoaAddress);
+                              toast.success('EOA address copied!');
+                            }
+                            setEoaDropdownOpen(false);
+                          }}
+                          className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-surge-dark/50 hover:text-white transition-colors flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          Copy Address
+                        </button>
+                        <button
+                          onClick={() => { setEoaDropdownOpen(false); clearAccountMode(); disconnect(); }}
+                          className="w-full px-4 py-3 text-left text-sm text-red-400 hover:bg-surge-dark/50 hover:text-red-300 transition-colors flex items-center gap-2 border-t border-surge-border/30"
+                        >
+                          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                          </svg>
+                          Disconnect
+                        </button>
+                      </div>
                     )}
-                  </button>
+                  </div>
                 ) : (
                   <button
                     onClick={openConnectModal}
@@ -157,10 +242,8 @@ export function Header({ onSetupWallet }: HeaderProps) {
           }}
         </ConnectButton.Custom>
       </div>
-
     </header>
     <DisclaimerModal isOpen={isDisclaimerOpen} onAccept={onAccept} onCancel={onCancel} />
-
     </>
   );
 }

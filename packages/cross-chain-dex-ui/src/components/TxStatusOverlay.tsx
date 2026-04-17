@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { TxOverlayPhase, TxOverlayState } from '../types';
+import { TxOverlayPhase, TxOverlayState, SwapVenue } from '../types';
 import { EXPLORER_URL } from '../lib/constants';
 
 // ─── Step definitions ────────────────────────────────────────────────────────
@@ -12,7 +12,8 @@ interface StepDef {
   color: string;
 }
 
-const STEPS: StepDef[] = [
+/// L1→L2→L1 UserOp lifecycle (swap via L2 DEX). Unchanged from the original overlay.
+const L2_DEX_STEPS: StepDef[] = [
   { phase: 'signing',    label: 'Signing',              color: '#fbbf24' },
   { phase: 'sequencing', label: 'Sequencing',           color: '#60a5fa' },
   { phase: 'proving',    label: 'Generating ZK Proof',  color: '#a78bfa' },
@@ -20,9 +21,32 @@ const STEPS: StepDef[] = [
   { phase: 'complete',   label: 'Execution Complete',   color: '#34d399' },
 ];
 
-const PHASE_TO_IDX: Partial<Record<TxOverlayPhase, number>> = {
+/// L2→L1→L2 direct-tx lifecycle (swap via L1 DEX).
+///   simulating → submitting → included → complete
+const L1_DEX_STEPS: StepDef[] = [
+  { phase: 'simulating', label: 'Simulating Return',   color: '#22d3ee' },
+  { phase: 'submitting', label: 'Submitting L2 Tx',    color: '#fbbf24' },
+  { phase: 'included',   label: 'L2 Included',         color: '#a78bfa' },
+  { phase: 'complete',   label: 'Settlement Complete', color: '#34d399' },
+];
+
+const L2_DEX_PHASE_TO_IDX: Partial<Record<TxOverlayPhase, number>> = {
   signing: 0, sequencing: 1, proving: 2, proposing: 3, complete: 4,
 };
+
+const L1_DEX_PHASE_TO_IDX: Partial<Record<TxOverlayPhase, number>> = {
+  simulating: 0, submitting: 1, included: 2, complete: 3,
+};
+
+function venueForPhase(phase: TxOverlayPhase): SwapVenue | null {
+  if (phase === 'signing' || phase === 'sequencing' || phase === 'proving' || phase === 'proposing') {
+    return 'L2_DEX';
+  }
+  if (phase === 'simulating' || phase === 'submitting' || phase === 'included') {
+    return 'L1_DEX';
+  }
+  return null; // idle / complete / rejected — use remembered venue
+}
 
 // px widths — used in both the circles row and the labels row so they stay aligned
 const NODE_W    = 108;
@@ -106,6 +130,31 @@ function NodeIcon({ phase, color }: { phase: ActivePhase; color: string }) {
       strokeLinecap="round" strokeLinejoin="round" style={s}>
       <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
       <polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" />
+    </svg>
+  );
+  if (phase === 'simulating') return (
+    // radar / scan dot
+    <svg viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" style={s}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M4 12a8 8 0 018-8" />
+      <path d="M20 12a8 8 0 01-8 8" />
+    </svg>
+  );
+  if (phase === 'submitting') return (
+    // paper plane
+    <svg viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" style={s}>
+      <path d="M22 2L11 13" />
+      <path d="M22 2l-7 20-4-9-9-4z" />
+    </svg>
+  );
+  if (phase === 'included') return (
+    // stacked layers (same visual language as sequencing, different color)
+    <svg viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" style={s}>
+      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+      <polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" />
     </svg>
   );
   return (
@@ -193,6 +242,7 @@ interface TxStatusOverlayProps {
 export function TxStatusOverlay({ state, onClose }: TxStatusOverlayProps) {
   const provingStartRef  = useRef<number | null>(null);
   const prevPhaseRef     = useRef<TxOverlayPhase>('idle');
+  const lastVenueRef     = useRef<SwapVenue>('L2_DEX');
   const [provingDuration, setProvingDuration] = useState<number | null>(null);
 
   useEffect(() => {
@@ -211,10 +261,19 @@ export function TxStatusOverlay({ state, onClose }: TxStatusOverlayProps) {
       provingStartRef.current = null;
     }
 
+    // Remember which pipeline this run belongs to so 'complete'/'rejected' terminal
+    // phases render with the right STEPS.
+    const venue = venueForPhase(curr);
+    if (venue) lastVenueRef.current = venue;
+
     prevPhaseRef.current = curr;
   }, [state.phase]);
 
   if (state.phase === 'idle') return null;
+
+  const venue = venueForPhase(state.phase) ?? lastVenueRef.current;
+  const STEPS = venue === 'L1_DEX' ? L1_DEX_STEPS : L2_DEX_STEPS;
+  const PHASE_TO_IDX = venue === 'L1_DEX' ? L1_DEX_PHASE_TO_IDX : L2_DEX_PHASE_TO_IDX;
 
   const currentIdx = PHASE_TO_IDX[state.phase] ?? 0;
   const isInProgress = !['complete', 'rejected'].includes(state.phase);

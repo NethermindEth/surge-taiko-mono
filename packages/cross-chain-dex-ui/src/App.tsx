@@ -7,6 +7,7 @@ import '@rainbow-me/rainbowkit/styles.css';
 import { Toaster } from 'react-hot-toast';
 
 import { config, surgeL1Chain, surgeL2Chain } from './lib/config';
+// L1_CHAIN_NAME used by Header via props
 import { Header } from './components/Header';
 import { SwapCard } from './components/SwapCard';
 import { BridgeCard } from './components/BridgeCard';
@@ -19,7 +20,7 @@ import { TxStatusProvider, useTxStatus } from './context/TxStatusContext';
 import { useSmartWallet, SmartWalletProvider } from './context/SmartWalletContext';
 import { useSharedTokenBalances } from './context/SmartWalletContext';
 import { AccountModeSelector } from './components/AccountModeSelector';
-import { ActiveTab } from './types';
+import { ActiveTab, SwapVenue } from './types';
 
 const queryClient = new QueryClient();
 
@@ -35,33 +36,47 @@ function AppContent() {
   const { switchChainAsync } = useSwitchChain();
   const { ethBalance, usdcBalance, ethFormatted, usdcFormatted, isLoading: balancesLoading } = useSharedTokenBalances();
 
+  const { selectedNetwork } = useSmartWallet();
   const [activeTab, setActiveTab] = useState<ActiveTab>('swap');
   const [showWalletSetup, setShowWalletSetup] = useState(false);
   const [dismissedWalletSetup, setDismissedWalletSetup] = useState(false);
   const [showNetworkSetup, setShowNetworkSetup] = useState(false);
   const [showFundWallet, setShowFundWallet] = useState(false);
   const [hasShownFundModal, setHasShownFundModal] = useState(false);
+
+  // Derive venue and required chain from selected network
+  const venue: SwapVenue = selectedNetwork === 'l2' ? 'L1_DEX' : 'L2_DEX';
+  const requiredChainId = selectedNetwork === 'l2' ? surgeL2Chain.id : surgeL1Chain.id;
+  const networkSetupTarget = selectedNetwork === 'l2' ? 'l2' as const : 'l1' as const;
+
+  // When L2 is selected, force swap tab (no bridge/liquidity on L2)
+  useEffect(() => {
+    if (selectedNetwork === 'l2' && activeTab !== 'swap') {
+      setActiveTab('swap');
+    }
+  }, [selectedNetwork, activeTab]);
+
   // Accept both L1 and L2 as valid networks
   const isWrongNetwork = isConnected && chainId !== surgeL1Chain.id && chainId !== surgeL2Chain.id;
 
-  // Auto-switch to L1 if on wrong network (no modal prompt)
+  // Only show network setup if on a completely unknown chain (neither L1 nor L2).
+  // If the user is on a valid chain but not the one matching the selected network,
+  // silently auto-switch without showing the modal.
   useEffect(() => {
+    if (!isConnected || !chainId) return;
     if (isWrongNetwork) {
-      switchChainAsync({ chainId: surgeL1Chain.id }).catch(() => {
-        // If auto-switch fails, show manual network setup
+      // On an unknown chain — try to switch, show modal if that fails
+      switchChainAsync({ chainId: requiredChainId }).catch(() => {
         setShowNetworkSetup(true);
       });
+    } else if (chainId !== requiredChainId) {
+      // On a valid chain (L1 or L2) but not the one for the selected network — silent switch
+      switchChainAsync({ chainId: requiredChainId }).catch(() => {});
+      setShowNetworkSetup(false);
     } else {
       setShowNetworkSetup(false);
     }
-  }, [isWrongNetwork, switchChainAsync]);
-
-  // Auto-switch to L1 when on swap/liquidity tabs
-  useEffect(() => {
-    if ((activeTab === 'swap' || activeTab === 'liquidity') && chainId === surgeL2Chain.id && isConnected) {
-      switchChainAsync({ chainId: surgeL1Chain.id }).catch(() => {});
-    }
-  }, [activeTab, chainId, isConnected, switchChainAsync]);
+  }, [isConnected, chainId, requiredChainId, isWrongNetwork, switchChainAsync]);
 
   // Reset dismissed flag when wallet connects/disconnects
   useEffect(() => {
@@ -69,7 +84,6 @@ function AppContent() {
   }, [isConnected, ownerAddress]);
 
   // Auto-show wallet setup if connected, on correct network, but no smart wallet
-  // Auto-close when wallet is created
   useEffect(() => {
     if (isConnected && !isWrongNetwork && !smartWallet && !isLoading && !dismissedWalletSetup && accountMode === 'safe' && !showModeSelector) {
       setShowWalletSetup(true);
@@ -78,12 +92,8 @@ function AppContent() {
     }
   }, [isConnected, isWrongNetwork, smartWallet, isLoading, showWalletSetup, dismissedWalletSetup, accountMode, showModeSelector]);
 
-  // Auto-show fund wallet modal when:
-  // 1. Wallet has no funds (needs funding), OR
-  // 2. Wallet has funds but L2 wallet doesn't exist (needs L2 creation)
-  // Only once per session
+  // Auto-show fund wallet modal
   useEffect(() => {
-    // Skip fund wallet modal entirely in ambire mode — the EOA already has funds
     if (accountMode === 'ambire') return;
     if (!smartWallet || hasShownFundModal || balancesLoading || isLoading || showNetworkSetup || showWalletSetup) return;
     const needsFunding = ethBalance === 0n && usdcBalance === 0n;
@@ -94,14 +104,18 @@ function AppContent() {
     }
   }, [smartWallet, ethBalance, usdcBalance, balancesLoading, hasShownFundModal, isLoading, l2WalletExists, showNetworkSetup, showWalletSetup, accountMode]);
 
+  const availableTabs: ActiveTab[] = selectedNetwork === 'l2'
+    ? ['swap']
+    : ['swap', 'liquidity', 'bridge'];
+
   return (
     <div className="h-screen overflow-hidden bg-surge-dark flex flex-col">
       <Header onSetupWallet={() => has7702Delegation ? setShowModeSelector(true) : setShowWalletSetup(true)} />
 
       <main className="flex-1 min-h-0 relative flex items-center justify-center px-4">
-        {/* Tab Navigation — absolutely positioned near header, independent of card */}
+        {/* Tab Navigation */}
         <div className="absolute top-8 left-1/2 -translate-x-1/2 flex gap-1 bg-surge-card/50 rounded-xl p-1 border border-surge-border/30 z-10">
-          {(['swap', 'liquidity', 'bridge'] as ActiveTab[]).map((tab) => (
+          {availableTabs.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -116,27 +130,33 @@ function AppContent() {
           ))}
         </div>
 
-        {/* Footer tagline — absolutely positioned at bottom */}
+        {/* Footer tagline */}
         <div className="absolute bottom-5 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
           <p className="text-sm text-gray-400">Powered by Surge Protocol</p>
-          <p className="text-sm text-gray-500 mt-1">L1 swaps through L2 liquidity • Real time cross chain settlement</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {selectedNetwork === 'l2'
+              ? 'Synchronous cross-chain settlement'
+              : 'L1 swaps through L2 liquidity \u2022 Real time cross chain settlement'}
+          </p>
         </div>
 
-        {/* Active Panel — centered in full main area */}
+        {/* Active Panel */}
         <div className="w-full flex items-center justify-center">
           {activeTab === 'swap' && (
             <SwapCard
               onSetupWallet={() => setShowWalletSetup(true)}
               onFundWallet={() => setShowFundWallet(true)}
+              venue={venue}
+              onVenueChange={() => {}}
             />
           )}
-          {activeTab === 'bridge' && (
+          {activeTab === 'bridge' && selectedNetwork === 'l1' && (
             <BridgeCard
               onSetupWallet={() => setShowWalletSetup(true)}
               onFundWallet={() => setShowFundWallet(true)}
             />
           )}
-          {activeTab === 'liquidity' && (
+          {activeTab === 'liquidity' && selectedNetwork === 'l1' && (
             <LiquidityCard
               onSetupWallet={() => setShowWalletSetup(true)}
             />
@@ -147,6 +167,7 @@ function AppContent() {
       <NetworkSetup
         isOpen={showNetworkSetup}
         onClose={() => setShowNetworkSetup(false)}
+        targetChain={networkSetupTarget}
       />
 
       <AccountModeSelector
@@ -179,7 +200,6 @@ function AppContent() {
         />
       )}
 
-      {/* Full-screen transaction status overlay */}
       <TxStatusOverlay
         state={txStatus}
         onClose={() => setTxStatus({ phase: 'idle' })}

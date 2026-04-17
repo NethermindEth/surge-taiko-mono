@@ -1,24 +1,30 @@
 import { useState } from 'react';
-import { surgeL1Chain } from '../lib/config';
-import { L1_RPC_URL } from '../lib/constants';
+import { surgeL1Chain, surgeL2Chain } from '../lib/config';
+import { L1_RPC_URL, L2_RPC_URL } from '../lib/constants';
 import toast from 'react-hot-toast';
+
+type TargetChain = 'l1' | 'l2';
 
 interface NetworkSetupProps {
   isOpen: boolean;
   onClose: () => void;
+  targetChain?: TargetChain;
 }
 
-export function NetworkSetup({ isOpen, onClose }: NetworkSetupProps) {
+export function NetworkSetup({ isOpen, onClose, targetChain = 'l1' }: NetworkSetupProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [showManual, setShowManual] = useState(false);
 
   if (!isOpen) return null;
 
+  const chain = targetChain === 'l2' ? surgeL2Chain : surgeL1Chain;
+  const rpcUrl = targetChain === 'l2' ? L2_RPC_URL : L1_RPC_URL;
+
   const networkConfig = {
-    networkName: surgeL1Chain.name,
-    rpcUrl: L1_RPC_URL,
-    chainId: surgeL1Chain.id,
-    currencySymbol: surgeL1Chain.nativeCurrency.symbol,
+    networkName: chain.name,
+    rpcUrl,
+    chainId: chain.id,
+    currencySymbol: chain.nativeCurrency.symbol,
   };
 
   const addNetwork = async () => {
@@ -29,29 +35,26 @@ export function NetworkSetup({ isOpen, onClose }: NetworkSetupProps) {
 
     setIsAdding(true);
     try {
-      // Try to switch first
       await window.ethereum.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: `0x${surgeL1Chain.id.toString(16)}` }],
+        params: [{ chainId: `0x${chain.id.toString(16)}` }],
       });
-      toast.success(`Switched to ${surgeL1Chain.name}!`);
+      toast.success(`Switched to ${chain.name}!`);
       onClose();
     } catch (switchError: any) {
-      // Chain doesn't exist, try to add it
       if (switchError.code === 4902) {
         try {
           await window.ethereum.request({
             method: 'wallet_addEthereumChain',
             params: [{
-              chainId: `0x${surgeL1Chain.id.toString(16)}`,
-              chainName: surgeL1Chain.name,
-              nativeCurrency: surgeL1Chain.nativeCurrency,
-              rpcUrls: [L1_RPC_URL],
+              chainId: `0x${chain.id.toString(16)}`,
+              chainName: chain.name,
+              nativeCurrency: chain.nativeCurrency,
+              rpcUrls: [rpcUrl],
             }],
           });
           toast.success('Network added! Please switch to it.');
         } catch (addError: any) {
-          // MetaMask requires HTTPS - show manual instructions
           if (addError.code === -32602 || addError.message?.includes('HTTPS')) {
             setShowManual(true);
             toast.error('Wallet requires HTTPS. Please add network manually.');
@@ -83,14 +86,14 @@ export function NetworkSetup({ isOpen, onClose }: NetworkSetupProps) {
           </div>
           <div>
             <h2 className="text-xl font-bold text-white">Wrong Network</h2>
-            <p className="text-sm text-gray-400">Connect to {surgeL1Chain.name} to continue</p>
+            <p className="text-sm text-gray-400">Connect to {chain.name} to continue</p>
           </div>
         </div>
 
         {!showManual ? (
           <>
             <p className="text-gray-400 text-sm mb-6">
-              Click the button below to add {surgeL1Chain.name} network to your wallet and switch to it.
+              Click the button below to add {chain.name} network to your wallet and switch to it.
             </p>
 
             <button
@@ -104,7 +107,7 @@ export function NetworkSetup({ isOpen, onClose }: NetworkSetupProps) {
                   Adding Network...
                 </>
               ) : (
-                `Add ${surgeL1Chain.name} Network`
+                `Add ${chain.name} Network`
               )}
             </button>
 
@@ -122,73 +125,29 @@ export function NetworkSetup({ isOpen, onClose }: NetworkSetupProps) {
             </p>
 
             <div className="space-y-3 mb-6">
-              <div className="bg-surge-dark rounded-lg p-3">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">Network Name</div>
-                    <div className="text-sm text-white font-mono">{networkConfig.networkName}</div>
+              {[
+                { label: 'Network Name', value: networkConfig.networkName },
+                { label: 'RPC URL', value: networkConfig.rpcUrl, truncate: true },
+                { label: 'Chain ID', value: String(networkConfig.chainId) },
+                { label: 'Currency Symbol', value: networkConfig.currencySymbol },
+              ].map(({ label, value, truncate }) => (
+                <div key={label} className="bg-surge-dark rounded-lg p-3">
+                  <div className="flex justify-between items-center">
+                    <div className={truncate ? 'flex-1 min-w-0' : ''}>
+                      <div className="text-xs text-gray-500 mb-1">{label}</div>
+                      <div className={`text-sm text-white font-mono ${truncate ? 'truncate' : ''}`}>{value}</div>
+                    </div>
+                    <button
+                      onClick={() => copyToClipboard(value, label)}
+                      className="p-2 hover:bg-surge-border rounded transition-colors ml-2"
+                    >
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </button>
                   </div>
-                  <button
-                    onClick={() => copyToClipboard(networkConfig.networkName, 'Network name')}
-                    className="p-2 hover:bg-surge-border rounded transition-colors"
-                  >
-                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </button>
                 </div>
-              </div>
-
-              <div className="bg-surge-dark rounded-lg p-3">
-                <div className="flex justify-between items-center">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs text-gray-500 mb-1">RPC URL</div>
-                    <div className="text-sm text-white font-mono truncate">{networkConfig.rpcUrl}</div>
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(networkConfig.rpcUrl, 'RPC URL')}
-                    className="p-2 hover:bg-surge-border rounded transition-colors ml-2"
-                  >
-                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-surge-dark rounded-lg p-3">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">Chain ID</div>
-                    <div className="text-sm text-white font-mono">{networkConfig.chainId}</div>
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(networkConfig.chainId.toString(), 'Chain ID')}
-                    className="p-2 hover:bg-surge-border rounded transition-colors"
-                  >
-                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-surge-dark rounded-lg p-3">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">Currency Symbol</div>
-                    <div className="text-sm text-white font-mono">{networkConfig.currencySymbol}</div>
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(networkConfig.currencySymbol, 'Currency symbol')}
-                    className="p-2 hover:bg-surge-border rounded transition-colors"
-                  >
-                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+              ))}
             </div>
 
             <div className="text-xs text-gray-500 mb-4">
