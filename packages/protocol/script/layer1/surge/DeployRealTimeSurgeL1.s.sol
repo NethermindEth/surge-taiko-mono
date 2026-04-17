@@ -307,7 +307,12 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         console2.logBytes32(ziskProgramVKey);
     }
 
-    function setupSharedResolver(SharedContracts memory _sharedContracts, address _owner) internal {
+    function setupSharedResolver(
+        SharedContracts memory _sharedContracts,
+        address _owner
+    )
+        internal
+    {
         // Register L2 addresses
         // ---------------------------------------------------------------
         register(

@@ -311,7 +311,8 @@ contract DeploySurgeL1 is DeployCapability {
         if (useDummyVerifier) {
             require(dummyVerifierSigner != address(0), "config: DUMMY_VERIFIER_SIGNER");
 
-            ProofVerifierDummy dummyVerifier = new ProofVerifierDummy(dummyVerifierSigner, l2ChainId);
+            ProofVerifierDummy dummyVerifier =
+                new ProofVerifierDummy(dummyVerifierSigner, l2ChainId);
             address dummyAddr = address(dummyVerifier);
             writeJson("proof_verifier_dummy", dummyAddr);
             console2.log("** Deployed ProofVerifierDummy:", dummyAddr);
@@ -363,7 +364,12 @@ contract DeploySurgeL1 is DeployCapability {
         }
     }
 
-    function setupSharedResolver(SharedContracts memory _sharedContracts, address _owner) internal {
+    function setupSharedResolver(
+        SharedContracts memory _sharedContracts,
+        address _owner
+    )
+        internal
+    {
         // Register L2 addresses
         // ---------------------------------------------------------------
         register(

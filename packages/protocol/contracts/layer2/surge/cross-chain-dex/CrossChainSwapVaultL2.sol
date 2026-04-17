@@ -21,6 +21,8 @@ interface ISimpleDEX {
 /// @title CrossChainSwapVaultL2
 /// @notice L2 counterpart of CrossChainSwapVaultL1. Receives bridge messages and
 /// handles minting bridged tokens, DEX swaps, and liquidity provisioning.
+/// Also exposes user-facing entrypoints that initiate L2→L1→L2 swaps against
+/// the L1-side DEX (paired contract: `CrossChainSwapVaultL1`'s `l1Router`).
 /// @dev Has minting authority over the bridged ERC20 (SwapTokenL2).
 /// @custom:security-contact security@taiko.xyz
 contract CrossChainSwapVaultL2 {
@@ -32,10 +34,12 @@ contract CrossChainSwapVaultL2 {
 
     enum Action {
         BRIDGE,
-        SWAP_ETH_TO_TOKEN,
-        SWAP_TOKEN_TO_ETH,
+        SWAP_ETH_TO_TOKEN, // L1→L2→L1, swap on L2 DEX
+        SWAP_TOKEN_TO_ETH, // L1→L2→L1, swap on L2 DEX
         ADD_LIQUIDITY,
-        REMOVE_LIQUIDITY
+        REMOVE_LIQUIDITY,
+        SWAP_ETH_TO_TOKEN_VIA_L1, // L2→L1→L2, swap on L1 DEX
+        SWAP_TOKEN_TO_ETH_VIA_L1 // L2→L1→L2, swap on L1 DEX
     }
 
     // ---------------------------------------------------------------
@@ -61,6 +65,23 @@ contract CrossChainSwapVaultL2 {
     event SwapExecutedETHToToken(address indexed recipient, uint256 ethIn, uint256 tokenOut);
     event SwapExecutedTokenToETH(address indexed recipient, uint256 tokenIn, uint256 ethOut);
     event LiquidityAdded(uint256 ethAmount, uint256 tokenAmount);
+    // L2→L1→L2 events
+    event L1DexSwapInitiatedETHForToken(
+        address indexed user,
+        address indexed recipient,
+        uint256 ethIn,
+        uint256 minTokenOut,
+        bytes32 outboundMsgHash
+    );
+    event L1DexSwapInitiatedTokenForETH(
+        address indexed user,
+        address indexed recipient,
+        uint256 tokenIn,
+        uint256 minETHOut,
+        bytes32 outboundMsgHash
+    );
+    event L1DexSwapCompletedETHForToken(address indexed recipient, uint256 tokenOut);
+    event L1DexSwapCompletedTokenForETH(address indexed recipient, uint256 ethOut);
 
     // ---------------------------------------------------------------
     // Errors
@@ -71,6 +92,9 @@ contract CrossChainSwapVaultL2 {
     error INVALID_SENDER();
     error L1_VAULT_NOT_SET();
     error UNKNOWN_ACTION();
+    error ZERO_AMOUNT();
+    error INVALID_RETURN_MESSAGE();
+    error ETH_TRANSFER_FAILED();
 
     // ---------------------------------------------------------------
     // Constructor
@@ -102,6 +126,77 @@ contract CrossChainSwapVaultL2 {
     }
 
     // ---------------------------------------------------------------
+    // L2→L1→L2 Entry Points (called directly by user EOA, NOT via UserOp)
+    //
+    // Both entrypoints expect a Catalyst-simulated `returnMessage` that the
+    // bridge will deliver back into this contract within the same L2 tx.
+    // ---------------------------------------------------------------
+
+    /// @notice Swap L2 ETH for bUSDC by routing through the L1 DEX.
+    /// @param _minTokenOut Minimum bUSDC the user is willing to accept.
+    /// @param _recipient Recipient of the resulting bUSDC on L2.
+    /// @param _returnMessage Catalyst-simulated L1→L2 return message that mints bUSDC here.
+    function swapETHForTokenViaL1(
+        uint256 _minTokenOut,
+        address _recipient,
+        IBridge.Message calldata _returnMessage
+    )
+        external
+        payable
+    {
+        if (l1Vault == address(0)) revert L1_VAULT_NOT_SET();
+        if (msg.value == 0) revert ZERO_AMOUNT();
+        // Sanity: the simulated return must target *this* contract or the unlock won't fire.
+        if (_returnMessage.to != address(this)) revert INVALID_RETURN_MESSAGE();
+
+        bytes memory data = abi.encode(
+            Action.SWAP_ETH_TO_TOKEN_VIA_L1, msg.sender, _recipient, msg.value, _minTokenOut
+        );
+        bytes32 outboundMsgHash = _sendMessageToL1(data, msg.value);
+
+        emit L1DexSwapInitiatedETHForToken(
+            msg.sender, _recipient, msg.value, _minTokenOut, outboundMsgHash
+        );
+
+        // Consume the Catalyst-injected fast signal — drives the L1→L2 return into us.
+        IBridge(bridge).processMessage(_returnMessage, "");
+    }
+
+    /// @notice Swap L2 bUSDC for L2 ETH by routing through the L1 DEX.
+    /// @param _amountIn Amount of bUSDC to swap.
+    /// @param _minETHOut Minimum L2 ETH the user is willing to accept.
+    /// @param _recipient Recipient of the resulting L2 ETH.
+    /// @param _returnMessage Catalyst-simulated L1→L2 return message that delivers ETH here.
+    function swapTokenForETHViaL1(
+        uint256 _amountIn,
+        uint256 _minETHOut,
+        address _recipient,
+        IBridge.Message calldata _returnMessage
+    )
+        external
+    {
+        if (l1Vault == address(0)) revert L1_VAULT_NOT_SET();
+        if (_amountIn == 0) revert ZERO_AMOUNT();
+        if (_returnMessage.to != address(this)) revert INVALID_RETURN_MESSAGE();
+
+        // Pull and burn the user's bUSDC. The L1 vault will draw matching USDC from its
+        // inventory and swap it for ETH.
+        swapTokenERC20.safeTransferFrom(msg.sender, address(this), _amountIn);
+        swapToken.burn(address(this), _amountIn);
+
+        bytes memory data = abi.encode(
+            Action.SWAP_TOKEN_TO_ETH_VIA_L1, msg.sender, _recipient, _amountIn, _minETHOut
+        );
+        bytes32 outboundMsgHash = _sendMessageToL1(data, 0);
+
+        emit L1DexSwapInitiatedTokenForETH(
+            msg.sender, _recipient, _amountIn, _minETHOut, outboundMsgHash
+        );
+
+        IBridge(bridge).processMessage(_returnMessage, "");
+    }
+
+    // ---------------------------------------------------------------
     // Bridge Callback (from L1)
     // ---------------------------------------------------------------
 
@@ -125,95 +220,111 @@ contract CrossChainSwapVaultL2 {
             _handleAddLiquidity(_data);
         } else if (action == Action.REMOVE_LIQUIDITY) {
             _handleRemoveLiquidity(_data);
+        } else if (action == Action.SWAP_ETH_TO_TOKEN_VIA_L1) {
+            _handleL1DexReturnETHForToken(_data);
+        } else if (action == Action.SWAP_TOKEN_TO_ETH_VIA_L1) {
+            _handleL1DexReturnTokenForETH(_data);
         } else {
             revert UNKNOWN_ACTION();
         }
     }
 
     // ---------------------------------------------------------------
-    // Internal Handlers
+    // Internal Handlers (L1→L2→L1 leg)
     // ---------------------------------------------------------------
 
-    /// @dev Bridge: mint bridged tokens to recipient (1 message, done)
     function _handleBridge(bytes calldata _data) internal {
         (, address recipient, uint256 amount) = abi.decode(_data, (Action, address, uint256));
         swapToken.mint(recipient, amount);
         emit TokensBridged(recipient, amount);
     }
 
-    /// @dev ETH→Token swap: receive ETH, swap on DEX, burn tokens, send completion to L1
     function _handleSwapETHToToken(bytes calldata _data) internal {
         (,, address recipient,, uint256 minTokenOut) =
             abi.decode(_data, (Action, address, address, uint256, uint256));
 
-        // Swap ETH on DEX — DEX sends tokens to this contract
         uint256 tokenOut = dex.swapETHForToken{ value: msg.value }(minTokenOut);
-
-        // Burn the received bridged tokens (they correspond to canonical tokens
-        // that will be released from the L1 vault)
         swapToken.burn(address(this), tokenOut);
 
         emit SwapExecutedETHToToken(recipient, msg.value, tokenOut);
 
-        // Send completion message to L1 vault (no ETH, just "release tokens")
         bytes memory completionData = abi.encode(Action.SWAP_ETH_TO_TOKEN, recipient, tokenOut);
         _sendMessageToL1(completionData, 0);
     }
 
-    /// @dev Token→ETH swap: mint tokens, swap on DEX for ETH, send ETH + completion to L1
     function _handleSwapTokenToETH(bytes calldata _data) internal {
         (,, address recipient, uint256 tokenAmount, uint256 minETHOut) =
             abi.decode(_data, (Action, address, address, uint256, uint256));
 
-        // Mint bridged tokens to this contract (representing locked canonical tokens on L1)
         swapToken.mint(address(this), tokenAmount);
-
-        // Approve DEX and swap tokens for ETH
         swapTokenERC20.approve(address(dex), tokenAmount);
         uint256 ethOut = dex.swapTokenForETH(tokenAmount, minETHOut);
 
         emit SwapExecutedTokenToETH(recipient, tokenAmount, ethOut);
 
-        // Send completion message with ETH back to L1 vault
         bytes memory completionData = abi.encode(Action.SWAP_TOKEN_TO_ETH, recipient, ethOut);
         _sendMessageToL1(completionData, ethOut);
     }
 
-    /// @dev Add liquidity: mint tokens, add to DEX (1 message, done)
     function _handleAddLiquidity(bytes calldata _data) internal {
         (, address provider, uint256 tokenAmount) = abi.decode(_data, (Action, address, uint256));
 
-        // Mint bridged tokens to this contract
         swapToken.mint(address(this), tokenAmount);
-
-        // Approve DEX and add liquidity
         swapTokenERC20.approve(address(dex), tokenAmount);
         dex.addLiquidity{ value: msg.value }(tokenAmount, provider);
 
         emit LiquidityAdded(msg.value, tokenAmount);
     }
 
-    /// @dev Remove liquidity: pull from DEX, burn tokens, send ETH + completion to L1
     function _handleRemoveLiquidity(bytes calldata _data) internal {
         (, address provider) = abi.decode(_data, (Action, address));
 
         (uint256 ethAmount, uint256 tokenAmount) = dex.removeLiquidity(provider);
 
-        // Burn the returned tokens
         if (tokenAmount > 0) {
             swapToken.burn(address(this), tokenAmount);
         }
 
-        // Send completion message with ETH back to L1 vault
         bytes memory completionData = abi.encode(Action.REMOVE_LIQUIDITY, provider, tokenAmount);
         _sendMessageToL1(completionData, ethAmount);
+    }
+
+    // ---------------------------------------------------------------
+    // Internal Handlers (L2→L1→L2 return leg)
+    // ---------------------------------------------------------------
+
+    function _handleL1DexReturnETHForToken(bytes calldata _data) internal {
+        (, address recipient, uint256 tokenOut) = abi.decode(_data, (Action, address, uint256));
+
+        // L1 took the user's ETH, swapped on L1 DEX, told us how much bUSDC to mint.
+        if (tokenOut > 0) {
+            swapToken.mint(recipient, tokenOut);
+        }
+        emit L1DexSwapCompletedETHForToken(recipient, tokenOut);
+    }
+
+    function _handleL1DexReturnTokenForETH(bytes calldata _data) internal {
+        (, address recipient, uint256 ethOut) = abi.decode(_data, (Action, address, uint256));
+
+        // L1 used its USDC inventory to swap and bridged the resulting ETH back to us.
+        if (msg.value > 0) {
+            (bool ok,) = recipient.call{ value: msg.value }("");
+            if (!ok) revert ETH_TRANSFER_FAILED();
+        }
+        emit L1DexSwapCompletedTokenForETH(recipient, ethOut);
     }
 
     // ---------------------------------------------------------------
     // Internal
     // ---------------------------------------------------------------
 
-    function _sendMessageToL1(bytes memory _innerData, uint256 _ethValue) internal {
+    function _sendMessageToL1(
+        bytes memory _innerData,
+        uint256 _ethValue
+    )
+        internal
+        returns (bytes32 msgHash_)
+    {
         bytes memory msgData = abi.encodeWithSignature("onMessageInvocation(bytes)", _innerData);
 
         IBridge.Message memory message = IBridge.Message({
@@ -230,12 +341,8 @@ contract CrossChainSwapVaultL2 {
             data: msgData
         });
 
-        IBridge(bridge).sendMessage{ value: _ethValue }(message);
+        (msgHash_,) = IBridge(bridge).sendMessage{ value: _ethValue }(message);
     }
-
-    // ---------------------------------------------------------------
-    // Receive ETH
-    // ---------------------------------------------------------------
 
     receive() external payable { }
 }
