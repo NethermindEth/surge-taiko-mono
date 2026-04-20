@@ -7,9 +7,11 @@ const CONTRACT_OWNER =
 const CHAIN_ID = parseInt(process.env.CHAIN_ID || "167", 10);
 const L1_CHAIN_ID = parseInt(process.env.L1_CHAIN_ID || "31337", 10);
 // Comma-separated list of addresses to prefund
-const SEED_ADDRESSES = process.env.SEED_ADDRESSES || process.env.SEED_ADDRESS || "";
+const SEED_ADDRESSES =
+  process.env.SEED_ADDRESSES || process.env.SEED_ADDRESS || "";
 // Comma-separated list of amounts (must match number of addresses, or single value applied to all)
-const SEED_AMOUNTS = process.env.SEED_AMOUNTS || process.env.SEED_AMOUNT || "1000";
+const SEED_AMOUNTS =
+  process.env.SEED_AMOUNTS || process.env.SEED_AMOUNT || "1000";
 const REMOTE_SIGNAL_SERVICE =
   process.env.REMOTE_SIGNAL_SERVICE ||
   "0x0000000000000000000000000000000000000000";
@@ -20,14 +22,17 @@ function parseSeedAccounts(addresses, amounts) {
     return [];
   }
 
-  const addressList = addresses.split(",").map((addr) => addr.trim()).filter(Boolean);
+  const addressList = addresses
+    .split(",")
+    .map((addr) => addr.trim())
+    .filter(Boolean);
   const amountList = amounts.split(",").map((amt) => parseInt(amt.trim(), 10));
 
   // If single amount provided, apply to all addresses
   const useUniformAmount = amountList.length === 1 && addressList.length > 1;
 
   return addressList.map((address, index) => ({
-    [address]: useUniformAmount ? amountList[0] : (amountList[index] || 0),
+    [address]: useUniformAmount ? amountList[0] : amountList[index] || 0,
   }));
 }
 
