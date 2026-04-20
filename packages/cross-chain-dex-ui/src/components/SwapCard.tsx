@@ -10,6 +10,7 @@ import { useDexReserves } from '../hooks/useDexReserves';
 import { useSwapQuote } from '../hooks/useSwapQuote';
 import { useL1DexQuote } from '../hooks/useL1DexQuote';
 import { useSharedTokenBalances } from '../context/SmartWalletContext';
+import { useTokenBalances } from '../hooks/useTokenBalances';
 import { useUserOp } from '../hooks/useUserOp';
 import { useInitiateL2Swap } from '../hooks/useInitiateL2Swap';
 import { SwapDirection, SwapVenue } from '../types';
@@ -32,9 +33,14 @@ export function SwapCard({ onSetupWallet, onFundWallet: _onFundWallet, venue, on
   const { smartWallet, isConnected, accountMode } = useSmartWallet();
   const { address: eoa } = useAccount();
   const { ethReserve, tokenReserve } = useDexReserves();
-  // useSharedTokenBalances reads from the context — already network-aware
-  // (L1: smart wallet balances, L2: EOA balances)
-  const { ethBalance, usdcBalance } = useSharedTokenBalances();
+  // Swap-pane balances track the account that actually signs the swap:
+  // L1_DEX (L2→L1→L2) is signed by the EOA on L2; L2_DEX (L1→L2→L1) is
+  // signed by the Smart Account on L1. Header balances remain on the Smart
+  // Account via useSharedTokenBalances.
+  const smartWalletBalances = useSharedTokenBalances();
+  const eoaL2Balances = useTokenBalances(eoa ?? null, 'l2');
+  const swapBalances = venue === 'L1_DEX' ? eoaL2Balances : smartWalletBalances;
+  const { ethBalance, usdcBalance } = swapBalances;
   const { executeSwap, isPending: isUserOpPending } = useUserOp(accountMode);
   const { initiate: initiateL2Swap, isPending: isL2SwapPending } = useInitiateL2Swap();
   const { isDisclaimerOpen, requireDisclaimer, onAccept, onCancel } = useDisclaimer();

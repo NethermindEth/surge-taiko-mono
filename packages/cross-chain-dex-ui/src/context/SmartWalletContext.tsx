@@ -29,8 +29,9 @@ export function SmartWalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     window.localStorage.setItem(SELECTED_NETWORK_STORAGE_KEY, selectedNetwork);
   }, [selectedNetwork]);
-  // L1: show Smart Wallet balances. L2: show EOA balances (L2 swaps use EOA directly).
-  const balanceAddress = selectedNetwork === 'l2' ? (eoaAddress ?? null) : wallet.smartWallet;
+  // Balance source follows the active account mode: Smart Account → Safe address
+  // (same CREATE2 address on L1 and L2); Ambire/EOA mode → connected EOA.
+  const balanceAddress = wallet.accountMode === 'safe' ? wallet.smartWallet : (eoaAddress ?? null);
   const tokenBalances = useTokenBalancesHook(balanceAddress, selectedNetwork);
   const value = useMemo(
     () => ({ ...wallet, tokenBalances, selectedNetwork, setSelectedNetwork }),
