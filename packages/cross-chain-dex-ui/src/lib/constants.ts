@@ -55,9 +55,20 @@ export const L1_DEX_NAME = (import.meta.env.VITE_L1_DEX_NAME as string) || 'L1 D
 
 // Bridge
 export const L1_BRIDGE = import.meta.env.VITE_L1_BRIDGE as `0x${string}`;
-export const L2_BRIDGE = (import.meta.env.VITE_L2_BRIDGE as `0x${string}`) || '0x7633740000000000000000000000000000000001';
 export const L2_CHAIN_ID = Number(import.meta.env.VITE_L2_CHAIN_ID || '763374');
-export const L2_RELAY = (import.meta.env.VITE_L2_RELAY as `0x${string}`) || '0xFf3F45cD388f33f7AaBa43CF705F3f8D09911412';
+
+/// Derive a genesis-allocated L2 address from `chainId` and a hex suffix, matching the
+/// `getConstantAddress(chainId, suffix)` pattern used by the L2 genesis generator:
+///   `0x<chainId-as-decimal-digits><padding-zeros><suffix>` totalling 40 hex chars.
+function deriveL2GenesisAddress(suffix: string): `0x${string}` {
+  const prefix = L2_CHAIN_ID.toString();
+  const zeros = '0'.repeat(40 - prefix.length - suffix.length);
+  return `0x${prefix}${zeros}${suffix}` as `0x${string}`;
+}
+
+export const L2_BRIDGE = deriveL2GenesisAddress('1');
+/// CrossChainRelay is predeployed at `...8989` as part of L2 genesis.
+export const L2_RELAY = deriveL2GenesisAddress('8989');
 
 // RPC URLs
 export const L1_RPC_URL = import.meta.env.VITE_L1_RPC_URL as string;

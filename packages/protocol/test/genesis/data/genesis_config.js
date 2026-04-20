@@ -54,6 +54,7 @@ module.exports = {
       BridgedERC721Impl: getConstantAddress(`0${this.chainId}`, 10097),
       BridgedERC1155Impl: getConstantAddress(`0${this.chainId}`, 10098),
       RegularERC20: getConstantAddress(`0${this.chainId}`, 10099),
+      CrossChainRelay: getConstantAddress(this.chainId, 8989),
       // Rollup Contracts
       TaikoAnchorImpl: getConstantAddress(`0${this.chainId}`, 10001),
       RollupResolverImpl: getConstantAddress(`0${this.chainId}`, 10002),

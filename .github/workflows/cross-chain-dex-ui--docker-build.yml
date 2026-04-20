@@ -103,11 +103,6 @@ on:
         required: false
         default: "763374"
         type: string
-      viteL2Relay:
-        description: "L2 relay contract address (VITE_L2_RELAY)"
-        required: false
-        default: "0x0000000000000000000000000000000000000000"
-        type: string
       viteWalletConnectProjectId:
         description: "WalletConnect Project ID (VITE_WALLETCONNECT_PROJECT_ID)"
         required: false
@@ -222,7 +217,6 @@ jobs:
             VITE_SIMPLE_DEX=${{ inputs.viteSimpleDex || '0x0000000000000000000000000000000000000000' }}
             VITE_L1_BRIDGE=${{ inputs.viteL1Bridge || '0x0000000000000000000000000000000000000000' }}
             VITE_L2_CHAIN_ID=${{ inputs.viteL2ChainId || '763374' }}
-            VITE_L2_RELAY=${{ inputs.viteL2Relay || '0x0000000000000000000000000000000000000000' }}
             VITE_WALLETCONNECT_PROJECT_ID=${{ inputs.viteWalletConnectProjectId || '' }}
 
       - name: Export digest
