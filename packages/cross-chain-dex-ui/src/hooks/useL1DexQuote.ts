@@ -11,6 +11,11 @@ interface UseL1DexQuoteParams {
   amountIn: bigint;
 }
 
+const SimpleDexL1ReservesABI = [
+  { type: 'function', name: 'reserveETH', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'reserveToken', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+] as const;
+
 /// Quote source for swaps routed through the L1 DEX (L2→L1→L2 venue).
 ///
 /// Calls `IUniswapV2Router02.getAmountsOut(amountIn, [WETH, USDC])` on the configured
@@ -19,6 +24,8 @@ interface UseL1DexQuoteParams {
 export function useL1DexQuote({ direction, amountIn }: UseL1DexQuoteParams): SwapQuote {
   const pageVisible = usePageVisible();
   const [amountOut, setAmountOut] = useState<bigint>(0n);
+  const [ethReserve, setEthReserve] = useState<bigint>(0n);
+  const [tokenReserve, setTokenReserve] = useState<bigint>(0n);
 
   const fetchQuote = useCallback(async () => {
     if (
@@ -52,18 +59,47 @@ export function useL1DexQuote({ direction, amountIn }: UseL1DexQuoteParams): Swa
     }
   }, [direction, amountIn]);
 
+  // Reserves are fetched independently so price impact can be computed. Works against
+  // `SimpleDEXL1` only — a live Uniswap V2 router has no `reserveETH`/`reserveToken`.
+  const fetchReserves = useCallback(async () => {
+    if (!L1_ROUTER || L1_ROUTER === zeroAddress) return;
+    try {
+      const [eth, token] = await Promise.all([
+        l1PublicClient.readContract({
+          address: L1_ROUTER,
+          abi: SimpleDexL1ReservesABI,
+          functionName: 'reserveETH',
+        }),
+        l1PublicClient.readContract({
+          address: L1_ROUTER,
+          abi: SimpleDexL1ReservesABI,
+          functionName: 'reserveToken',
+        }),
+      ]);
+      setEthReserve(eth);
+      setTokenReserve(token);
+    } catch {
+      setEthReserve(0n);
+      setTokenReserve(0n);
+    }
+  }, []);
+
   useEffect(() => {
     if (!pageVisible) return;
     fetchQuote();
-    const interval = setInterval(fetchQuote, 10_000);
+    fetchReserves();
+    const interval = setInterval(() => {
+      fetchQuote();
+      fetchReserves();
+    }, 10_000);
     return () => clearInterval(interval);
-  }, [fetchQuote, pageVisible]);
+  }, [fetchQuote, fetchReserves, pageVisible]);
 
   const fee = (amountIn * 3n) / 1000n; // Uniswap V2 constant
   const insufficientLiquidity = amountIn > 0n && amountOut === 0n;
 
   // Rate approximation for display only — normalizes decimal mismatch so the UI field
-  // stays readable. Price impact is omitted (would need a spot-price query).
+  // stays readable.
   const inputDecimals = direction === 'ETH_TO_USDC' ? 18 : USDC_TOKEN.decimals;
   const outputDecimals = direction === 'ETH_TO_USDC' ? USDC_TOKEN.decimals : 18;
   const rate =
@@ -72,9 +108,21 @@ export function useL1DexQuote({ direction, amountIn }: UseL1DexQuoteParams): Swa
         10 ** (inputDecimals - outputDecimals)
       : 0;
 
+  // Price impact = (idealOutput - actualOutput) / idealOutput * 100, using current reserves.
+  // Falls back to 0 if reserves couldn't be read (e.g., live Uniswap router without those getters).
+  const reserveIn = direction === 'ETH_TO_USDC' ? ethReserve : tokenReserve;
+  const reserveOut = direction === 'ETH_TO_USDC' ? tokenReserve : ethReserve;
+  let priceImpact = 0;
+  if (amountIn > 0n && amountOut > 0n && reserveIn > 0n && reserveOut > 0n) {
+    const idealOutput = (amountIn * reserveOut) / reserveIn;
+    if (idealOutput > 0n && idealOutput >= amountOut) {
+      priceImpact = Number(((idealOutput - amountOut) * 10000n) / idealOutput) / 100;
+    }
+  }
+
   return {
     amountOut,
-    priceImpact: 0,
+    priceImpact,
     fee,
     rate,
     insufficientLiquidity,
