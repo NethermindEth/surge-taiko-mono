@@ -18,12 +18,12 @@ export L1_BRIDGE=${L1_BRIDGE:-"0xc1e59A201cE4CD58590FC3Ab45081921cF186550"}
 # If not set, a new SwapToken will be deployed
 export SWAP_TOKEN=${SWAP_TOKEN:-""}
 
-# Token decimals (default 18; set to 6 for real USDC)
-export TOKEN_DECIMALS=${TOKEN_DECIMALS:-"18"}
+# Token decimals (default 6 for USDC-like; set to 18 for ETH-like)
+export TOKEN_DECIMALS=${TOKEN_DECIMALS:-"6"}
 
 # Initial token supply (1 million tokens — raw units, must account for decimals)
 # Only used when deploying a new token (SWAP_TOKEN is not set)
-export INITIAL_TOKEN_SUPPLY=${INITIAL_TOKEN_SUPPLY:-"1000000000000000000000000"}
+export INITIAL_TOKEN_SUPPLY=${INITIAL_TOKEN_SUPPLY:-"1000000000000"}
 
 # Get chain IDs from RPCs
 echo "Getting chain IDs from RPCs..."

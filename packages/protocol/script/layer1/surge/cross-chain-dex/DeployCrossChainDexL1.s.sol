@@ -24,7 +24,7 @@ contract DeployCrossChainDexL1 is Script {
     address internal immutable bridge = vm.envAddress("L1_BRIDGE");
     uint64 internal immutable l2ChainId = uint64(vm.envUint("L2_CHAIN_ID"));
     uint256 internal immutable initialTokenSupply = vm.envUint("INITIAL_TOKEN_SUPPLY");
-    uint8 internal immutable tokenDecimals = uint8(vm.envOr("TOKEN_DECIMALS", uint256(18)));
+    uint8 internal immutable tokenDecimals = uint8(vm.envOr("TOKEN_DECIMALS", uint256(6)));
     address internal immutable existingToken = vm.envOr("SWAP_TOKEN", address(0));
 
     // L1 DEX configuration

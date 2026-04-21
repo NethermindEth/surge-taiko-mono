@@ -14,7 +14,7 @@ import { console2 } from "forge-std/src/console2.sol";
 contract DeployCrossChainDexL2 is Script {
     address internal immutable bridge = vm.envAddress("L2_BRIDGE");
     uint64 internal immutable l1ChainId = uint64(vm.envUint("L1_CHAIN_ID"));
-    uint8 internal immutable tokenDecimals = uint8(vm.envOr("TOKEN_DECIMALS", uint256(18)));
+    uint8 internal immutable tokenDecimals = uint8(vm.envOr("TOKEN_DECIMALS", uint256(6)));
 
     // Devnet-only EOAs pre-funded with bUSDC so end-users can swap immediately after
     // deployment. Matches the L1 deploy script's funding list. Only applied when
