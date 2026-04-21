@@ -37,6 +37,14 @@ contract DeployCrossChainDexL1 is Script {
     uint256 internal immutable l1VaultSeedToken = vm.envOr("L1_VAULT_SEED_TOKEN", uint256(0));
     uint256 internal immutable l1VaultSeedEth = vm.envOr("L1_VAULT_SEED_ETH", uint256(0));
 
+    // Devnet-only EOAs that get pre-funded with USDC so end-users can swap immediately
+    // after deployment without needing a separate faucet step. Only applied when
+    // `block.chainid == DEVNET_L1_CHAIN_ID`.
+    uint256 internal constant DEVNET_L1_CHAIN_ID = 3_151_908;
+    address internal constant DEVNET_DEPLOYER = 0x3e95dFbBaF6B348396E6674C7871546dCC568e56;
+    address internal constant DEVNET_OPERATOR = 0x5918b2e647464d4743601a865753e64C8059Dc4F;
+    address internal constant DEVNET_SUBMITTER = 0x589A698b7b7dA0Bec545177D3963A2741105C7C9;
+
     modifier broadcast() {
         vm.startBroadcast();
         _;
@@ -70,6 +78,16 @@ contract DeployCrossChainDexL1 is Script {
 
             swapToken.mint(deployer, initialTokenSupply);
             console2.log("Minted", initialTokenSupply, "tokens to deployer");
+        }
+
+        // ---- Step 1b: Pre-fund devnet EOAs with 100 USDC each (devnet L1 only) ----
+        if (block.chainid == DEVNET_L1_CHAIN_ID) {
+            uint256 devnetFundAmount = 100 * 10 ** uint256(tokenDecimals);
+            address[3] memory devnetEoas = [DEVNET_DEPLOYER, DEVNET_OPERATOR, DEVNET_SUBMITTER];
+            for (uint256 i = 0; i < devnetEoas.length; i++) {
+                SwapToken(swapToken_).mint(devnetEoas[i], devnetFundAmount);
+                console2.log("Funded devnet EOA with USDC:", devnetEoas[i]);
+            }
         }
 
         // ---- Step 2: L1 DEX (test mode auto-deploy, live mode use env) ----
