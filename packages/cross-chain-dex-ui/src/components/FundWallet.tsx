@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Address, parseEther } from 'viem';
-import { useWalletClient } from 'wagmi';
+import { Address, parseEther, parseUnits } from 'viem';
+import { useWalletClient, useSwitchChain } from 'wagmi';
 import toast from 'react-hot-toast';
-import { surgeL1Chain } from '../lib/config';
-import { L1_NATIVE_SYMBOL } from '../lib/constants';
+import { surgeL1Chain, surgeL2Chain } from '../lib/config';
+import { L1_NATIVE_SYMBOL, USDC_TOKEN, L2_USDC_TOKEN } from '../lib/constants';
+import { ERC20ABI } from '../lib/contracts';
 import { WarningBannerWrapped } from './WarningBanner';
 
 interface FundWalletProps {
@@ -12,6 +13,9 @@ interface FundWalletProps {
   smartWallet: Address;
   ethBalance: string;
   usdcBalance: string;
+  /// Chain the transfers must land on. Driven by the app's selected network; passed
+  /// in so the fund CTAs never race against a pending wagmi chain switch.
+  targetChainId: number;
   l2WalletExists?: boolean;
   onCreateL2Wallet?: () => Promise<void>;
   isCreatingL2Wallet?: boolean;
@@ -23,22 +27,50 @@ export function FundWallet({
   smartWallet,
   ethBalance,
   usdcBalance,
+  targetChainId,
   l2WalletExists = false,
   onCreateL2Wallet,
   isCreatingL2Wallet = false,
 }: FundWalletProps) {
   const { data: walletClient } = useWalletClient();
+  const { switchChainAsync } = useSwitchChain();
   const [isFunding, setIsFunding] = useState(false);
+  const [isFundingUsdc, setIsFundingUsdc] = useState(false);
 
   if (!isOpen) return null;
 
   const hasFunds = parseFloat(ethBalance) > 0 || parseFloat(usdcBalance) > 0;
 
+  // Target chain drives which USDC token we touch. The CTA label is always "USDC"
+  // regardless of the underlying contract's symbol.
+  const isOnL2 = targetChainId === surgeL2Chain.id;
+  const activeUsdc = isOnL2 ? L2_USDC_TOKEN : USDC_TOKEN;
+  const targetChain = isOnL2 ? surgeL2Chain : surgeL1Chain;
+  const hasEth = parseFloat(ethBalance) > 0;
+  const hasUsdc = parseFloat(usdcBalance) > 0;
+
+  /// Ensure the wallet is on the target chain before submitting. Without this, a
+  /// pending wagmi chain-switch can silently divert the transfer to the opposite
+  /// chain (e.g. sending L1 USDC when the user is viewing the L2 page).
+  const ensureTargetChain = async (): Promise<boolean> => {
+    if (walletClient?.chain?.id === targetChainId) return true;
+    try {
+      await switchChainAsync({ chainId: targetChainId });
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Chain switch failed';
+      if (!msg.includes('rejected')) toast.error(msg);
+      return false;
+    }
+  };
+
   const fundWallet = async () => {
     if (!walletClient) return;
     setIsFunding(true);
     try {
+      if (!(await ensureTargetChain())) return;
       const hash = await walletClient.sendTransaction({
+        chain: targetChain,
         to: smartWallet,
         value: parseEther('0.01'),
       });
@@ -48,6 +80,27 @@ export function FundWallet({
       if (!msg.includes('rejected')) toast.error(msg);
     } finally {
       setIsFunding(false);
+    }
+  };
+
+  const fundWalletUsdc = async () => {
+    if (!walletClient || !activeUsdc.address) return;
+    setIsFundingUsdc(true);
+    try {
+      if (!(await ensureTargetChain())) return;
+      const hash = await walletClient.writeContract({
+        chain: targetChain,
+        address: activeUsdc.address,
+        abi: ERC20ABI,
+        functionName: 'transfer',
+        args: [smartWallet, parseUnits('1', activeUsdc.decimals)],
+      });
+      toast.success(`Sent 1 USDC (tx: ${hash.slice(0, 10)}...)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Transfer failed';
+      if (!msg.includes('rejected')) toast.error(msg);
+    } finally {
+      setIsFundingUsdc(false);
     }
   };
 
@@ -120,18 +173,25 @@ export function FundWallet({
           </div>
         </div>
 
-        {parseFloat(ethBalance) < 0.01 && (
+        <div className="flex gap-3 mb-4">
           <button
             onClick={fundWallet}
-            disabled={isFunding || !walletClient}
-            className="w-full py-3 mb-4 bg-surge-primary/80 hover:bg-surge-primary disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+            disabled={isFunding || !walletClient || hasEth}
+            className="flex-1 py-3 bg-surge-primary/80 hover:bg-surge-primary disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
           >
-            {isFunding ? 'Sending...' : `Send 0.01 ${L1_NATIVE_SYMBOL} from EOA`}
+            {isFunding ? 'Sending...' : `Send 0.01 ${L1_NATIVE_SYMBOL}`}
           </button>
-        )}
+          <button
+            onClick={fundWalletUsdc}
+            disabled={isFundingUsdc || !walletClient || !activeUsdc.address || hasUsdc}
+            className="flex-1 py-3 bg-surge-primary/80 hover:bg-surge-primary disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+          >
+            {isFundingUsdc ? 'Sending...' : 'Send 1 USDC'}
+          </button>
+        </div>
 
         <div className="text-xs text-gray-500 mb-4">
-          <strong>Note:</strong> Send funds on {surgeL1Chain.name} (Chain ID: {surgeL1Chain.id})
+          <strong>Note:</strong> Send funds on {targetChain.name} (Chain ID: {targetChain.id})
         </div>
 
         {/* L2 Safe status / creation — only show after wallet is funded */}

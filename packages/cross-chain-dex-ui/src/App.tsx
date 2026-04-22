@@ -96,7 +96,7 @@ function AppContent() {
   useEffect(() => {
     if (accountMode === 'ambire') return;
     if (!smartWallet || hasShownFundModal || balancesLoading || isLoading || showNetworkSetup || showWalletSetup) return;
-    const needsFunding = ethBalance === 0n && usdcBalance === 0n;
+    const needsFunding = ethBalance === 0n || usdcBalance === 0n;
     const needsL2 = accountMode === 'safe' && !l2WalletExists;
     if (needsFunding || needsL2) {
       setShowFundWallet(true);
@@ -194,6 +194,7 @@ function AppContent() {
           smartWallet={smartWallet}
           ethBalance={ethFormatted}
           usdcBalance={usdcFormatted}
+          targetChainId={requiredChainId}
           l2WalletExists={accountMode === 'ambire' ? true : l2WalletExists}
           onCreateL2Wallet={accountMode === 'ambire' ? undefined : createL2Wallet}
           isCreatingL2Wallet={isCreatingL2Wallet}
