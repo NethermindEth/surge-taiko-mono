@@ -190,7 +190,7 @@ jobs:
         with:
           platforms: ${{ matrix.platform }}
           context: packages/cross-chain-dex-ui
-          target: builder
+          target: runtime
           push: true
           tags: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_REPOSITORY }}
           labels: ${{ steps.meta.outputs.labels }}
