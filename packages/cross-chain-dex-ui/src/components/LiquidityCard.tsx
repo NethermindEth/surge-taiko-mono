@@ -131,7 +131,7 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
       <div className="w-full md:max-w-md bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20 hover-glow">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Liquidity</h2>
-          <span className="text-xs text-gray-400">L1 &rarr; L2 DEX</span>
+          <span className="text-xs font-medium text-emerald-400">Via Smart Account</span>
         </div>
         <WarningBanner />
 

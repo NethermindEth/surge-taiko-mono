@@ -3,21 +3,39 @@
 # =============================================================================
 # Cross-Chain DEX Full Deployment Script
 # =============================================================================
-# Deploys the complete Cross-Chain DEX system on L1 and L2, links the vaults,
+# Deploys the complete cross-chain DEX system on L1 and L2, links the vaults,
 # and outputs a summary of deployed addresses.
+#
+# Supports two L1-side DEX modes:
+#   - Test mode (default): deploy fresh WETH9Stub + SimpleDEXL1 with seeded liquidity.
+#   - Live mode: point at an existing Uniswap V2 router via L1_DEX_ROUTER/L1_DEX_WETH.
 #
 # Usage:
 #   PRIVATE_KEY=0x... ./script/deploy_cross_chain_dex.sh
 #
-# Environment variables (all have sensible defaults except PRIVATE_KEY):
-#   PRIVATE_KEY      - Deployer private key (required)
+# Required env:
+#   PRIVATE_KEY      - Deployer private key
 #   L1_RPC           - L1 RPC URL
 #   L2_RPC           - L2 RPC URL
+#
+# Optional env (sensible defaults):
 #   L1_BRIDGE        - L1 Bridge contract address
 #   L2_BRIDGE        - L2 Bridge contract address
-#   SWAP_TOKEN       - Existing L1 ERC20 address (if empty, deploys a new SwapToken)
-#   TOKEN_DECIMALS   - Token decimals (default: 18; set to 6 for real USDC)
-#   INITIAL_TOKEN_SUPPLY - Only used when deploying new token (default: 1M tokens)
+#   SWAP_TOKEN       - Existing L1 ERC20 address (if empty, a fresh SwapToken is deployed)
+#   TOKEN_DECIMALS   - Token decimals (default: 6 for USDC-like)
+#   INITIAL_TOKEN_SUPPLY - Only used when deploying a fresh token (default: 1M tokens)
+#
+#   # L1 DEX configuration
+#   L1_DEX_ROUTER    - Existing Uniswap V2 router address (live mode). If unset,
+#                      deploys fresh WETH9Stub + SimpleDEXL1.
+#   L1_DEX_WETH      - Existing WETH9 address (required with L1_DEX_ROUTER).
+#   L1_DEX_SEED_ETH  - ETH amount to seed the fresh SimpleDEXL1 (test mode only).
+#   L1_DEX_SEED_TOKEN - Token amount to seed the fresh SimpleDEXL1 (test mode only).
+#
+#   # L1 Vault inventory seeding — required so L2→L1→L2 token→ETH works on day one.
+#   L1_VAULT_SEED_TOKEN - Token amount to seed the L1 vault inventory.
+#   L1_VAULT_SEED_ETH   - ETH amount to seed the L1 vault inventory.
+#
 #   LOG_LEVEL        - Forge verbosity (default: -vvvv)
 #   DRY_RUN          - Set to "true" to simulate without broadcasting
 # =============================================================================
@@ -43,10 +61,21 @@ export L1_BRIDGE=${L1_BRIDGE:-"0xc1e59A201cE4CD58590FC3Ab45081921cF186550"}
 export L2_BRIDGE=${L2_BRIDGE:-"0x7633740000000000000000000000000000000001"}
 
 export SWAP_TOKEN=${SWAP_TOKEN:-""}
-export TOKEN_DECIMALS=${TOKEN_DECIMALS:-"6"} # (Default: 6 for USDC)
+export TOKEN_DECIMALS=${TOKEN_DECIMALS:-"6"}  # default 6 for USDC-like
+export INITIAL_TOKEN_SUPPLY=${INITIAL_TOKEN_SUPPLY:-"1000000000000"}  # 1M with 6 decimals
 
-# Only specify if SWAP_TOKEN is empty
-export INITIAL_TOKEN_SUPPLY=${INITIAL_TOKEN_SUPPLY:-"1000000000000000000000000"}
+# L1 DEX mode — leave L1_DEX_ROUTER empty to auto-deploy a fresh SimpleDEXL1.
+export L1_DEX_ROUTER=${L1_DEX_ROUTER:-""}
+export L1_DEX_WETH=${L1_DEX_WETH:-""}
+# Seeds for the fresh SimpleDEXL1 (ignored if L1_DEX_ROUTER is set).
+# Default: 10 ETH + 20k tokens (6 decimals) — plenty for a demo session.
+export L1_DEX_SEED_ETH=${L1_DEX_SEED_ETH:-"10000000000000000000"}
+export L1_DEX_SEED_TOKEN=${L1_DEX_SEED_TOKEN:-"20000000000"}
+
+# L1 Vault inventory — what it uses to source the USDC/ETH side of L2→L1→L2 swaps.
+# Default: 10 ETH + 50k tokens (6 decimals).
+export L1_VAULT_SEED_TOKEN=${L1_VAULT_SEED_TOKEN:-"50000000000"}
+export L1_VAULT_SEED_ETH=${L1_VAULT_SEED_ETH:-"10000000000000000000"}
 
 export LOG_LEVEL=${LOG_LEVEL:-"-vvvv"}
 export DRY_RUN=${DRY_RUN:-"false"}
@@ -83,6 +112,17 @@ else
     echo "  Token Supply:  $INITIAL_TOKEN_SUPPLY"
 fi
 echo "  Token Decimals: $TOKEN_DECIMALS"
+if [ -n "$L1_DEX_ROUTER" ]; then
+    echo "  L1 DEX Mode:   Live (router=$L1_DEX_ROUTER, weth=$L1_DEX_WETH)"
+    if [ -z "$L1_DEX_WETH" ]; then
+        echo "ERROR: L1_DEX_WETH must be set when L1_DEX_ROUTER is set"
+        exit 1
+    fi
+else
+    echo "  L1 DEX Mode:   Test (fresh WETH9Stub + SimpleDEXL1, seeded with"
+    echo "                  ETH=$L1_DEX_SEED_ETH, tokens=$L1_DEX_SEED_TOKEN)"
+fi
+echo "  L1 Vault Seed: ETH=$L1_VAULT_SEED_ETH, tokens=$L1_VAULT_SEED_TOKEN"
 echo ""
 
 if [ "$DRY_RUN" = "true" ]; then
@@ -120,10 +160,14 @@ fi
 # Parse L1 deployment output
 L1_VAULT=$(python3 -c "import json; print(json.load(open('$L1_DEPLOY_JSON'))['CrossChainSwapVaultL1'])")
 L1_TOKEN=$(python3 -c "import json; print(json.load(open('$L1_DEPLOY_JSON'))['SwapToken'])")
+L1_ROUTER=$(python3 -c "import json; print(json.load(open('$L1_DEPLOY_JSON'))['L1Router'])")
+L1_WETH=$(python3 -c "import json; print(json.load(open('$L1_DEPLOY_JSON'))['WETH'])")
 
 echo ""
 echo "  L1 Vault:  $L1_VAULT"
 echo "  L1 Token:  $L1_TOKEN"
+echo "  L1 Router: $L1_ROUTER"
+echo "  L1 WETH:   $L1_WETH"
 echo ""
 
 # ---------------------------------------------------------------
@@ -190,6 +234,10 @@ L1_VAULT_L2=$(cast call "$L1_VAULT" "l2Vault()(address)" --rpc-url "$L1_RPC")
 L2_VAULT_L1=$(cast call "$L2_VAULT" "l1Vault()(address)" --rpc-url "$L2_RPC")
 L2_MINTER=$(cast call "$L2_TOKEN" "minter()(address)" --rpc-url "$L2_RPC")
 L2_LP=$(cast call "$L2_DEX" "liquidityProvider()(address)" --rpc-url "$L2_RPC")
+L1_ROUTER_ON_VAULT=$(cast call "$L1_VAULT" "l1Router()(address)" --rpc-url "$L1_RPC")
+L1_WETH_ON_VAULT=$(cast call "$L1_VAULT" "weth()(address)" --rpc-url "$L1_RPC")
+L1_VAULT_TOKEN_BAL=$(cast call "$L1_TOKEN" "balanceOf(address)(uint256)" "$L1_VAULT" --rpc-url "$L1_RPC" | awk '{print $1}')
+L1_VAULT_ETH_BAL=$(cast balance "$L1_VAULT" --rpc-url "$L1_RPC")
 
 ERRORS=0
 
@@ -221,6 +269,34 @@ else
     echo "  OK: SimpleDEX liquidityProvider = L2 Vault"
 fi
 
+if [ "$L1_ROUTER_ON_VAULT" != "$L1_ROUTER" ]; then
+    echo "  ERROR: L1 Vault l1Router mismatch: $L1_ROUTER_ON_VAULT != $L1_ROUTER"
+    ERRORS=$((ERRORS + 1))
+else
+    echo "  OK: L1 Vault -> L1 Router linked"
+fi
+
+if [ "$L1_WETH_ON_VAULT" != "$L1_WETH" ]; then
+    echo "  ERROR: L1 Vault weth mismatch: $L1_WETH_ON_VAULT != $L1_WETH"
+    ERRORS=$((ERRORS + 1))
+else
+    echo "  OK: L1 Vault -> WETH linked"
+fi
+
+if [ "$L1_VAULT_SEED_TOKEN" != "0" ] && [ "$L1_VAULT_TOKEN_BAL" = "0" ]; then
+    echo "  ERROR: L1 Vault token inventory is 0 (expected >= $L1_VAULT_SEED_TOKEN)"
+    ERRORS=$((ERRORS + 1))
+else
+    echo "  OK: L1 Vault token inventory = $L1_VAULT_TOKEN_BAL"
+fi
+
+if [ "$L1_VAULT_SEED_ETH" != "0" ] && [ "$L1_VAULT_ETH_BAL" = "0" ]; then
+    echo "  ERROR: L1 Vault ETH inventory is 0 (expected >= $L1_VAULT_SEED_ETH)"
+    ERRORS=$((ERRORS + 1))
+else
+    echo "  OK: L1 Vault ETH inventory = $L1_VAULT_ETH_BAL"
+fi
+
 echo ""
 
 if [ "$ERRORS" -gt 0 ]; then
@@ -239,6 +315,8 @@ echo ""
 echo " L1 Contracts:"
 echo "   SwapToken:              $L1_TOKEN"
 echo "   CrossChainSwapVaultL1:  $L1_VAULT"
+echo "   L1 Router:              $L1_ROUTER"
+echo "   WETH:                   $L1_WETH"
 echo ""
 echo " L2 Contracts:"
 echo "   SwapTokenL2:            $L2_TOKEN"
@@ -250,4 +328,8 @@ echo "   L1 Bridge:              $L1_BRIDGE"
 echo "   L2 Bridge:              $L2_BRIDGE"
 echo "   Token Decimals:         $TOKEN_DECIMALS"
 echo ""
+echo " Demo next steps:"
+echo "   1. Seed the L2 DEX (addLiquidityToL2) from L1 so L1→L2→L1 swaps have liquidity."
+echo "   2. Set up the UI .env with the above addresses."
+echo "   3. For L2→L1→L2 smoke test, use ./script/initiate_l2_to_l1_swap.sh."
 echo "============================================="

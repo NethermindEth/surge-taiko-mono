@@ -33,6 +33,27 @@ interface IRealTimeInbox {
         uint48 maxAnchorBlockNumber;
     }
 
+    /// @notice Input for `tentativePropose` (L2→L1→L2 flow).
+    /// @dev Splits signal slots into two categories:
+    ///      - existingSignals: already-sent L1→L2 signals, verified immediately
+    ///      - requiredReturnSignals: L1 signals that must exist by `finalizePropose`.
+    ///        These are injected as fast signals on L2 (the ZK proof commits to them)
+    ///        but are produced later in the same L1 multicall by the L1 callback of a
+    ///        L2→L1 bridge processMessage.
+    /// @dev The anchor on L2 consumes the UNION of both lists as fast signals. The ZK
+    ///      proof commits to the union hash. The inbox splits the verification timing.
+    struct ProposeInputV2 {
+        /// @notice Blob reference for proposal data.
+        LibBlobs.BlobReference blobReference;
+        /// @notice L1 signals already on L1, verified at `tentativePropose` time.
+        bytes32[] existingSignals;
+        /// @notice L1 signals that must exist on L1 by `finalizePropose`. Produced by
+        ///         the L1 callback during the multicall (between tentative and finalize).
+        bytes32[] requiredReturnSignals;
+        /// @notice The max L1 block number to verify linkage.
+        uint48 maxAnchorBlockNumber;
+    }
+
     /// @notice Transient proposal (not stored on-chain, only hashed).
     struct Proposal {
         /// @notice The height of highest anchor block.
@@ -83,6 +104,12 @@ interface IRealTimeInbox {
     /// @param genesisBlockHash The genesis block hash.
     event Activated(bytes32 genesisBlockHash);
 
+    /// @notice Emitted when a tentative proposal is registered. The proposal is not
+    ///         finalized until `finalizePropose` completes in the same transaction.
+    /// @param proposalId Identifier for the pending proposal (equal to its proposal hash).
+    /// @param requiredReturnSignalsHash Hash of the required return signal list.
+    event TentativeProposed(bytes32 indexed proposalId, bytes32 requiredReturnSignalsHash);
+
     // ---------------------------------------------------------------
     // External Transactional Functions
     // ---------------------------------------------------------------
@@ -103,6 +130,36 @@ interface IRealTimeInbox {
         bytes calldata _proof
     )
         external;
+
+    /// @notice Tentatively proposes L2 blocks whose validity depends on L1 return signals
+    ///         that will be produced later in the same L1 multicall.
+    /// @dev Must be paired with `finalizePropose` in the same transaction. Between the two,
+    ///      the pending checkpoint is saved so `Bridge.processMessage` can verify
+    ///      L2→L1 signals produced by the proposed L2 block. The L1 callback triggered by
+    ///      `processMessage` is expected to produce the `requiredReturnSignals`.
+    /// @dev Emits `ProposedAndProved` and updates the chain head inside this call.
+    ///      If `finalizePropose` reverts or is not called with matching signals, the
+    ///      entire transaction reverts (by caller convention — the builder always pairs them).
+    /// @param _data Encoded `ProposeInputV2` struct.
+    /// @param _checkpoint Checkpoint data for the proven state.
+    /// @param _proof The validity proof (SurgeVerifier SubProof[] encoded).
+    /// @return proposalId_ Identifier for the pending proposal (= proposal hash).
+    function tentativePropose(
+        bytes calldata _data,
+        ICheckpointStore.Checkpoint calldata _checkpoint,
+        bytes calldata _proof
+    )
+        external
+        returns (bytes32 proposalId_);
+
+    /// @notice Finalizes a tentative proposal by verifying that all required return signals
+    ///         have been produced on L1 during the multicall.
+    /// @dev Must be called in the same transaction as `tentativePropose`. Reverts if any
+    ///      required signal is missing or if the signal list does not hash-match what
+    ///      was committed in `tentativePropose`.
+    /// @param _requiredReturnSignals The required return signal slots (same order and
+    ///        contents as in `ProposeInputV2.requiredReturnSignals`).
+    function finalizePropose(bytes32[] calldata _requiredReturnSignals) external;
 
     // ---------------------------------------------------------------
     // External View Functions

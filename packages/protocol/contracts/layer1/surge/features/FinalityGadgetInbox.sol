@@ -55,7 +55,12 @@ abstract contract FinalityGadgetInbox is Inbox {
     /// @param _commitments ABI-encoded array of Commitment structs to prove conflicts between
     /// @param _proofs Array of proofs corresponding to each commitment (index 0 for finalizing,
     /// rest for conflicting)
-    function proveConflicts(bytes calldata _commitments, bytes[] calldata _proofs) external {
+    function proveConflicts(
+        bytes calldata _commitments,
+        bytes[] calldata _proofs
+    )
+        external
+    {
         Commitment[] memory commitments = _decodeCommitments(_commitments);
 
         // Multiple conflicting commitments should be provided

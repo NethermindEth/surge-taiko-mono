@@ -5,7 +5,7 @@ const { ethers } = require("ethers");
 const linker = require("solc/linker");
 const { computeStorageSlots, getStorageLayout } = require("./utils");
 const ARTIFACTS_PATH = path.join(__dirname, "../../../out/layer2");
-// const SHARED_ARTIFACTS_PATH = path.join(__dirname, "../../../out/shared");
+const SHARED_ARTIFACTS_PATH = path.join(__dirname, "../../../out/shared");
 
 const IMPLEMENTATION_SLOT =
     "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
@@ -194,6 +194,14 @@ async function generateContractConfigs(
         // Libraries
         LibNetwork: require(
             path.join(ARTIFACTS_PATH, "./LibNetwork.sol/LibNetwork.json"),
+        ),
+        // Stateless cross-chain relay — forwards bridge messages so the
+        // target contract sees the relay (not the bridge) as msg.sender.
+        CrossChainRelay: require(
+            path.join(
+                SHARED_ARTIFACTS_PATH,
+                "./CrossChainRelay.sol/CrossChainRelay.json",
+            ),
         ),
     };
 
@@ -760,6 +768,11 @@ async function generateContractConfigs(
             address: addressMap.LibNetwork,
             deployedBytecode:
                 contractArtifacts.LibNetwork.deployedBytecode.object,
+        },
+        CrossChainRelay: {
+            address: addressMap.CrossChainRelay,
+            deployedBytecode:
+                contractArtifacts.CrossChainRelay.deployedBytecode.object,
         },
     };
 }

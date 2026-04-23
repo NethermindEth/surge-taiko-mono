@@ -3,4 +3,5 @@ lib/
 contracts/layer1/automata-attestation/
 contracts/layer1/preconf/avs-mvp/
 contracts/layer1/preconf/libs/LibBLS12381.sol
+contracts/layer1/verifiers/zisk-vendor/
 test/shared/thirdparty/

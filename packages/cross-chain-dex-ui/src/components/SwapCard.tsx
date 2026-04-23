@@ -1,5 +1,6 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { parseUnits, formatUnits } from 'viem';
+import { useAccount } from 'wagmi';
 import { TokenInput } from './TokenInput';
 import { SwapDetails } from './SwapDetails';
 import { SwapPath } from './SwapPath';
@@ -7,30 +8,48 @@ import { SwapButton } from './SwapButton';
 import { useSmartWallet } from '../context/SmartWalletContext';
 import { useDexReserves } from '../hooks/useDexReserves';
 import { useSwapQuote } from '../hooks/useSwapQuote';
+import { useL1DexQuote } from '../hooks/useL1DexQuote';
 import { useSharedTokenBalances } from '../context/SmartWalletContext';
+import { useTokenBalances } from '../hooks/useTokenBalances';
 import { useUserOp } from '../hooks/useUserOp';
-import { SwapDirection } from '../types';
-import { ETH_TOKEN, USDC_TOKEN } from '../lib/constants';
+import { useInitiateL2Swap } from '../hooks/useInitiateL2Swap';
+import { SwapDirection, SwapVenue } from '../types';
+import { ETH_TOKEN, USDC_TOKEN, DEFAULT_SLIPPAGE } from '../lib/constants';
+import { calculateMinOutput } from '../lib/userOp';
 import { DisclaimerModal } from './DisclaimerModal';
 import { useDisclaimer } from '../hooks/useDisclaimer';
 import { WarningBanner } from './WarningBanner';
 
-const MAX_SWAP_AMOUNT = 1; // $1 max per swap
+const MAX_SWAP_AMOUNT = 1; // $1 max per swap (L2_DEX venue only; audience demo guard-rail)
 
 interface SwapCardProps {
   onSetupWallet: () => void;
   onFundWallet?: () => void;
+  venue: SwapVenue;
+  onVenueChange: (v: SwapVenue) => void;
 }
 
-export function SwapCard({ onSetupWallet, onFundWallet: _onFundWallet }: SwapCardProps) {
+export function SwapCard({ onSetupWallet, onFundWallet: _onFundWallet, venue, onVenueChange: _onVenueChange }: SwapCardProps) {
   const { smartWallet, isConnected, accountMode } = useSmartWallet();
-  const { ethReserve, tokenReserve, isLoading: reservesLoading } = useDexReserves();
-  const { ethBalance, usdcBalance } = useSharedTokenBalances();
-  const { executeSwap, isPending } = useUserOp(accountMode);
+  const { address: eoa } = useAccount();
+  const { ethReserve, tokenReserve } = useDexReserves();
+  // Swap-pane balances track the account that actually signs the swap:
+  // L1_DEX (L2→L1→L2) is signed by the EOA on L2; L2_DEX (L1→L2→L1) is
+  // signed by the Smart Account on L1. Header balances remain on the Smart
+  // Account via useSharedTokenBalances.
+  const smartWalletBalances = useSharedTokenBalances();
+  const eoaL2Balances = useTokenBalances(eoa ?? null, 'l2');
+  const swapBalances = venue === 'L1_DEX' ? eoaL2Balances : smartWalletBalances;
+  const { ethBalance, usdcBalance } = swapBalances;
+  const { executeSwap, isPending: isUserOpPending } = useUserOp(accountMode);
+  const { initiate: initiateL2Swap, isPending: isL2SwapPending } = useInitiateL2Swap();
   const { isDisclaimerOpen, requireDisclaimer, onAccept, onCancel } = useDisclaimer();
 
   const [direction, setDirection] = useState<SwapDirection>('ETH_TO_USDC');
   const [inputAmount, setInputAmount] = useState('');
+
+  const isL1Venue = venue === 'L1_DEX';
+  const isPending = isL1Venue ? isL2SwapPending : isUserOpPending;
 
   const inputToken = direction === 'ETH_TO_USDC' ? ETH_TOKEN : USDC_TOKEN;
   const outputToken = direction === 'ETH_TO_USDC' ? USDC_TOKEN : ETH_TOKEN;
@@ -43,19 +62,35 @@ export function SwapCard({ onSetupWallet, onFundWallet: _onFundWallet }: SwapCar
     }
   }, [inputAmount, inputToken.decimals]);
 
-  const quote = useSwapQuote({
+  // Quote source is venue-specific. Both hooks are cheap memo/read-only, so we call both
+  // but only surface the one for the active venue.
+  const l2Quote = useSwapQuote({
     direction,
-    amountIn,
+    amountIn: isL1Venue ? 0n : amountIn,
     ethReserve,
     tokenReserve,
   });
+  const l1Quote = useL1DexQuote({
+    direction,
+    amountIn: isL1Venue ? amountIn : 0n,
+  });
+  const quote = isL1Venue ? l1Quote : l2Quote;
+
+  // Balances: L2_DEX uses the smart wallet on L1, L1_DEX uses the EOA on L2.
+  // Context balances are already network-aware (L1=smart wallet, L2=EOA)
   const inputBalance = direction === 'ETH_TO_USDC' ? ethBalance : usdcBalance;
   const outputBalance = direction === 'ETH_TO_USDC' ? usdcBalance : ethBalance;
 
   const hasInsufficientBalance = amountIn > inputBalance;
-  const exceedsSwapLimit = amountIn > parseUnits(String(MAX_SWAP_AMOUNT), inputToken.decimals)
-    ? `Max ${MAX_SWAP_AMOUNT} ${inputToken.symbol} per swap`
-    : undefined;
+  const exceedsSwapLimit =
+    !isL1Venue && amountIn > parseUnits(String(MAX_SWAP_AMOUNT), inputToken.decimals)
+      ? `Max ${MAX_SWAP_AMOUNT} ${inputToken.symbol} per swap`
+      : undefined;
+
+  // Venue is now controlled by the network selector in App — clear input on change
+  useEffect(() => {
+    setInputAmount('');
+  }, [venue]);
 
   const handleSwapDirection = useCallback(() => {
     setDirection((prev) => (prev === 'ETH_TO_USDC' ? 'USDC_TO_ETH' : 'ETH_TO_USDC'));
@@ -63,19 +98,44 @@ export function SwapCard({ onSetupWallet, onFundWallet: _onFundWallet }: SwapCar
   }, []);
 
   const handleSwap = useCallback(async () => {
-    if (!smartWallet || amountIn === 0n) return;
+    if (amountIn === 0n) return;
 
-    const success = await executeSwap({
+    if (isL1Venue) {
+      if (!eoa) return;
+      const minOut = calculateMinOutput(quote.amountOut, DEFAULT_SLIPPAGE);
+      const ok = await initiateL2Swap({
+        direction,
+        amountIn,
+        minAmountOut: minOut,
+        recipient: eoa,
+        expectedAmountOut: quote.amountOut,
+      });
+      if (ok) setInputAmount('');
+      return;
+    }
+
+    if (!smartWallet) return;
+    const ok = await executeSwap({
       direction,
       amountIn,
       expectedAmountOut: quote.amountOut,
       smartWallet,
     });
+    if (ok) setInputAmount('');
+  }, [
+    isL1Venue,
+    eoa,
+    smartWallet,
+    amountIn,
+    direction,
+    quote.amountOut,
+    executeSwap,
+    initiateL2Swap,
+  ]);
 
-    if (success) {
-      setInputAmount('');
-    }
-  }, [smartWallet, amountIn, direction, quote.amountOut, executeSwap]);
+  // L1 venue bypasses smart-wallet setup — the connected EOA is sufficient.
+  const walletGateOk = isL1Venue ? !!eoa : !!smartWallet;
+  const needsSetupWallet = isConnected && !isL1Venue && !smartWallet;
 
   return (
     <div className="flex flex-col md:flex-row items-start gap-4 justify-center w-full relative z-10">
@@ -84,10 +144,11 @@ export function SwapCard({ onSetupWallet, onFundWallet: _onFundWallet }: SwapCar
         {/* Header */}
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Swap</h2>
-          {reservesLoading && (
-            <span className="text-xs text-gray-400">Loading reserves...</span>
-          )}
+          <span className={`text-xs font-medium ${isL1Venue ? 'text-cyan-400' : 'text-emerald-400'}`}>
+            {isL1Venue ? 'Via EOA' : 'Via Smart Account'}
+          </span>
         </div>
+
         <WarningBanner />
 
         {/* Input Token */}
@@ -138,28 +199,30 @@ export function SwapCard({ onSetupWallet, onFundWallet: _onFundWallet }: SwapCar
 
         {/* Swap Button */}
         <SwapButton
-          onClick={isConnected && !smartWallet ? onSetupWallet : () => requireDisclaimer(handleSwap)}
+          onClick={
+            needsSetupWallet ? onSetupWallet : () => requireDisclaimer(handleSwap)
+          }
           disabled={false}
           isLoading={isPending}
           isConnected={isConnected}
-          hasSmartWallet={!!smartWallet}
+          hasSmartWallet={walletGateOk}
           hasInsufficientBalance={hasInsufficientBalance}
           hasInsufficientLiquidity={quote.insufficientLiquidity}
           hasAmount={amountIn > 0n}
           exceedsSwapLimit={exceedsSwapLimit}
+          needsApproval={isL1Venue && direction === 'USDC_TO_ETH'}
         />
 
       </div>
 
-      {/* Right panel — trade details (shown when amount is entered) */}
-      {amountIn > 0n && (
-        <div className="w-full md:max-w-sm bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20 animate-panel-in">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Trade Details</h3>
-          <SwapDetails quote={quote} direction={direction} amountIn={amountIn} />
-          <SwapPath direction={direction} show={true} />
-        </div>
-      )}
+      {/* Right panel — trade details (always visible; shows "-" placeholders when no input) */}
+      <div className="w-full md:max-w-sm bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20">
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Trade Details</h3>
+        <SwapPath direction={direction} venue={venue} />
+        <SwapDetails quote={quote} direction={direction} amountIn={amountIn} />
+      </div>
       <DisclaimerModal isOpen={isDisclaimerOpen} onAccept={onAccept} onCancel={onCancel} />
     </div>
   );
 }
+

@@ -98,10 +98,27 @@ export function useSmartWalletInternal() {
   const [has7702Delegation, setHas7702Delegation] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
 
-  const { writeContract, data: txHash, isPending: isCreating, reset } = useWriteContract();
+  const { writeContract, data: txHash, isPending: isCreating, reset, error: writeError } = useWriteContract();
   const { data: receipt, isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash: txHash,
   });
+
+  // Debug logging for wallet creation flow
+  useEffect(() => {
+    if (txHash) console.log('[SmartWallet] tx submitted, hash:', txHash);
+  }, [txHash]);
+  useEffect(() => {
+    if (writeError) console.error('[SmartWallet] writeContract error:', writeError);
+  }, [writeError]);
+  useEffect(() => {
+    if (isConfirming) console.log('[SmartWallet] waiting for receipt...');
+  }, [isConfirming]);
+  useEffect(() => {
+    if (receipt) console.log('[SmartWallet] receipt:', receipt.status, 'block:', receipt.blockNumber);
+  }, [receipt]);
+  useEffect(() => {
+    console.log('[SmartWallet] state: isPending=', isCreating, 'isConfirming=', isConfirming, 'isSuccess=', isSuccess);
+  }, [isCreating, isConfirming, isSuccess]);
 
   const { executeCreateL2Wallet } = useUserOp(accountMode);
   const l2PollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -278,12 +295,22 @@ export function useSmartWalletInternal() {
     const initializer = buildSafeSetupCalldata(ownerAddress, SAFE_FALLBACK_HANDLER);
     const saltNonce = BigInt(keccak256(encodePacked(['address'], [ownerAddress])));
 
+    console.log('[createSmartWallet] owner:', ownerAddress);
+    console.log('[createSmartWallet] factory:', SAFE_PROXY_FACTORY);
+    console.log('[createSmartWallet] singleton:', SAFE_SINGLETON);
+    console.log('[createSmartWallet] saltNonce:', saltNonce.toString());
+    console.log('[createSmartWallet] initializer:', initializer);
+    console.log('[createSmartWallet] calling writeContract...');
+
     writeContract({
       address: SAFE_PROXY_FACTORY,
       abi: SafeProxyFactoryABI,
       functionName: 'createProxyWithNonce',
       args: [SAFE_SINGLETON, initializer, saltNonce],
-    });
+    }, {
+      onSuccess: (hash: string) => console.log('[createSmartWallet] tx hash:', hash),
+      onError: (err: Error) => console.error('[createSmartWallet] error:', err),
+    } as any);
   }, [ownerAddress, writeContract]);
 
   const createL2Wallet = useCallback(async (): Promise<void> => {

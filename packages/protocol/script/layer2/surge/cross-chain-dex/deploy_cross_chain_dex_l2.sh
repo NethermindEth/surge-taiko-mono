@@ -14,8 +14,8 @@ export L2_RPC=${L2_RPC:-"http://45.33.84.128:8547"}
 # Bridge addresses
 export L2_BRIDGE=${L2_BRIDGE:-"0x7633740000000000000000000000000000000001"}
 
-# Token decimals (must match L1 token; default 18)
-export TOKEN_DECIMALS=${TOKEN_DECIMALS:-"18"}
+# Token decimals (must match L1 token; default 6 for USDC-like)
+export TOKEN_DECIMALS=${TOKEN_DECIMALS:-"6"}
 
 # Get chain IDs from RPCs
 echo "Getting chain IDs from RPCs..."

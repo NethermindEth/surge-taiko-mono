@@ -176,6 +176,156 @@ export const CrossChainSwapVaultL1ABI = [
     outputs: [{ name: '', type: 'address' }],
     stateMutability: 'view',
   },
+  {
+    type: 'function',
+    name: 'l1Router',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'weth',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+] as const;
+
+/// ABI fragment for the L2→L1→L2 entry points on `CrossChainSwapVaultL2`.
+/// Also includes events the UI subscribes to for the "included"/"complete" phases.
+export const CrossChainSwapVaultL2ABI = [
+  {
+    type: 'function',
+    name: 'swapETHForTokenViaL1',
+    inputs: [
+      { name: '_minTokenOut', type: 'uint256' },
+      { name: '_recipient', type: 'address' },
+      {
+        name: '_returnMessage',
+        type: 'tuple',
+        components: [
+          { name: 'id', type: 'uint64' },
+          { name: 'fee', type: 'uint64' },
+          { name: 'gasLimit', type: 'uint32' },
+          { name: 'from', type: 'address' },
+          { name: 'srcChainId', type: 'uint64' },
+          { name: 'srcOwner', type: 'address' },
+          { name: 'destChainId', type: 'uint64' },
+          { name: 'destOwner', type: 'address' },
+          { name: 'to', type: 'address' },
+          { name: 'value', type: 'uint256' },
+          { name: 'data', type: 'bytes' },
+        ],
+      },
+    ],
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    name: 'swapTokenForETHViaL1',
+    inputs: [
+      { name: '_amountIn', type: 'uint256' },
+      { name: '_minETHOut', type: 'uint256' },
+      { name: '_recipient', type: 'address' },
+      {
+        name: '_returnMessage',
+        type: 'tuple',
+        components: [
+          { name: 'id', type: 'uint64' },
+          { name: 'fee', type: 'uint64' },
+          { name: 'gasLimit', type: 'uint32' },
+          { name: 'from', type: 'address' },
+          { name: 'srcChainId', type: 'uint64' },
+          { name: 'srcOwner', type: 'address' },
+          { name: 'destChainId', type: 'uint64' },
+          { name: 'destOwner', type: 'address' },
+          { name: 'to', type: 'address' },
+          { name: 'value', type: 'uint256' },
+          { name: 'data', type: 'bytes' },
+        ],
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    name: 'L1DexSwapInitiatedETHForToken',
+    inputs: [
+      { name: 'user', type: 'address', indexed: true },
+      { name: 'recipient', type: 'address', indexed: true },
+      { name: 'ethIn', type: 'uint256', indexed: false },
+      { name: 'minTokenOut', type: 'uint256', indexed: false },
+      { name: 'outboundMsgHash', type: 'bytes32', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'L1DexSwapInitiatedTokenForETH',
+    inputs: [
+      { name: 'user', type: 'address', indexed: true },
+      { name: 'recipient', type: 'address', indexed: true },
+      { name: 'tokenIn', type: 'uint256', indexed: false },
+      { name: 'minETHOut', type: 'uint256', indexed: false },
+      { name: 'outboundMsgHash', type: 'bytes32', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'L1DexSwapCompletedETHForToken',
+    inputs: [
+      { name: 'recipient', type: 'address', indexed: true },
+      { name: 'tokenOut', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'L1DexSwapCompletedTokenForETH',
+    inputs: [
+      { name: 'recipient', type: 'address', indexed: true },
+      { name: 'ethOut', type: 'uint256', indexed: false },
+    ],
+  },
+] as const;
+
+/// Unified ABI fragment exposed by both `SimpleDEXL1` and any Uniswap V2 router.
+/// The cross-chain DEX UI treats the L1 router opaquely — it only needs the
+/// two quote / swap entry points via the V2 router ABI plus WETH().
+export const UniswapV2RouterABI = [
+  {
+    type: 'function',
+    name: 'WETH',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getAmountsOut',
+    inputs: [
+      { name: 'amountIn', type: 'uint256' },
+      { name: 'path', type: 'address[]' },
+    ],
+    outputs: [{ name: 'amounts', type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+] as const;
+
+/// Extra view methods that are only available on our `SimpleDEXL1` (not on real Uniswap).
+/// Used as a fallback when `getAmountsOut` reverts (e.g. no pair deployed yet).
+export const SimpleDEXL1ABI = [
+  {
+    type: 'function',
+    name: 'getReserves',
+    inputs: [],
+    outputs: [
+      { name: 'ethReserve_', type: 'uint256' },
+      { name: 'tokenReserve_', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
 ] as const;
 
 export const SimpleDEXABI = [

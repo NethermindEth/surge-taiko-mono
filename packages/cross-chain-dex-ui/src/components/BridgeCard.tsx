@@ -137,9 +137,7 @@ export function BridgeCard({ onSetupWallet, onFundWallet }: BridgeCardProps) {
       <div className="w-full md:max-w-md bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20 hover-glow transition-all duration-[1000ms] ease-[cubic-bezier(0.16,1,0.3,1)]">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Bridge</h2>
-          <span className="text-xs text-gray-400">
-            {isDeposit ? "L1 \u2192 L2" : "L2 \u2192 L1"}
-          </span>
+          <span className="text-xs font-medium text-emerald-400">Via Smart Account</span>
         </div>
         <WarningBanner />
 

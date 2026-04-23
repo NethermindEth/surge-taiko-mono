@@ -8,6 +8,7 @@ interface SwapButtonProps {
   hasInsufficientLiquidity: boolean;
   hasAmount: boolean;
   exceedsSwapLimit?: string;
+  needsApproval?: boolean;
 }
 
 export function SwapButton({
@@ -20,16 +21,17 @@ export function SwapButton({
   hasInsufficientLiquidity,
   hasAmount,
   exceedsSwapLimit,
+  needsApproval,
 }: SwapButtonProps) {
   const getButtonText = () => {
-    if (isLoading) return 'Swapping...';
+    if (isLoading) return needsApproval ? 'Approving and Swapping...' : 'Swapping...';
     if (!isConnected) return 'Connect Wallet';
     if (!hasSmartWallet) return 'Setup Smart Wallet First';
     if (!hasAmount) return 'Enter Amount';
     if (exceedsSwapLimit) return exceedsSwapLimit;
     if (hasInsufficientLiquidity) return 'Insufficient Liquidity';
     if (hasInsufficientBalance) return 'Insufficient Balance';
-    return 'Swap';
+    return needsApproval ? 'Approve and Swap' : 'Swap';
   };
 
   const isDisabled = disabled || isLoading || !isConnected || !hasSmartWallet || !hasAmount || hasInsufficientBalance || hasInsufficientLiquidity || !!exceedsSwapLimit;
@@ -47,7 +49,7 @@ export function SwapButton({
       {isLoading ? (
         <span className="flex items-center justify-center gap-2">
           <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          Swapping...
+          {needsApproval ? 'Approving and Swapping...' : 'Swapping...'}
         </span>
       ) : (
         getButtonText()

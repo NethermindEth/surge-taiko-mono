@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { Address, Hex } from 'viem';
 import { useWalletClient, useSwitchChain, useConfig } from 'wagmi';
 import { getWalletClient } from 'wagmi/actions';
@@ -23,13 +23,13 @@ import {
   userOpsToSafeTx,
   sendUserOpToBuilder,
   calculateMinOutput,
-  queryTxStatus,
 } from '../lib/userOp';
 import { getSafeNonce, buildSafeTxTypedData, buildExecTransactionCalldata } from '../lib/safeOp';
 import { UserOp } from '../types';
 import { CHAIN_ID, L2_CHAIN_ID, DEFAULT_SLIPPAGE } from '../lib/constants';
 import { l1PublicClient, l2PublicClient } from '../lib/config';
 import { useTxStatus } from '../context/TxStatusContext';
+import { useTxStatusPolling } from './useTxStatusPolling';
 
 function parseWalletError(err: unknown): string {
   const raw = err instanceof Error ? err.message : 'Operation failed';
@@ -86,83 +86,20 @@ export function useUserOp(accountMode: AccountMode = 'safe'): UseUserOpReturn {
   const { switchChainAsync } = useSwitchChain();
   const wagmiConfig = useConfig();
   const { setTxStatus } = useTxStatus();
+  const { pollStatus: pollStatusShared, txHashRef } = useTxStatusPolling();
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const txHashRef = useRef<string | undefined>(undefined);
 
-  useEffect(() => {
-    return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-    };
-  }, []);
-
-  const pollStatus = useCallback((query: { userOpId: number } | { txHash: string }): Promise<boolean> => {
-    return new Promise((resolve) => {
-      setTxStatus({ phase: 'sequencing' });
-
-      // Phase ordering: sequencing(0) < proving(1) < proposing(2) < complete(3)
-      // proving comes before proposing because the ZK proof is generated before L1 submission
-      const phaseOrder: Record<string, number> = {
-        sequencing: 0, proving: 1, proposing: 2, complete: 3, rejected: 3,
-      };
-      let highestPhase = 0;
-      let hasSeenProving = false;
-      let pollCount = 0;
-      const MAX_POLLS = 60; // 1 minute at 1s intervals
-
-      pollIntervalRef.current = setInterval(async () => {
-        pollCount++;
-        if (pollCount > MAX_POLLS) {
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-          setTxStatus({ phase: 'rejected', errorMessage: 'Transaction timed out' });
-          setError(new Error('Transaction timed out'));
-          setIsPending(false);
-          resolve(false);
-          return;
-        }
-
-        const status = await queryTxStatus(query);
-        if (!status) return;
-
-        if (status.status === 'Pending') {
-          if (highestPhase <= phaseOrder.sequencing) {
-            setTxStatus({ phase: 'sequencing' });
-          }
-        } else if (status.status === 'ProvingBlock') {
-          hasSeenProving = true;
-          if (phaseOrder.proving > highestPhase) {
-            highestPhase = phaseOrder.proving;
-            setTxStatus({ phase: 'proving' });
-          }
-        } else if (status.status === 'Processing') {
-          txHashRef.current = status.tx_hash;
-          // Only show "proposing" after proving has been seen
-          // Before proving, Processing means "sequencing"
-          if (hasSeenProving && phaseOrder.proposing > highestPhase) {
-            highestPhase = phaseOrder.proposing;
-            setTxStatus({ phase: 'proposing' });
-          } else if (!hasSeenProving && highestPhase <= phaseOrder.sequencing) {
-            setTxStatus({ phase: 'sequencing' });
-          }
-        } else if (status.status === 'Executed') {
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-          setTxStatus({ phase: 'complete', txHash: txHashRef.current });
-          setIsPending(false);
-          resolve(true);
-        } else if (status.status === 'Rejected') {
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-          setTxStatus({ phase: 'rejected', errorMessage: status.reason });
-          setError(new Error(status.reason));
-          setIsPending(false);
-          resolve(false);
-        }
-      }, 1000);
-    });
-  }, [setTxStatus]);
+  // Wrap the shared poller so isPending/error stay in sync with the final result.
+  const pollStatus = useCallback(
+    async (query: { userOpId: number } | { txHash: string }): Promise<boolean> => {
+      const ok = await pollStatusShared(query);
+      setIsPending(false);
+      if (!ok) setError(new Error('Transaction failed'));
+      return ok;
+    },
+    [pollStatusShared]
+  );
 
   const executeGenericOps = useCallback(
     async (ops: UserOp[], smartWallet: Address, chainId?: number): Promise<boolean> => {
