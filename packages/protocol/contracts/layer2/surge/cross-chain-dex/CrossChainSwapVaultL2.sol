@@ -54,7 +54,7 @@ contract CrossChainSwapVaultL2 {
     address public immutable admin;
     address public l1Vault;
 
-    uint32 public constant GAS_LIMIT = 1_000_000;
+    uint32 public constant GAS_LIMIT = 2_000_000;
 
     // ---------------------------------------------------------------
     // Events

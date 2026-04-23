@@ -1,46 +1,43 @@
 #!/bin/sh
 
-# This script sets up the Cross-Chain DEX by setting L1 handler on L2 handler.
+# This script sets up the Cross-Chain DEX by linking L1Vault into L2Vault.
 # Run this on L2 after both L1 and L2 contracts are deployed.
 set -e
 
-# Private key for deployment
-export PRIVATE_KEY=${PRIVATE_KEY:-"0x94eb3102993b41ec55c241060f47daa0f6372e2e3ad7e91612ae36c364042e44"}
+# Foundry keystore account for the signer (must be the L2Vault admin)
+export ACCOUNT=${ACCOUNT:-"surge_gnosis_deployer"}
+export PASSWORD_FILE=${PASSWORD_FILE:-"/tmp/.keystore-pw"}
 
 # Network configuration
-export L2_RPC=${L2_RPC:-"ws://45.33.84.128:8548"}
+export L2_RPC=${L2_RPC:-"https://rpc.realtime.surge.wtf"}
 
-# Handler addresses (must be set after deployment)
-export L1_HANDLER=${L1_HANDLER:-""}
-export L2_HANDLER=${L2_HANDLER:-""}
+# Vault addresses (must be set after deployment)
+export L1_VAULT=${L1_VAULT:-""}
+export L2_VAULT=${L2_VAULT:-""}
 
-if [ -z "$L1_HANDLER" ] || [ -z "$L2_HANDLER" ]; then
-    echo "ERROR: L1_HANDLER and L2_HANDLER must be set"
-    echo "Usage: L1_HANDLER=0x... L2_HANDLER=0x... ./setup_cross_chain_dex_l2.sh"
+if [ -z "$L1_VAULT" ] || [ -z "$L2_VAULT" ]; then
+    echo "ERROR: L1_VAULT and L2_VAULT must be set"
+    echo "Usage: L1_VAULT=0x... L2_VAULT=0x... ./setup_cross_chain_dex_l2.sh"
     exit 1
 fi
 
 # Broadcast transactions
 export BROADCAST=${BROADCAST:-false}
 
-# Parameterize broadcasting
 export BROADCAST_ARG=""
 if [ "$BROADCAST" = "true" ]; then
     BROADCAST_ARG="--broadcast"
 fi
 
-# Parameterize log level
 export LOG_LEVEL=${LOG_LEVEL:-"-vvvv"}
-
-# Parametrize foundry profile
 export FOUNDRY_PROFILE=${FOUNDRY_PROFILE:-"layer2"}
 
 echo "=====================================";
 echo "Setting up Cross-Chain DEX (L2)";
 echo "=====================================";
 echo "L2 RPC: $L2_RPC"
-echo "L1 Handler: $L1_HANDLER"
-echo "L2 Handler: $L2_HANDLER"
+echo "L1 Vault: $L1_VAULT"
+echo "L2 Vault: $L2_VAULT"
 echo ""
 
 if [ "$BROADCAST" = "true" ]; then
@@ -54,4 +51,5 @@ forge script ./script/layer2/surge/cross-chain-dex/SetupCrossChainDexL2.s.sol:Se
     --fork-url $L2_RPC \
     $BROADCAST_ARG \
     $LOG_LEVEL \
-    --private-key $PRIVATE_KEY
+    --account $ACCOUNT \
+    --password-file $PASSWORD_FILE
