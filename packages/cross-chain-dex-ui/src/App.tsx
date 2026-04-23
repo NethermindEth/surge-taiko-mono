@@ -92,17 +92,20 @@ function AppContent() {
     }
   }, [isConnected, isWrongNetwork, smartWallet, isLoading, showWalletSetup, dismissedWalletSetup, accountMode, showModeSelector]);
 
-  // Auto-show fund wallet modal
+  // Auto-show fund wallet modal.
+  // On L2, suppress until the L2 Safe actually exists — creation is initiated from L1
+  // via the bridge, so funding an undeployed L2 address is a dead-end for the user.
   useEffect(() => {
     if (accountMode === 'ambire') return;
     if (!smartWallet || hasShownFundModal || balancesLoading || isLoading || showNetworkSetup || showWalletSetup) return;
+    if (selectedNetwork === 'l2' && !l2WalletExists) return;
     const needsFunding = ethBalance === 0n || usdcBalance === 0n;
     const needsL2 = accountMode === 'safe' && !l2WalletExists;
     if (needsFunding || needsL2) {
       setShowFundWallet(true);
       setHasShownFundModal(true);
     }
-  }, [smartWallet, ethBalance, usdcBalance, balancesLoading, hasShownFundModal, isLoading, l2WalletExists, showNetworkSetup, showWalletSetup, accountMode]);
+  }, [smartWallet, ethBalance, usdcBalance, balancesLoading, hasShownFundModal, isLoading, l2WalletExists, showNetworkSetup, showWalletSetup, accountMode, selectedNetwork]);
 
   const availableTabs: ActiveTab[] = selectedNetwork === 'l2'
     ? ['swap']

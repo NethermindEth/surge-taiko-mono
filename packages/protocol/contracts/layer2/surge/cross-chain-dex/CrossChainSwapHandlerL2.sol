@@ -184,7 +184,7 @@ contract CrossChainSwapHandlerL2 {
         IBridge.Message memory message = IBridge.Message({
             id: 0,
             fee: 0,
-            gasLimit: 1_000_000,
+            gasLimit: 2_000_000,
             from: address(0),
             srcChainId: 0,
             srcOwner: address(this),
@@ -229,7 +229,7 @@ contract CrossChainSwapHandlerL2 {
         IBridge.Message memory message = IBridge.Message({
             id: 0,
             fee: 0,
-            gasLimit: 1_000_000,
+            gasLimit: 1_500_000,
             from: address(0),
             srcChainId: 0,
             srcOwner: address(this),
@@ -270,7 +270,7 @@ contract CrossChainSwapHandlerL2 {
         IBridge.Message memory message = IBridge.Message({
             id: 0,
             fee: 0,
-            gasLimit: 1_000_000,
+            gasLimit: 1_500_000,
             from: address(0),
             srcChainId: 0,
             srcOwner: address(this),
