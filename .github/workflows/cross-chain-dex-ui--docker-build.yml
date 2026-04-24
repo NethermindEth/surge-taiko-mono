@@ -14,14 +14,14 @@ on:
         default: "http://localhost:8547"
         type: string
       viteBuilderRpcUrl:
-        description: "Builder RPC URL (VITE_BUILDER_RPC_URL)"
+        description: "Builder RPC URL (VITE_BUILDER_RPC_URL) — use /api/builder in prod to route via nginx and avoid CORS"
         required: false
-        default: "http://localhost:4545"
+        default: "/api/builder"
         type: string
       viteCatalystRpcUrl:
-        description: "Catalyst RPC URL (VITE_CATALYST_RPC_URL)"
+        description: "Catalyst RPC URL (VITE_CATALYST_RPC_URL) — use /api/builder in prod to route via nginx and avoid CORS"
         required: false
-        default: "http://localhost:8545"
+        default: "/api/builder"
         type: string
       viteChainId:
         description: "L1 chain ID (VITE_CHAIN_ID)"
@@ -204,8 +204,8 @@ jobs:
           build-args: |
             VITE_L1_RPC_URL=${{ inputs.viteL1RpcUrl || 'http://localhost:8545' }}
             VITE_L2_RPC_URL=${{ inputs.viteL2RpcUrl || 'http://localhost:8547' }}
-            VITE_BUILDER_RPC_URL=${{ inputs.viteBuilderRpcUrl || 'http://localhost:4545' }}
-            VITE_CATALYST_RPC_URL=${{ inputs.viteCatalystRpcUrl || 'http://localhost:8545' }}
+            VITE_BUILDER_RPC_URL=${{ inputs.viteBuilderRpcUrl || '/api/builder' }}
+            VITE_CATALYST_RPC_URL=${{ inputs.viteCatalystRpcUrl || '/api/builder' }}
             VITE_CHAIN_ID=${{ inputs.viteChainId || '11155111' }}
             VITE_L1_CHAIN_NAME=${{ inputs.viteL1ChainName || 'Surge' }}
             VITE_L1_NATIVE_SYMBOL=${{ inputs.viteL1NativeSymbol || 'ETH' }}
