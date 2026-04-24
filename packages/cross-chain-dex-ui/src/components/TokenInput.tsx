@@ -33,17 +33,17 @@ export function TokenInput({
   };
 
   return (
-    <div className="bg-surge-dark/50 rounded-xl p-3 border border-surge-border/20">
+    <div className="bg-surge-card-hover rounded-xl p-3 border border-surge-border">
       <div className="flex justify-between items-center mb-2">
-        <span className="text-sm text-gray-400">{label}</span>
+        <span className="text-sm text-surge-muted">{label}</span>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-400">
+          <span className="text-sm text-surge-muted">
             Balance: {Number(formatUnits(balance, token.decimals)).toFixed(4)}
           </span>
           {showMax && !disabled && balance > 0n && (
             <button
               onClick={handleMaxClick}
-              className="text-xs text-surge-primary hover:text-surge-secondary font-medium px-2 py-0.5 bg-surge-primary/10 rounded hover:bg-surge-primary/20 transition-colors"
+              className="text-xs font-semibold tracking-wider text-surge-primary px-2.5 py-0.5 bg-surge-lavender/40 border border-surge-lavender/70 rounded-full hover:bg-surge-lavender/60 transition-colors"
             >
               MAX
             </button>
@@ -53,9 +53,9 @@ export function TokenInput({
 
       <div className="flex items-center gap-3">
         {/* Token selector - fixed width */}
-        <div className="flex items-center gap-2 bg-surge-card/80 px-3 py-2 rounded-lg shrink-0">
+        <div className="flex items-center gap-2 bg-surge-card px-3 py-2 rounded-lg shrink-0 border border-surge-border">
           <img src={token.logo} alt={token.symbol} className="w-6 h-6" />
-          <span className="text-white font-medium">{token.symbol}</span>
+          <span className="text-surge-text font-medium">{token.symbol}</span>
         </div>
 
         {/* Input - takes remaining space */}
@@ -65,7 +65,7 @@ export function TokenInput({
           onChange={handleChange}
           disabled={disabled}
           placeholder="0.0"
-          className="flex-1 min-w-0 bg-transparent text-2xl text-white text-right outline-none placeholder-gray-600 disabled:opacity-50"
+          className="flex-1 min-w-0 bg-transparent text-2xl text-surge-text text-right outline-none placeholder-surge-muted/50 disabled:opacity-50"
         />
       </div>
     </div>
