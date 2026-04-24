@@ -128,10 +128,15 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
   return (
     <div className="flex flex-col md:flex-row items-start gap-4 justify-center w-full relative z-10">
       {/* Left panel — inputs */}
-      <div className="w-full md:max-w-md bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20 hover-glow">
+      <div className="w-full md:max-w-md glass-card rounded-2xl p-4 space-y-3 hover-glow">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Liquidity</h2>
-          <span className="text-xs font-medium text-emerald-400">Via Smart Account</span>
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-1 h-5 rounded-full bg-surge-lavender" />
+            <h2 className="text-lg font-semibold text-surge-text">Liquidity</h2>
+          </div>
+          <span className="text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border bg-surge-lavender/25 border-surge-lavender/70 text-surge-primary">
+            Via Smart Account
+          </span>
         </div>
         <WarningBanner />
 
@@ -143,8 +148,8 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
               onClick={() => setTab(t)}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
                 tab === t
-                  ? 'bg-surge-primary text-white'
-                  : 'bg-surge-dark/50 text-gray-400 hover:text-white border border-surge-border/30'
+                  ? 'bg-surge-primary text-white shadow-sm'
+                  : 'bg-surge-card-hover text-surge-muted hover:text-surge-text border border-surge-border'
               }`}
             >
               {t === 'add' ? 'Add Liquidity' : 'Remove Liquidity'}
@@ -164,7 +169,7 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
             />
 
             <div className="flex justify-center">
-              <div className="text-gray-400 text-lg">+</div>
+              <div className="text-surge-muted text-lg">+</div>
             </div>
 
             {/* Token Input */}
@@ -182,8 +187,8 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
               disabled={isAddDisabled}
               className={`w-full py-3 rounded-xl font-semibold text-base transition-all duration-200 ${
                 isAddDisabled
-                  ? 'bg-surge-card/50 text-gray-500 cursor-not-allowed border border-surge-border/30'
-                  : 'bg-gradient-to-r from-surge-primary to-surge-secondary text-white hover:shadow-lg hover:shadow-surge-primary/30 hover:scale-[1.02] active:scale-[0.98]'
+                  ? 'bg-surge-card-hover text-surge-muted cursor-not-allowed border border-surge-border'
+                  : 'bg-surge-primary text-white hover:bg-surge-secondary hover:shadow-md hover:shadow-surge-secondary/25 active:scale-[0.98]'
               }`}
             >
               {isPending ? (
@@ -201,27 +206,27 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
             {/* Your Position */}
             {position.hasPosition ? (
               <div className="space-y-3">
-                <div className="text-xs text-gray-500 font-medium">Your Position</div>
+                <div className="text-xs text-surge-muted font-medium">Your Position</div>
 
                 {/* ETH to receive (disabled input) */}
                 <div className="space-y-1">
-                  <label className="text-xs text-gray-400">{L1_NATIVE_SYMBOL} to receive</label>
-                  <div className="w-full bg-surge-dark/50 border border-surge-border/30 rounded-lg px-3 py-3 text-sm text-white">
+                  <label className="text-xs text-surge-muted">{L1_NATIVE_SYMBOL} to receive</label>
+                  <div className="w-full bg-surge-card-hover border border-surge-border rounded-lg px-3 py-3 text-sm text-surge-text">
                     {formatEther(position.ethAmount)} {L1_NATIVE_SYMBOL}
                   </div>
                 </div>
 
                 {/* Token to receive (disabled input) */}
                 <div className="space-y-1">
-                  <label className="text-xs text-gray-400">USDC to receive</label>
-                  <div className="w-full bg-surge-dark/50 border border-surge-border/30 rounded-lg px-3 py-3 text-sm text-white">
+                  <label className="text-xs text-surge-muted">USDC to receive</label>
+                  <div className="w-full bg-surge-card-hover border border-surge-border rounded-lg px-3 py-3 text-sm text-surge-text">
                     {formatUnits(position.tokenAmount, USDC_TOKEN.decimals)} USDC
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="bg-surge-dark/30 rounded-lg p-4 text-center">
-                <p className="text-sm text-gray-400">You have no liquidity position in this pool.</p>
+              <div className="bg-surge-card-hover border border-surge-border rounded-lg p-4 text-center">
+                <p className="text-sm text-surge-muted">You have no liquidity position in this pool.</p>
               </div>
             )}
 
@@ -231,8 +236,8 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
               disabled={isRemoveDisabled}
               className={`w-full py-3 rounded-xl font-semibold text-base transition-all duration-200 ${
                 isRemoveDisabled
-                  ? 'bg-surge-card/50 text-gray-500 cursor-not-allowed border border-surge-border/30'
-                  : 'bg-gradient-to-r from-red-500 to-red-600 text-white hover:shadow-lg hover:shadow-red-500/30 hover:scale-[1.02] active:scale-[0.98]'
+                  ? 'bg-surge-card-hover text-surge-muted cursor-not-allowed border border-surge-border'
+                  : 'bg-surge-peach text-surge-primary hover:bg-surge-amber hover:shadow-md hover:shadow-surge-peach/40 active:scale-[0.98]'
               }`}
             >
               {isPending ? (
@@ -255,43 +260,46 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
       </div>
 
       {/* Right panel — pool info */}
-      <div className="w-full md:max-w-sm bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Pool Info</h3>
+      <div className="w-full md:max-w-sm glass-card rounded-2xl p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-1 h-4 rounded-full bg-surge-mint" />
+          <h3 className="text-xs font-semibold text-surge-muted uppercase tracking-widest">Pool Info</h3>
+        </div>
 
         {/* Set initial price when pool is empty */}
         {!hasReserves && tab === 'add' && (
-          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 space-y-2">
-            <div className="text-xs text-yellow-400 font-medium">Pool is empty — set the initial price</div>
+          <div className="bg-red-50 border border-red-300 rounded-lg p-3 space-y-2">
+            <div className="text-xs text-red-700 font-medium">Pool is empty — set the initial price</div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400 whitespace-nowrap">1 {L1_NATIVE_SYMBOL} =</span>
+              <span className="text-sm text-surge-muted whitespace-nowrap">1 {L1_NATIVE_SYMBOL} =</span>
               <input
                 type="number"
                 value={priceInput}
                 onChange={(e) => handlePriceChange(e.target.value)}
-                className="flex-1 bg-surge-dark/50 border border-surge-border/50 rounded-lg px-3 py-1.5 text-white text-sm outline-none focus:border-surge-primary/50"
+                className="flex-1 bg-surge-card border border-surge-border rounded-lg px-3 py-1.5 text-surge-text text-sm outline-none focus:border-surge-secondary"
                 placeholder="1000"
                 min="0"
               />
-              <span className="text-sm text-gray-400">USDC</span>
+              <span className="text-sm text-surge-muted">USDC</span>
             </div>
           </div>
         )}
 
         {/* Current Pool Stats */}
-        <div className="bg-surge-dark/30 rounded-lg p-3 space-y-1">
-          <div className="text-xs text-gray-500 font-medium mb-2">L2 DEX Reserves</div>
+        <div className="bg-surge-card-hover border border-surge-border rounded-lg p-3 space-y-1">
+          <div className="text-xs text-surge-muted font-medium mb-2">L2 DEX Reserves</div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-400">{L1_NATIVE_SYMBOL} Reserve</span>
-            <span className="text-white">{formatEther(ethReserve)} {L1_NATIVE_SYMBOL}</span>
+            <span className="text-surge-muted">{L1_NATIVE_SYMBOL} Reserve</span>
+            <span className="text-surge-text">{formatEther(ethReserve)} {L1_NATIVE_SYMBOL}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-400">Token Reserve</span>
-            <span className="text-white">{formatUnits(tokenReserve, USDC_TOKEN.decimals)} USDC</span>
+            <span className="text-surge-muted">Token Reserve</span>
+            <span className="text-surge-text">{formatUnits(tokenReserve, USDC_TOKEN.decimals)} USDC</span>
           </div>
           {price > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">Price</span>
-              <span className="text-white">
+              <span className="text-surge-muted">Price</span>
+              <span className="text-surge-text">
                 1 {L1_NATIVE_SYMBOL} = {price.toFixed(2)} USDC
               </span>
             </div>
@@ -300,34 +308,34 @@ export function LiquidityCard({ onSetupWallet }: LiquidityCardProps) {
 
         {/* Your Position Summary (always shown in right panel) */}
         {position.hasPosition && (
-          <div className="bg-surge-dark/30 rounded-lg p-3 space-y-1">
-            <div className="text-xs text-gray-500 font-medium mb-2">Your Liquidity</div>
+          <div className="bg-surge-card-hover border border-surge-border rounded-lg p-3 space-y-1">
+            <div className="text-xs text-surge-muted font-medium mb-2">Your Liquidity</div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">{L1_NATIVE_SYMBOL}</span>
-              <span className="text-white">{formatEther(position.ethAmount)} {L1_NATIVE_SYMBOL}</span>
+              <span className="text-surge-muted">{L1_NATIVE_SYMBOL}</span>
+              <span className="text-surge-text">{formatEther(position.ethAmount)} {L1_NATIVE_SYMBOL}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">USDC</span>
-              <span className="text-white">{formatUnits(position.tokenAmount, USDC_TOKEN.decimals)} USDC</span>
+              <span className="text-surge-muted">USDC</span>
+              <span className="text-surge-text">{formatUnits(position.tokenAmount, USDC_TOKEN.decimals)} USDC</span>
             </div>
           </div>
         )}
 
         {/* Flow Info (add tab only) */}
         {tab === 'add' && ethAmount > 0n && tokenAmount > 0n && (
-          <div className="bg-surge-dark/30 rounded-lg p-3 space-y-1 animate-panel-in">
-            <div className="text-xs text-gray-500 font-medium mb-2">Your Deposit</div>
+          <div className="bg-surge-card-hover border border-surge-border rounded-lg p-3 space-y-1 animate-panel-in">
+            <div className="text-xs text-surge-muted font-medium mb-2">Your Deposit</div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">{L1_NATIVE_SYMBOL}</span>
-              <span className="text-white">{ethInput} {L1_NATIVE_SYMBOL}</span>
+              <span className="text-surge-muted">{L1_NATIVE_SYMBOL}</span>
+              <span className="text-surge-text">{ethInput} {L1_NATIVE_SYMBOL}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">USDC</span>
-              <span className="text-white">{tokenInput} USDC</span>
+              <span className="text-surge-muted">USDC</span>
+              <span className="text-surge-text">{tokenInput} USDC</span>
             </div>
-            <div className="flex justify-between text-sm mt-1 pt-1 border-t border-surge-border/30">
-              <span className="text-gray-400">Operation</span>
-              <span className="text-white text-xs">Lock on L1 &rarr; Add to L2 DEX</span>
+            <div className="flex justify-between text-sm mt-1 pt-1 border-t border-surge-border">
+              <span className="text-surge-muted">Operation</span>
+              <span className="text-surge-text text-xs">Lock on L1 &rarr; Add to L2 DEX</span>
             </div>
           </div>
         )}

@@ -140,11 +140,18 @@ export function SwapCard({ onSetupWallet, onFundWallet: _onFundWallet, venue, on
   return (
     <div className="flex flex-col md:flex-row items-start gap-4 justify-center w-full relative z-10">
       {/* Left panel — inputs */}
-      <div className="w-full md:max-w-md bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20 hover-glow transition-all duration-[1000ms] ease-[cubic-bezier(0.16,1,0.3,1)]">
+      <div className="w-full md:max-w-md glass-card rounded-2xl p-4 space-y-3 hover-glow transition-all duration-[1000ms] ease-[cubic-bezier(0.16,1,0.3,1)]">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Swap</h2>
-          <span className={`text-xs font-medium ${isL1Venue ? 'text-cyan-400' : 'text-emerald-400'}`}>
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-1 h-5 rounded-full bg-surge-mint" />
+            <h2 className="text-lg font-semibold text-surge-text">Swap</h2>
+          </div>
+          <span className={`text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+            isL1Venue
+              ? 'bg-surge-secondary/20 border-surge-secondary/60 text-surge-primary'
+              : 'bg-surge-mint/25 border-surge-mint/70 text-surge-primary'
+          }`}>
             {isL1Venue ? 'Via EOA' : 'Via Smart Account'}
           </span>
         </div>
@@ -164,11 +171,11 @@ export function SwapCard({ onSetupWallet, onFundWallet: _onFundWallet, venue, on
         <div className="flex justify-center -my-2 relative z-10">
           <button
             onClick={handleSwapDirection}
-            className="p-2 bg-surge-card border border-surge-border rounded-lg hover:bg-surge-dark transition-colors"
+            className="p-2 bg-surge-mint/30 border border-surge-mint/70 rounded-lg hover:bg-surge-mint/50 transition-colors shadow-sm"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 text-gray-400"
+              className="h-5 w-5 text-surge-primary"
               viewBox="0 0 20 20"
               fill="currentColor"
             >
@@ -216,8 +223,11 @@ export function SwapCard({ onSetupWallet, onFundWallet: _onFundWallet, venue, on
       </div>
 
       {/* Right panel — trade details (always visible; shows "-" placeholders when no input) */}
-      <div className="w-full md:max-w-sm bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20">
-        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Trade Details</h3>
+      <div className="w-full md:max-w-sm glass-card rounded-2xl p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-1 h-4 rounded-full bg-surge-lavender" />
+          <h3 className="text-xs font-semibold text-surge-muted uppercase tracking-widest">Trade Details</h3>
+        </div>
         <SwapPath direction={direction} venue={venue} />
         <SwapDetails quote={quote} direction={direction} amountIn={amountIn} />
       </div>

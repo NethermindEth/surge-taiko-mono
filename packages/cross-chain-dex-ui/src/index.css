@@ -10,7 +10,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
-  background: linear-gradient(135deg, #06090e 0%, #080d14 30%, #06090e 60%, #050810 100%);
+  color: #172342;
+  background: linear-gradient(135deg, #fcfcfc 0%, #f5f7fb 30%, #fcfcfc 60%, #f7f7f7 100%);
   background-attachment: fixed;
 }
 
@@ -19,7 +20,7 @@ body {
   position: relative;
 }
 
-/* Ambient glow effects */
+/* Ambient pastel glow — surge.wtf style */
 #root::before {
   content: '';
   position: fixed;
@@ -28,7 +29,7 @@ body {
   transform: translateX(-50%);
   width: 100%;
   height: 600px;
-  background: radial-gradient(ellipse at center top, rgba(16, 185, 129, 0.09) 0%, rgba(6, 182, 212, 0.05) 40%, transparent 70%);
+  background: radial-gradient(ellipse at center top, rgba(123, 172, 255, 0.22) 0%, rgba(190, 158, 255, 0.14) 40%, transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
@@ -40,8 +41,8 @@ body {
   left: 0;
   width: 100%;
   height: 400px;
-  background: radial-gradient(ellipse at bottom left, rgba(6, 182, 212, 0.04) 0%, transparent 60%),
-              radial-gradient(ellipse at bottom right, rgba(16, 185, 129, 0.04) 0%, transparent 60%);
+  background: radial-gradient(ellipse at bottom left, rgba(250, 190, 171, 0.18) 0%, transparent 60%),
+              radial-gradient(ellipse at bottom right, rgba(140, 232, 171, 0.16) 0%, transparent 60%);
   pointer-events: none;
   z-index: 0;
 }
@@ -52,16 +53,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #06090e;
+  background: #f5f7fb;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #182030;
+  background: #d6d6d6;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #10b981;
+  background: #7bacff;
 }
 
 /* Input number hide arrows */
@@ -75,11 +76,12 @@ input[type='number'] {
   -moz-appearance: textfield;
 }
 
-/* Glass effect for cards */
+/* Glass effect for cards — light theme */
 .glass-card {
-  background: rgba(11, 18, 25, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(24, 32, 48, 0.6);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(23, 35, 66, 0.08);
+  box-shadow: 0 1px 2px rgba(23, 35, 66, 0.04), 0 8px 24px rgba(23, 35, 66, 0.05);
 }
 
 /* Hover glow effect for cards and modals */
@@ -88,8 +90,8 @@ input[type='number'] {
 }
 
 .hover-glow:hover {
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.15), 0 0 40px rgba(6, 182, 212, 0.1);
-  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 0 24px rgba(123, 172, 255, 0.22), 0 0 48px rgba(190, 158, 255, 0.14);
+  border-color: rgba(123, 172, 255, 0.45);
 }
 
 /* Glow button effect */
@@ -105,7 +107,7 @@ input[type='number'] {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
   transition: left 0.5s;
 }
 

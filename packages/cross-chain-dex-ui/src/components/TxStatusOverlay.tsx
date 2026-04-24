@@ -12,22 +12,22 @@ interface StepDef {
   color: string;
 }
 
-/// L1→L2→L1 UserOp lifecycle (swap via L2 DEX). Unchanged from the original overlay.
+/// L1→L2→L1 UserOp lifecycle (swap via L2 DEX). Surge pastel palette.
 const L2_DEX_STEPS: StepDef[] = [
-  { phase: 'signing',    label: 'Signing',              color: '#fbbf24' },
-  { phase: 'sequencing', label: 'Sequencing',           color: '#60a5fa' },
-  { phase: 'proving',    label: 'Generating ZK Proof',  color: '#a78bfa' },
-  { phase: 'proposing',  label: 'Submitting Block',     color: '#10b981' },
-  { phase: 'complete',   label: 'Execution Complete',   color: '#34d399' },
+  { phase: 'signing',    label: 'Signing',              color: '#f1aa47' }, // amber
+  { phase: 'sequencing', label: 'Sequencing',           color: '#7bacff' }, // periwinkle
+  { phase: 'proving',    label: 'Generating ZK Proof',  color: '#be9eff' }, // lavender
+  { phase: 'proposing',  label: 'Submitting Block',     color: '#172342' }, // primary navy
+  { phase: 'complete',   label: 'Execution Complete',   color: '#34d399' }, // mint (saturated for contrast)
 ];
 
 /// L2→L1→L2 direct-tx lifecycle (swap via L1 DEX).
 ///   simulating → submitting → included → complete
 const L1_DEX_STEPS: StepDef[] = [
-  { phase: 'simulating', label: 'Simulating Return',   color: '#22d3ee' },
-  { phase: 'submitting', label: 'Submitting L2 Tx',    color: '#fbbf24' },
-  { phase: 'included',   label: 'L2 Included',         color: '#a78bfa' },
-  { phase: 'complete',   label: 'Settlement Complete', color: '#34d399' },
+  { phase: 'simulating', label: 'Simulating Return',   color: '#7bacff' }, // periwinkle
+  { phase: 'submitting', label: 'Submitting L2 Tx',    color: '#f1aa47' }, // amber
+  { phase: 'included',   label: 'L2 Included',         color: '#be9eff' }, // lavender
+  { phase: 'complete',   label: 'Settlement Complete', color: '#34d399' }, // mint
 ];
 
 const L2_DEX_PHASE_TO_IDX: Partial<Record<TxOverlayPhase, number>> = {
@@ -88,7 +88,7 @@ function ChevronConnector({ filled, color }: { filled: boolean; color: string })
             key={i}
             points={pts}
             fill="none"
-            stroke={filled ? color : '#1c2a3a'}
+            stroke={filled ? color : '#d6d6d6'}
             strokeWidth="1.9"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -224,8 +224,8 @@ function NodeCircle({ phase, status, color }: { phase: ActivePhase; status: Node
 
   // pending — show the step icon at low opacity so the upcoming step is recognisable
   return (
-    <div style={{ ...base, background: '#080f17', border: '2px solid #1e3248' }}>
-      <div style={{ opacity: 0.28 }}>
+    <div style={{ ...base, background: '#f5f7fb', border: '2px solid #e5e7eb' }}>
+      <div style={{ opacity: 0.45 }}>
         <NodeIcon phase={phase} color={color} />
       </div>
     </div>
@@ -277,7 +277,6 @@ export function TxStatusOverlay({ state, onClose }: TxStatusOverlayProps) {
 
   const currentIdx = PHASE_TO_IDX[state.phase] ?? 0;
   const isInProgress = !['complete', 'rejected'].includes(state.phase);
-  const activeColor = STEPS[currentIdx]?.color ?? '#10b981';
 
   // ── Rejected view ─────────────────────────────────────────────────────────
   if (state.phase === 'rejected') {
@@ -288,27 +287,27 @@ export function TxStatusOverlay({ state, onClose }: TxStatusOverlayProps) {
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
               <div style={{
                 width: 72, height: 72, borderRadius: '50%',
-                border: '2.5px solid #ef4444', background: '#ef444414',
+                border: '2.5px solid #f1aa47', background: 'rgba(250, 190, 171, 0.25)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5"
+                <svg viewBox="0 0 24 24" fill="none" stroke="#f1aa47" strokeWidth="2.5"
                   strokeLinecap="round" style={{ width: 34, height: 34 }}>
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </div>
             </div>
-            <p style={{ color: '#f1f5f9', fontWeight: 600, fontSize: 18, marginBottom: 8, fontFamily: 'inherit' }}>
+            <p style={{ color: '#172342', fontWeight: 600, fontSize: 18, marginBottom: 8, fontFamily: 'inherit' }}>
               Transaction Failed
             </p>
             {state.errorMessage && (
-              <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 24, fontFamily: 'inherit', lineHeight: 1.5 }}>
+              <p style={{ color: '#5e6575', fontSize: 14, marginBottom: 24, fontFamily: 'inherit', lineHeight: 1.5 }}>
                 {state.errorMessage}
               </p>
             )}
             <button
               onClick={onClose}
-              className="w-full py-3 rounded-xl text-sm font-medium bg-surge-card border border-surge-border/50 text-white hover:bg-surge-border/50 transition-colors"
+              className="w-full py-3 rounded-xl text-sm font-medium bg-surge-card border border-surge-border text-surge-text hover:bg-surge-card-hover transition-colors"
             >
               Close
             </button>
@@ -331,7 +330,7 @@ export function TxStatusOverlay({ state, onClose }: TxStatusOverlayProps) {
             fontWeight: 500,
             letterSpacing: '0.12em',
             textTransform: 'uppercase',
-            color: '#475569',
+            color: '#5e6575',
             marginBottom: 44,
             fontFamily: 'inherit',
           }}>
@@ -369,7 +368,7 @@ export function TxStatusOverlay({ state, onClose }: TxStatusOverlayProps) {
                     <span style={{
                       fontSize: 20,
                       fontWeight: status === 'active' ? 600 : 400,
-                      color: status === 'pending' ? '#2e4a62' : step.color,
+                      color: status === 'pending' ? '#b0b7c3' : step.color,
                       letterSpacing: '0.01em',
                       fontFamily: 'inherit',
                       whiteSpace: 'normal',
@@ -421,23 +420,21 @@ export function TxStatusOverlay({ state, onClose }: TxStatusOverlayProps) {
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                       padding: '14px 20px',
                       borderRadius: 14,
-                      border: `1.5px solid ${activeColor}55`,
-                      color: activeColor,
-                      background: `${activeColor}0e`,
+                      border: 'none',
+                      color: '#172342',
+                      background: 'rgba(140, 232, 171, 0.5)',
                       fontFamily: 'inherit',
                       fontSize: 15,
                       fontWeight: 600,
                       textDecoration: 'none',
-                      transition: 'background 0.2s ease, border-color 0.2s ease',
+                      transition: 'background 0.2s ease',
                       letterSpacing: '-0.01em',
                     }}
                     onMouseEnter={e => {
-                      (e.currentTarget as HTMLAnchorElement).style.background = `${activeColor}1e`;
-                      (e.currentTarget as HTMLAnchorElement).style.borderColor = `${activeColor}90`;
+                      (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(140, 232, 171, 0.75)';
                     }}
                     onMouseLeave={e => {
-                      (e.currentTarget as HTMLAnchorElement).style.background = `${activeColor}0e`;
-                      (e.currentTarget as HTMLAnchorElement).style.borderColor = `${activeColor}55`;
+                      (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(140, 232, 171, 0.5)';
                     }}
                   >
                     {/* External link icon */}
@@ -451,7 +448,7 @@ export function TxStatusOverlay({ state, onClose }: TxStatusOverlayProps) {
                 )}
                 <button
                   onClick={onClose}
-                  className="bg-gradient-to-r from-surge-primary to-surge-secondary text-white hover:shadow-lg hover:shadow-surge-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  className="bg-surge-primary text-white hover:bg-surge-secondary hover:shadow-md hover:shadow-surge-secondary/25 active:scale-[0.98] transition-all"
                   style={{
                     flex: 1,
                     padding: '14px 20px',
@@ -480,8 +477,8 @@ export function TxStatusOverlay({ state, onClose }: TxStatusOverlayProps) {
 function Backdrop({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backgroundColor: 'rgba(3, 5, 8, 0.92)' }}
+      className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
+      style={{ backgroundColor: 'rgba(23, 35, 66, 0.42)' }}
     >
       {children}
     </div>
@@ -494,11 +491,11 @@ function Card({ children }: { children: React.ReactNode }) {
       className="w-full mx-4"
       style={{
         maxWidth: 1000,
-        background: 'linear-gradient(180deg, #090d12 0%, #07090d 100%)',
-        border: '1px solid rgba(24, 32, 48, 0.9)',
+        background: 'linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%)',
+        border: '1px solid rgba(23, 35, 66, 0.08)',
         borderRadius: 24,
         boxShadow:
-          'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 32px 64px rgba(0, 0, 0, 0.8), 0 0 60px rgba(16, 185, 129, 0.06)',
+          'inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 32px 64px rgba(23, 35, 66, 0.16), 0 0 60px rgba(123, 172, 255, 0.18)',
       }}
     >
       {children}

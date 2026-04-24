@@ -59,43 +59,51 @@ export function Header({ onSetupWallet }: HeaderProps) {
 
   return (
     <>
-    <header className="w-full px-6 py-3 flex items-center justify-between border-b border-surge-border/30 bg-surge-dark/50 backdrop-blur-sm relative z-10">
+    <header className="w-full px-6 py-3 flex items-center justify-between border-b border-surge-border bg-white/70 backdrop-blur-md relative z-10">
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-surge-primary to-surge-secondary rounded-lg shadow-lg shadow-surge-primary/20" />
-          <h1 className="text-xl font-bold text-white">Surge DEX</h1>
-        </div>
+        <a
+          href="https://www.surge.wtf/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center"
+        >
+          <img src="/surge-logo.svg" alt="Surge" className="h-10 w-auto" />
+        </a>
 
         {/* Network dropdown */}
         <div className="relative" ref={networkDropdownRef}>
           <button
             onClick={() => { setNetworkDropdownOpen((p) => !p); setSwDropdownOpen(false); setEoaDropdownOpen(false); }}
-            className="flex items-center gap-2 px-3 py-1.5 bg-surge-card rounded-lg border border-surge-border/50 text-sm font-medium transition-colors hover:bg-surge-border/30"
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+              selectedNetwork === 'l1'
+                ? 'bg-surge-mint/25 border-surge-mint/70 hover:bg-surge-mint/35'
+                : 'bg-surge-secondary/20 border-surge-secondary/60 hover:bg-surge-secondary/30'
+            }`}
           >
-            <div className={`w-2 h-2 rounded-full ${selectedNetwork === 'l1' ? 'bg-emerald-400' : 'bg-cyan-400'}`} />
-            <span className="text-white">{selectedNetwork === 'l1' ? L1_CHAIN_NAME : 'Surge L2'}</span>
-            <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className={`w-2 h-2 rounded-full ${selectedNetwork === 'l1' ? 'bg-surge-mint' : 'bg-surge-secondary'}`} />
+            <span className="text-surge-primary">{selectedNetwork === 'l1' ? L1_CHAIN_NAME : 'Surge L2'}</span>
+            <svg className="w-3.5 h-3.5 text-surge-primary/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
           {networkDropdownOpen && (
-            <div className="absolute left-0 top-full mt-1 bg-surge-card border border-surge-border/50 rounded-lg shadow-xl shadow-black/30 overflow-hidden min-w-[180px] z-50">
+            <div className="absolute left-0 top-full mt-1 bg-surge-card border border-surge-border rounded-lg shadow-xl shadow-surge-primary/10 overflow-hidden min-w-[180px] z-50">
               <button
                 onClick={() => { setSelectedNetwork('l1'); setNetworkDropdownOpen(false); }}
                 className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 transition-colors ${
-                  selectedNetwork === 'l1' ? 'text-emerald-400 bg-emerald-500/10' : 'text-gray-300 hover:bg-surge-dark/50 hover:text-white'
+                  selectedNetwork === 'l1' ? 'text-surge-primary bg-surge-mint/20' : 'text-surge-muted hover:bg-surge-card-hover hover:text-surge-text'
                 }`}
               >
-                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                <div className="w-2 h-2 rounded-full bg-surge-mint" />
                 {L1_CHAIN_NAME}
               </button>
               <button
                 onClick={() => { setSelectedNetwork('l2'); setNetworkDropdownOpen(false); }}
-                className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 transition-colors border-t border-surge-border/20 ${
-                  selectedNetwork === 'l2' ? 'text-cyan-400 bg-cyan-500/10' : 'text-gray-300 hover:bg-surge-dark/50 hover:text-white'
+                className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 transition-colors border-t border-surge-border ${
+                  selectedNetwork === 'l2' ? 'text-surge-primary bg-surge-secondary/15' : 'text-surge-muted hover:bg-surge-card-hover hover:text-surge-text'
                 }`}
               >
-                <div className="w-2 h-2 rounded-full bg-cyan-400" />
+                <div className="w-2 h-2 rounded-full bg-surge-secondary" />
                 Surge L2
               </button>
             </div>
@@ -108,7 +116,7 @@ export function Header({ onSetupWallet }: HeaderProps) {
         {isConnected && smartWallet && selectedNetwork === 'l2' && !l2WalletExists && (
           <button
             onClick={onSetupWallet}
-            className="px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded-lg text-sm font-medium transition-colors border border-cyan-500/30"
+            className="px-4 py-2 bg-surge-secondary/15 hover:bg-surge-secondary/25 text-surge-primary rounded-lg text-sm font-medium transition-colors border border-surge-secondary/40"
           >
             Setup Smart Wallet on L2
           </button>
@@ -117,34 +125,34 @@ export function Header({ onSetupWallet }: HeaderProps) {
         {/* Smart Wallet display — show when wallet exists on the selected network */}
         {isConnected && smartWallet && (selectedNetwork === 'l1' || l2WalletExists) && (
           <div className="hidden md:flex items-center relative" ref={swDropdownRef}>
-            <div className="flex items-center gap-2 px-3 py-2 bg-surge-card rounded-lg border border-surge-border/50">
-              <div className="w-2 h-2 bg-green-500 rounded-full" />
+            <div className="flex items-center gap-2 px-3 py-2 bg-surge-card rounded-lg border border-surge-border">
+              <div className="w-2 h-2 bg-surge-mint rounded-full" />
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(smartWallet);
                   toast.success('Smart wallet address copied!');
                 }}
-                className="text-sm text-gray-300 hover:text-white transition-colors flex items-center gap-1"
+                className="text-sm text-surge-text hover:text-surge-primary transition-colors flex items-center gap-1"
                 title="Click to copy"
               >
                 Smart Wallet: {smartWallet.slice(0, 6)}...{smartWallet.slice(-4)}
-                <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3 text-surge-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
               </button>
-              <span className="text-xs text-gray-500">|</span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-surge-muted/60">|</span>
+              <span className="text-xs text-surge-muted">
                 {parseFloat(ethFormatted).toFixed(4)} {ETH_TOKEN.symbol}
               </span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-surge-muted">
                 {parseFloat(usdcFormatted).toFixed(2)} USDC
               </span>
               {accountMode === 'safe' && (
                 <>
-                  <span className="text-xs text-gray-500">|</span>
+                  <span className="text-xs text-surge-muted/60">|</span>
                   <button
                     onClick={() => { setSwDropdownOpen((p) => !p); setEoaDropdownOpen(false); }}
-                    className="text-gray-400 hover:text-white transition-colors p-0.5"
+                    className="text-surge-muted hover:text-surge-primary transition-colors p-0.5"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -155,11 +163,11 @@ export function Header({ onSetupWallet }: HeaderProps) {
             </div>
 
             {swDropdownOpen && accountMode === 'safe' && (
-              <div className="absolute right-0 top-full mt-1 bg-surge-card border border-surge-border/50 rounded-lg shadow-xl shadow-black/30 overflow-hidden min-w-[240px] z-50">
+              <div className="absolute right-0 top-full mt-1 bg-surge-card border border-surge-border rounded-lg shadow-xl shadow-surge-primary/10 overflow-hidden min-w-[240px] z-50">
                 <button
                   onClick={() => requireDisclaimer(handleWithdraw)}
                   disabled={isPending || (ethBalance === 0n && usdcBalance === 0n)}
-                  className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-surge-dark/50 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="w-full px-4 py-3 text-left text-sm text-surge-text hover:bg-surge-card-hover hover:text-surge-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -174,7 +182,7 @@ export function Header({ onSetupWallet }: HeaderProps) {
         {isConnected && !smartWallet && (
           <button
             onClick={onSetupWallet}
-            className="px-4 py-2 bg-surge-primary hover:bg-surge-secondary text-white rounded-lg text-sm font-medium transition-colors"
+            className="px-4 py-2 bg-surge-primary hover:opacity-90 text-white rounded-lg text-sm font-medium transition-opacity shadow-sm"
           >
             Setup Smart Wallet
           </button>
@@ -190,18 +198,18 @@ export function Header({ onSetupWallet }: HeaderProps) {
                   <div className="relative" ref={eoaDropdownRef}>
                     <button
                       onClick={() => { setEoaDropdownOpen((p) => !p); setSwDropdownOpen(false); }}
-                      className="px-4 py-2 bg-surge-card hover:bg-surge-border text-white rounded-lg text-sm font-medium transition-colors border border-surge-border flex items-center gap-2"
+                      className="px-4 py-2 bg-surge-card hover:bg-surge-card-hover text-surge-text rounded-lg text-sm font-medium transition-colors border border-surge-border flex items-center gap-2"
                     >
                       <span>{account.displayName}</span>
                       {account.displayBalance && (
-                        <span className="text-xs text-gray-400">({account.displayBalance})</span>
+                        <span className="text-xs text-surge-muted">({account.displayBalance})</span>
                       )}
-                      <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3 h-3 text-surge-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
                     {eoaDropdownOpen && (
-                      <div className="absolute right-0 top-full mt-1 bg-surge-card border border-surge-border/50 rounded-lg shadow-xl shadow-black/30 overflow-hidden min-w-[180px] z-50">
+                      <div className="absolute right-0 top-full mt-1 bg-surge-card border border-surge-border rounded-lg shadow-xl shadow-surge-primary/10 overflow-hidden min-w-[180px] z-50">
                         <button
                           onClick={() => {
                             if (eoaAddress) {
@@ -210,7 +218,7 @@ export function Header({ onSetupWallet }: HeaderProps) {
                             }
                             setEoaDropdownOpen(false);
                           }}
-                          className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-surge-dark/50 hover:text-white transition-colors flex items-center gap-2"
+                          className="w-full px-4 py-3 text-left text-sm text-surge-text hover:bg-surge-card-hover hover:text-surge-primary transition-colors flex items-center gap-2"
                         >
                           <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -219,7 +227,7 @@ export function Header({ onSetupWallet }: HeaderProps) {
                         </button>
                         <button
                           onClick={() => { setEoaDropdownOpen(false); clearAccountMode(); disconnect(); }}
-                          className="w-full px-4 py-3 text-left text-sm text-red-400 hover:bg-surge-dark/50 hover:text-red-300 transition-colors flex items-center gap-2 border-t border-surge-border/30"
+                          className="w-full px-4 py-3 text-left text-sm text-surge-amber hover:bg-surge-peach/20 hover:text-surge-amber transition-colors flex items-center gap-2 border-t border-surge-border"
                         >
                           <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -232,7 +240,7 @@ export function Header({ onSetupWallet }: HeaderProps) {
                 ) : (
                   <button
                     onClick={openConnectModal}
-                    className="px-4 py-2 bg-surge-primary hover:bg-surge-secondary text-white rounded-lg text-sm font-medium transition-colors"
+                    className="px-4 py-2 bg-surge-primary hover:opacity-90 text-white rounded-lg text-sm font-medium transition-opacity shadow-sm"
                   >
                     Connect Wallet
                   </button>
