@@ -53,26 +53,6 @@ on:
         required: false
         default: "https://sepolia.etherscan.io"
         type: string
-      viteSafeProxyFactory:
-        description: "Safe proxy factory address (VITE_SAFE_PROXY_FACTORY)"
-        required: false
-        default: "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
-        type: string
-      viteSafeSingleton:
-        description: "Safe singleton address (VITE_SAFE_SINGLETON)"
-        required: false
-        default: "0x29fcB43b46531BcA003ddC8FCB67FFE91900C762"
-        type: string
-      viteSafeMultisend:
-        description: "Safe multisend address (VITE_SAFE_MULTISEND)"
-        required: false
-        default: "0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526"
-        type: string
-      viteSafeFallbackHandler:
-        description: "Safe fallback handler address (VITE_SAFE_FALLBACK_HANDLER)"
-        required: false
-        default: "0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99"
-        type: string
       viteL1Vault:
         description: "L1Vault contract address (VITE_L1_VAULT)"
         required: false
@@ -232,10 +212,10 @@ jobs:
             VITE_L1_NATIVE_NAME=${{ inputs.viteL1NativeName || 'Ether' }}
             VITE_L1_NATIVE_LOGO=${{ inputs.viteL1NativeLogo || '/eth-logo.svg' }}
             VITE_EXPLORER_URL=${{ inputs.viteExplorerUrl || 'https://sepolia.etherscan.io' }}
-            VITE_SAFE_PROXY_FACTORY=${{ inputs.viteSafeProxyFactory || '0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67' }}
-            VITE_SAFE_SINGLETON=${{ inputs.viteSafeSingleton || '0x29fcB43b46531BcA003ddC8FCB67FFE91900C762' }}
-            VITE_SAFE_MULTISEND=${{ inputs.viteSafeMultisend || '0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526' }}
-            VITE_SAFE_FALLBACK_HANDLER=${{ inputs.viteSafeFallbackHandler || '0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99' }}
+            VITE_SAFE_PROXY_FACTORY=0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67
+            VITE_SAFE_SINGLETON=0x29fcB43b46531BcA003ddC8FCB67FFE91900C762
+            VITE_SAFE_MULTISEND=0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526
+            VITE_SAFE_FALLBACK_HANDLER=0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99
             VITE_L1_VAULT=${{ inputs.viteL1Vault || '0x0000000000000000000000000000000000000000' }}
             VITE_USDC_TOKEN=${{ inputs.viteUsdcToken || '0x0000000000000000000000000000000000000000' }}
             VITE_USDC_DECIMALS=${{ inputs.viteUsdcDecimals || '6' }}
