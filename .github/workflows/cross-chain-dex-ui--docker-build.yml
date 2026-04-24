@@ -18,8 +18,8 @@ on:
         required: false
         default: "http://localhost:4545"
         type: string
-      viteBuilderApiUrl:
-        description: "Builder API URL (VITE_BUILDER_API_URL)"
+      viteCatalystRpcUrl:
+        description: "Catalyst RPC URL (VITE_CATALYST_RPC_URL)"
         required: false
         default: "http://localhost:8545"
         type: string
@@ -48,6 +48,11 @@ on:
         required: false
         default: "/eth-logo.svg"
         type: string
+      viteExplorerUrl:
+        description: "L1 block explorer URL (VITE_EXPLORER_URL)"
+        required: false
+        default: "https://sepolia.etherscan.io"
+        type: string
       viteSafeProxyFactory:
         description: "Safe proxy factory address (VITE_SAFE_PROXY_FACTORY)"
         required: false
@@ -68,11 +73,6 @@ on:
         required: false
         default: "0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99"
         type: string
-      viteUserOpsFactory:
-        description: "UserOpsFactory contract address (VITE_USER_OPS_FACTORY)"
-        required: false
-        default: "0x0000000000000000000000000000000000000000"
-        type: string
       viteL1Vault:
         description: "L1Vault contract address (VITE_L1_VAULT)"
         required: false
@@ -86,7 +86,7 @@ on:
       viteUsdcDecimals:
         description: "USDC token decimals (VITE_USDC_DECIMALS)"
         required: false
-        default: "18"
+        default: "6"
         type: string
       viteSimpleDex:
         description: "SimpleDEX contract address (VITE_SIMPLE_DEX)"
@@ -102,6 +102,31 @@ on:
         description: "L2 chain ID (VITE_L2_CHAIN_ID)"
         required: false
         default: "763374"
+        type: string
+      viteL2Vault:
+        description: "L1Vault contract address (VITE_L2_VAULT)"
+        required: false
+        default: "0x0000000000000000000000000000000000000000"
+        type: string
+      viteL2UsdcToken:
+        description: "L2 USDC token address (VITE_L2_USDC_TOKEN)"
+        required: false
+        default: "0x0000000000000000000000000000000000000000"
+        type: string
+      viteL1Router:
+        description: "L1Router contract address (VITE_L1_ROUTER)"
+        required: false
+        default: "0x0000000000000000000000000000000000000000"
+        type: string
+      viteL1DexWeth:
+        description: "L1 DEX WETH address (VITE_L1_DEX_WETH)"
+        required: false
+        default: "0x0000000000000000000000000000000000000000"
+        type: string
+      viteL1DexName:
+        description: "L1 DEX name (VITE_L1_DEX_NAME)"
+        required: false
+        default: "Swap"
         type: string
       viteWalletConnectProjectId:
         description: "WalletConnect Project ID (VITE_WALLETCONNECT_PROJECT_ID)"
@@ -200,23 +225,28 @@ jobs:
             VITE_L1_RPC_URL=${{ inputs.viteL1RpcUrl || 'http://localhost:8545' }}
             VITE_L2_RPC_URL=${{ inputs.viteL2RpcUrl || 'http://localhost:8547' }}
             VITE_BUILDER_RPC_URL=${{ inputs.viteBuilderRpcUrl || 'http://localhost:4545' }}
-            VITE_BUILDER_API_URL=${{ inputs.viteBuilderApiUrl || 'http://localhost:8545' }}
+            VITE_CATALYST_RPC_URL=${{ inputs.viteCatalystRpcUrl || 'http://localhost:8545' }}
             VITE_CHAIN_ID=${{ inputs.viteChainId || '11155111' }}
             VITE_L1_CHAIN_NAME=${{ inputs.viteL1ChainName || 'Surge' }}
             VITE_L1_NATIVE_SYMBOL=${{ inputs.viteL1NativeSymbol || 'ETH' }}
             VITE_L1_NATIVE_NAME=${{ inputs.viteL1NativeName || 'Ether' }}
             VITE_L1_NATIVE_LOGO=${{ inputs.viteL1NativeLogo || '/eth-logo.svg' }}
+            VITE_EXPLORER_URL=${{ inputs.viteExplorerUrl || 'https://sepolia.etherscan.io' }}
             VITE_SAFE_PROXY_FACTORY=${{ inputs.viteSafeProxyFactory || '0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67' }}
             VITE_SAFE_SINGLETON=${{ inputs.viteSafeSingleton || '0x29fcB43b46531BcA003ddC8FCB67FFE91900C762' }}
             VITE_SAFE_MULTISEND=${{ inputs.viteSafeMultisend || '0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526' }}
             VITE_SAFE_FALLBACK_HANDLER=${{ inputs.viteSafeFallbackHandler || '0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99' }}
-            VITE_USER_OPS_FACTORY=${{ inputs.viteUserOpsFactory || '0x0000000000000000000000000000000000000000' }}
             VITE_L1_VAULT=${{ inputs.viteL1Vault || '0x0000000000000000000000000000000000000000' }}
             VITE_USDC_TOKEN=${{ inputs.viteUsdcToken || '0x0000000000000000000000000000000000000000' }}
-            VITE_USDC_DECIMALS=${{ inputs.viteUsdcDecimals || '18' }}
+            VITE_USDC_DECIMALS=${{ inputs.viteUsdcDecimals || '6' }}
             VITE_SIMPLE_DEX=${{ inputs.viteSimpleDex || '0x0000000000000000000000000000000000000000' }}
             VITE_L1_BRIDGE=${{ inputs.viteL1Bridge || '0x0000000000000000000000000000000000000000' }}
             VITE_L2_CHAIN_ID=${{ inputs.viteL2ChainId || '763374' }}
+            VITE_L2_VAULT=${{ inputs.viteL2Vault || '0x0000000000000000000000000000000000000000' }}
+            VITE_L2_USDC_TOKEN=${{ inputs.viteL2UsdcToken || '0x0000000000000000000000000000000000000000' }}
+            VITE_L1_ROUTER=${{ inputs.viteL1Router || '0x0000000000000000000000000000000000000000' }}
+            VITE_L1_DEX_WETH=${{ inputs.viteL1DexWeth || '0x0000000000000000000000000000000000000000' }}
+            VITE_L1_DEX_NAME=${{ inputs.viteL1DexName || 'Swap' }}
             VITE_WALLETCONNECT_PROJECT_ID=${{ inputs.viteWalletConnectProjectId || '' }}
 
       - name: Export digest
