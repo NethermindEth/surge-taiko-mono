@@ -477,8 +477,8 @@ export function TxStatusOverlay({ state, onClose }: TxStatusOverlayProps) {
 function Backdrop({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm"
-      style={{ backgroundColor: 'rgba(23, 35, 66, 0.42)' }}
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ backgroundColor: 'rgba(23, 35, 66, 0.65)' }}
     >
       {children}
     </div>
