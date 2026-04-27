@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { WagmiProvider } from 'wagmi';
 import { useAccount, useSwitchChain } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
+import { RainbowKitProvider, lightTheme } from '@rainbow-me/rainbowkit';
 import '@rainbow-me/rainbowkit/styles.css';
 import { Toaster } from 'react-hot-toast';
 
@@ -117,30 +117,39 @@ function AppContent() {
 
       <main className="flex-1 min-h-0 relative flex items-center justify-center px-4">
         {/* Tab Navigation */}
-        <div className="absolute top-8 left-1/2 -translate-x-1/2 flex gap-1 bg-surge-card/50 rounded-xl p-1 border border-surge-border/30 z-10">
-          {availableTabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                activeTab === tab
-                  ? 'bg-gradient-to-r from-surge-primary to-surge-secondary text-white shadow-md'
-                  : 'text-gray-400 hover:text-white hover:bg-surge-dark/50'
-              }`}
-            >
-              {tab === 'swap' ? 'Swap' : tab === 'bridge' ? 'Bridge' : 'Liquidity'}
-            </button>
-          ))}
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 flex gap-1 bg-white/70 backdrop-blur-md rounded-xl p-1 border border-surge-border z-10 shadow-sm">
+          {availableTabs.map((tab) => {
+            const active = activeTab === tab;
+            const pastelHover =
+              tab === 'swap' ? 'hover:bg-surge-mint/30'
+              : tab === 'liquidity' ? 'hover:bg-surge-lavender/30'
+              : 'hover:bg-surge-secondary/20';
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-5 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  active
+                    ? 'bg-surge-primary text-white shadow-md'
+                    : `text-surge-muted hover:text-surge-primary ${pastelHover}`
+                }`}
+              >
+                {tab === 'swap' ? 'Swap' : tab === 'bridge' ? 'Bridge' : 'Liquidity'}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Footer tagline */}
-        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
-          <p className="text-sm text-gray-400">Powered by Surge Protocol</p>
-          <p className="text-sm text-gray-500 mt-1">
-            {selectedNetwork === 'l2'
-              ? 'Synchronous cross-chain settlement'
-              : 'L1 swaps through L2 liquidity \u2022 Real time cross chain settlement'}
-          </p>
+        {/* Footer — Powered by Nethermind */}
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 text-center">
+          <a
+            href="https://www.nethermind.io/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block opacity-80 hover:opacity-100 transition-opacity"
+          >
+            <img src="/powered-by-nethermind.svg" alt="Powered by Nethermind" className="h-5 w-auto" />
+          </a>
         </div>
 
         {/* Active Panel */}
@@ -213,20 +222,21 @@ function AppContent() {
         position="bottom-right"
         toastOptions={{
           style: {
-            background: '#0f2847',
-            color: '#e2e8f0',
-            border: '1px solid #1e4976',
+            background: '#ffffff',
+            color: '#172342',
+            border: '1px solid #e5e7eb',
+            boxShadow: '0 8px 24px rgba(23, 35, 66, 0.08)',
           },
           success: {
             iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
+              primary: '#8ce8ab',
+              secondary: '#172342',
             },
           },
           error: {
             iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff',
+              primary: '#fabeab',
+              secondary: '#172342',
             },
           },
         }}
@@ -239,7 +249,7 @@ function App() {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={darkTheme({ accentColor: '#10b981' })}>
+        <RainbowKitProvider theme={lightTheme({ accentColor: '#172342', accentColorForeground: '#ffffff', borderRadius: 'medium' })}>
           <TxStatusProvider>
             <SmartWalletProvider>
               <AppContent />

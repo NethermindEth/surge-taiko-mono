@@ -17,17 +17,17 @@ export function SwapDetails({ quote, direction, amountIn }: SwapDetailsProps) {
   const hasInput = amountIn > 0n;
 
   return (
-    <div className="bg-surge-dark rounded-xl p-4 space-y-3">
+    <div className="bg-surge-card-hover border border-surge-border rounded-xl p-4 space-y-3">
       <div className="flex justify-between items-center text-sm">
-        <span className="text-gray-400">Rate</span>
-        <span className="text-white">
+        <span className="text-surge-muted">Rate</span>
+        <span className="text-surge-text">
           {hasInput ? `1 ${inputSymbol} = ${quote.rate.toFixed(6)} ${outputSymbol}` : '-'}
         </span>
       </div>
 
       <div className="flex justify-between items-center text-sm">
-        <span className="text-gray-400">Fee ({FEE_PERCENT}%)</span>
-        <span className="text-white">
+        <span className="text-surge-muted">Fee ({FEE_PERCENT}%)</span>
+        <span className="text-surge-text">
           {hasInput
             ? `${Number(formatUnits(quote.fee, inputToken.decimals)).toFixed(6)} ${inputSymbol}`
             : '-'}
@@ -35,16 +35,16 @@ export function SwapDetails({ quote, direction, amountIn }: SwapDetailsProps) {
       </div>
 
       <div className="flex justify-between items-center text-sm">
-        <span className="text-gray-400">Price Impact</span>
+        <span className="text-surge-muted">Price Impact</span>
         <span
           className={
             hasInput
               ? quote.priceImpact > 5
-                ? 'text-red-500'
+                ? 'text-surge-amber'
                 : quote.priceImpact > 1
-                ? 'text-yellow-500'
-                : 'text-green-500'
-              : 'text-white'
+                ? 'text-surge-peach'
+                : 'text-surge-primary'
+              : 'text-surge-text'
           }
         >
           {hasInput ? `${quote.priceImpact.toFixed(2)}%` : '-'}
@@ -52,8 +52,8 @@ export function SwapDetails({ quote, direction, amountIn }: SwapDetailsProps) {
       </div>
 
       <div className="flex justify-between items-center text-sm">
-        <span className="text-gray-400">Expected Output</span>
-        <span className="text-white font-medium">
+        <span className="text-surge-muted">Expected Output</span>
+        <span className="text-surge-text font-medium">
           {hasInput
             ? `${Number(formatUnits(quote.amountOut, outputToken.decimals)).toFixed(6)} ${outputSymbol}`
             : '-'}

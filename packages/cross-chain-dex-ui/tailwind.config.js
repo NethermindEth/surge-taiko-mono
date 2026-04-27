@@ -7,19 +7,31 @@ export default {
   theme: {
     extend: {
       colors: {
-        'surge-primary': '#10b981',      // Emerald green
-        'surge-secondary': '#06b6d4',    // Cyan blue
-        'surge-accent': '#22d3ee',       // Light cyan
-        'surge-dark': '#06090e',         // Near-black base
-        'surge-card': '#0b1219',         // Dark charcoal card
-        'surge-card-hover': '#0f1a25',   // Slightly lifted hover
-        'surge-border': '#182030',       // Subtle dark border
-        'surge-text': '#e2e8f0',         // Light gray text
-        'surge-muted': '#64748b',        // Muted text
+        // Core brand (surge.wtf light theme)
+        'surge-primary': '#172342',        // Deep navy — primary dark / CTA base
+        'surge-secondary': '#7bacff',      // Periwinkle blue — secondary accent
+        'surge-accent': '#be9eff',         // Lavender — tertiary accent
+
+        // Surface tokens (names preserved; values flipped to light)
+        'surge-dark': '#fcfcfc',           // Page background (off-white)
+        'surge-card': '#ffffff',           // Card surface (white)
+        'surge-card-hover': '#f5f7fb',     // Hovered card surface
+        'surge-border': '#e5e7eb',         // Subtle light border
+
+        // Text
+        'surge-text': '#172342',           // Primary text (navy)
+        'surge-muted': '#5e6575',          // Muted / secondary text
+
+        // Pastel accent set from surge.wtf
+        'surge-mint': '#8ce8ab',           // Success / positive
+        'surge-aqua': '#90eee4',           // Info / neutral highlight
+        'surge-peach': '#fabeab',          // Warning / warm accent
+        'surge-amber': '#f1aa47',          // Strong warn / CTA contrast
+        'surge-lavender': '#be9eff',       // Brand accent (same as accent)
       },
       backgroundImage: {
-        'surge-gradient': 'linear-gradient(135deg, #0a1628 0%, #0f2847 50%, #0a1628 100%)',
-        'surge-glow': 'radial-gradient(ellipse at top, rgba(16, 185, 129, 0.15) 0%, transparent 50%)',
+        'surge-gradient': 'linear-gradient(135deg, #ffffff 0%, #f5f7fb 50%, #ffffff 100%)',
+        'surge-glow': 'radial-gradient(ellipse at top, rgba(123, 172, 255, 0.18) 0%, transparent 55%)',
       },
     },
   },

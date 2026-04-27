@@ -134,10 +134,15 @@ export function BridgeCard({ onSetupWallet, onFundWallet }: BridgeCardProps) {
   return (
     <div className="flex flex-col md:flex-row items-start gap-4 justify-center w-full relative z-10">
       {/* Left panel — inputs */}
-      <div className="w-full md:max-w-md bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20 hover-glow transition-all duration-[1000ms] ease-[cubic-bezier(0.16,1,0.3,1)]">
+      <div className="w-full md:max-w-md glass-card rounded-2xl p-4 space-y-3 hover-glow transition-all duration-[1000ms] ease-[cubic-bezier(0.16,1,0.3,1)]">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Bridge</h2>
-          <span className="text-xs font-medium text-emerald-400">Via Smart Account</span>
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-1 h-5 rounded-full bg-surge-secondary" />
+            <h2 className="text-lg font-semibold text-surge-text">Bridge</h2>
+          </div>
+          <span className="text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border bg-surge-secondary/15 border-surge-secondary/50 text-surge-primary">
+            Via Smart Account
+          </span>
         </div>
         <WarningBanner />
 
@@ -150,8 +155,8 @@ export function BridgeCard({ onSetupWallet, onFundWallet }: BridgeCardProps) {
             }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
               isDeposit
-                ? "bg-surge-primary text-white"
-                : "bg-surge-dark/50 text-gray-400 hover:text-white border border-surge-border/30"
+                ? "bg-surge-primary text-white shadow-sm"
+                : "bg-surge-card-hover text-surge-muted hover:text-surge-text border border-surge-border"
             }`}
           >
             Deposit L1&rarr;L2
@@ -163,8 +168,8 @@ export function BridgeCard({ onSetupWallet, onFundWallet }: BridgeCardProps) {
             }}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
               !isDeposit
-                ? "bg-surge-primary text-white"
-                : "bg-surge-dark/50 text-gray-400 hover:text-white border border-surge-border/30"
+                ? "bg-surge-primary text-white shadow-sm"
+                : "bg-surge-card-hover text-surge-muted hover:text-surge-text border border-surge-border"
             }`}
           >
             Withdraw L2&rarr;L1
@@ -182,8 +187,8 @@ export function BridgeCard({ onSetupWallet, onFundWallet }: BridgeCardProps) {
               }}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
                 bridgeToken === t
-                  ? "bg-surge-primary text-white"
-                  : "bg-surge-dark/50 text-gray-400 hover:text-white border border-surge-border/30"
+                  ? "bg-surge-primary text-white shadow-sm"
+                  : "bg-surge-card-hover text-surge-muted hover:text-surge-text border border-surge-border"
               }`}
             >
               {t}
@@ -193,7 +198,7 @@ export function BridgeCard({ onSetupWallet, onFundWallet }: BridgeCardProps) {
 
         {/* USDC withdrawal not supported notice */}
         {isWithdrawUSDC && (
-          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-3 py-2 text-xs text-yellow-400">
+          <div className="bg-red-50 border border-red-300 rounded-lg px-3 py-2 text-xs text-red-700">
             USDC withdrawal (L2&rarr;L1) is not yet supported. Only native {L1_NATIVE_SYMBOL} withdrawals are available.
           </div>
         )}
@@ -209,7 +214,7 @@ export function BridgeCard({ onSetupWallet, onFundWallet }: BridgeCardProps) {
 
         {/* Recipient (optional) */}
         <div className="space-y-1">
-          <label className="text-xs text-gray-400">
+          <label className="text-xs text-surge-muted">
             {isDeposit ? "Recipient on L2 (optional)" : "Recipient on L1 (optional)"}
           </label>
           <input
@@ -219,7 +224,7 @@ export function BridgeCard({ onSetupWallet, onFundWallet }: BridgeCardProps) {
             placeholder={
               smartWallet ? `Default: ${smartWallet.slice(0, 10)}...` : "0x..."
             }
-            className="w-full bg-surge-dark/50 border border-surge-border/30 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-surge-primary/50"
+            className="w-full bg-surge-card-hover border border-surge-border rounded-lg px-3 py-2 text-sm text-surge-text placeholder-surge-muted/60 focus:outline-none focus:border-surge-secondary"
           />
         </div>
 
@@ -235,8 +240,8 @@ export function BridgeCard({ onSetupWallet, onFundWallet }: BridgeCardProps) {
           disabled={!needsL2WalletSetup && isDisabled}
           className={`w-full py-3 rounded-xl font-semibold text-base transition-all duration-200 ${
             isDisabled
-              ? "bg-surge-card/50 text-gray-500 cursor-not-allowed border border-surge-border/30"
-              : "bg-gradient-to-r from-surge-primary to-surge-secondary text-white hover:shadow-lg hover:shadow-surge-primary/30 hover:scale-[1.02] active:scale-[0.98]"
+              ? "bg-surge-card-hover text-surge-muted cursor-not-allowed border border-surge-border"
+              : "bg-surge-primary text-white hover:bg-surge-secondary hover:shadow-md hover:shadow-surge-secondary/25 active:scale-[0.98]"
           }`}
         >
           {isPending ? (
@@ -252,43 +257,46 @@ export function BridgeCard({ onSetupWallet, onFundWallet }: BridgeCardProps) {
 
       {/* Right panel — bridge details (shown when amount is entered) */}
       {amountIn > 0n && (
-        <div className="w-full md:max-w-sm bg-surge-card/80 border border-surge-border/50 rounded-2xl p-4 space-y-3 shadow-xl shadow-black/20 animate-panel-in">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Bridge Details</h3>
+        <div className="w-full md:max-w-sm glass-card rounded-2xl p-4 space-y-3 animate-panel-in">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-1 h-4 rounded-full bg-surge-secondary" />
+            <h3 className="text-xs font-semibold text-surge-muted uppercase tracking-widest">Bridge Details</h3>
+          </div>
 
           {/* Flow Visualization */}
           <div className="flex items-center justify-center gap-3 py-3">
-            <div className="flex items-center gap-2 bg-surge-dark/50 px-3 py-2 rounded-lg">
-              <span className="text-xs text-gray-400">{isDeposit ? "L1" : "L2"}</span>
-              <span className="text-sm text-white font-medium">
+            <div className="flex items-center gap-2 bg-surge-card-hover border border-surge-border px-3 py-2 rounded-lg">
+              <span className="text-xs text-surge-muted">{isDeposit ? "L1" : "L2"}</span>
+              <span className="text-sm text-surge-text font-medium">
                 {isDeposit ? (bridgeToken === L1_NATIVE_SYMBOL ? "Send" : "Lock") : "Send"}
               </span>
             </div>
-            <div className="text-surge-primary">&rarr;</div>
-            <div className="flex items-center gap-2 bg-surge-dark/50 px-3 py-2 rounded-lg">
-              <span className="text-xs text-gray-400">{isDeposit ? "L2" : "L1"}</span>
-              <span className="text-sm text-white font-medium">
+            <div className="text-surge-secondary">&rarr;</div>
+            <div className="flex items-center gap-2 bg-surge-card-hover border border-surge-border px-3 py-2 rounded-lg">
+              <span className="text-xs text-surge-muted">{isDeposit ? "L2" : "L1"}</span>
+              <span className="text-sm text-surge-text font-medium">
                 {isDeposit ? (bridgeToken === L1_NATIVE_SYMBOL ? "Receive" : "Mint") : "Receive"}
               </span>
             </div>
           </div>
 
           {/* Transfer Summary */}
-          <div className="bg-surge-dark/30 rounded-lg p-3 space-y-1">
+          <div className="bg-surge-card-hover border border-surge-border rounded-lg p-3 space-y-1">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">You send</span>
-              <span className="text-white">
+              <span className="text-surge-muted">You send</span>
+              <span className="text-surge-text">
                 {formatUnits(amountIn, currentToken.decimals)} {bridgeToken}
               </span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-400">You receive</span>
-              <span className="text-white">
+              <span className="text-surge-muted">You receive</span>
+              <span className="text-surge-text">
                 {formatUnits(amountIn, currentToken.decimals)} {bridgeToken} on {isDeposit ? "L2" : "L1"}
               </span>
             </div>
-            <div className="flex justify-between text-sm mt-1 pt-1 border-t border-surge-border/30">
-              <span className="text-gray-400">Recipient</span>
-              <span className="text-white text-xs font-mono">
+            <div className="flex justify-between text-sm mt-1 pt-1 border-t border-surge-border">
+              <span className="text-surge-muted">Recipient</span>
+              <span className="text-surge-text text-xs font-mono">
                 {effectiveRecipient
                   ? `${effectiveRecipient.slice(0, 6)}...${effectiveRecipient.slice(-4)}`
                   : "—"}
