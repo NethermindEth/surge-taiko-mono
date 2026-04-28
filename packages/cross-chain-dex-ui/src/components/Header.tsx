@@ -14,7 +14,7 @@ interface HeaderProps {
 }
 
 export function Header({ onSetupWallet }: HeaderProps) {
-  const { smartWallet, isConnected, ownerAddress, accountMode, clearAccountMode, selectedNetwork, setSelectedNetwork, l2WalletExists } = useSmartWallet();
+  const { smartWallet, isConnected, ownerAddress, accountMode, clearAccountMode, selectedNetwork, setSelectedNetwork } = useSmartWallet();
   const { address: eoaAddress } = useAccount();
   const { disconnect } = useDisconnect();
   const { executeWithdraw, isPending } = useUserOp(accountMode);
@@ -112,18 +112,8 @@ export function Header({ onSetupWallet }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-3">
-        {/* Smart Wallet: show "Setup on L2" button when on L2 network and L2 wallet doesn't exist */}
-        {isConnected && smartWallet && selectedNetwork === 'l2' && !l2WalletExists && (
-          <button
-            onClick={onSetupWallet}
-            className="px-4 py-2 bg-surge-secondary/15 hover:bg-surge-secondary/25 text-surge-primary rounded-lg text-sm font-medium transition-colors border border-surge-secondary/40"
-          >
-            Setup Smart Wallet on L2
-          </button>
-        )}
-
-        {/* Smart Wallet display — show when wallet exists on the selected network */}
-        {isConnected && smartWallet && (selectedNetwork === 'l1' || l2WalletExists) && (
+        {/* Smart Wallet display — L1 only (swaps on L2 use the connected EOA) */}
+        {isConnected && smartWallet && selectedNetwork === 'l1' && (
           <div className="hidden md:flex items-center relative" ref={swDropdownRef}>
             <div className="flex items-center gap-2 px-3 py-2 bg-surge-card rounded-lg border border-surge-border">
               <div className="w-2 h-2 bg-surge-mint rounded-full" />
@@ -179,7 +169,7 @@ export function Header({ onSetupWallet }: HeaderProps) {
           </div>
         )}
 
-        {isConnected && !smartWallet && (
+        {isConnected && !smartWallet && selectedNetwork === 'l1' && (
           <button
             onClick={onSetupWallet}
             className="px-4 py-2 bg-surge-primary hover:opacity-90 text-white rounded-lg text-sm font-medium transition-opacity shadow-sm"
