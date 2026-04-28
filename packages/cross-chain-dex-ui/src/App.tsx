@@ -83,22 +83,21 @@ function AppContent() {
     setDismissedWalletSetup(false);
   }, [isConnected, ownerAddress]);
 
-  // Auto-show wallet setup if connected, on correct network, but no smart wallet
+  // Auto-show wallet setup if connected on L1 with no smart wallet.
+  // On L2, swaps use the connected EOA — smart wallet is an L1-only feature.
   useEffect(() => {
-    if (isConnected && !isWrongNetwork && !smartWallet && !isLoading && !dismissedWalletSetup && accountMode === 'safe' && !showModeSelector) {
+    if (isConnected && selectedNetwork === 'l1' && !isWrongNetwork && !smartWallet && !isLoading && !dismissedWalletSetup && accountMode === 'safe' && !showModeSelector) {
       setShowWalletSetup(true);
     } else if (smartWallet && showWalletSetup) {
       setShowWalletSetup(false);
     }
-  }, [isConnected, isWrongNetwork, smartWallet, isLoading, showWalletSetup, dismissedWalletSetup, accountMode, showModeSelector]);
+  }, [isConnected, isWrongNetwork, smartWallet, isLoading, showWalletSetup, dismissedWalletSetup, accountMode, showModeSelector, selectedNetwork]);
 
-  // Auto-show fund wallet modal.
-  // On L2, suppress until the L2 Safe actually exists — creation is initiated from L1
-  // via the bridge, so funding an undeployed L2 address is a dead-end for the user.
+  // Auto-show fund wallet modal — L1 only (smart wallet is L1-only feature).
   useEffect(() => {
+    if (selectedNetwork !== 'l1') return;
     if (accountMode === 'ambire') return;
     if (!smartWallet || hasShownFundModal || balancesLoading || isLoading || showNetworkSetup || showWalletSetup) return;
-    if (selectedNetwork === 'l2' && !l2WalletExists) return;
     const needsFunding = ethBalance === 0n || usdcBalance === 0n;
     const needsL2 = accountMode === 'safe' && !l2WalletExists;
     if (needsFunding || needsL2) {
@@ -183,13 +182,13 @@ function AppContent() {
       />
 
       <AccountModeSelector
-        isOpen={showModeSelector}
+        isOpen={showModeSelector && selectedNetwork === 'l1'}
         onSelect={selectAccountMode}
         onClose={() => setShowModeSelector(false)}
       />
 
       <SmartWalletSetup
-        isOpen={showWalletSetup && !isWrongNetwork && !showModeSelector}
+        isOpen={showWalletSetup && !isWrongNetwork && !showModeSelector && selectedNetwork === 'l1'}
         onClose={() => {
           setShowWalletSetup(false);
           setDismissedWalletSetup(true);
@@ -199,7 +198,7 @@ function AppContent() {
         createSmartWallet={createSmartWallet}
       />
 
-      {smartWallet && (
+      {smartWallet && selectedNetwork === 'l1' && (
         <FundWallet
           isOpen={showFundWallet}
           onClose={() => setShowFundWallet(false)}
