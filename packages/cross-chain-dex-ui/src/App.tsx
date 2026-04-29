@@ -62,8 +62,15 @@ function AppContent() {
   // Only show network setup if on a completely unknown chain (neither L1 nor L2).
   // If the user is on a valid chain but not the one matching the selected network,
   // silently auto-switch without showing the modal.
+  //
+  // While a tx is in flight (e.g. a bridge withdrawal triggered from the L1 page that
+  // needs to sign on L2), suppress the auto-switch so we don't fight the in-flight
+  // hook-driven chain switch. Once the tx settles ('complete' / 'rejected' / 'idle'),
+  // the effect re-fires and pulls the wallet back to the selected page network.
+  const isTxInFlight = txStatus.phase !== 'idle' && txStatus.phase !== 'complete' && txStatus.phase !== 'rejected';
   useEffect(() => {
     if (!isConnected || !chainId) return;
+    if (isTxInFlight) return;
     if (isWrongNetwork) {
       // On an unknown chain — try to switch, show modal if that fails
       switchChainAsync({ chainId: requiredChainId }).catch(() => {
@@ -76,7 +83,7 @@ function AppContent() {
     } else {
       setShowNetworkSetup(false);
     }
-  }, [isConnected, chainId, requiredChainId, isWrongNetwork, switchChainAsync]);
+  }, [isConnected, chainId, requiredChainId, isWrongNetwork, switchChainAsync, isTxInFlight]);
 
   // Reset dismissed flag when wallet connects/disconnects
   useEffect(() => {
