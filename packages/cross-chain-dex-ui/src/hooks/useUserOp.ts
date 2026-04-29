@@ -142,6 +142,27 @@ export function useUserOp(accountMode: AccountMode = 'safe'): UseUserOpReturn {
           setTxStatus({ phase: 'sequencing' });
           await l2PublicClient.waitForTransactionReceipt({ hash: txHash });
           return await pollStatus({ txHash });
+        } else if (accountMode === 'safe' && targetChainId === L2_CHAIN_ID) {
+          // Safe on L2 (e.g. bridge-out L2 -> L1): standard L2 tx — sign safeTx
+          // and submit Safe.execTransaction directly. The L1 UserOp builder is
+          // not involved; the bridge message emitted on L2 is delivered to L1
+          // by the relayer asynchronously.
+          const nonce = await getSafeNonce(publicClient, smartWallet);
+          const safeTx = userOpsToSafeTx(ops);
+          const typedData = buildSafeTxTypedData(smartWallet, targetChainId, nonce, safeTx);
+          const signature = await activeClient.signTypedData(typedData);
+          const execCalldata = buildExecTransactionCalldata(safeTx, signature as Hex);
+          const txHash = await activeClient.sendTransaction({
+            to: smartWallet,
+            data: execCalldata,
+            chain: activeClient.chain,
+            account: activeClient.account,
+          });
+          setTxStatus({ phase: 'sequencing' });
+          await l2PublicClient.waitForTransactionReceipt({ hash: txHash });
+          setTxStatus({ phase: 'complete', txHash });
+          setIsPending(false);
+          return true;
         } else if (accountMode === 'ambire') {
           // AmbireAccount path on L1: personal_sign + execute()
           const txns = userOpsToAmbireTransactions(ops);
