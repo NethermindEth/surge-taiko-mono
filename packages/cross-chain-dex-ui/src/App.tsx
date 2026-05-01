@@ -49,9 +49,10 @@ function AppContent() {
   const requiredChainId = selectedNetwork === 'l2' ? surgeL2Chain.id : surgeL1Chain.id;
   const networkSetupTarget = selectedNetwork === 'l2' ? 'l2' as const : 'l1' as const;
 
-  // When L2 is selected, force swap tab (no bridge/liquidity on L2)
+  // L2 only exposes Swap and Bridge (withdraw). If the user is on the
+  // Liquidity tab when switching to L2, fall back to Swap.
   useEffect(() => {
-    if (selectedNetwork === 'l2' && activeTab !== 'swap') {
+    if (selectedNetwork === 'l2' && activeTab === 'liquidity') {
       setActiveTab('swap');
     }
   }, [selectedNetwork, activeTab]);
@@ -114,7 +115,7 @@ function AppContent() {
   }, [smartWallet, ethBalance, usdcBalance, balancesLoading, hasShownFundModal, isLoading, l2WalletExists, showNetworkSetup, showWalletSetup, accountMode, selectedNetwork]);
 
   const availableTabs: ActiveTab[] = selectedNetwork === 'l2'
-    ? ['swap']
+    ? ['swap', 'bridge']
     : ['swap', 'liquidity', 'bridge'];
 
   return (
@@ -168,8 +169,9 @@ function AppContent() {
               onVenueChange={() => {}}
             />
           )}
-          {activeTab === 'bridge' && selectedNetwork === 'l1' && (
+          {activeTab === 'bridge' && (
             <BridgeCard
+              network={selectedNetwork}
               onSetupWallet={() => setShowWalletSetup(true)}
               onFundWallet={() => setShowFundWallet(true)}
             />
