@@ -37,7 +37,10 @@ abstract contract RealTimeInboxTestBase is CommonTest {
         config = IRealTimeInbox.Config({
             proofVerifier: address(verifier),
             signalService: address(signalService),
-            basefeeSharingPctg: 0
+            basefeeSharingPctg: 0,
+            forcedInclusionDelay: 3600,
+            forcedInclusionFeeInGwei: 1_000_000,
+            forcedInclusionFeeDoubleThreshold: 100
         });
 
         inbox = _deployInbox(config);
@@ -93,6 +96,7 @@ abstract contract RealTimeInboxTestBase is CommonTest {
     {
         input_ = IRealTimeInbox.ProposeInput({
             blobReference: LibBlobs.BlobReference({ blobStartIndex: 0, numBlobs: 1, offset: 0 }),
+            numForcedInclusions: 0,
             signalSlots: new bytes32[](0),
             maxAnchorBlockNumber: uint48(block.number - 1)
         });

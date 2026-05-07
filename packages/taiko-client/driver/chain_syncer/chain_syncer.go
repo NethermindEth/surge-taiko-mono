@@ -14,6 +14,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/chain_syncer/event"
 	preconfBlocks "github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/preconf_blocks"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/state"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/privacy"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 )
 
@@ -49,12 +50,15 @@ func New(
 	blobServerEndpoint *url.URL,
 	latestSeenProposalCh chan *encoding.LastSeenProposal,
 	fork string,
+	privacyKeys privacy.Keys,
 ) (*L2ChainSyncer, error) {
 	tracker := beaconsync.NewSyncProgressTracker(rpc.L2, p2pSyncTimeout)
 	go tracker.Track(ctx)
 
 	beaconSyncer := beaconsync.NewSyncer(ctx, rpc, state, tracker)
-	eventSyncer, err := event.NewSyncer(ctx, rpc, state, tracker, blobServerEndpoint, latestSeenProposalCh, fork)
+	eventSyncer, err := event.NewSyncer(
+		ctx, rpc, state, tracker, blobServerEndpoint, latestSeenProposalCh, fork, privacyKeys,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create event syncer: %w", err)
 	}

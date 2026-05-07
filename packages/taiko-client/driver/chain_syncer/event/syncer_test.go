@@ -22,6 +22,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/state"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/jwt"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/privacy"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/proposer"
 )
@@ -46,6 +47,7 @@ func (s *EventSyncerTestSuite) SetupTest() {
 		s.BlobServer.URL(),
 		nil,
 		"pacaya",
+		privacy.Keys{},
 	)
 	s.Nil(err)
 	s.s = syncer

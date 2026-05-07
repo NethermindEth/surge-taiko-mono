@@ -28,6 +28,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/state"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/jwt"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/privacy"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	builder "github.com/taikoxyz/taiko-mono/packages/taiko-client/proposer/transaction_builder"
 )
@@ -53,6 +54,7 @@ func (s *ProposerTestSuite) SetupTest() {
 		s.BlobServer.URL(),
 		nil,
 		"pacaya",
+		privacy.Keys{},
 	)
 	s.Nil(err)
 	s.s = syncer

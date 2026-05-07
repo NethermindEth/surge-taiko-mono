@@ -27,6 +27,7 @@ import (
 	eventIterator "github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/chain_iterator/event_iterator"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/fork"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/preconf"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/privacy"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 )
 
@@ -64,6 +65,7 @@ func NewSyncer(
 	blobServerEndpoint *url.URL,
 	latestSeenProposalCh chan *encoding.LastSeenProposal,
 	forkStr string,
+	privacyKeys privacy.Keys,
 ) (*Syncer, error) {
 	constructor, err := anchorTxConstructor.New(client)
 	if err != nil {
@@ -82,7 +84,7 @@ func NewSyncer(
 		progressTracker:         progressTracker,
 		txListDecompressor:      txListDecompressor,
 		fork:                    forkStr,
-		derivationSourceFetcher: shastaManifest.NewDerivationSourceFetcher(client, blobDataSource),
+		derivationSourceFetcher: shastaManifest.NewDerivationSourceFetcher(client, blobDataSource, privacyKeys),
 	}
 
 	switch forkStr {
