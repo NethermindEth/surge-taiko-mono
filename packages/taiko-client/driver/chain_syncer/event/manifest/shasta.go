@@ -15,6 +15,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/manifest"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/metadata"
 	shastaBindings "github.com/taikoxyz/taiko-mono/packages/taiko-client/bindings/shasta"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/privacy"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/utils"
 )
@@ -33,15 +34,23 @@ type ShastaDerivationSourcePayload struct {
 
 // ShastaDerivationSourceFetcher is responsible for fetching the blob source from the L1 block sidecar.
 type ShastaDerivationSourceFetcher struct {
-	cli        *rpc.Client
-	dataSource *rpc.BlobDataSource
+	cli         *rpc.Client
+	dataSource  *rpc.BlobDataSource
+	privacyKeys privacy.Keys
 }
 
 // NewDerivationSourceFetcher creates a new ShastaManifestFetcher instance based on the given rpc client.
-func NewDerivationSourceFetcher(cli *rpc.Client, dataSource *rpc.BlobDataSource) *ShastaDerivationSourceFetcher {
+// `privacyKeys` provides the optional decryption keys for realtime blob payloads. Pass an empty
+// `privacy.Keys{}` to disable encrypted-blob handling (only scheme 0x00 plaintext blobs will decode).
+func NewDerivationSourceFetcher(
+	cli *rpc.Client,
+	dataSource *rpc.BlobDataSource,
+	privacyKeys privacy.Keys,
+) *ShastaDerivationSourceFetcher {
 	return &ShastaDerivationSourceFetcher{
-		cli:        cli,
-		dataSource: dataSource,
+		cli:         cli,
+		dataSource:  dataSource,
+		privacyKeys: privacyKeys,
 	}
 }
 
@@ -117,6 +126,7 @@ func (f *ShastaDerivationSourceFetcher) manifestFromBlobBytesRealTime(
 ) (*ShastaDerivationSourcePayload, error) {
 	var (
 		offset                   = int(meta.GetEventData().Sources[derivationIdx].BlobSlice.Offset.Uint64())
+		isForcedInclusion        = meta.GetEventData().Sources[derivationIdx].IsForcedInclusion
 		defaultPayload           = &ShastaDerivationSourcePayload{Default: true}
 		derivationSourceManifest = new(manifest.DerivationSourceManifest)
 	)
@@ -144,7 +154,27 @@ func (f *ShastaDerivationSourceFetcher) manifestFromBlobBytesRealTime(
 		)
 		return defaultPayload, nil
 	}
-	encoded, err := utils.Decompress(b[start : start+int(size)])
+
+	// Privacy: the inner buffer `b[start : start+size]` starts with a 1-byte scheme id
+	// (see PRIVACY_STACK.md). Dispatch reads the scheme and (for 0x01 / 0x02) decrypts
+	// using the configured keys, returning the compressed manifest. For non-FI sources a
+	// dispatch failure is fatal (Catalyst is misbehaving). For FI sources we fall back to
+	// the empty-block-with-anchor default per the privacy plan.
+	innerSchemed := b[start : start+int(size)]
+	compressed, err := privacy.Dispatch(innerSchemed, f.privacyKeys)
+	if err != nil {
+		if isForcedInclusion {
+			log.Warn(
+				"Failed to decrypt forced-inclusion blob, use default payload (empty block + anchor)",
+				"derivationIdx", derivationIdx,
+				"error", err,
+			)
+			return defaultPayload, nil
+		}
+		return nil, fmt.Errorf("failed to decrypt non-FI realtime blob payload: %w", err)
+	}
+
+	encoded, err := utils.Decompress(compressed)
 	if err != nil {
 		log.Warn(
 			"Failed to decompress manifest bytes, use default payload instead",
@@ -161,7 +191,15 @@ func (f *ShastaDerivationSourceFetcher) manifestFromBlobBytesRealTime(
 		return defaultPayload, nil
 	}
 
-	// RealTime always has a single source, no forced-inclusion check needed.
+	// Forced-inclusion sources are constrained to a single block, mirroring the
+	// non-realtime path. Any deviation collapses to the empty-block fallback.
+	if isForcedInclusion && len(derivationSourceManifest.Blocks) != 1 {
+		log.Warn(
+			"Invalid blocks count in forced-inclusion source manifest, use default payload",
+			"blocks", len(derivationSourceManifest.Blocks),
+		)
+		return defaultPayload, nil
+	}
 
 	if len(derivationSourceManifest.Blocks) > manifest.ProposalMaxBlocks {
 		log.Warn(

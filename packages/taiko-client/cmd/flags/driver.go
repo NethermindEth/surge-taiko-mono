@@ -81,6 +81,25 @@ var (
 		Category: driverCategory,
 		EnvVars:  []string{"FORK"},
 	}
+	PrivacyMode = &cli.BoolFlag{
+		Name:     "privacy.mode",
+		Usage:    `Enable realtime blob payload privacy. Must match the proposer (Catalyst) and prover (raiko) configuration.`,
+		Value:    false,
+		Category: driverCategory,
+		EnvVars:  []string{"SURGE_PRIVACY_MODE"},
+	}
+	PrivacySymmetricKey = &cli.StringFlag{
+		Name:     "privacy.symmetricKey",
+		Usage:    `Hex-encoded 32-byte AES-256-GCM key used to decrypt scheme-0x01 (normal proposal) blobs. Required when --privacy.mode=true.`,
+		Category: driverCategory,
+		EnvVars:  []string{"SURGE_PRIVACY_SYMMETRIC_KEY"},
+	}
+	PrivacyFIPrivateKey = &cli.StringFlag{
+		Name:     "privacy.fiPrivateKey",
+		Usage:    `Hex-encoded 32-byte secp256k1 system FI private key used to decrypt scheme-0x02 (forced inclusion) blobs.`,
+		Category: driverCategory,
+		EnvVars:  []string{"SURGE_PRIVACY_FI_PRIVKEY"},
+	}
 )
 
 // DriverFlags All driver flags.
@@ -99,4 +118,7 @@ var DriverFlags = MergeFlags(CommonFlags, []cli.Flag{
 	PreconfWhitelistAddress,
 	DriverTaikoWrapperAddress,
 	Fork,
+	PrivacyMode,
+	PrivacySymmetricKey,
+	PrivacyFIPrivateKey,
 }, p2pFlags.P2PFlags("PRECONFIRMATION"))

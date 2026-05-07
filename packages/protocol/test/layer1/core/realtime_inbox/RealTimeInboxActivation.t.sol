@@ -55,7 +55,12 @@ contract RealTimeInboxActivationTest is RealTimeInboxTestBase {
 
     function test_constructor_RevertWhen_ProofVerifierZero() public {
         IRealTimeInbox.Config memory cfg = IRealTimeInbox.Config({
-            proofVerifier: address(0), signalService: address(signalService), basefeeSharingPctg: 0
+            proofVerifier: address(0),
+            signalService: address(signalService),
+            basefeeSharingPctg: 0,
+            forcedInclusionDelay: 3600,
+            forcedInclusionFeeInGwei: 1_000_000,
+            forcedInclusionFeeDoubleThreshold: 100
         });
 
         vm.expectRevert("config: proofVerifier");
@@ -64,7 +69,12 @@ contract RealTimeInboxActivationTest is RealTimeInboxTestBase {
 
     function test_constructor_RevertWhen_SignalServiceZero() public {
         IRealTimeInbox.Config memory cfg = IRealTimeInbox.Config({
-            proofVerifier: address(verifier), signalService: address(0), basefeeSharingPctg: 0
+            proofVerifier: address(verifier),
+            signalService: address(0),
+            basefeeSharingPctg: 0,
+            forcedInclusionDelay: 3600,
+            forcedInclusionFeeInGwei: 1_000_000,
+            forcedInclusionFeeDoubleThreshold: 100
         });
 
         vm.expectRevert("config: signalService");
@@ -75,10 +85,27 @@ contract RealTimeInboxActivationTest is RealTimeInboxTestBase {
         IRealTimeInbox.Config memory cfg = IRealTimeInbox.Config({
             proofVerifier: address(verifier),
             signalService: address(signalService),
-            basefeeSharingPctg: 101
+            basefeeSharingPctg: 101,
+            forcedInclusionDelay: 3600,
+            forcedInclusionFeeInGwei: 1_000_000,
+            forcedInclusionFeeDoubleThreshold: 100
         });
 
         vm.expectRevert("config: basefeeSharingPctg");
+        new RealTimeInbox(cfg);
+    }
+
+    function test_constructor_RevertWhen_FeeDoubleThresholdZero() public {
+        IRealTimeInbox.Config memory cfg = IRealTimeInbox.Config({
+            proofVerifier: address(verifier),
+            signalService: address(signalService),
+            basefeeSharingPctg: 0,
+            forcedInclusionDelay: 3600,
+            forcedInclusionFeeInGwei: 1_000_000,
+            forcedInclusionFeeDoubleThreshold: 0
+        });
+
+        vm.expectRevert("config: feeDoubleThreshold");
         new RealTimeInbox(cfg);
     }
 }

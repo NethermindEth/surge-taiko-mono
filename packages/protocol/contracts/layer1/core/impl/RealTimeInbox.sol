@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import { IForcedInclusionStore } from "../iface/IForcedInclusionStore.sol";
 import { IInbox } from "../iface/IInbox.sol";
 import { IRealTimeInbox } from "../iface/IRealTimeInbox.sol";
 import { LibBlobs } from "../libs/LibBlobs.sol";
+import { LibForcedInclusion } from "../libs/LibForcedInclusion.sol";
 import { SurgeVerifier } from "src/layer1/surge/SurgeVerifier.sol";
 import { EssentialContract } from "src/shared/common/EssentialContract.sol";
+import { LibAddress } from "src/shared/libs/LibAddress.sol";
 import { ICheckpointStore } from "src/shared/signal/ICheckpointStore.sol";
 import { ISignalService } from "src/shared/signal/ISignalService.sol";
 
@@ -13,14 +16,18 @@ import { ISignalService } from "src/shared/signal/ISignalService.sol";
 /// @notice Inbox contract that combines proposal and proof verification into a single atomic
 /// operation. Each call to `propose()` submits a proposal, verifies a ZK proof, and finalizes
 /// the state in one transaction.
-/// @dev Proposer checks (lookahead, PreconfWhitelist), bond logic, forced inclusions, ring buffer
-///      storage, and prover whitelist are all scrapped for this real-time proving POC.
+/// @dev Proposer checks (lookahead, PreconfWhitelist), bond logic, ring buffer storage, and
+///      prover whitelist are all scrapped for this real-time proving POC. Forced inclusions
+///      are retained: external users enqueue blobs via `saveForcedInclusion`; the proposer
+///      consumes them via `numForcedInclusions` on the propose input.
 /// @dev WARNING: This contract is vulnerable to proposal frontrunning. A malicious actor can observe
 ///      a pending `propose()` transaction in the mempool and submit the same proposal with their own
 ///      address to steal credit. In production, an `actualProver` field (msg.sender) should be included
 ///      in the Commitment hash so that the proof is bound to a specific sender and cannot be replayed.
 /// @custom:security-contact security@nethermind.io
 contract RealTimeInbox is IRealTimeInbox, EssentialContract {
+    using LibAddress for address;
+    using LibForcedInclusion for LibForcedInclusion.Storage;
     // ---------------------------------------------------------------
     // Immutable Variables
     // ---------------------------------------------------------------
@@ -34,6 +41,15 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     /// @notice The percentage of basefee paid to coinbase.
     uint8 internal immutable _basefeeSharingPctg;
 
+    /// @notice The delay in seconds after which a forced inclusion is "due".
+    uint16 internal immutable _forcedInclusionDelay;
+
+    /// @notice The base fee in Gwei for the forced-inclusion dynamic-fee curve.
+    uint64 internal immutable _forcedInclusionFeeInGwei;
+
+    /// @notice Queue size at which the forced-inclusion fee doubles.
+    uint64 internal immutable _forcedInclusionFeeDoubleThreshold;
+
     // ---------------------------------------------------------------
     // State Variables
     // ---------------------------------------------------------------
@@ -41,7 +57,10 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     /// @notice Block hash of the last finalized L2 block. Serves as the chain head.
     bytes32 public lastFinalizedBlockHash;
 
-    uint256[49] private __gap;
+    /// @dev Storage for the forced-inclusion FIFO queue. Uses 2 storage slots.
+    LibForcedInclusion.Storage private _forcedInclusionStorage;
+
+    uint256[47] private __gap;
 
     // ---------------------------------------------------------------
     // Transient Storage for Pending Proposals
@@ -73,10 +92,14 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
         require(_config.proofVerifier != address(0), "config: proofVerifier");
         require(_config.signalService != address(0), "config: signalService");
         require(_config.basefeeSharingPctg <= 100, "config: basefeeSharingPctg");
+        require(_config.forcedInclusionFeeDoubleThreshold > 0, "config: feeDoubleThreshold");
 
         _proofVerifier = SurgeVerifier(_config.proofVerifier);
         _signalService = ISignalService(_config.signalService);
         _basefeeSharingPctg = _config.basefeeSharingPctg;
+        _forcedInclusionDelay = _config.forcedInclusionDelay;
+        _forcedInclusionFeeInGwei = _config.forcedInclusionFeeInGwei;
+        _forcedInclusionFeeDoubleThreshold = _config.forcedInclusionFeeDoubleThreshold;
     }
 
     // ---------------------------------------------------------------
@@ -210,6 +233,27 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
         _pendingRequiredSignalsHash = bytes32(0);
     }
 
+    /// @inheritdoc IForcedInclusionStore
+    /// @dev Reverts before activation: forced inclusions cannot be enqueued until the inbox
+    /// is activated, since their `blobSlice.timestamp` would not be meaningfully comparable
+    /// to anything pre-genesis.
+    function saveForcedInclusion(LibBlobs.BlobReference memory _blobReference)
+        external
+        payable
+        nonReentrant
+    {
+        require(lastFinalizedBlockHash != bytes32(0), NotActivated());
+
+        uint256 refund = _forcedInclusionStorage.saveForcedInclusion(
+            _forcedInclusionFeeInGwei, _forcedInclusionFeeDoubleThreshold, _blobReference
+        );
+
+        // Refund excess payment to the sender
+        if (refund > 0) {
+            msg.sender.sendEtherAndVerify(refund);
+        }
+    }
+
     // ---------------------------------------------------------------
     // Encoding / Decoding / Hashing Functions
     // ---------------------------------------------------------------
@@ -272,8 +316,35 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
         config_ = Config({
             proofVerifier: address(_proofVerifier),
             signalService: address(_signalService),
-            basefeeSharingPctg: _basefeeSharingPctg
+            basefeeSharingPctg: _basefeeSharingPctg,
+            forcedInclusionDelay: _forcedInclusionDelay,
+            forcedInclusionFeeInGwei: _forcedInclusionFeeInGwei,
+            forcedInclusionFeeDoubleThreshold: _forcedInclusionFeeDoubleThreshold
         });
+    }
+
+    /// @inheritdoc IForcedInclusionStore
+    function getCurrentForcedInclusionFee() external view returns (uint64 feeInGwei_) {
+        return _forcedInclusionStorage.getCurrentForcedInclusionFee(
+            _forcedInclusionFeeInGwei, _forcedInclusionFeeDoubleThreshold
+        );
+    }
+
+    /// @inheritdoc IForcedInclusionStore
+    function getForcedInclusions(
+        uint48 _start,
+        uint48 _maxCount
+    )
+        external
+        view
+        returns (IForcedInclusionStore.ForcedInclusion[] memory inclusions_)
+    {
+        return _forcedInclusionStorage.getForcedInclusions(_start, _maxCount);
+    }
+
+    /// @inheritdoc IForcedInclusionStore
+    function getForcedInclusionState() external view returns (uint48 head_, uint48 tail_) {
+        return _forcedInclusionStorage.getForcedInclusionState();
     }
 
     // ---------------------------------------------------------------
@@ -287,7 +358,6 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     /// @return signalSlots_ The raw signal slots from the input.
     function _buildProposal(bytes calldata _data)
         internal
-        view
         returns (bytes32 proposalHash_, Proposal memory proposal_, bytes32[] memory signalSlots_)
     {
         ProposeInput memory input = decodeProposeInput(_data);
@@ -306,9 +376,10 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
         // The driver can derive the blob timestamp from the L1 block that contains the event.
         blobSlice.timestamp = 0;
 
-        // Build derivation sources
-        IInbox.DerivationSource[] memory sources = new IInbox.DerivationSource[](1);
-        sources[0] = IInbox.DerivationSource(false, blobSlice);
+        // Build derivation sources: forced inclusions (if any) come first, the proposer's
+        // own blob last. Also dequeues from the FI queue and forwards fees to msg.sender.
+        IInbox.DerivationSource[] memory sources =
+            _consumeForcedInclusions(input.numForcedInclusions, blobSlice);
 
         // Build proposal (standalone — no parent linkage)
         proposal_ = Proposal({
@@ -333,7 +404,6 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     /// @return requiredSignalsHash_ Hash of the required return signal list.
     function _buildProposalV2(bytes calldata _data)
         internal
-        view
         returns (
             bytes32 proposalHash_,
             Proposal memory proposal_,
@@ -365,9 +435,10 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
         LibBlobs.BlobSlice memory blobSlice = LibBlobs.validateBlobReference(input.blobReference);
         blobSlice.timestamp = 0;
 
-        // Build derivation sources
-        IInbox.DerivationSource[] memory sources = new IInbox.DerivationSource[](1);
-        sources[0] = IInbox.DerivationSource(false, blobSlice);
+        // Build derivation sources: forced inclusions (if any) come first, the proposer's
+        // own blob last. Also dequeues from the FI queue and forwards fees to msg.sender.
+        IInbox.DerivationSource[] memory sources =
+            _consumeForcedInclusions(input.numForcedInclusions, blobSlice);
 
         proposal_ = Proposal({
             maxAnchorBlockNumber: input.maxAnchorBlockNumber,
@@ -378,6 +449,63 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
         });
 
         proposalHash_ = hashProposal(proposal_);
+    }
+
+    /// @dev Dequeues forced inclusions from the queue, builds the combined sources array
+    ///      (forced inclusions first, proposer's own blob last), and forwards accumulated fees
+    ///      to `msg.sender`. Reverts if the proposer fails to consume an overdue inclusion.
+    /// @param _numForcedInclusionsRequested The number of forced inclusions requested by the proposer.
+    /// @param _proposerBlobSlice The proposer's own blob slice (already validated by caller).
+    /// @return sources_ Sources array of length `toProcess + 1`. Forced inclusions occupy
+    ///         indices `[0, toProcess)`; the proposer's blob is at index `toProcess`.
+    function _consumeForcedInclusions(
+        uint16 _numForcedInclusionsRequested,
+        LibBlobs.BlobSlice memory _proposerBlobSlice
+    )
+        private
+        returns (IInbox.DerivationSource[] memory sources_)
+    {
+        unchecked {
+            LibForcedInclusion.Storage storage $ = _forcedInclusionStorage;
+
+            (uint48 head, uint48 tail) = ($.head, $.tail);
+            uint256 available = uint256(tail) - uint256(head);
+
+            uint256 toProcess = uint256(_numForcedInclusionsRequested) > available
+                ? available
+                : uint256(_numForcedInclusionsRequested);
+
+            uint48 headAfter = head + uint48(toProcess);
+
+            // If unconsumed inclusions remain and the next one is past its delay, the proposer
+            // is censoring it — revert.
+            if (available > toProcess) {
+                require(
+                    !$.isOldestForcedInclusionDue(headAfter, tail, _forcedInclusionDelay),
+                    UnprocessedForcedInclusionIsDue()
+                );
+            }
+
+            sources_ = new IInbox.DerivationSource[](toProcess + 1);
+
+            uint256 totalFees;
+            for (uint256 i; i < toProcess; ++i) {
+                IForcedInclusionStore.ForcedInclusion storage inclusion = $.queue[head + i];
+                sources_[i] = IInbox.DerivationSource(true, inclusion.blobSlice);
+                totalFees += uint256(inclusion.feeInGwei);
+            }
+
+            // Proposer's own blob always last (drives the canonical L2 progression).
+            sources_[toProcess] = IInbox.DerivationSource(false, _proposerBlobSlice);
+
+            if (toProcess > 0) {
+                $.head = headAfter;
+            }
+
+            if (totalFees > 0) {
+                msg.sender.sendEtherAndVerify(totalFees * 1 gwei);
+            }
+        }
     }
 
     /// @dev Concatenates two signal slot arrays. Existing signals come first,
@@ -462,4 +590,5 @@ contract RealTimeInbox is IRealTimeInbox, EssentialContract {
     error NoPendingProposal();
     error RequiredSignalsMismatch();
     error RequiredSignalNotSent(bytes32 slot);
+    error UnprocessedForcedInclusionIsDue();
 }
