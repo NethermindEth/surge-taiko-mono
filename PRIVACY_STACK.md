@@ -53,10 +53,16 @@ A **blob** as broadcast on L1 (EIP-4844 / EIP-7594) is a 131,072-byte sidecar. C
 What it changes is the inner **payload buffer** layout:
 
 ```
-payload_buffer = [version (1B)] [size (3B BE)] [scheme (1B)] [scheme_body (size-1 bytes)]
+payload_buffer = [bytes32(version=1) (32B)] [bytes32(size) (32B)] [scheme (1B)] [scheme_body]
+                                                                   └──── inner ─────┘
+                                                                   size = 1 + len(scheme_body)
 ```
 
-The outer `version`/`size` framing is unchanged; the scheme byte is the first byte of the inner content. Define `M = zlib(RLP(DerivationSourceManifest))` — the compressed manifest, exactly the same buffer that today is the inner content. This is the plaintext of every encryption operation.
+- `version` is `[0u8; 31] || 0x01` — i.e. `B256::with_last_byte(1)`. The driver and prover reject anything else.
+- `size` is `U256(inner_len).to_be_bytes::<32>()` — full 32-byte big-endian; the meaningful u64 lives in bytes `[24..32]`.
+- The outer 64-byte frame is the existing Shasta blob frame; the privacy scheme byte is the **first byte of the inner content**, _not_ the first byte of the buffer. (Catalyst's `build_blob_payload` helper enforces this — emitting the scheme outside the frame breaks raiko's `blob_tx_slice_param_for_source` and the driver's `ExtractVersionAndSize`.)
+
+Define `M = zlib(RLP(DerivationSourceManifest))` — the compressed manifest, exactly the same buffer that today is the inner content. This is the plaintext of every encryption operation.
 
 ### Scheme 0x00 — plaintext
 
