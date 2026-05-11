@@ -222,8 +222,4 @@ If logs show "privacy dispatch failed" repeatedly, one component has the wrong k
 
 ## 11. Open issues / future work
 
-- **HKDF-per-proposal symmetric key derivation**: gives forward secrecy on master-key rotation. v2.
-- **Threshold key management**: t-of-n distribution of `K_sym` and `SK_sys` so no single party holds the secret. v2.
-- **Padding blobs to fixed size**: eliminates the side-channel where blob size leaks the tx-batch size. v2.
-- **Encrypted P2P mempool**: privacy from validators/peers, not just L1. Out of scope for this stack.
 - **Standalone FI submitter CLI**: a tool that takes a tx list + system pubkey and emits a ready-to-sign blob tx. Currently submitters do this manually.
