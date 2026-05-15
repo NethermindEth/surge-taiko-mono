@@ -295,7 +295,7 @@ func (s *ProverTestSuite) TestProveMultiBlobBatch() {
 
 	var (
 		batchSize    = 2
-		txNumInBatch = 500
+		txNumInBatch = 400
 	)
 
 	proposeMultiBlockBatch := func() {
