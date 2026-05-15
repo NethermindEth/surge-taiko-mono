@@ -1,0 +1,28 @@
+[package]
+name = "privacy-proxy"
+version = "0.1.0"
+edition = "2021"
+description = "EVM JSON-RPC proxy with role-based access control over contract calls"
+
+[dependencies]
+tokio = { version = "1.37", features = ["macros", "rt-multi-thread", "signal", "net"] }
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.5"
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
+alloy = { version = "1.0", default-features = false, features = ["consensus", "eips", "rpc-types", "sol-types", "k256"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+rand = "0.8"
+sha2 = "0.10"
+hex = "0.4"
+thiserror = "1"
+anyhow = "1"
+async-trait = "0.1"
+http = "1"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }

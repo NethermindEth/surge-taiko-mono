@@ -1,0 +1,8 @@
+target/
+**/*.db
+**/*.db-journal
+.env
+.env.*
+docs/
+tests/
+README.md

@@ -1,0 +1,347 @@
+use alloy::primitives::Address;
+use anyhow::Result;
+
+use crate::acl::lambdas::{self, LambdaCtx};
+use crate::acl::registry;
+use crate::auth::CallerCtx;
+use crate::db::Pool;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AccessDecision {
+    Allow,
+    Deny {
+        contract: Address,
+        selector: [u8; 4],
+        reason: DenyReason,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DenyReason {
+    NotInAllowList,
+    InDenyList,
+    LambdaRejected,
+    UnknownLambda,
+    AnonymousAgainstGatedCall,
+    UnknownRuleMode,
+    /// Default behavior for a synthetic-selector RPC method when the
+    /// target is an EOA other than the caller's own EOA and no admin
+    /// rule overrides.
+    DefaultEoaSelfOnly,
+}
+
+/// Check a single contract call against the registry.
+///
+/// Truth table (rule `mode` × entry presence × lambda):
+///
+/// | mode  | entry exists | lambda      | decision |
+/// |-------|--------------|-------------|----------|
+/// | n/a (no rule) | -    | -           | allow    |
+/// | allow | no           | -           | DENY (NotInAllowList) |
+/// | allow | yes          | none        | allow    |
+/// | allow | yes          | true        | allow    |
+/// | allow | yes          | false       | DENY (LambdaRejected) |
+/// | deny  | no           | -           | allow    |
+/// | deny  | yes          | none        | DENY (InDenyList) |
+/// | deny  | yes          | true        | DENY (LambdaRejected) |
+/// | deny  | yes          | false       | allow    |
+pub async fn check_call(
+    pool: &Pool,
+    ctx: &CallerCtx,
+    contract: &Address,
+    call_data: &[u8],
+) -> Result<AccessDecision> {
+    if call_data.len() < 4 {
+        // Plain value transfer or empty call: no function selector to gate.
+        return Ok(AccessDecision::Allow);
+    }
+    let selector: [u8; 4] = call_data[0..4].try_into().expect("len checked above");
+    let selector_hex = format!("0x{}", hex::encode(selector));
+    let contract_hex = format!("0x{}", hex::encode(contract.as_slice()));
+
+    let Some(rule) = registry::find_rule(pool, &contract_hex, &selector_hex).await? else {
+        return Ok(AccessDecision::Allow);
+    };
+
+    // Anonymous (no role) and the rule exists → only `mode = deny` without
+    // an entry for "anonymous" would still allow; but we have no anonymous
+    // role binding, so any rule with `mode = allow` is a deny, and any rule
+    // with `mode = deny` is an allow (no entry can match a null role).
+    let role_name = match &ctx.role {
+        Some(r) => r.as_str(),
+        None => {
+            return Ok(match rule.mode.as_str() {
+                "allow" => AccessDecision::Deny {
+                    contract: *contract,
+                    selector,
+                    reason: DenyReason::AnonymousAgainstGatedCall,
+                },
+                "deny" => AccessDecision::Allow,
+                _ => AccessDecision::Deny {
+                    contract: *contract,
+                    selector,
+                    reason: DenyReason::UnknownRuleMode,
+                },
+            });
+        }
+    };
+
+    let entry = registry::entry_for_role(pool, rule.id, role_name).await?;
+
+    let (entry_matches, lambda_outcome) = match entry {
+        None => (false, true), // lambda_outcome is irrelevant when no entry
+        Some(e) => {
+            let outcome = match e.lambda_name.as_deref() {
+                None => true,
+                Some(name) => match lambdas::lookup(name) {
+                    Some(spec) => (spec.run)(&LambdaCtx {
+                        caller_info: &ctx.caller_info,
+                        selector,
+                        call_data,
+                    }),
+                    None => {
+                        // Lambda name in DB does not exist in this build → fail closed.
+                        return Ok(AccessDecision::Deny {
+                            contract: *contract,
+                            selector,
+                            reason: DenyReason::UnknownLambda,
+                        });
+                    }
+                },
+            };
+            (true, outcome)
+        }
+    };
+
+    let decision = match rule.mode.as_str() {
+        "allow" => {
+            if !entry_matches {
+                AccessDecision::Deny {
+                    contract: *contract,
+                    selector,
+                    reason: DenyReason::NotInAllowList,
+                }
+            } else if !lambda_outcome {
+                AccessDecision::Deny {
+                    contract: *contract,
+                    selector,
+                    reason: DenyReason::LambdaRejected,
+                }
+            } else {
+                AccessDecision::Allow
+            }
+        }
+        "deny" => {
+            if entry_matches && lambda_outcome {
+                AccessDecision::Deny {
+                    contract: *contract,
+                    selector,
+                    reason: if entry_matches {
+                        DenyReason::InDenyList
+                    } else {
+                        DenyReason::LambdaRejected
+                    },
+                }
+            } else {
+                AccessDecision::Allow
+            }
+        }
+        _ => AccessDecision::Deny {
+            contract: *contract,
+            selector,
+            reason: DenyReason::UnknownRuleMode,
+        },
+    };
+    Ok(decision)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db;
+    use alloy::primitives::Address;
+    use serde_json::json;
+    use sqlx::sqlite::SqlitePoolOptions;
+    use sqlx::Row;
+
+    async fn fresh_pool() -> Pool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        pool
+    }
+
+    fn user_ctx() -> CallerCtx {
+        CallerCtx {
+            eoa: Some(Address::ZERO),
+            role: Some("user".to_string()),
+            caller_info: json!({ "kyc": true, "max_transfer": "1000" }),
+        }
+    }
+
+    fn anon_ctx() -> CallerCtx {
+        CallerCtx::anonymous()
+    }
+
+    async fn insert_rule(pool: &Pool, mode: &str) -> i64 {
+        sqlx::query(
+            "INSERT INTO access_rules (contract_address, function_selector, mode)
+             VALUES ('0x000000000000000000000000000000000000beef', '0xa9059cbb', ?)",
+        )
+        .bind(mode)
+        .execute(pool)
+        .await
+        .unwrap();
+        let row = sqlx::query("SELECT last_insert_rowid() AS id")
+            .fetch_one(pool)
+            .await
+            .unwrap();
+        row.get("id")
+    }
+
+    async fn insert_entry(pool: &Pool, rule_id: i64, role: &str, lambda: Option<&str>) {
+        let role_id: i64 = sqlx::query("SELECT id FROM roles WHERE name = ?")
+            .bind(role)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+            .get("id");
+        sqlx::query(
+            "INSERT INTO access_rule_entries (rule_id, role_id, lambda_name) VALUES (?, ?, ?)",
+        )
+        .bind(rule_id)
+        .bind(role_id)
+        .bind(lambda)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    fn contract() -> Address {
+        "0x000000000000000000000000000000000000beef".parse().unwrap()
+    }
+
+    fn transfer_call_data(amount: u64) -> Vec<u8> {
+        use alloy::primitives::U256;
+        use alloy::sol_types::SolCall;
+        let call = crate::acl::lambdas::examples::transferCall {
+            to: Address::ZERO,
+            amount: U256::from(amount),
+        };
+        call.abi_encode()
+    }
+
+    #[tokio::test]
+    async fn no_rule_means_free_access() {
+        let pool = fresh_pool().await;
+        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
+        assert_eq!(dec, AccessDecision::Allow);
+    }
+
+    #[tokio::test]
+    async fn allow_mode_no_entry_for_role_denies() {
+        let pool = fresh_pool().await;
+        insert_rule(&pool, "allow").await;
+        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
+        assert!(matches!(dec, AccessDecision::Deny { reason: DenyReason::NotInAllowList, .. }));
+    }
+
+    #[tokio::test]
+    async fn allow_mode_entry_no_lambda_allows() {
+        let pool = fresh_pool().await;
+        let r = insert_rule(&pool, "allow").await;
+        insert_entry(&pool, r, "user", None).await;
+        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
+        assert_eq!(dec, AccessDecision::Allow);
+    }
+
+    #[tokio::test]
+    async fn allow_mode_lambda_pass() {
+        let pool = fresh_pool().await;
+        let r = insert_rule(&pool, "allow").await;
+        insert_entry(&pool, r, "user", Some("require_kyc")).await;
+        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
+        assert_eq!(dec, AccessDecision::Allow);
+    }
+
+    #[tokio::test]
+    async fn allow_mode_lambda_reject() {
+        let pool = fresh_pool().await;
+        let r = insert_rule(&pool, "allow").await;
+        insert_entry(&pool, r, "user", Some("require_kyc")).await;
+        let mut ctx = user_ctx();
+        ctx.caller_info = json!({ "kyc": false });
+        let dec = check_call(&pool, &ctx, &contract(), &transfer_call_data(1)).await.unwrap();
+        assert!(matches!(dec, AccessDecision::Deny { reason: DenyReason::LambdaRejected, .. }));
+    }
+
+    #[tokio::test]
+    async fn deny_mode_no_entry_allows() {
+        let pool = fresh_pool().await;
+        insert_rule(&pool, "deny").await;
+        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
+        assert_eq!(dec, AccessDecision::Allow);
+    }
+
+    #[tokio::test]
+    async fn deny_mode_entry_no_lambda_denies() {
+        let pool = fresh_pool().await;
+        let r = insert_rule(&pool, "deny").await;
+        insert_entry(&pool, r, "user", None).await;
+        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
+        assert!(matches!(dec, AccessDecision::Deny { reason: DenyReason::InDenyList, .. }));
+    }
+
+    #[tokio::test]
+    async fn deny_mode_lambda_pass_denies() {
+        let pool = fresh_pool().await;
+        let r = insert_rule(&pool, "deny").await;
+        insert_entry(&pool, r, "user", Some("require_kyc")).await;
+        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
+        // kyc=true → lambda returns true → DENY mode triggered
+        assert!(matches!(dec, AccessDecision::Deny { reason: DenyReason::InDenyList, .. }));
+    }
+
+    #[tokio::test]
+    async fn deny_mode_lambda_fail_allows() {
+        let pool = fresh_pool().await;
+        let r = insert_rule(&pool, "deny").await;
+        insert_entry(&pool, r, "user", Some("require_kyc")).await;
+        let mut ctx = user_ctx();
+        ctx.caller_info = json!({ "kyc": false });
+        let dec = check_call(&pool, &ctx, &contract(), &transfer_call_data(1)).await.unwrap();
+        assert_eq!(dec, AccessDecision::Allow);
+    }
+
+    #[tokio::test]
+    async fn anonymous_caller_denied_on_allow_rule() {
+        let pool = fresh_pool().await;
+        insert_rule(&pool, "allow").await;
+        let dec = check_call(&pool, &anon_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
+        assert!(matches!(dec, AccessDecision::Deny { reason: DenyReason::AnonymousAgainstGatedCall, .. }));
+    }
+
+    #[tokio::test]
+    async fn anonymous_caller_allowed_on_deny_rule() {
+        let pool = fresh_pool().await;
+        insert_rule(&pool, "deny").await;
+        let dec = check_call(&pool, &anon_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
+        assert_eq!(dec, AccessDecision::Allow);
+    }
+
+    #[tokio::test]
+    async fn unknown_lambda_fails_closed() {
+        let pool = fresh_pool().await;
+        let r = insert_rule(&pool, "allow").await;
+        insert_entry(&pool, r, "user", Some("does_not_exist")).await;
+        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
+        assert!(matches!(dec, AccessDecision::Deny { reason: DenyReason::UnknownLambda, .. }));
+    }
+
+    // Suppress unused warning since `db` import is for type alias clarity only.
+    #[allow(dead_code)]
+    fn _typecheck(_: db::Pool) {}
+}
