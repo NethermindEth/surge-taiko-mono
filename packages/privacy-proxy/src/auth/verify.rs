@@ -72,15 +72,26 @@ pub async fn handler(
         return Err(ApiError::unauthorized("signature does not match address"));
     }
 
-    // ensure a users row exists. New EOAs default to role = 'user'.
+    // Ensure a members row exists. New EOAs default to role = 'user' with
+    // `kyc=false, blacklisted=false`. These attributes are admin-managed
+    // and are never modified by self sign-in.
+    let mut tx = state.pool.begin().await?;
     sqlx::query(
-        "INSERT OR IGNORE INTO users (eoa_address, role_id, caller_info_json, created_at)
-         VALUES (?, (SELECT id FROM roles WHERE name = 'user'), '{}', ?)",
+        "INSERT OR IGNORE INTO members (eoa_address, role_id, created_at)
+         VALUES (?, (SELECT id FROM roles WHERE name = 'user'), ?)",
     )
     .bind(&addr_hex)
     .bind(now)
-    .execute(&state.pool)
+    .execute(&mut *tx)
     .await?;
+    sqlx::query(
+        "INSERT OR IGNORE INTO user_attributes (eoa_address, kyc, blacklisted)
+         VALUES (?, 0, 0)",
+    )
+    .bind(&addr_hex)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
 
     let mut token_bytes = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut token_bytes);

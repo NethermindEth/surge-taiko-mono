@@ -4,6 +4,7 @@ pub mod auth;
 pub mod config;
 pub mod db;
 pub mod error;
+pub mod roles;
 pub mod rpc;
 pub mod server;
 pub mod state;
@@ -24,6 +25,7 @@ pub async fn run() -> anyhow::Result<()> {
 
     let cfg = Config::from_env()?;
     let pool = db::init_pool(&cfg.db_url).await?;
+    roles::reconcile_roles(&pool).await?;
     admin::reconcile_seed_admins(&pool, &cfg.admin_eoas).await?;
 
     let bind = cfg.bind_addr.clone();

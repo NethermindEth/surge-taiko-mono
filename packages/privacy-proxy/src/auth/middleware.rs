@@ -1,3 +1,4 @@
+use alloy::primitives::Address;
 use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::Response;
@@ -5,8 +6,10 @@ use axum::Extension;
 use sha2::{Digest, Sha256};
 use sqlx::Row;
 
-use crate::auth::CallerCtx;
+use crate::acl::lambdas::user::UserCallerInfo;
+use crate::auth::{AdminCallerInfo, CallerAttributes, CallerCtx};
 use crate::db::now_unix;
+use crate::roles::{ROLE_ADMIN, ROLE_USER};
 use crate::state::AppState;
 
 /// Axum middleware that resolves an `Authorization: Bearer <token>` header
@@ -51,10 +54,10 @@ async fn resolve_token(state: &AppState, token: &str) -> Option<CallerCtx> {
     let now = now_unix();
 
     let row = sqlx::query(
-        "SELECT u.eoa_address, r.name AS role_name, u.caller_info_json, t.expires_at
+        "SELECT m.eoa_address, r.name AS role_name, t.expires_at
          FROM auth_tokens t
-         JOIN users u ON u.eoa_address = t.eoa_address
-         JOIN roles r ON r.id = u.role_id
+         JOIN members m ON m.eoa_address = t.eoa_address
+         JOIN roles r ON r.id = m.role_id
          WHERE t.token_hash = ?",
     )
     .bind(&token_hash)
@@ -68,27 +71,50 @@ async fn resolve_token(state: &AppState, token: &str) -> Option<CallerCtx> {
     }
     let eoa_str: String = row.try_get("eoa_address").ok()?;
     let role: String = row.try_get("role_name").ok()?;
-    let info_str: String = row.try_get("caller_info_json").ok()?;
-    let mut caller_info: serde_json::Value =
-        serde_json::from_str(&info_str).unwrap_or_else(|_| serde_json::json!({}));
-    // The auth layer is the trusted writer of identity fields. Any pre-existing
-    // `eoa` value in caller_info_json is overwritten with the token-resolved EOA;
-    // a non-object caller_info is replaced with a fresh object so the injection
-    // is always available to lambdas.
-    if !caller_info.is_object() {
-        caller_info = serde_json::json!({});
-    }
-    if let serde_json::Value::Object(map) = &mut caller_info {
-        map.insert(
-            "eoa".to_string(),
-            serde_json::Value::String(eoa_str.to_ascii_lowercase()),
-        );
-    }
-    let eoa = eoa_str.parse().ok()?;
+    let eoa: Address = eoa_str.parse().ok()?;
+
+    let attributes = match role.as_str() {
+        ROLE_ADMIN => CallerAttributes::Admin(AdminCallerInfo { eoa }),
+        ROLE_USER => {
+            // Missing row would mean data drift (a user without an
+            // attribute row); fall back to defaults so the request can
+            // still proceed and be gated by lambdas/rules.
+            let attrs = sqlx::query(
+                "SELECT kyc, blacklisted FROM user_attributes WHERE eoa_address = ?",
+            )
+            .bind(&eoa_str)
+            .fetch_optional(&state.pool)
+            .await
+            .ok()?;
+            let (kyc, blacklisted) = match attrs {
+                Some(r) => {
+                    let kyc: i64 = r.try_get("kyc").ok()?;
+                    let bl: i64 = r.try_get("blacklisted").ok()?;
+                    (kyc != 0, bl != 0)
+                }
+                None => {
+                    tracing::warn!(
+                        eoa = %eoa_str,
+                        "member row exists without user_attributes; using defaults",
+                    );
+                    (false, false)
+                }
+            };
+            CallerAttributes::User(UserCallerInfo {
+                eoa,
+                kyc,
+                blacklisted,
+            })
+        }
+        other => {
+            tracing::warn!(role = %other, "unknown role for resolved token");
+            return None;
+        }
+    };
+
     Some(CallerCtx {
         eoa: Some(eoa),
-        role: Some(role),
-        caller_info,
+        attributes: Some(attributes),
     })
 }
 
@@ -96,6 +122,7 @@ async fn resolve_token(state: &AppState, token: &str) -> Option<CallerCtx> {
 mod tests {
     use super::*;
     use crate::config::Config;
+    use crate::roles::reconcile_roles;
     use crate::state::AppState;
     use std::time::Duration;
 
@@ -106,6 +133,7 @@ mod tests {
             .await
             .unwrap();
         sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        reconcile_roles(&pool).await.unwrap();
         let config = Config {
             bind_addr: "127.0.0.1:0".to_string(),
             upstream_url: "http://127.0.0.1:1".to_string(),
@@ -118,24 +146,35 @@ mod tests {
         AppState::new(config, pool)
     }
 
-    async fn seed_user_with_token(
+    async fn seed_member_with_token(
         state: &AppState,
         eoa: &str,
         role: &str,
-        caller_info_json: &str,
+        kyc: bool,
+        blacklisted: bool,
     ) -> String {
         let now = now_unix();
         sqlx::query(
-            "INSERT INTO users (eoa_address, role_id, caller_info_json, created_at)
-             VALUES (?, (SELECT id FROM roles WHERE name = ?), ?, ?)",
+            "INSERT INTO members (eoa_address, role_id, created_at)
+             VALUES (?, (SELECT id FROM roles WHERE name = ?), ?)",
         )
         .bind(eoa)
         .bind(role)
-        .bind(caller_info_json)
         .bind(now)
         .execute(&state.pool)
         .await
         .unwrap();
+        if role == ROLE_USER {
+            sqlx::query(
+                "INSERT INTO user_attributes (eoa_address, kyc, blacklisted) VALUES (?, ?, ?)",
+            )
+            .bind(eoa)
+            .bind(kyc as i64)
+            .bind(blacklisted as i64)
+            .execute(&state.pool)
+            .await
+            .unwrap();
+        }
         use rand::RngCore;
         let mut buf = [0u8; 32];
         rand::thread_rng().fill_bytes(&mut buf);
@@ -156,37 +195,74 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn auth_layer_injects_eoa_and_preserves_admin_set_fields() {
+    async fn resolves_user_with_typed_attributes() {
         let state = fresh_state().await;
         let eoa = "0x1111111111111111111111111111111111111111";
-        let token = seed_user_with_token(&state, eoa, "user", r#"{"kyc":true}"#).await;
+        let token = seed_member_with_token(&state, eoa, "user", true, false).await;
         let ctx = resolve_token(&state, &token).await.unwrap();
-        assert_eq!(ctx.caller_info["eoa"], serde_json::json!(eoa));
-        assert_eq!(ctx.caller_info["kyc"], serde_json::json!(true));
+        match ctx.attributes.unwrap() {
+            CallerAttributes::User(u) => {
+                assert_eq!(format!("0x{}", hex::encode(u.eoa.as_slice())), eoa);
+                assert!(u.kyc);
+                assert!(!u.blacklisted);
+            }
+            other => panic!("expected User, got {other:?}"),
+        }
     }
 
     #[tokio::test]
-    async fn auth_layer_overwrites_admin_set_eoa_field() {
+    async fn resolves_admin_identity_only() {
         let state = fresh_state().await;
         let eoa = "0x2222222222222222222222222222222222222222";
-        let token = seed_user_with_token(
-            &state,
-            eoa,
-            "user",
-            r#"{"eoa":"0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}"#,
-        )
-        .await;
+        let token = seed_member_with_token(&state, eoa, "admin", false, false).await;
         let ctx = resolve_token(&state, &token).await.unwrap();
-        assert_eq!(ctx.caller_info["eoa"], serde_json::json!(eoa));
+        match ctx.attributes.unwrap() {
+            CallerAttributes::Admin(a) => {
+                assert_eq!(format!("0x{}", hex::encode(a.eoa.as_slice())), eoa);
+            }
+            other => panic!("expected Admin, got {other:?}"),
+        }
     }
 
     #[tokio::test]
-    async fn auth_layer_synthesizes_object_when_caller_info_is_empty_object() {
+    async fn falls_back_to_defaults_when_user_attributes_row_missing() {
         let state = fresh_state().await;
         let eoa = "0x3333333333333333333333333333333333333333";
-        let token = seed_user_with_token(&state, eoa, "user", "{}").await;
+        // Seed members row without user_attributes (simulating data drift).
+        let now = now_unix();
+        sqlx::query(
+            "INSERT INTO members (eoa_address, role_id, created_at)
+             VALUES (?, (SELECT id FROM roles WHERE name = 'user'), ?)",
+        )
+        .bind(eoa)
+        .bind(now)
+        .execute(&state.pool)
+        .await
+        .unwrap();
+        use rand::RngCore;
+        let mut buf = [0u8; 32];
+        rand::thread_rng().fill_bytes(&mut buf);
+        let token = hex::encode(buf);
+        let token_hash = hex::encode(Sha256::digest(token.as_bytes()));
+        sqlx::query(
+            "INSERT INTO auth_tokens (token_hash, eoa_address, issued_at, expires_at)
+             VALUES (?, ?, ?, ?)",
+        )
+        .bind(&token_hash)
+        .bind(eoa)
+        .bind(now)
+        .bind(now + 3600)
+        .execute(&state.pool)
+        .await
+        .unwrap();
+
         let ctx = resolve_token(&state, &token).await.unwrap();
-        assert_eq!(ctx.caller_info["eoa"], serde_json::json!(eoa));
-        assert!(ctx.caller_info.is_object());
+        match ctx.attributes.unwrap() {
+            CallerAttributes::User(u) => {
+                assert!(!u.kyc);
+                assert!(!u.blacklisted);
+            }
+            other => panic!("expected User, got {other:?}"),
+        }
     }
 }

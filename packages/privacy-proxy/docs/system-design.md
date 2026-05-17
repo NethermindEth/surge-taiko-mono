@@ -34,9 +34,12 @@ For every HTTP request:
 1. **Auth resolution.** The `caller_ctx_layer` middleware
    ([src/auth/middleware.rs](../src/auth/middleware.rs)) extracts the
    `Authorization: Bearer <token>` header, looks up the sha256 hash in
-   `auth_tokens`, joins to `users` and `roles`, and inserts a
-   `CallerCtx` into the request's extensions. Missing / invalid /
-   expired tokens fall back to `CallerCtx::anonymous()`.
+   `auth_tokens`, joins to `members` and `roles`, loads the role's typed
+   attributes (from `user_attributes` for `user`; identity-only for
+   `admin`), and inserts a `CallerCtx { eoa, attributes:
+CallerAttributes::{Admin|User}(...) }` into the request's
+   extensions. Missing / invalid / expired tokens fall back to
+   `CallerCtx::anonymous()`.
 2. **JSON-RPC dispatch.** `rpc::dispatch`
    ([src/rpc/handlers.rs](../src/rpc/handlers.rs)) parses the JSON
    body (rejecting batches), inspects `method`, and:
@@ -151,8 +154,9 @@ SQLite, file-backed by default. Migrations run on startup via
 
 | Table                 | Purpose                                                                                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `roles`               | Dynamic role definitions. Two seeded: `admin`, `user`.                                                                                                                 |
-| `users`               | `eoa_address → role_id + caller_info_json`. JSON is opaque to the DB so new roles need no migrations.                                                                  |
+| `roles`               | Mirror of the static `ROLES: &[&str]` in `src/roles.rs`. Reconciled at boot. Adding a role is a code change + migration; no runtime mutation API exists.               |
+| `members`             | `eoa_address → role_id`. Identity-only; per-role attributes live in role-specific tables. Both admins and users are rows here.                                         |
+| `user_attributes`     | Per `user`-role attributes: `(eoa_address PK FK → members, kyc bool, blacklisted bool)`. Admin role has no attribute table — an admin's only attribute is their EOA.   |
 | `auth_tokens`         | `sha256(token) → eoa_address` with expiry. Token plaintext is never persisted.                                                                                         |
 | `challenges`          | Short-lived sign-in nonces. Required to prove (a) the wallet signed _this_ server's freshly issued nonce (no replay) and (b) the wallet has the private key right now. |
 | `access_rules`        | `(contract_address, function_selector) → mode`. Unique on the pair.                                                                                                    |
@@ -160,54 +164,132 @@ SQLite, file-backed by default. Migrations run on startup via
 
 ## 5. Lambdas
 
-`LambdaSpec` and `LambdaFn` live in
-[src/acl/lambdas/mod.rs](../src/acl/lambdas/mod.rs):
+The base types in [src/acl/lambdas/mod.rs](../src/acl/lambdas/mod.rs)
+are generic over the caller's attribute type `C`:
 
 ```rust
-pub struct LambdaCtx<'a> {
-    pub caller_info: &'a serde_json::Value,
+pub struct LambdaCtx<'a, C> {
+    pub caller_info: &'a C,
     pub selector:    [u8; 4],
     pub call_data:   &'a [u8],
 }
-pub type LambdaFn = fn(&LambdaCtx) -> bool;
-pub struct LambdaSpec {
+pub struct LambdaSpec<C: 'static> {
     pub name: &'static str,
     pub description: &'static str,
     pub expected_selector: Option<[u8; 4]>,
-    pub run: LambdaFn,
+    pub run: fn(&LambdaCtx<C>) -> bool,
 }
 ```
 
-`registry()` returns a `&'static HashMap<&'static str, &'static LambdaSpec>`
-built once via `LazyLock` from a static table. Description and selector
-are static literals next to the `fn` pointer — code is the single
-source of truth.
+Lambdas live in **role-specific directories** under `src/acl/lambdas/<role>/`.
+Each role declares its attribute struct in its `mod.rs` and exposes a
+`registry()` returning `&'static HashMap<&'static str, &'static LambdaSpec<RoleAttrs>>`.
+Currently:
 
-**Caller identity in `caller_info`.** Anything a lambda needs about the
-caller flows through the single `caller_info` JSON. The auth middleware
-([src/auth/middleware.rs](../src/auth/middleware.rs)) is the trusted
-writer of identity fields — after deserializing the DB-stored
-`caller_info_json`, it injects `caller_info.eoa = "0x{lowercase hex}"`
-for every authenticated request (overwriting any admin-stored `eoa`).
-Lambdas read `caller_info.eoa` like any other field; if it's missing or
-unparseable, the lambda returns `false` and the rule's allow/deny
-semantics decide. New auth-derived fields (role, issued_at, …) get a
-single `map.insert(...)` call here and a corresponding read in
-whichever lambda needs them — no per-lambda declarations, no merge
-passes, no `LambdaCtx` changes.
+- `src/acl/lambdas/user/` — `UserCallerInfo { eoa, kyc, blacklisted }`.
+  Lambdas: `require_kyc`, `erc20_self_only`.
+- Admin has no lambda registry: an admin's only attribute is their
+  EOA, and write-time validation in [`admin/registry.rs`](../src/admin/registry.rs)
+  rejects `lambda_name` on admin entries.
 
-**Constraint**: lambdas ship with the binary. Adding one = (a) implement
-the fn in [src/acl/lambdas/examples.rs](../src/acl/lambdas/examples.rs)
-(or a sibling), (b) add a `LambdaSpec` entry in `registry()`. Admins
-attach lambdas to rule entries by name via the admin API; an unknown
-name on write returns `400`, and an unknown name discovered at
-evaluation time fails closed (`UnknownLambda`).
+The evaluator unwraps `CallerCtx.attributes` (a `CallerAttributes`
+tagged enum) and dispatches to the matching role's registry. Each
+lambda receives the typed struct directly — no JSON probing, no
+silently-missing fields.
 
-## 6. Admin management & root trust
+**Constraint**: lambdas ship with the binary. Adding one for a role =
+(a) add a sibling module under that role's directory with the
+`fn(&LambdaCtx<RoleAttrs>) -> bool` implementation, (b) add a
+`LambdaSpec` entry in the role's `registry()`. Admins attach lambdas
+to rule entries by name via the admin API; an unknown name on write
+returns `400` (validated against the _target role's_ registry), and an
+unknown name discovered at evaluation time fails closed
+(`UnknownLambda`).
+
+## 6. Roles
+
+The set of roles is declared in code, not in the database. The static
+slice `ROLES: &[&str]` in [src/roles.rs](../src/roles.rs) is the source
+of truth; on boot, `reconcile_roles` inserts each name into the `roles`
+table so foreign keys from `members.role_id` and
+`access_rule_entries.role_id` resolve. The admin API exposes a single
+read endpoint (`GET /admin/roles`) for enumeration.
+
+For each role, two more pieces may exist alongside the name:
+
+- A **typed attribute struct** plus a backing table, if the role
+  carries per-member state beyond identity. The `user` role declares
+  `UserCallerInfo { eoa, kyc, blacklisted }` and persists it in
+  `user_attributes`. The `admin` role is identity-only and has no
+  attribute table.
+- A **lambda registry** under `src/acl/lambdas/<role>/`, holding the
+  `LambdaSpec<RoleAttrs>` entries the role accepts on its rule entries.
+  Roles without role-specific gating (e.g. `admin`) have no registry
+  and reject any `lambda_name` on their entries at write time.
+
+### Adding a role
+
+To introduce a new role `foo` with attributes `bar: bool`:
+
+1. **Declare the role name.** In [src/roles.rs](../src/roles.rs), add
+   `pub const ROLE_FOO: &str = "foo";` and append `ROLE_FOO` to the
+   `ROLES` slice. `reconcile_roles` will insert it into the `roles`
+   table on the next boot.
+
+2. **Add the attribute table.** Create a new migration in
+   `migrations/` (next numbered prefix):
+
+   ```sql
+   CREATE TABLE foo_attributes (
+       eoa_address TEXT PRIMARY KEY REFERENCES members(eoa_address) ON DELETE CASCADE,
+       bar         INTEGER NOT NULL DEFAULT 0 CHECK (bar IN (0, 1))
+   );
+   ```
+
+   Skip this step if the role is identity-only (like `admin`).
+
+3. **Declare the typed attribute struct.** Create
+   `src/acl/lambdas/foo/mod.rs` with `pub struct FooCallerInfo { eoa,
+bar }` plus a `registry()` returning
+   `&'static HashMap<&str, &LambdaSpec<FooCallerInfo>>` (start empty if
+   no lambdas yet). Wire it under `pub mod foo;` in
+   [src/acl/lambdas/mod.rs](../src/acl/lambdas/mod.rs).
+
+4. **Extend `CallerAttributes`.** In [src/auth/mod.rs](../src/auth/mod.rs),
+   add a `Foo(FooCallerInfo)` variant to `CallerAttributes` and a
+   matching arm in `role_name()` / `eoa()`.
+
+5. **Load the attributes on token resolution.** In
+   [src/auth/middleware.rs](../src/auth/middleware.rs), add an arm to
+   the role match in `resolve_token` that joins `foo_attributes` for
+   this role and builds `CallerAttributes::Foo(...)`.
+
+6. **Dispatch in the evaluator.** In
+   [src/acl/evaluator.rs](../src/acl/evaluator.rs)'s lambda dispatch
+   match, add a `(Some(CallerAttributes::Foo(info)), Some(name))` arm
+   that looks up `lambdas::foo::lookup(name)`.
+
+7. **Allow admin writes for the new role.** In
+   [src/admin/registry.rs](../src/admin/registry.rs), add the role to
+   `ensure_lambda_known`. In [src/admin/members.rs](../src/admin/members.rs),
+   extend `load_member` and `upsert_member` to read/write the new
+   attribute table.
+
+8. **Document it.** Update the schema table in §4, the lambdas list in
+   §5, and the role-attribute summary in this section. Add typed
+   attribute fields to the validation cheatsheet in
+   [admin-api.md](admin-api.md).
+
+A test that round-trips a `PUT /admin/members/:eoa { "role": "foo",
+"attributes": {...} }` and asserts the resolved `CallerAttributes`
+variant exercises every layer touched above.
+
+## 7. Admin management & root trust
 
 `ADMIN_EOAS` (comma-separated env var) is the trust anchor. On every
 boot, [`admin::reconcile_seed_admins`](../src/admin/mod.rs) upserts each
-EOA into `users` with `role = admin`. Properties:
+EOA into `members` with `role = admin` and drops any leftover
+`user_attributes` row for the EOA. Properties:
 
 - Operator owns root via deploy config.
 - All admin auth still goes through the wallet-signature flow → no
@@ -217,9 +299,9 @@ EOA into `users` with `role = admin`. Properties:
   locked out by DB state alone.
 - **Key rotation**: edit `ADMIN_EOAS` and restart. To revoke active
   sessions for a compromised EOA without rotation:
-  `DELETE /admin/users/:eoa/tokens`.
+  `DELETE /admin/members/:eoa/tokens`.
 
-## 7. Authentication & tokens
+## 8. Authentication & tokens
 
 Challenge-response sequence:
 
@@ -237,14 +319,18 @@ Challenge-response sequence:
    [`auth::verify::handler`](../src/auth/verify.rs) loads the pending
    nonce, reconstructs the exact message, recovers the signer via
    `alloy::primitives::Signature::recover_address_from_msg`, deletes
-   the consumed nonce, upserts the `users` row (default role = `user`),
-   mints a fresh 32-byte random token, stores its sha256, returns the
-   token plaintext (only time the plaintext exists outside the wallet).
+   the consumed nonce, upserts the `members` row (default role = `user`)
+   and a `user_attributes` row with defaults `kyc=false, blacklisted=false`
+   in a single transaction, then mints a fresh 32-byte random token,
+   stores its sha256, and returns the token plaintext (only time the
+   plaintext exists outside the wallet). `kyc` and `blacklisted` are
+   admin-managed only; this endpoint never modifies them after the
+   initial row creation.
 
 Token format: 64 hex chars. Stored hashed: `sha256(token)`. Tokens are
 opaque; rotating them is "revoke + re-sign-in".
 
-## 8. Filtering via `debug_traceCall`
+## 9. Filtering via `debug_traceCall`
 
 `callTracer` returns the call tree as a nested JSON of frames with
 `{type, from, to, input, value, calls?}`. `CallFrame::flatten`
@@ -260,28 +346,28 @@ A future hardening would gate at execution time (rejecting receipts
 post-hoc) or freeze the simulation block tag to `pending` and
 re-validate aggressively.
 
-## 9. Module layout
+## 10. Module layout
 
-| Path                                                    | Responsibility                                                            |
-| ------------------------------------------------------- | ------------------------------------------------------------------------- |
-| [src/main.rs](../src/main.rs)                           | bin entry — calls `lib::run()`                                            |
-| [src/lib.rs](../src/lib.rs)                             | module aggregator + bootstrap                                             |
-| [src/config.rs](../src/config.rs)                       | env-based config                                                          |
-| [src/db.rs](../src/db.rs)                               | sqlx pool, migration, `now_unix`                                          |
-| [src/state.rs](../src/state.rs)                         | `AppState { config, pool, upstream }`                                     |
-| [src/upstream.rs](../src/upstream.rs)                   | reqwest client to Nethermind                                              |
-| [src/error.rs](../src/error.rs)                         | `ApiError` + JSON error response shape                                    |
-| [src/server.rs](../src/server.rs)                       | axum router assembly                                                      |
-| [src/auth/](../src/auth/)                               | challenge, verify, middleware, `CallerCtx`                                |
-| [src/rpc/](../src/rpc/)                                 | JSON-RPC dispatcher, method classification                                |
-| [src/rpc/gated_methods.rs](../src/rpc/gated_methods.rs) | synthetic selectors for address-parameterized read methods + helpers      |
-| [src/acl/evaluator.rs](../src/acl/evaluator.rs)         | allow/deny semantics                                                      |
-| [src/acl/registry.rs](../src/acl/registry.rs)           | DB reads of rules + entries                                               |
-| [src/acl/lambdas/](../src/acl/lambdas/)                 | named lambda registry + examples                                          |
-| [src/tracer/mod.rs](../src/tracer/mod.rs)               | `debug_traceCall` + frame walk + raw tx decode                            |
-| [src/admin/](../src/admin/)                             | `/admin/*` routes (roles, users, registry, lambdas) + seed reconciliation |
+| Path                                                    | Responsibility                                                              |
+| ------------------------------------------------------- | --------------------------------------------------------------------------- |
+| [src/main.rs](../src/main.rs)                           | bin entry — calls `lib::run()`                                              |
+| [src/lib.rs](../src/lib.rs)                             | module aggregator + bootstrap                                               |
+| [src/config.rs](../src/config.rs)                       | env-based config                                                            |
+| [src/db.rs](../src/db.rs)                               | sqlx pool, migration, `now_unix`                                            |
+| [src/state.rs](../src/state.rs)                         | `AppState { config, pool, upstream }`                                       |
+| [src/upstream.rs](../src/upstream.rs)                   | reqwest client to Nethermind                                                |
+| [src/error.rs](../src/error.rs)                         | `ApiError` + JSON error response shape                                      |
+| [src/server.rs](../src/server.rs)                       | axum router assembly                                                        |
+| [src/auth/](../src/auth/)                               | challenge, verify, middleware, `CallerCtx`                                  |
+| [src/rpc/](../src/rpc/)                                 | JSON-RPC dispatcher, method classification                                  |
+| [src/rpc/gated_methods.rs](../src/rpc/gated_methods.rs) | synthetic selectors for address-parameterized read methods + helpers        |
+| [src/acl/evaluator.rs](../src/acl/evaluator.rs)         | allow/deny semantics                                                        |
+| [src/acl/registry.rs](../src/acl/registry.rs)           | DB reads of rules + entries                                                 |
+| [src/acl/lambdas/](../src/acl/lambdas/)                 | named lambda registry + examples                                            |
+| [src/tracer/mod.rs](../src/tracer/mod.rs)               | `debug_traceCall` + frame walk + raw tx decode                              |
+| [src/admin/](../src/admin/)                             | `/admin/*` routes (roles, members, registry, lambdas) + seed reconciliation |
 
-## 10. Out of scope (deferred) — engineering notes
+## 11. Out of scope (deferred) — engineering notes
 
 | Feature                              | Notes for whoever picks this up                                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -296,22 +382,23 @@ re-validate aggressively.
 | Multi-chain                          | Per-`chain_id` config and DB partitioning; one binary per chain remains simplest.                                                                                                                                                                                                                                                                                                    |
 | `BALANCE` opcode leak via `eth_call` | The callTracer used today emits no frame for opcode-level state reads (`BALANCE`, `EXTCODESIZE`, `EXTCODEHASH`). Plug by switching to `prestateTracer` (returns every account touched during simulation) and adding a new check pass that compares the touched-set against the per-role ACL. Higher latency, more false positives — only worth doing if the threat model demands it. |
 
-## 11. Verification matrix
+## 12. Verification matrix
 
-| Layer                                     | Test type   | Where                                                                                                                                                                   |
-| ----------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ACL truth table                           | unit        | [src/acl/evaluator.rs](../src/acl/evaluator.rs) — 12 cases covering allow/deny × entry × lambda × anonymous + unknown lambda.                                           |
-| Lambda decoding                           | unit        | [src/acl/lambdas/examples.rs](../src/acl/lambdas/examples.rs) — `require_kyc`, `transfer_under_limit`.                                                                  |
-| Admin gate                                | integration | [tests/admin.rs](../tests/admin.rs) — `401` / `403` / `200` matrix on `/admin/roles`.                                                                                   |
-| Lambda listing                            | integration | [tests/admin.rs](../tests/admin.rs) — `GET /admin/registry/lambdas`.                                                                                                    |
-| Restart reconciliation                    | integration | [tests/admin.rs](../tests/admin.rs) — pre-seed a user → reconcile → assert promoted to admin.                                                                           |
-| Non-eth namespace rejection               | integration | [tests/admin.rs](../tests/admin.rs).                                                                                                                                    |
-| Synthetic selector encoding               | unit        | [src/rpc/gated_methods.rs](../src/rpc/gated_methods.rs) — round-trip lookup + ABI layout for target/slot.                                                               |
-| `target_in_caller_allowlist` lambda       | unit        | covered indirectly via the allowlist integration test below.                                                                                                            |
-| `erc20_self_only` lambda                  | unit        | [src/acl/lambdas/examples.rs](../src/acl/lambdas/examples.rs) — balanceOf and allowance × self/other × missing/unparseable eoa × unknown selector × malformed calldata. |
-| Auth-layer injects `caller_info.eoa`      | unit        | [src/auth/middleware.rs](../src/auth/middleware.rs) — preserves admin-set fields, overwrites stale `eoa`, synthesizes object when caller_info is empty.                 |
-| Default gated-method policy               | integration | [tests/gated_methods.rs](../tests/gated_methods.rs) — self-allowed, other-EOA denied, contract free, anonymous denied.                                                  |
-| Admin override on gated method            | integration | [tests/gated_methods.rs](../tests/gated_methods.rs) — deny rule on contract; allow rule with `target_in_caller_allowlist`.                                              |
-| Method-name selector normalization        | integration | [tests/gated_methods.rs](../tests/gated_methods.rs) — `POST /admin/registry/rules` with `function_selector: "eth_getBalance"` stores `0xff010001`.                      |
-| `GET /admin/registry/synthetic-selectors` | integration | [tests/gated_methods.rs](../tests/gated_methods.rs).                                                                                                                    |
-| End-to-end RPC + tracer                   | manual      | run against real Nethermind; see operator-guide.md.                                                                                                                     |
+| Layer                                     | Test type   | Where                                                                                                                                                                 |
+| ----------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ACL truth table                           | unit        | [src/acl/evaluator.rs](../src/acl/evaluator.rs) — 12 cases covering allow/deny × entry × lambda × anonymous + unknown lambda.                                         |
+| `require_kyc` lambda                      | unit        | [src/acl/lambdas/user/require_kyc.rs](../src/acl/lambdas/user/require_kyc.rs) — typed kyc bool flips.                                                                 |
+| `erc20_self_only` lambda                  | unit        | [src/acl/lambdas/user/erc20_self_only.rs](../src/acl/lambdas/user/erc20_self_only.rs) — balanceOf and allowance × self/other × unknown selector × malformed calldata. |
+| Auth-layer typed attribute resolution     | unit        | [src/auth/middleware.rs](../src/auth/middleware.rs) — admin / user / drift-default tests.                                                                             |
+| Admin gate                                | integration | [tests/admin.rs](../tests/admin.rs) — `401` / `403` / `200` matrix on `/admin/roles`.                                                                                 |
+| Lambda listing                            | integration | [tests/admin.rs](../tests/admin.rs) — `GET /admin/registry/lambdas` grouped by role.                                                                                  |
+| Removed role create/delete endpoints      | integration | [tests/admin.rs](../tests/admin.rs).                                                                                                                                  |
+| Typed user upsert + admin lambda reject   | integration | [tests/admin.rs](../tests/admin.rs).                                                                                                                                  |
+| Restart reconciliation                    | integration | [tests/admin.rs](../tests/admin.rs) — pre-seed a user with attrs → reconcile → assert promoted + attrs dropped.                                                       |
+| Non-eth namespace rejection               | integration | [tests/admin.rs](../tests/admin.rs).                                                                                                                                  |
+| Synthetic selector encoding               | unit        | [src/rpc/gated_methods.rs](../src/rpc/gated_methods.rs) — round-trip lookup + ABI layout for target/slot.                                                             |
+| Default gated-method policy               | integration | [tests/gated_methods.rs](../tests/gated_methods.rs) — self-allowed, other-EOA denied, contract free, anonymous denied.                                                |
+| Admin override on gated method            | integration | [tests/gated_methods.rs](../tests/gated_methods.rs) — deny rule on contract.                                                                                          |
+| Method-name selector normalization        | integration | [tests/gated_methods.rs](../tests/gated_methods.rs) — `POST /admin/registry/rules` with `function_selector: "eth_getBalance"` stores `0xff010001`.                    |
+| `GET /admin/registry/synthetic-selectors` | integration | [tests/gated_methods.rs](../tests/gated_methods.rs).                                                                                                                  |
+| End-to-end RPC + tracer                   | manual      | run against real Nethermind; see operator-guide.md.                                                                                                                   |

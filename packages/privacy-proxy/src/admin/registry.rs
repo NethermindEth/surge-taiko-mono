@@ -5,9 +5,10 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 
-use crate::acl::lambdas;
+use crate::acl::lambdas::user as user_lambdas;
 use crate::admin::{normalize_address, normalize_selector, validate_mode};
 use crate::error::{ApiError, ApiResult};
+use crate::roles::{ROLE_ADMIN, ROLE_USER};
 use crate::state::AppState;
 
 #[derive(Serialize)]
@@ -62,13 +63,31 @@ pub struct UpdateEntryReq {
     pub lambda_name: Option<String>,
 }
 
-fn ensure_lambda_known(name: &str) -> Result<(), ApiError> {
-    if lambdas::lookup(name).is_none() {
-        return Err(ApiError::bad_request(format!(
-            "unknown lambda `{name}`"
-        )));
+/// Validate that `name` is a lambda registered for the given role. The
+/// admin role rejects any lambda (admin has no registry); the user role
+/// looks up by name. Unknown role names error out.
+fn ensure_lambda_known(role: &str, name: &str) -> Result<(), ApiError> {
+    match role {
+        ROLE_USER => user_lambdas::lookup(name)
+            .map(|_| ())
+            .ok_or_else(|| ApiError::bad_request(format!("unknown lambda `{name}` for role `{role}`"))),
+        ROLE_ADMIN => Err(ApiError::bad_request(
+            "admin role does not accept lambdas",
+        )),
+        other => Err(ApiError::bad_request(format!("unknown role `{other}`"))),
     }
-    Ok(())
+}
+
+async fn lookup_entry_role(pool: &crate::db::Pool, entry_id: i64) -> Result<String, ApiError> {
+    sqlx::query(
+        "SELECT r.name AS role FROM access_rule_entries e
+         JOIN roles r ON r.id = e.role_id WHERE e.id = ?",
+    )
+    .bind(entry_id)
+    .fetch_optional(pool)
+    .await?
+    .map(|r| r.get::<String, _>("role"))
+    .ok_or_else(|| ApiError::not_found("entry"))
 }
 
 async fn resolve_role_id(pool: &crate::db::Pool, role: &str) -> Result<i64, ApiError> {
@@ -169,7 +188,7 @@ pub async fn create_rule(
     let mut entries_resolved: Vec<(i64, Option<String>)> = Vec::with_capacity(req.entries.len());
     for e in &req.entries {
         if let Some(name) = &e.lambda_name {
-            ensure_lambda_known(name)?;
+            ensure_lambda_known(&e.role, name)?;
         }
         let role_id = resolve_role_id(&state.pool, &e.role).await?;
         entries_resolved.push((role_id, e.lambda_name.clone()));
@@ -216,7 +235,7 @@ pub async fn replace_rule(
     let mut entries_resolved: Vec<(i64, Option<String>)> = Vec::with_capacity(req.entries.len());
     for e in &req.entries {
         if let Some(name) = &e.lambda_name {
-            ensure_lambda_known(name)?;
+            ensure_lambda_known(&e.role, name)?;
         }
         let role_id = resolve_role_id(&state.pool, &e.role).await?;
         entries_resolved.push((role_id, e.lambda_name.clone()));
@@ -272,7 +291,7 @@ pub async fn add_entry(
     Json(req): Json<EntryInput>,
 ) -> ApiResult<impl IntoResponse> {
     if let Some(name) = &req.lambda_name {
-        ensure_lambda_known(name)?;
+        ensure_lambda_known(&req.role, name)?;
     }
     let _ = sqlx::query("SELECT 1 FROM access_rules WHERE id = ?")
         .bind(rule_id)
@@ -310,7 +329,8 @@ pub async fn update_entry(
     Json(req): Json<UpdateEntryReq>,
 ) -> ApiResult<Json<EntryView>> {
     if let Some(name) = &req.lambda_name {
-        ensure_lambda_known(name)?;
+        let role = lookup_entry_role(&state.pool, entry_id).await?;
+        ensure_lambda_known(&role, name)?;
     }
     let res = sqlx::query(
         "UPDATE access_rule_entries SET lambda_name = ? WHERE id = ? AND rule_id = ?",

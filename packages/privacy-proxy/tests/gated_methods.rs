@@ -6,6 +6,7 @@ use axum::http::{Request, StatusCode};
 use axum::routing::post;
 use axum::{Json, Router};
 use privacy_proxy::config::Config;
+use privacy_proxy::roles::reconcile_roles;
 use privacy_proxy::{build_router, db, AppState};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -52,6 +53,7 @@ async fn build_app_with_upstream(upstream_url: String) -> (AppState, axum::Route
         .await
         .unwrap();
     sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    reconcile_roles(&pool).await.unwrap();
 
     let config = Config {
         bind_addr: "127.0.0.1:0".to_string(),
@@ -71,8 +73,8 @@ async fn issue_token(state: &AppState, role: &str, eoa: Address) -> String {
     let addr_hex = format!("0x{}", hex::encode(eoa.as_slice()));
     let now = db::now_unix();
     sqlx::query(
-        "INSERT INTO users (eoa_address, role_id, caller_info_json, created_at)
-         VALUES (?, (SELECT id FROM roles WHERE name = ?), '{}', ?)
+        "INSERT INTO members (eoa_address, role_id, created_at)
+         VALUES (?, (SELECT id FROM roles WHERE name = ?), ?)
          ON CONFLICT(eoa_address) DO UPDATE SET role_id = excluded.role_id",
     )
     .bind(&addr_hex)
@@ -81,6 +83,15 @@ async fn issue_token(state: &AppState, role: &str, eoa: Address) -> String {
     .execute(&state.pool)
     .await
     .unwrap();
+    if role == "user" {
+        sqlx::query(
+            "INSERT OR IGNORE INTO user_attributes (eoa_address, kyc, blacklisted) VALUES (?, 0, 0)",
+        )
+        .bind(&addr_hex)
+        .execute(&state.pool)
+        .await
+        .unwrap();
+    }
     use rand::RngCore;
     let mut buf = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut buf);
@@ -239,57 +250,6 @@ async fn admin_deny_rule_on_contract_blocks_user() {
 }
 
 #[tokio::test]
-async fn admin_allow_rule_with_allowlist_lambda() {
-    let upstream = spawn_mock_upstream().await;
-    let (state, app) = build_app_with_upstream(upstream).await;
-    let user: Address = USER_EOA.parse().unwrap();
-    let token = issue_token(&state, "user", user).await;
-
-    // Set caller_info to include OTHER_EOA in the balance_allowlist.
-    sqlx::query("UPDATE users SET caller_info_json = ? WHERE eoa_address = ?")
-        .bind(json!({ "balance_allowlist": [OTHER_EOA] }).to_string())
-        .bind(USER_EOA)
-        .execute(&state.pool)
-        .await
-        .unwrap();
-
-    // Install an allow rule on OTHER_EOA with the allowlist lambda.
-    sqlx::query(
-        "INSERT INTO access_rules (contract_address, function_selector, mode) VALUES (?, ?, 'allow')",
-    )
-    .bind(OTHER_EOA)
-    .bind("0xff010001")
-    .execute(&state.pool)
-    .await
-    .unwrap();
-    let rule_id: i64 = sqlx::query_scalar("SELECT last_insert_rowid()")
-        .fetch_one(&state.pool)
-        .await
-        .unwrap();
-    sqlx::query(
-        "INSERT INTO access_rule_entries (rule_id, role_id, lambda_name)
-         VALUES (?, (SELECT id FROM roles WHERE name = 'user'), 'target_in_caller_allowlist')",
-    )
-    .bind(rule_id)
-    .execute(&state.pool)
-    .await
-    .unwrap();
-
-    let res = app
-        .clone()
-        .oneshot(rpc_req(
-            Some(&token),
-            "eth_getBalance",
-            json!([OTHER_EOA, "latest"]),
-        ))
-        .await
-        .unwrap();
-    let v = body_json(res).await;
-    assert!(v.get("error").is_none(), "got error: {v}");
-    assert_eq!(v["result"], "0xabcd");
-}
-
-#[tokio::test]
 async fn admin_can_create_rule_with_method_name_selector() {
     let upstream = spawn_mock_upstream().await;
     let (state, app) = build_app_with_upstream(upstream).await;
@@ -344,29 +304,4 @@ async fn synthetic_selectors_endpoint_lists_methods() {
     assert!(methods.contains(&"eth_getStorageAt"));
     assert!(methods.contains(&"eth_getCode"));
     assert!(methods.contains(&"eth_getTransactionCount"));
-}
-
-#[tokio::test]
-async fn target_in_allowlist_lambda_listed_in_lambdas() {
-    let upstream = spawn_mock_upstream().await;
-    let (state, app) = build_app_with_upstream(upstream).await;
-    let admin: Address = "0xa3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3".parse().unwrap();
-    let token = issue_token(&state, "admin", admin).await;
-
-    let req = Request::builder()
-        .method("GET")
-        .uri("/admin/registry/lambdas")
-        .header("authorization", format!("Bearer {token}"))
-        .body(Body::empty())
-        .unwrap();
-    let res = app.clone().oneshot(req).await.unwrap();
-    assert_eq!(res.status(), StatusCode::OK);
-    let v = body_json(res).await;
-    let names: Vec<&str> = v
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|r| r["name"].as_str().unwrap())
-        .collect();
-    assert!(names.contains(&"target_in_caller_allowlist"));
 }

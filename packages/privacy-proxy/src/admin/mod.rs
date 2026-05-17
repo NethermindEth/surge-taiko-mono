@@ -1,8 +1,8 @@
 pub mod lambdas;
+pub mod members;
 pub mod middleware;
 pub mod registry;
 pub mod roles;
-pub mod users;
 
 use alloy::primitives::Address;
 use anyhow::{Context, Result};
@@ -16,13 +16,6 @@ use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        // capability 9 — list in-build lambdas
-        .route("/admin/registry/lambdas", get(lambdas::list_lambdas))
-        // capability 19 — list synthetic selectors for gated RPC methods
-        .route(
-            "/admin/registry/synthetic-selectors",
-            get(lambdas::list_synthetic_selectors),
-        )
         // capabilities 1-8 — access rules + entries
         .route(
             "/admin/registry/rules",
@@ -42,21 +35,28 @@ pub fn router() -> Router<AppState> {
             "/admin/registry/rules/:id/entries/:entry_id",
             put(registry::update_entry).delete(registry::delete_entry),
         )
-        // capabilities 10-12 — roles
-        .route("/admin/roles", get(roles::list_roles).post(roles::create_role))
-        .route("/admin/roles/:id", delete(roles::delete_role))
-        // capabilities 13-18 — users
-        .route("/admin/users", get(users::list_users))
+        // capability 9 — list in-build lambdas grouped by role
+        .route("/admin/registry/lambdas", get(lambdas::list_lambdas))
+        // capability 10 — list synthetic selectors for gated RPC methods
         .route(
-            "/admin/users/:eoa",
-            get(users::get_user).put(users::upsert_user).delete(users::delete_user),
+            "/admin/registry/synthetic-selectors",
+            get(lambdas::list_synthetic_selectors),
         )
-        .route("/admin/users/:eoa/tokens", delete(users::revoke_tokens))
+        // capability 11 — enumerate the code-declared roles
+        .route("/admin/roles", get(roles::list_roles))
+        // capabilities 12-16 — members (admins + users live in one table)
+        .route("/admin/members", get(members::list_members))
+        .route(
+            "/admin/members/:eoa",
+            get(members::get_member).put(members::upsert_member).delete(members::delete_member),
+        )
+        .route("/admin/members/:eoa/tokens", delete(members::revoke_tokens))
         .route_layer(axum::middleware::from_fn(middleware::admin_gate))
 }
 
 /// On every startup, reconcile the contents of `ADMIN_EOAS` so the seed
-/// admins are always promoted in DB. Idempotent.
+/// admins are always promoted in DB. Idempotent. If the EOA previously
+/// existed as a `user`, its `user_attributes` row is deleted.
 pub async fn reconcile_seed_admins(pool: &Pool, admin_eoas: &[Address]) -> Result<()> {
     if admin_eoas.is_empty() {
         tracing::warn!("ADMIN_EOAS is empty — no seed admins will exist on this boot");
@@ -65,17 +65,26 @@ pub async fn reconcile_seed_admins(pool: &Pool, admin_eoas: &[Address]) -> Resul
     let now = now_unix();
     for eoa in admin_eoas {
         let addr_hex = format_address(eoa);
+        let mut tx = pool.begin().await?;
         sqlx::query(
-            "INSERT INTO users (eoa_address, role_id, caller_info_json, created_at)
-             VALUES (?, (SELECT id FROM roles WHERE name = 'admin'), '{}', ?)
+            "INSERT INTO members (eoa_address, role_id, created_at)
+             VALUES (?, (SELECT id FROM roles WHERE name = 'admin'), ?)
              ON CONFLICT(eoa_address) DO UPDATE
              SET role_id = (SELECT id FROM roles WHERE name = 'admin')",
         )
         .bind(&addr_hex)
         .bind(now)
-        .execute(pool)
+        .execute(&mut *tx)
         .await
         .with_context(|| format!("failed to upsert seed admin {addr_hex}"))?;
+        sqlx::query("DELETE FROM user_attributes WHERE eoa_address = ?")
+            .bind(&addr_hex)
+            .execute(&mut *tx)
+            .await
+            .with_context(|| {
+                format!("failed to drop user_attributes for seed admin {addr_hex}")
+            })?;
+        tx.commit().await?;
         tracing::info!("reconciled seed admin: {addr_hex}");
     }
     Ok(())

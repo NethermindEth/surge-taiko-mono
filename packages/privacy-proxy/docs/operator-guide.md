@@ -28,7 +28,7 @@ bootstrap, key rotation, and restart semantics.
    - Upsert every EOA in `ADMIN_EOAS` to `role = admin`.
    - Start serving on `BIND_ADDR`.
 4. From the admin's wallet, hit `/auth/challenge` and `/auth/verify` to
-   obtain an admin bearer token (same flow as users — see
+   obtain an admin bearer token (same flow as regular users — see
    [wallet-integration.md](wallet-integration.md)).
 5. Use the admin token to populate the registry. See
    [admin-api.md](admin-api.md) for the full surface.
@@ -44,8 +44,8 @@ bootstrap, key rotation, and restart semantics.
    - The compromised EOA is **not** automatically demoted in DB — that
      row still has whatever role was last assigned to it.
 3. From an unaffected admin's session, call
-   `PUT /admin/users/:compromisedEoa { "role": "user" }` to demote.
-4. Call `DELETE /admin/users/:compromisedEoa/tokens` to revoke any
+   `PUT /admin/members/:compromisedEoa { "role": "user" }` to demote.
+4. Call `DELETE /admin/members/:compromisedEoa/tokens` to revoke any
    tokens already issued.
 
 Until step 3, the compromised EOA's existing tokens (if any) still
@@ -62,7 +62,7 @@ the API.
 
 Every restart re-runs `reconcile_seed_admins`:
 
-- Each EOA in `ADMIN_EOAS` is upserted into `users` with `role =
+- Each EOA in `ADMIN_EOAS` is upserted into `members` with `role =
 admin`. If the row exists with a different role, it is **promoted**
   back to admin.
 - EOAs that used to be in `ADMIN_EOAS` but are no longer listed are
@@ -98,7 +98,7 @@ SQLite, default file path `./privacy-proxy.db`. To inspect:
 ```bash
 sqlite3 privacy-proxy.db
 .tables
-SELECT * FROM users;
+SELECT * FROM members;
 SELECT * FROM access_rules;
 ```
 

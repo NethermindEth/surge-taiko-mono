@@ -15,7 +15,10 @@ This package is a POC scoped to the `eth_` namespace and HTTP transport.
 ## How users interact with it
 
 1. **Sign in once.** The wallet asks for a challenge, signs it with the
-   user's EOA, and receives a bearer token (TTL ~7 days). See
+   user's EOA, and receives a bearer token (TTL ~7 days). On first
+   sign-in the user is created with role `user` and default attributes
+   `kyc=false, blacklisted=false`; admins manage those attributes
+   afterwards via the admin API. See
    [docs/wallet-integration.md](docs/wallet-integration.md) for the
    wire-level flow.
 2. **Send normal JSON-RPC.** Every subsequent request goes to the proxy
@@ -65,15 +68,21 @@ time; those EOAs are promoted on every restart. After that, admins sign
 in with their wallet exactly like users — their token resolves to the
 `admin` role. There is no separate admin password.
 
-Admins use 18 endpoints under `/admin/*` (see
+Admins use the endpoints under `/admin/*` (see
 [docs/admin-api.md](docs/admin-api.md)) to:
 
 - **Manage the access registry**: list/create/update/delete rules and
   per-role entries; pick from the in-build list of named lambdas via
-  `GET /admin/registry/lambdas`.
-- **Manage roles**: list/create/delete.
-- **Manage users**: list/get/upsert (role + caller info)/delete; revoke
-  all active sessions for an EOA.
+  `GET /admin/registry/lambdas` (grouped by the role each lambda
+  targets).
+- **Enumerate roles**: `GET /admin/roles` lists the code-declared
+  roles. Roles cannot be created or deleted at runtime.
+- **Manage members**: list/get/upsert (role + typed attributes)/delete;
+  revoke all active sessions for an EOA. A _member_ is any
+  authenticated account — both admins and users live in the same
+  `members` table, distinguished by `role`. User attributes (`kyc`,
+  `blacklisted`) are admin-write-only — never touched by the user's
+  own sign-in flow.
 
 All admin endpoints require an admin-role token; a user-role token gets
 `403`, no token gets `401`.
@@ -91,9 +100,10 @@ gets, full upserts).
 - A registry entry is either an **allow** list of roles or a **deny**
   list — never both.
 - Each role in the entry may have an optional named **lambda**: a
-  code-defined predicate over the caller's stored info **plus the
-  function's arguments**. Admins pick a lambda from a fixed in-build
-  list.
+  code-defined predicate over the caller's **typed attribute struct**
+  for that role plus the function's arguments. Admins pick a lambda
+  from a fixed in-build list scoped to the entry's role (admin entries
+  have no lambdas — admins are gated by role membership only).
 - Contracts or functions not in the registry are **freely callable** —
   the registry is opt-in.
 - Filtering applies to internal calls too. If any contract call inside

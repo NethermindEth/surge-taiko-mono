@@ -1,9 +1,9 @@
 use alloy::primitives::Address;
 use anyhow::Result;
 
-use crate::acl::lambdas::{self, LambdaCtx};
+use crate::acl::lambdas::{user as user_lambdas, LambdaCtx};
 use crate::acl::registry;
-use crate::auth::CallerCtx;
+use crate::auth::{CallerAttributes, CallerCtx};
 use crate::db::Pool;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -52,7 +52,6 @@ pub async fn check_call(
     call_data: &[u8],
 ) -> Result<AccessDecision> {
     if call_data.len() < 4 {
-        // Plain value transfer or empty call: no function selector to gate.
         return Ok(AccessDecision::Allow);
     }
     let selector: [u8; 4] = call_data[0..4].try_into().expect("len checked above");
@@ -63,12 +62,8 @@ pub async fn check_call(
         return Ok(AccessDecision::Allow);
     };
 
-    // Anonymous (no role) and the rule exists → only `mode = deny` without
-    // an entry for "anonymous" would still allow; but we have no anonymous
-    // role binding, so any rule with `mode = allow` is a deny, and any rule
-    // with `mode = deny` is an allow (no entry can match a null role).
-    let role_name = match &ctx.role {
-        Some(r) => r.as_str(),
+    let role_name = match ctx.role_name() {
+        Some(r) => r,
         None => {
             return Ok(match rule.mode.as_str() {
                 "allow" => AccessDecision::Deny {
@@ -89,25 +84,36 @@ pub async fn check_call(
     let entry = registry::entry_for_role(pool, rule.id, role_name).await?;
 
     let (entry_matches, lambda_outcome) = match entry {
-        None => (false, true), // lambda_outcome is irrelevant when no entry
+        None => (false, true),
         Some(e) => {
-            let outcome = match e.lambda_name.as_deref() {
-                None => true,
-                Some(name) => match lambdas::lookup(name) {
-                    Some(spec) => (spec.run)(&LambdaCtx {
-                        caller_info: &ctx.caller_info,
-                        selector,
-                        call_data,
-                    }),
-                    None => {
-                        // Lambda name in DB does not exist in this build → fail closed.
-                        return Ok(AccessDecision::Deny {
-                            contract: *contract,
+            let outcome = match (&ctx.attributes, e.lambda_name.as_deref()) {
+                (_, None) => true,
+                (Some(CallerAttributes::User(info)), Some(name)) => {
+                    match user_lambdas::lookup(name) {
+                        Some(spec) => (spec.run)(&LambdaCtx {
+                            caller_info: info,
                             selector,
-                            reason: DenyReason::UnknownLambda,
-                        });
+                            call_data,
+                        }),
+                        None => {
+                            return Ok(AccessDecision::Deny {
+                                contract: *contract,
+                                selector,
+                                reason: DenyReason::UnknownLambda,
+                            });
+                        }
                     }
-                },
+                }
+                (Some(CallerAttributes::Admin(_)), Some(_)) => {
+                    // Admin role has no lambda registry — write-time
+                    // validation rejects this configuration. Fail closed.
+                    return Ok(AccessDecision::Deny {
+                        contract: *contract,
+                        selector,
+                        reason: DenyReason::UnknownLambda,
+                    });
+                }
+                (None, Some(_)) => unreachable!("anonymous handled earlier"),
             };
             (true, outcome)
         }
@@ -158,9 +164,11 @@ pub async fn check_call(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::acl::lambdas::user::UserCallerInfo;
+    use crate::auth::AdminCallerInfo;
     use crate::db;
+    use crate::roles::reconcile_roles;
     use alloy::primitives::Address;
-    use serde_json::json;
     use sqlx::sqlite::SqlitePoolOptions;
     use sqlx::Row;
 
@@ -171,14 +179,27 @@ mod tests {
             .await
             .unwrap();
         sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        reconcile_roles(&pool).await.unwrap();
         pool
     }
 
-    fn user_ctx() -> CallerCtx {
+    fn user_ctx(kyc: bool) -> CallerCtx {
         CallerCtx {
             eoa: Some(Address::ZERO),
-            role: Some("user".to_string()),
-            caller_info: json!({ "kyc": true, "max_transfer": "1000" }),
+            attributes: Some(CallerAttributes::User(UserCallerInfo {
+                eoa: Address::ZERO,
+                kyc,
+                blacklisted: false,
+            })),
+        }
+    }
+
+    fn _admin_ctx() -> CallerCtx {
+        CallerCtx {
+            eoa: Some(Address::ZERO),
+            attributes: Some(CallerAttributes::Admin(AdminCallerInfo {
+                eoa: Address::ZERO,
+            })),
         }
     }
 
@@ -189,7 +210,7 @@ mod tests {
     async fn insert_rule(pool: &Pool, mode: &str) -> i64 {
         sqlx::query(
             "INSERT INTO access_rules (contract_address, function_selector, mode)
-             VALUES ('0x000000000000000000000000000000000000beef', '0xa9059cbb', ?)",
+             VALUES ('0x000000000000000000000000000000000000beef', '0x70a08231', ?)",
         )
         .bind(mode)
         .execute(pool)
@@ -224,12 +245,11 @@ mod tests {
         "0x000000000000000000000000000000000000beef".parse().unwrap()
     }
 
-    fn transfer_call_data(amount: u64) -> Vec<u8> {
-        use alloy::primitives::U256;
+    fn balance_of_call_data() -> Vec<u8> {
+        use crate::acl::lambdas::user::erc20_self_only::balanceOfCall;
         use alloy::sol_types::SolCall;
-        let call = crate::acl::lambdas::examples::transferCall {
-            to: Address::ZERO,
-            amount: U256::from(amount),
+        let call = balanceOfCall {
+            account: Address::ZERO,
         };
         call.abi_encode()
     }
@@ -237,7 +257,9 @@ mod tests {
     #[tokio::test]
     async fn no_rule_means_free_access() {
         let pool = fresh_pool().await;
-        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
+        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
+            .await
+            .unwrap();
         assert_eq!(dec, AccessDecision::Allow);
     }
 
@@ -245,8 +267,16 @@ mod tests {
     async fn allow_mode_no_entry_for_role_denies() {
         let pool = fresh_pool().await;
         insert_rule(&pool, "allow").await;
-        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
-        assert!(matches!(dec, AccessDecision::Deny { reason: DenyReason::NotInAllowList, .. }));
+        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
+            .await
+            .unwrap();
+        assert!(matches!(
+            dec,
+            AccessDecision::Deny {
+                reason: DenyReason::NotInAllowList,
+                ..
+            }
+        ));
     }
 
     #[tokio::test]
@@ -254,7 +284,9 @@ mod tests {
         let pool = fresh_pool().await;
         let r = insert_rule(&pool, "allow").await;
         insert_entry(&pool, r, "user", None).await;
-        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
+        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
+            .await
+            .unwrap();
         assert_eq!(dec, AccessDecision::Allow);
     }
 
@@ -263,7 +295,9 @@ mod tests {
         let pool = fresh_pool().await;
         let r = insert_rule(&pool, "allow").await;
         insert_entry(&pool, r, "user", Some("require_kyc")).await;
-        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
+        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
+            .await
+            .unwrap();
         assert_eq!(dec, AccessDecision::Allow);
     }
 
@@ -272,17 +306,25 @@ mod tests {
         let pool = fresh_pool().await;
         let r = insert_rule(&pool, "allow").await;
         insert_entry(&pool, r, "user", Some("require_kyc")).await;
-        let mut ctx = user_ctx();
-        ctx.caller_info = json!({ "kyc": false });
-        let dec = check_call(&pool, &ctx, &contract(), &transfer_call_data(1)).await.unwrap();
-        assert!(matches!(dec, AccessDecision::Deny { reason: DenyReason::LambdaRejected, .. }));
+        let dec = check_call(&pool, &user_ctx(false), &contract(), &balance_of_call_data())
+            .await
+            .unwrap();
+        assert!(matches!(
+            dec,
+            AccessDecision::Deny {
+                reason: DenyReason::LambdaRejected,
+                ..
+            }
+        ));
     }
 
     #[tokio::test]
     async fn deny_mode_no_entry_allows() {
         let pool = fresh_pool().await;
         insert_rule(&pool, "deny").await;
-        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
+        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
+            .await
+            .unwrap();
         assert_eq!(dec, AccessDecision::Allow);
     }
 
@@ -291,8 +333,16 @@ mod tests {
         let pool = fresh_pool().await;
         let r = insert_rule(&pool, "deny").await;
         insert_entry(&pool, r, "user", None).await;
-        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
-        assert!(matches!(dec, AccessDecision::Deny { reason: DenyReason::InDenyList, .. }));
+        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
+            .await
+            .unwrap();
+        assert!(matches!(
+            dec,
+            AccessDecision::Deny {
+                reason: DenyReason::InDenyList,
+                ..
+            }
+        ));
     }
 
     #[tokio::test]
@@ -300,9 +350,16 @@ mod tests {
         let pool = fresh_pool().await;
         let r = insert_rule(&pool, "deny").await;
         insert_entry(&pool, r, "user", Some("require_kyc")).await;
-        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
-        // kyc=true → lambda returns true → DENY mode triggered
-        assert!(matches!(dec, AccessDecision::Deny { reason: DenyReason::InDenyList, .. }));
+        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
+            .await
+            .unwrap();
+        assert!(matches!(
+            dec,
+            AccessDecision::Deny {
+                reason: DenyReason::InDenyList,
+                ..
+            }
+        ));
     }
 
     #[tokio::test]
@@ -310,9 +367,9 @@ mod tests {
         let pool = fresh_pool().await;
         let r = insert_rule(&pool, "deny").await;
         insert_entry(&pool, r, "user", Some("require_kyc")).await;
-        let mut ctx = user_ctx();
-        ctx.caller_info = json!({ "kyc": false });
-        let dec = check_call(&pool, &ctx, &contract(), &transfer_call_data(1)).await.unwrap();
+        let dec = check_call(&pool, &user_ctx(false), &contract(), &balance_of_call_data())
+            .await
+            .unwrap();
         assert_eq!(dec, AccessDecision::Allow);
     }
 
@@ -320,15 +377,25 @@ mod tests {
     async fn anonymous_caller_denied_on_allow_rule() {
         let pool = fresh_pool().await;
         insert_rule(&pool, "allow").await;
-        let dec = check_call(&pool, &anon_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
-        assert!(matches!(dec, AccessDecision::Deny { reason: DenyReason::AnonymousAgainstGatedCall, .. }));
+        let dec = check_call(&pool, &anon_ctx(), &contract(), &balance_of_call_data())
+            .await
+            .unwrap();
+        assert!(matches!(
+            dec,
+            AccessDecision::Deny {
+                reason: DenyReason::AnonymousAgainstGatedCall,
+                ..
+            }
+        ));
     }
 
     #[tokio::test]
     async fn anonymous_caller_allowed_on_deny_rule() {
         let pool = fresh_pool().await;
         insert_rule(&pool, "deny").await;
-        let dec = check_call(&pool, &anon_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
+        let dec = check_call(&pool, &anon_ctx(), &contract(), &balance_of_call_data())
+            .await
+            .unwrap();
         assert_eq!(dec, AccessDecision::Allow);
     }
 
@@ -337,11 +404,18 @@ mod tests {
         let pool = fresh_pool().await;
         let r = insert_rule(&pool, "allow").await;
         insert_entry(&pool, r, "user", Some("does_not_exist")).await;
-        let dec = check_call(&pool, &user_ctx(), &contract(), &transfer_call_data(1)).await.unwrap();
-        assert!(matches!(dec, AccessDecision::Deny { reason: DenyReason::UnknownLambda, .. }));
+        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
+            .await
+            .unwrap();
+        assert!(matches!(
+            dec,
+            AccessDecision::Deny {
+                reason: DenyReason::UnknownLambda,
+                ..
+            }
+        ));
     }
 
-    // Suppress unused warning since `db` import is for type alias clarity only.
     #[allow(dead_code)]
     fn _typecheck(_: db::Pool) {}
 }

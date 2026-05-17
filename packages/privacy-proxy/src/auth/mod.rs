@@ -4,34 +4,71 @@ pub mod verify;
 
 use alloy::primitives::Address;
 use serde::Serialize;
-use serde_json::Value;
+
+use crate::acl::lambdas::user::UserCallerInfo;
+use crate::roles::{ROLE_ADMIN, ROLE_USER};
 
 pub use middleware::caller_ctx_layer;
 
-/// Resolved caller for a single request. `eoa` and `role` are `None` for
-/// anonymous (no token / expired token / unknown token) requests.
+/// Typed attributes for the `admin` role. Identity-only: an admin has no
+/// extra state beyond the EOA used to authenticate.
+#[derive(Clone, Debug, Serialize)]
+pub struct AdminCallerInfo {
+    pub eoa: Address,
+}
+
+/// Tagged union over the per-role attribute structs. The evaluator
+/// unwraps this to dispatch to the matching role's lambda registry.
+#[derive(Clone, Debug, Serialize)]
+#[serde(tag = "role", rename_all = "lowercase")]
+pub enum CallerAttributes {
+    Admin(AdminCallerInfo),
+    User(UserCallerInfo),
+}
+
+impl CallerAttributes {
+    pub fn role_name(&self) -> &'static str {
+        match self {
+            CallerAttributes::Admin(_) => ROLE_ADMIN,
+            CallerAttributes::User(_) => ROLE_USER,
+        }
+    }
+
+    pub fn eoa(&self) -> Address {
+        match self {
+            CallerAttributes::Admin(a) => a.eoa,
+            CallerAttributes::User(u) => u.eoa,
+        }
+    }
+}
+
+/// Resolved caller for a single request. `eoa` and `attributes` are
+/// `None` for anonymous (no token / expired token / unknown token)
+/// requests.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct CallerCtx {
     pub eoa: Option<Address>,
-    pub role: Option<String>,
-    pub caller_info: Value,
+    pub attributes: Option<CallerAttributes>,
 }
 
 impl CallerCtx {
     pub fn anonymous() -> Self {
         Self {
             eoa: None,
-            role: None,
-            caller_info: Value::Null,
+            attributes: None,
         }
     }
 
     pub fn is_admin(&self) -> bool {
-        self.role.as_deref() == Some("admin")
+        matches!(self.attributes, Some(CallerAttributes::Admin(_)))
     }
 
     pub fn is_anonymous(&self) -> bool {
-        self.role.is_none()
+        self.attributes.is_none()
+    }
+
+    pub fn role_name(&self) -> Option<&'static str> {
+        self.attributes.as_ref().map(|a| a.role_name())
     }
 }
 

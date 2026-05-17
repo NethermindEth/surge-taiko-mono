@@ -4,9 +4,12 @@ use alloy::primitives::Address;
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use privacy_proxy::config::Config;
+use privacy_proxy::roles::reconcile_roles;
 use privacy_proxy::{admin, build_router, db, AppState};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 use sqlx::sqlite::SqlitePoolOptions;
+use sqlx::Row;
 use tower::ServiceExt;
 
 async fn build_test_app() -> (AppState, axum::Router) {
@@ -16,6 +19,7 @@ async fn build_test_app() -> (AppState, axum::Router) {
         .await
         .unwrap();
     sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    reconcile_roles(&pool).await.unwrap();
 
     let config = Config {
         bind_addr: "127.0.0.1:0".to_string(),
@@ -38,12 +42,12 @@ fn random_token() -> String {
     hex::encode(buf)
 }
 
-async fn insert_user_with_token(state: &AppState, role_name: &str, eoa: Address) -> String {
+async fn insert_member_with_token(state: &AppState, role_name: &str, eoa: Address) -> String {
     let addr_hex = format!("0x{}", hex::encode(eoa.as_slice()));
     let now = db::now_unix();
     sqlx::query(
-        "INSERT INTO users (eoa_address, role_id, caller_info_json, created_at)
-         VALUES (?, (SELECT id FROM roles WHERE name = ?), '{}', ?)
+        "INSERT INTO members (eoa_address, role_id, created_at)
+         VALUES (?, (SELECT id FROM roles WHERE name = ?), ?)
          ON CONFLICT(eoa_address) DO UPDATE SET role_id = excluded.role_id",
     )
     .bind(&addr_hex)
@@ -52,6 +56,15 @@ async fn insert_user_with_token(state: &AppState, role_name: &str, eoa: Address)
     .execute(&state.pool)
     .await
     .unwrap();
+    if role_name == "user" {
+        sqlx::query(
+            "INSERT OR IGNORE INTO user_attributes (eoa_address, kyc, blacklisted) VALUES (?, 0, 0)",
+        )
+        .bind(&addr_hex)
+        .execute(&state.pool)
+        .await
+        .unwrap();
+    }
 
     let token = random_token();
     let token_hash = hex::encode(Sha256::digest(token.as_bytes()));
@@ -93,7 +106,7 @@ async fn admin_endpoint_without_token_returns_401() {
 async fn admin_endpoint_with_user_token_returns_403() {
     let (state, app) = build_test_app().await;
     let eoa: Address = "0x1111111111111111111111111111111111111111".parse().unwrap();
-    let token = insert_user_with_token(&state, "user", eoa).await;
+    let token = insert_member_with_token(&state, "user", eoa).await;
     let res = app
         .clone()
         .oneshot(make_req("GET", "/admin/roles", Some(&token)))
@@ -106,7 +119,7 @@ async fn admin_endpoint_with_user_token_returns_403() {
 async fn admin_endpoint_with_admin_token_returns_200() {
     let (state, app) = build_test_app().await;
     let eoa: Address = "0x2222222222222222222222222222222222222222".parse().unwrap();
-    let token = insert_user_with_token(&state, "admin", eoa).await;
+    let token = insert_member_with_token(&state, "admin", eoa).await;
     let res = app
         .clone()
         .oneshot(make_req("GET", "/admin/roles", Some(&token)))
@@ -126,10 +139,10 @@ async fn admin_endpoint_with_admin_token_returns_200() {
 }
 
 #[tokio::test]
-async fn lambdas_endpoint_lists_in_build_lambdas() {
+async fn lambdas_endpoint_groups_by_role() {
     let (state, app) = build_test_app().await;
     let eoa: Address = "0x3333333333333333333333333333333333333333".parse().unwrap();
-    let token = insert_user_with_token(&state, "admin", eoa).await;
+    let token = insert_member_with_token(&state, "admin", eoa).await;
     let res = app
         .clone()
         .oneshot(make_req("GET", "/admin/registry/lambdas", Some(&token)))
@@ -138,14 +151,156 @@ async fn lambdas_endpoint_lists_in_build_lambdas() {
     assert_eq!(res.status(), StatusCode::OK);
     let body = to_bytes(res.into_body(), 4096).await.unwrap();
     let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    let names: Vec<&str> = v
+    let groups = v.as_array().unwrap();
+
+    let admin_group = groups.iter().find(|g| g["role"] == "admin").unwrap();
+    assert!(admin_group["lambdas"].as_array().unwrap().is_empty());
+
+    let user_group = groups.iter().find(|g| g["role"] == "user").unwrap();
+    let user_names: Vec<&str> = user_group["lambdas"]
         .as_array()
         .unwrap()
         .iter()
         .map(|r| r["name"].as_str().unwrap())
         .collect();
-    assert!(names.contains(&"require_kyc"));
-    assert!(names.contains(&"transfer_under_limit"));
+    assert!(user_names.contains(&"require_kyc"));
+    assert!(user_names.contains(&"erc20_self_only"));
+}
+
+#[tokio::test]
+async fn member_upsert_writes_typed_user_attributes() {
+    let (state, app) = build_test_app().await;
+    let admin_eoa: Address = "0xa0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0".parse().unwrap();
+    let admin_token = insert_member_with_token(&state, "admin", admin_eoa).await;
+
+    let target = "0x1010101010101010101010101010101010101010";
+    let body = json!({
+        "role": "user",
+        "attributes": { "kyc": true, "blacklisted": false }
+    });
+    let req = Request::builder()
+        .method("PUT")
+        .uri(format!("/admin/members/{target}"))
+        .header("authorization", format!("Bearer {admin_token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&body).unwrap()))
+        .unwrap();
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let v: serde_json::Value =
+        serde_json::from_slice(&to_bytes(res.into_body(), 4096).await.unwrap()).unwrap();
+    assert_eq!(v["role"], "user");
+    assert_eq!(v["attributes"]["kyc"], true);
+    assert_eq!(v["attributes"]["blacklisted"], false);
+
+    // Verify the row.
+    let row = sqlx::query("SELECT kyc, blacklisted FROM user_attributes WHERE eoa_address = ?")
+        .bind(target)
+        .fetch_one(&state.pool)
+        .await
+        .unwrap();
+    let kyc: i64 = row.get("kyc");
+    let bl: i64 = row.get("blacklisted");
+    assert_eq!(kyc, 1);
+    assert_eq!(bl, 0);
+}
+
+#[tokio::test]
+async fn member_upsert_admin_has_null_attributes() {
+    let (state, app) = build_test_app().await;
+    let admin_eoa: Address = "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1".parse().unwrap();
+    let admin_token = insert_member_with_token(&state, "admin", admin_eoa).await;
+
+    let target = "0x2020202020202020202020202020202020202020";
+    let body = json!({ "role": "admin" });
+    let req = Request::builder()
+        .method("PUT")
+        .uri(format!("/admin/members/{target}"))
+        .header("authorization", format!("Bearer {admin_token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&body).unwrap()))
+        .unwrap();
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let v: serde_json::Value =
+        serde_json::from_slice(&to_bytes(res.into_body(), 4096).await.unwrap()).unwrap();
+    assert_eq!(v["role"], "admin");
+    assert!(v["attributes"].is_null());
+
+    // No row in user_attributes.
+    let row_count: i64 =
+        sqlx::query("SELECT COUNT(*) AS c FROM user_attributes WHERE eoa_address = ?")
+            .bind(target)
+            .fetch_one(&state.pool)
+            .await
+            .unwrap()
+            .get("c");
+    assert_eq!(row_count, 0);
+}
+
+#[tokio::test]
+async fn member_upsert_admin_with_attributes_rejected() {
+    let (state, app) = build_test_app().await;
+    let admin_eoa: Address = "0xa2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2".parse().unwrap();
+    let admin_token = insert_member_with_token(&state, "admin", admin_eoa).await;
+
+    let target = "0x3030303030303030303030303030303030303030";
+    let body = json!({ "role": "admin", "attributes": { "kyc": true, "blacklisted": false } });
+    let req = Request::builder()
+        .method("PUT")
+        .uri(format!("/admin/members/{target}"))
+        .header("authorization", format!("Bearer {admin_token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&body).unwrap()))
+        .unwrap();
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn rule_with_admin_lambda_rejected() {
+    let (state, app) = build_test_app().await;
+    let admin_eoa: Address = "0xa3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3".parse().unwrap();
+    let admin_token = insert_member_with_token(&state, "admin", admin_eoa).await;
+
+    let body = json!({
+        "contract_address": "0xcccccccccccccccccccccccccccccccccccccccc",
+        "function_selector": "0xa9059cbb",
+        "mode": "deny",
+        "entries": [ { "role": "admin", "lambda_name": "require_kyc" } ]
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/admin/registry/rules")
+        .header("authorization", format!("Bearer {admin_token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&body).unwrap()))
+        .unwrap();
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn rule_with_user_lambda_accepted() {
+    let (state, app) = build_test_app().await;
+    let admin_eoa: Address = "0xa4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4".parse().unwrap();
+    let admin_token = insert_member_with_token(&state, "admin", admin_eoa).await;
+
+    let body = json!({
+        "contract_address": "0xcccccccccccccccccccccccccccccccccccccccc",
+        "function_selector": "0x70a08231",
+        "mode": "allow",
+        "entries": [ { "role": "user", "lambda_name": "require_kyc" } ]
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/admin/registry/rules")
+        .header("authorization", format!("Bearer {admin_token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&body).unwrap()))
+        .unwrap();
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
 }
 
 #[tokio::test]
@@ -156,35 +311,52 @@ async fn reconcile_promotes_seed_eoa_to_admin() {
         .await
         .unwrap();
     sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    reconcile_roles(&pool).await.unwrap();
 
     let seed: Address = "0x4444444444444444444444444444444444444444".parse().unwrap();
     let addr_hex = format!("0x{}", hex::encode(seed.as_slice()));
 
-    // Pre-seed the user at role 'user'.
+    // Pre-seed the member at role 'user' with an attribute row.
     let now = db::now_unix();
     sqlx::query(
-        "INSERT INTO users (eoa_address, role_id, caller_info_json, created_at)
-         VALUES (?, (SELECT id FROM roles WHERE name = 'user'), '{}', ?)",
+        "INSERT INTO members (eoa_address, role_id, created_at)
+         VALUES (?, (SELECT id FROM roles WHERE name = 'user'), ?)",
     )
     .bind(&addr_hex)
     .bind(now)
     .execute(&pool)
     .await
     .unwrap();
+    sqlx::query(
+        "INSERT INTO user_attributes (eoa_address, kyc, blacklisted) VALUES (?, 1, 0)",
+    )
+    .bind(&addr_hex)
+    .execute(&pool)
+    .await
+    .unwrap();
 
-    // Run reconciliation with the EOA in ADMIN_EOAS.
     admin::reconcile_seed_admins(&pool, &[seed]).await.unwrap();
 
-    let row = sqlx::query(
-        "SELECT r.name FROM users u JOIN roles r ON r.id = u.role_id WHERE u.eoa_address = ?",
+    // Role flipped to admin.
+    let role: String = sqlx::query(
+        "SELECT r.name FROM members m JOIN roles r ON r.id = m.role_id WHERE m.eoa_address = ?",
     )
     .bind(&addr_hex)
     .fetch_one(&pool)
     .await
-    .unwrap();
-    use sqlx::Row;
-    let role: String = row.get("name");
+    .unwrap()
+    .get("name");
     assert_eq!(role, "admin");
+
+    // Attribute row dropped.
+    let row_count: i64 =
+        sqlx::query("SELECT COUNT(*) AS c FROM user_attributes WHERE eoa_address = ?")
+            .bind(&addr_hex)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+            .get("c");
+    assert_eq!(row_count, 0);
 }
 
 #[tokio::test]
@@ -195,27 +367,27 @@ async fn reconcile_creates_missing_seed_eoa() {
         .await
         .unwrap();
     sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    reconcile_roles(&pool).await.unwrap();
 
     let seed: Address = "0x5555555555555555555555555555555555555555".parse().unwrap();
     let addr_hex = format!("0x{}", hex::encode(seed.as_slice()));
     admin::reconcile_seed_admins(&pool, &[seed]).await.unwrap();
 
-    let row = sqlx::query(
-        "SELECT r.name FROM users u JOIN roles r ON r.id = u.role_id WHERE u.eoa_address = ?",
+    let role: String = sqlx::query(
+        "SELECT r.name FROM members m JOIN roles r ON r.id = m.role_id WHERE m.eoa_address = ?",
     )
     .bind(&addr_hex)
     .fetch_one(&pool)
     .await
-    .unwrap();
-    use sqlx::Row;
-    let role: String = row.get("name");
+    .unwrap()
+    .get("name");
     assert_eq!(role, "admin");
 }
 
 #[tokio::test]
 async fn non_eth_namespace_method_rejected() {
     let (_state, app) = build_test_app().await;
-    let body = serde_json::json!({
+    let body = json!({
         "jsonrpc": "2.0", "id": 1, "method": "net_version", "params": []
     });
     let req = Request::builder()
