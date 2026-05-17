@@ -1,0 +1,8 @@
+# Runtime SQLite database
+privacy-proxy.db
+privacy-proxy.db-journal
+privacy-proxy.db-wal
+privacy-proxy.db-shm
+
+# Rust build output
+target/

@@ -13,9 +13,15 @@ pub struct LambdaCtx<'a, C> {
 /// In-build metadata for a single lambda. Each role's `registry()` builds
 /// a `HashMap<&str, &LambdaSpec<RoleAttrs>>`; entries are referenced by
 /// `name` from `access_rule_entries.lambda_name`.
+///
+/// `expected_selectors` is the set of 4-byte selectors the lambda is built
+/// to evaluate. An empty slice means the lambda is selector-agnostic
+/// (e.g. attribute-only predicates like `require_kyc`). Admins authoring
+/// rules use this to confirm a lambda is paired with a compatible
+/// `function_selector`; the proxy itself does not enforce the match.
 pub struct LambdaSpec<C: 'static> {
     pub name: &'static str,
     pub description: &'static str,
-    pub expected_selector: Option<[u8; 4]>,
+    pub expected_selectors: &'static [[u8; 4]],
     pub run: fn(&LambdaCtx<C>) -> bool,
 }

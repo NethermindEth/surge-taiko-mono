@@ -10,7 +10,9 @@ use crate::rpc::gated_methods;
 pub struct LambdaDescriptor {
     pub name: &'static str,
     pub description: &'static str,
-    pub expected_selector: Option<String>,
+    /// 4-byte selectors the lambda is built to evaluate. Empty array means
+    /// the lambda is selector-agnostic.
+    pub expected_selectors: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -42,9 +44,11 @@ pub async fn list_lambdas() -> ApiResult<Json<Vec<RoleLambdas>>> {
                 .map(|s| LambdaDescriptor {
                     name: s.name,
                     description: s.description,
-                    expected_selector: s
-                        .expected_selector
-                        .map(|b| format!("0x{}", hex::encode(b))),
+                    expected_selectors: s
+                        .expected_selectors
+                        .iter()
+                        .map(|b| format!("0x{}", hex::encode(b)))
+                        .collect(),
                 })
                 .collect(),
         },

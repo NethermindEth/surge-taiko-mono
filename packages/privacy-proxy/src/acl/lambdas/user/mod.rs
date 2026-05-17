@@ -29,14 +29,17 @@ pub fn registry() -> &'static HashMap<&'static str, &'static LambdaSpec<UserCall
             let specs: Box<[LambdaSpec<UserCallerInfo>]> = Box::new([
                 LambdaSpec {
                     name: "require_kyc",
-                    description: "Allow only callers whose stored attributes have kyc=true.",
-                    expected_selector: None,
+                    description: "Allow only callers who have completed their KYC.",
+                    expected_selectors: &[],
                     run: require_kyc::run,
                 },
                 LambdaSpec {
                     name: "erc20_self_only",
-                    description: "For ERC-20 balanceOf(address) and allowance(address,address): allow only when the queried account (balanceOf) or owner (allowance) equals the caller's EOA.",
-                    expected_selector: None,
+                    description: "Restrict users from viewing the ERC20 balance and approvals of other accounts",
+                    expected_selectors: &[
+                        erc20_self_only::BALANCE_OF_SELECTOR,
+                        erc20_self_only::ALLOWANCE_SELECTOR,
+                    ],
                     run: erc20_self_only::run,
                 },
             ]);

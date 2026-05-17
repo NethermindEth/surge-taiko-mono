@@ -176,7 +176,7 @@ pub struct LambdaCtx<'a, C> {
 pub struct LambdaSpec<C: 'static> {
     pub name: &'static str,
     pub description: &'static str,
-    pub expected_selector: Option<[u8; 4]>,
+    pub expected_selectors: &'static [[u8; 4]],
     pub run: fn(&LambdaCtx<C>) -> bool,
 }
 ```

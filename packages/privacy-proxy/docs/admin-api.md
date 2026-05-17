@@ -180,21 +180,23 @@ Response:
       {
         "name": "require_kyc",
         "description": "Allow only callers whose stored attributes have kyc=true.",
-        "expected_selector": null
+        "expected_selectors": []
       },
       {
         "name": "erc20_self_only",
         "description": "For ERC-20 balanceOf(address) and allowance(address,address): allow only when the queried account (balanceOf) or owner (allowance) equals the caller's EOA.",
-        "expected_selector": null
+        "expected_selectors": ["0x70a08231", "0xdd62ed3e"]
       }
     ]
   }
 ]
 ```
 
-`expected_selector` is advisory — the UI should warn (but not block)
+`expected_selectors` is advisory — the UI should warn (but not block)
 if an operator attaches a lambda to a rule whose `function_selector`
-differs. Empty groups (e.g. `admin`) are returned for shape stability.
+isn't in the list. An empty array means the lambda is
+selector-agnostic. Empty groups (e.g. `admin`) are returned for shape
+stability.
 
 ### 10. `GET /admin/registry/synthetic-selectors`
 
