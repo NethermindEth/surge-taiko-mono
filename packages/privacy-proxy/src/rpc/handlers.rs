@@ -15,6 +15,21 @@ use crate::rpc::gated_methods;
 use crate::state::AppState;
 use crate::tracer::{decode_raw_tx, trace_call, CallSite};
 
+/// Whitelist of `eth_` methods every caller (including anonymous) is
+/// allowed to invoke. These return only chain-global state with no
+/// per-user data: chain id, latest block number, gas/fee oracles, sync
+/// status. Everything else — block contents, logs, receipts, calls,
+/// reads of address-parameterized state — requires authentication.
+const ALWAYS_PUBLIC_METHODS: &[&str] = &[
+    "eth_chainId",
+    "eth_blockNumber",
+    "eth_gasPrice",
+    "eth_maxPriorityFeePerGas",
+    "eth_feeHistory",
+    "eth_syncing",
+    "eth_protocolVersion",
+];
+
 #[derive(Debug, Deserialize)]
 struct JsonRpcRequest {
     #[allow(dead_code)]
@@ -73,6 +88,19 @@ pub async fn dispatch(
             -32601,
             "only eth_ namespace methods are accepted by this proxy",
             None,
+        );
+    }
+
+    // Strict default: every method except a small whitelist of
+    // chain-global status calls requires authentication. Anonymous
+    // callers can fetch chain id / latest block / gas prices and
+    // nothing else.
+    if ctx.is_anonymous() && !ALWAYS_PUBLIC_METHODS.contains(&req.method.as_str()) {
+        return access_denied_resp(
+            id,
+            Address::ZERO,
+            [0; 4],
+            &format!("{:?}", DenyReason::AnonymousAgainstGatedCall),
         );
     }
 

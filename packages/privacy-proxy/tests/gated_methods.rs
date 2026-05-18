@@ -278,6 +278,68 @@ async fn admin_can_create_rule_with_method_name_selector() {
 }
 
 #[tokio::test]
+async fn anonymous_eth_call_denied() {
+    let upstream = spawn_mock_upstream().await;
+    let (_state, app) = build_app_with_upstream(upstream).await;
+
+    let res = app
+        .clone()
+        .oneshot(rpc_req(
+            None,
+            "eth_call",
+            json!([{ "to": CONTRACT_ADDR, "data": "0x95d89b41" }, "latest"]),
+        ))
+        .await
+        .unwrap();
+    let v = body_json(res).await;
+    assert_eq!(v["error"]["code"], -32001);
+    assert_eq!(v["error"]["data"]["detail"], "AnonymousAgainstGatedCall");
+}
+
+#[tokio::test]
+async fn anonymous_eth_chain_id_allowed() {
+    let upstream = spawn_mock_upstream().await;
+    let (_state, app) = build_app_with_upstream(upstream).await;
+
+    let res = app
+        .clone()
+        .oneshot(rpc_req(None, "eth_chainId", json!([])))
+        .await
+        .unwrap();
+    let v = body_json(res).await;
+    assert!(v.get("error").is_none(), "got error: {v}");
+}
+
+#[tokio::test]
+async fn anonymous_eth_block_number_allowed() {
+    let upstream = spawn_mock_upstream().await;
+    let (_state, app) = build_app_with_upstream(upstream).await;
+
+    let res = app
+        .clone()
+        .oneshot(rpc_req(None, "eth_blockNumber", json!([])))
+        .await
+        .unwrap();
+    let v = body_json(res).await;
+    assert!(v.get("error").is_none(), "got error: {v}");
+}
+
+#[tokio::test]
+async fn anonymous_eth_get_logs_denied() {
+    let upstream = spawn_mock_upstream().await;
+    let (_state, app) = build_app_with_upstream(upstream).await;
+
+    let res = app
+        .clone()
+        .oneshot(rpc_req(None, "eth_getLogs", json!([{ "fromBlock": "latest" }])))
+        .await
+        .unwrap();
+    let v = body_json(res).await;
+    assert_eq!(v["error"]["code"], -32001);
+    assert_eq!(v["error"]["data"]["detail"], "AnonymousAgainstGatedCall");
+}
+
+#[tokio::test]
 async fn synthetic_selectors_endpoint_lists_methods() {
     let upstream = spawn_mock_upstream().await;
     let (state, app) = build_app_with_upstream(upstream).await;

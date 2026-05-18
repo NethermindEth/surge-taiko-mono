@@ -1,9 +1,9 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use alloy::primitives::Address;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde_json::Value;
 
 const IS_CONTRACT_TTL: Duration = Duration::from_secs(60);
@@ -13,6 +13,7 @@ pub struct UpstreamClient {
     url: String,
     client: reqwest::Client,
     is_contract_cache: Mutex<HashMap<Address, (bool, Instant)>>,
+    chain_id: OnceLock<u64>,
 }
 
 impl UpstreamClient {
@@ -25,7 +26,25 @@ impl UpstreamClient {
             url,
             client,
             is_contract_cache: Mutex::new(HashMap::new()),
+            chain_id: OnceLock::new(),
         }
+    }
+
+    /// Lazily fetch and cache the upstream chain_id. Two concurrent first
+    /// callers may both issue the RPC; whichever sets first wins and the
+    /// other is discarded — benign since chain_id is immutable per chain.
+    pub async fn chain_id(&self) -> Result<u64> {
+        if let Some(&id) = self.chain_id.get() {
+            return Ok(id);
+        }
+        let result = self.call("eth_chainId", serde_json::json!([])).await?;
+        let id_hex = result
+            .as_str()
+            .context("eth_chainId returned non-string result")?;
+        let id = u64::from_str_radix(id_hex.trim_start_matches("0x"), 16)
+            .with_context(|| format!("invalid chain_id hex: {id_hex}"))?;
+        let _ = self.chain_id.set(id);
+        Ok(id)
     }
 
     /// Forward a raw JSON-RPC payload verbatim and return the response body.

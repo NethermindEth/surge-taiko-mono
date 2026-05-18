@@ -3,10 +3,13 @@ use axum::middleware::Next;
 use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Extension, Router};
+use http::Method;
+use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
 use crate::admin;
 use crate::auth::{caller_ctx_layer, challenge, verify};
+use crate::info;
 use crate::rpc;
 use crate::state::AppState;
 
@@ -23,12 +26,23 @@ pub fn build_router(state: AppState) -> Router {
             Box<dyn std::future::Future<Output = Response> + Send>,
         > { Box::pin(caller_ctx_layer(ext, req, next)) };
 
+    // Permissive CORS: the proxy uses Bearer tokens (no cookies, no
+    // credentials), so allowing any origin is safe. Required so browser
+    // extensions and dapp web UIs can probe `/info`, sign in, and call
+    // JSON-RPC without proxy-side configuration.
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers(Any)
+        .allow_origin(Any);
+
     Router::new()
         .route("/", post(rpc::dispatch))
+        .route("/info", get(info::handler))
         .merge(auth_router)
         .merge(admin_router)
         .layer(axum::middleware::from_fn(ctx_mw))
         .layer(Extension(state.clone()))
+        .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

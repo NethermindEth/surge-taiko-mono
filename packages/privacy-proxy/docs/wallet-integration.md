@@ -23,6 +23,38 @@ Ethereum node. No params change.
 
 ## Endpoints
 
+### `GET /info`
+
+Public, unauthenticated identification endpoint. A wallet probes this to
+detect that an RPC URL is a privacy-proxy (rather than a vanilla node)
+and to learn the auth scheme it should use.
+
+```json
+HTTP 200
+{
+  "name":     "privacy-proxy",
+  "version":  "0.1.0",
+  "chain_id": 763374,
+  "domain":   "privacy-proxy",
+  "auth": {
+    "scheme":         "bearer",
+    "challenge_path": "/auth/challenge",
+    "verify_path":    "/auth/verify"
+  }
+}
+```
+
+- `name` is the stable string `"privacy-proxy"` — wallets should
+  treat any other value (or a non-JSON / 404 response) as "not a proxy"
+  and skip the sign-in flow.
+- `chain_id` is the upstream chain's id (decimal). Useful for
+  cross-checking against the wallet's network configuration.
+- `domain` matches the `domain` portion of the challenge message.
+- `auth.scheme` is currently always `"bearer"`.
+
+CORS is enabled on `/info` so it can be fetched from any web origin or
+extension context.
+
 ### `GET /auth/challenge?address={eoa}`
 
 Returns the EIP-191 message the wallet must sign to prove it controls
@@ -99,15 +131,34 @@ POST /
 }
 ```
 
-Most methods that don't carry call data (`eth_blockNumber`,
-`eth_getTransactionReceipt`, `eth_chainId`, …) are always passed
-through. **Exception**: a small set of address-parameterized reads —
-`eth_getBalance`, `eth_getProof`, `eth_getTransactionCount`,
-`eth_getCode`, `eth_getStorageAt` — are also gated. By default a user
-can only query their **own** EOA; querying any other EOA returns
-`-32001` with `data.detail = "DefaultEoaSelfOnly"`. Contract targets
-are free unless the operator has installed a restriction. Methods that
-carry call data may be filtered too; see below.
+**Authentication is required for everything except a small whitelist
+of chain-global status methods.** Anonymous callers may only invoke:
+
+- `eth_chainId`
+- `eth_blockNumber`
+- `eth_gasPrice`
+- `eth_maxPriorityFeePerGas`
+- `eth_feeHistory`
+- `eth_syncing`
+- `eth_protocolVersion`
+
+Every other `eth_*` method (block reads, logs, receipts, transactions,
+calls, address-parameterized reads, sends) returns `-32001` with
+`data.detail = "AnonymousAgainstGatedCall"` if called without a valid
+bearer token. Make sure the wallet completes the sign-in flow **before**
+issuing any other RPC.
+
+Among authenticated calls, additional gating applies:
+
+- Address-parameterized reads — `eth_getBalance`, `eth_getProof`,
+  `eth_getTransactionCount`, `eth_getCode`, `eth_getStorageAt` — default
+  to allowing the caller to query **their own** EOA only. Other EOAs
+  return `-32001` with `data.detail = "DefaultEoaSelfOnly"`. Contract
+  targets are free unless the operator has installed a restriction.
+- Call/transaction methods (`eth_call`, `eth_estimateGas`,
+  `eth_sendRawTransaction`, etc.) are filtered through the rule
+  registry, including internal calls revealed by tracing. See below for
+  the error shape.
 
 #### Access-denied response
 
