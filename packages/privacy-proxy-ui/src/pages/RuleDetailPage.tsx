@@ -7,13 +7,13 @@ import { Badge, ModeBadge, RoleBadge } from "../components/common/Badge";
 import { Skeleton } from "../components/common/Skeleton";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { RuleDrawer } from "../components/rules/RuleDrawer";
+import { LambdaPicker } from "../components/rules/LambdaPicker";
 import {
   useAddEntry,
   useDeleteEntry,
   useGetRule,
   useUpdateEntry,
 } from "../hooks/rules/useRules";
-import { useLambdas } from "../hooks/useLambdas";
 import { useRoles } from "../hooks/useRoles";
 import { useSyntheticSelectors } from "../hooks/useSyntheticSelectors";
 import { AdminApiError } from "../lib/apiClient";
@@ -23,7 +23,6 @@ export function RuleDetailPage() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
   const detail = useGetRule(Number.isNaN(id) ? undefined : id);
-  const lambdas = useLambdas();
   const roles = useRoles();
   const selectors = useSyntheticSelectors();
   const addEntry = useAddEntry();
@@ -32,10 +31,10 @@ export function RuleDetailPage() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [newEntryRole, setNewEntryRole] = useState<RoleName>("user");
-  const [newEntryLambda, setNewEntryLambda] = useState<string>("");
+  const [newEntryLambda, setNewEntryLambda] = useState<number | null>(null);
   const [editingLambda, setEditingLambda] = useState<{
     entry: EntryView;
-    lambda: string;
+    lambdaId: number | null;
   } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<EntryView | null>(null);
 
@@ -57,9 +56,6 @@ export function RuleDetailPage() {
     (s) => s.selector.toLowerCase() === rule.function_selector.toLowerCase(),
   );
 
-  const lambdasForRole = (role: string) =>
-    lambdas.data?.find((g) => g.role === role)?.lambdas ?? [];
-
   const onAddEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -67,12 +63,12 @@ export function RuleDetailPage() {
         ruleId: rule.id,
         body: {
           role: newEntryRole,
-          lambda_name: newEntryLambda || null,
+          lambda_id: newEntryLambda,
         },
       });
       toast.success("Entry added");
       setNewEntryRole("user");
-      setNewEntryLambda("");
+      setNewEntryLambda(null);
     } catch (err) {
       toast.error(
         err instanceof AdminApiError ? err.message : (err as Error).message,
@@ -87,7 +83,7 @@ export function RuleDetailPage() {
         ruleId: rule.id,
         entryId: editingLambda.entry.id,
         body: {
-          lambda_name: editingLambda.lambda || null,
+          lambda_id: editingLambda.lambdaId,
         },
       });
       toast.success("Entry updated");
@@ -115,9 +111,6 @@ export function RuleDetailPage() {
     }
   };
 
-  // Roles not yet on the rule — used to populate the add-entry role
-  // dropdown. Admin is excluded for the same reason as in EntriesEditor:
-  // admins aren't gated by rule entries.
   const usedRoles = new Set(rule.entries.map((e) => e.role));
   const availableRoles =
     roles.data?.filter((r) => r.name !== "admin" && !usedRoles.has(r.name)) ?? [];
@@ -206,37 +199,21 @@ export function RuleDetailPage() {
               <tbody className="divide-y divide-surge-border">
                 {rule.entries.map((e) => {
                   const isEditing = editingLambda?.entry.id === e.id;
-                  const options = lambdasForRole(e.role);
                   return (
                     <tr key={e.id}>
-                      <td className="px-4 py-3 align-middle">
+                      <td className="px-4 py-3 align-top">
                         <RoleBadge role={e.role} />
                       </td>
-                      <td className="px-4 py-3 align-middle">
+                      <td className="px-4 py-3 align-top">
                         {isEditing ? (
-                          options.length === 0 ? (
-                            <span className="text-xs text-surge-muted">
-                              No lambdas available for {e.role}.
-                            </span>
-                          ) : (
-                            <select
-                              value={editingLambda!.lambda}
-                              onChange={(ev) =>
-                                setEditingLambda({
-                                  entry: e,
-                                  lambda: ev.target.value,
-                                })
-                              }
-                              className="rounded-md border border-surge-border bg-surge-card px-2 py-1.5 text-sm outline-none focus:border-surge-secondary"
-                            >
-                              <option value="">(no lambda)</option>
-                              {options.map((l) => (
-                                <option key={l.name} value={l.name}>
-                                  {l.name}
-                                </option>
-                              ))}
-                            </select>
-                          )
+                          <LambdaPicker
+                            role={e.role}
+                            selector={rule.function_selector}
+                            value={editingLambda!.lambdaId}
+                            onChange={(id) =>
+                              setEditingLambda({ entry: e, lambdaId: id })
+                            }
+                          />
                         ) : e.lambda_name ? (
                           <Badge tone="aqua" className="font-mono text-[10px]">
                             {e.lambda_name}
@@ -247,7 +224,7 @@ export function RuleDetailPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right align-middle">
+                      <td className="px-4 py-3 text-right align-top">
                         {isEditing ? (
                           <div className="flex justify-end gap-1">
                             <button
@@ -273,7 +250,7 @@ export function RuleDetailPage() {
                               onClick={() =>
                                 setEditingLambda({
                                   entry: e,
-                                  lambda: e.lambda_name ?? "",
+                                  lambdaId: e.lambda_id ?? null,
                                 })
                               }
                               className="rounded-md px-2 py-1 text-xs font-medium text-surge-secondary hover:bg-surge-card-hover"
@@ -300,58 +277,55 @@ export function RuleDetailPage() {
 
         <form
           onSubmit={onAddEntry}
-          className="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto] items-end gap-2 rounded-xl border border-dashed border-surge-border bg-surge-card-hover/30 p-3"
+          className="mt-4 space-y-3 rounded-xl border border-dashed border-surge-border bg-surge-card-hover/30 p-3"
         >
-          <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-wide text-surge-muted">
-              Role
-            </label>
-            <select
-              value={newEntryRole}
-              onChange={(e) => {
-                setNewEntryRole(e.target.value as RoleName);
-                setNewEntryLambda("");
-              }}
-              className="mt-1 w-full rounded-md border border-surge-border bg-surge-card px-2 py-1.5 text-sm outline-none focus:border-surge-secondary"
-            >
-              {availableRoles.length === 0 ? (
-                <option value="" disabled>
-                  All roles already attached
-                </option>
-              ) : (
-                availableRoles.map((r) => (
-                  <option key={r.id} value={r.name}>
-                    {r.name}
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wide text-surge-muted">
+                Role
+              </label>
+              <select
+                value={newEntryRole}
+                onChange={(e) => {
+                  setNewEntryRole(e.target.value as RoleName);
+                  setNewEntryLambda(null);
+                }}
+                className="mt-1 w-full rounded-md border border-surge-border bg-surge-card px-2 py-1.5 text-sm outline-none focus:border-surge-secondary"
+              >
+                {availableRoles.length === 0 ? (
+                  <option value="" disabled>
+                    All roles already attached
                   </option>
-                ))
-              )}
-            </select>
+                ) : (
+                  availableRoles.map((r) => (
+                    <option key={r.id} value={r.name}>
+                      {r.name}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+            <button
+              type="submit"
+              disabled={availableRoles.length === 0 || addEntry.isPending}
+              className="rounded-lg bg-surge-primary px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-surge-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {addEntry.isPending ? "Adding…" : "Add entry"}
+            </button>
           </div>
           <div>
             <label className="block text-[10px] font-semibold uppercase tracking-wide text-surge-muted">
               Lambda
             </label>
-            <select
-              value={newEntryLambda}
-              onChange={(e) => setNewEntryLambda(e.target.value)}
-              className="mt-1 w-full rounded-md border border-surge-border bg-surge-card px-2 py-1.5 text-sm outline-none focus:border-surge-secondary"
-              disabled={lambdasForRole(newEntryRole).length === 0}
-            >
-              <option value="">(no lambda)</option>
-              {lambdasForRole(newEntryRole).map((l) => (
-                <option key={l.name} value={l.name}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
+            <div className="mt-1">
+              <LambdaPicker
+                role={newEntryRole}
+                selector={rule.function_selector}
+                value={newEntryLambda}
+                onChange={(id) => setNewEntryLambda(id)}
+              />
+            </div>
           </div>
-          <button
-            type="submit"
-            disabled={availableRoles.length === 0 || addEntry.isPending}
-            className="rounded-lg bg-surge-primary px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-surge-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {addEntry.isPending ? "Adding…" : "Add entry"}
-          </button>
         </form>
       </section>
 

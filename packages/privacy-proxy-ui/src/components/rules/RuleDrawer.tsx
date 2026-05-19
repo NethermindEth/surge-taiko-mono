@@ -52,7 +52,7 @@ export function RuleDrawer({ open, onClose, editingId, presets }: RuleDrawerProp
         mode: detail.data.mode,
         entries: detail.data.entries.map((e) => ({
           role: e.role,
-          lambda_name: e.lambda_name,
+          lambda_id: e.lambda_id,
         })),
       });
     } else if (!isEdit) {
@@ -197,6 +197,7 @@ export function RuleDrawer({ open, onClose, editingId, presets }: RuleDrawerProp
             <EntriesEditor
               entries={form.entries}
               onChange={(entries) => setForm({ ...form, entries })}
+              selector={form.selector}
             />
           </div>
         </div>
