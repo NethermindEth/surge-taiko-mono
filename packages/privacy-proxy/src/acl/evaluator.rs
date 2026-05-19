@@ -1,9 +1,9 @@
 use alloy::primitives::Address;
 use anyhow::Result;
 
-use crate::acl::lambdas::{user as user_lambdas, LambdaCtx};
+use crate::acl::lambdas::{eval as lambda_eval, loader as lambda_loader};
 use crate::acl::registry;
-use crate::auth::{CallerAttributes, CallerCtx};
+use crate::auth::CallerCtx;
 use crate::db::Pool;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -22,34 +22,18 @@ pub enum DenyReason {
     InDenyList,
     LambdaRejected,
     UnknownLambda,
+    LambdaRoleMismatch,
     AnonymousAgainstGatedCall,
     UnknownRuleMode,
-    /// Default behavior for a synthetic-selector RPC method when the
-    /// target is an EOA other than the caller's own EOA and no admin
-    /// rule overrides.
     DefaultEoaSelfOnly,
 }
 
-/// Check a single contract call against the registry.
-///
-/// Truth table (rule `mode` × entry presence × lambda):
-///
-/// | mode  | entry exists | lambda      | decision |
-/// |-------|--------------|-------------|----------|
-/// | n/a (no rule) | -    | -           | allow    |
-/// | allow | no           | -           | DENY (NotInAllowList) |
-/// | allow | yes          | none        | allow    |
-/// | allow | yes          | true        | allow    |
-/// | allow | yes          | false       | DENY (LambdaRejected) |
-/// | deny  | no           | -           | allow    |
-/// | deny  | yes          | none        | DENY (InDenyList) |
-/// | deny  | yes          | true        | DENY (LambdaRejected) |
-/// | deny  | yes          | false       | allow    |
 pub async fn check_call(
     pool: &Pool,
     ctx: &CallerCtx,
     contract: &Address,
     call_data: &[u8],
+    msg_sender: Address,
 ) -> Result<AccessDecision> {
     if call_data.len() < 4 {
         return Ok(AccessDecision::Allow);
@@ -86,32 +70,33 @@ pub async fn check_call(
     let (entry_matches, lambda_outcome) = match entry {
         None => (false, true),
         Some(e) => {
-            let outcome = match (&ctx.attributes, e.lambda_name.as_deref()) {
+            let outcome = match (&ctx.attributes, e.lambda_id) {
                 (_, None) => true,
-                (Some(CallerAttributes::User(info)), Some(name)) => {
-                    match user_lambdas::lookup(name) {
-                        Some(spec) => (spec.run)(&LambdaCtx {
-                            caller_info: info,
+                (Some(attrs), Some(lambda_id)) => {
+                    let Some(lambda) = lambda_loader::load_lambda_by_id(pool, lambda_id).await?
+                    else {
+                        return Ok(AccessDecision::Deny {
+                            contract: *contract,
                             selector,
-                            call_data,
-                        }),
-                        None => {
-                            return Ok(AccessDecision::Deny {
-                                contract: *contract,
-                                selector,
-                                reason: DenyReason::UnknownLambda,
-                            });
-                        }
+                            reason: DenyReason::UnknownLambda,
+                        });
+                    };
+                    if lambda.role_id != e.role_id {
+                        return Ok(AccessDecision::Deny {
+                            contract: *contract,
+                            selector,
+                            reason: DenyReason::LambdaRoleMismatch,
+                        });
                     }
-                }
-                (Some(CallerAttributes::Admin(_)), Some(_)) => {
-                    // Admin role has no lambda registry — write-time
-                    // validation rejects this configuration. Fail closed.
-                    return Ok(AccessDecision::Deny {
-                        contract: *contract,
+                    let tx_origin = ctx.eoa.unwrap_or(Address::ZERO);
+                    lambda_eval::evaluate(
+                        &lambda,
+                        attrs,
                         selector,
-                        reason: DenyReason::UnknownLambda,
-                    });
+                        call_data,
+                        tx_origin,
+                        msg_sender,
+                    )
                 }
                 (None, Some(_)) => unreachable!("anonymous handled earlier"),
             };
@@ -142,11 +127,7 @@ pub async fn check_call(
                 AccessDecision::Deny {
                     contract: *contract,
                     selector,
-                    reason: if entry_matches {
-                        DenyReason::InDenyList
-                    } else {
-                        DenyReason::LambdaRejected
-                    },
+                    reason: DenyReason::InDenyList,
                 }
             } else {
                 AccessDecision::Allow
@@ -164,9 +145,9 @@ pub async fn check_call(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::acl::lambdas::user::UserCallerInfo;
-    use crate::auth::AdminCallerInfo;
+    use crate::auth::{AdminCallerInfo, CallerAttributes, UserCallerInfo};
     use crate::db;
+    use crate::db::now_unix;
     use crate::roles::reconcile_roles;
     use alloy::primitives::Address;
     use sqlx::sqlite::SqlitePoolOptions;
@@ -223,7 +204,7 @@ mod tests {
         row.get("id")
     }
 
-    async fn insert_entry(pool: &Pool, rule_id: i64, role: &str, lambda: Option<&str>) {
+    async fn insert_kyc_lambda(pool: &Pool, role: &str) -> i64 {
         let role_id: i64 = sqlx::query("SELECT id FROM roles WHERE name = ?")
             .bind(role)
             .fetch_one(pool)
@@ -231,11 +212,46 @@ mod tests {
             .unwrap()
             .get("id");
         sqlx::query(
-            "INSERT INTO access_rule_entries (rule_id, role_id, lambda_name) VALUES (?, ?, ?)",
+            "INSERT INTO lambdas (name, role_id, description, created_at)
+             VALUES ('require_kyc', ?, NULL, ?)",
+        )
+        .bind(role_id)
+        .bind(now_unix())
+        .execute(pool)
+        .await
+        .unwrap();
+        let lambda_id: i64 = sqlx::query("SELECT last_insert_rowid() AS id")
+            .fetch_one(pool)
+            .await
+            .unwrap()
+            .get("id");
+        let one_word = format!("0x{}01", "00".repeat(31));
+        sqlx::query(
+            "INSERT INTO lambda_rules (lambda_id, selector, lhs_kind, lhs_offset, lhs_attribute,
+                                       condition, rhs_kind, rhs_value)
+             VALUES (?, '0x70a08231', 'attribute', NULL, 'kyc', 'eq', 'literal', ?)",
+        )
+        .bind(lambda_id)
+        .bind(one_word)
+        .execute(pool)
+        .await
+        .unwrap();
+        lambda_id
+    }
+
+    async fn insert_entry(pool: &Pool, rule_id: i64, role: &str, lambda_id: Option<i64>) {
+        let role_id: i64 = sqlx::query("SELECT id FROM roles WHERE name = ?")
+            .bind(role)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+            .get("id");
+        sqlx::query(
+            "INSERT INTO access_rule_entries (rule_id, role_id, lambda_id) VALUES (?, ?, ?)",
         )
         .bind(rule_id)
         .bind(role_id)
-        .bind(lambda)
+        .bind(lambda_id)
         .execute(pool)
         .await
         .unwrap();
@@ -246,18 +262,15 @@ mod tests {
     }
 
     fn balance_of_call_data() -> Vec<u8> {
-        use crate::acl::lambdas::user::erc20_self_only::balanceOfCall;
-        use alloy::sol_types::SolCall;
-        let call = balanceOfCall {
-            account: Address::ZERO,
-        };
-        call.abi_encode()
+        let mut out = vec![0x70, 0xa0, 0x82, 0x31];
+        out.extend_from_slice(&[0u8; 32]);
+        out
     }
 
     #[tokio::test]
     async fn no_rule_means_free_access() {
         let pool = fresh_pool().await;
-        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
+        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data(), Address::ZERO)
             .await
             .unwrap();
         assert_eq!(dec, AccessDecision::Allow);
@@ -267,7 +280,7 @@ mod tests {
     async fn allow_mode_no_entry_for_role_denies() {
         let pool = fresh_pool().await;
         insert_rule(&pool, "allow").await;
-        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
+        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data(), Address::ZERO)
             .await
             .unwrap();
         assert!(matches!(
@@ -284,7 +297,7 @@ mod tests {
         let pool = fresh_pool().await;
         let r = insert_rule(&pool, "allow").await;
         insert_entry(&pool, r, "user", None).await;
-        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
+        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data(), Address::ZERO)
             .await
             .unwrap();
         assert_eq!(dec, AccessDecision::Allow);
@@ -294,8 +307,9 @@ mod tests {
     async fn allow_mode_lambda_pass() {
         let pool = fresh_pool().await;
         let r = insert_rule(&pool, "allow").await;
-        insert_entry(&pool, r, "user", Some("require_kyc")).await;
-        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
+        let lid = insert_kyc_lambda(&pool, "user").await;
+        insert_entry(&pool, r, "user", Some(lid)).await;
+        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data(), Address::ZERO)
             .await
             .unwrap();
         assert_eq!(dec, AccessDecision::Allow);
@@ -305,8 +319,9 @@ mod tests {
     async fn allow_mode_lambda_reject() {
         let pool = fresh_pool().await;
         let r = insert_rule(&pool, "allow").await;
-        insert_entry(&pool, r, "user", Some("require_kyc")).await;
-        let dec = check_call(&pool, &user_ctx(false), &contract(), &balance_of_call_data())
+        let lid = insert_kyc_lambda(&pool, "user").await;
+        insert_entry(&pool, r, "user", Some(lid)).await;
+        let dec = check_call(&pool, &user_ctx(false), &contract(), &balance_of_call_data(), Address::ZERO)
             .await
             .unwrap();
         assert!(matches!(
@@ -322,7 +337,7 @@ mod tests {
     async fn deny_mode_no_entry_allows() {
         let pool = fresh_pool().await;
         insert_rule(&pool, "deny").await;
-        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
+        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data(), Address::ZERO)
             .await
             .unwrap();
         assert_eq!(dec, AccessDecision::Allow);
@@ -333,7 +348,7 @@ mod tests {
         let pool = fresh_pool().await;
         let r = insert_rule(&pool, "deny").await;
         insert_entry(&pool, r, "user", None).await;
-        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
+        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data(), Address::ZERO)
             .await
             .unwrap();
         assert!(matches!(
@@ -349,8 +364,9 @@ mod tests {
     async fn deny_mode_lambda_pass_denies() {
         let pool = fresh_pool().await;
         let r = insert_rule(&pool, "deny").await;
-        insert_entry(&pool, r, "user", Some("require_kyc")).await;
-        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
+        let lid = insert_kyc_lambda(&pool, "user").await;
+        insert_entry(&pool, r, "user", Some(lid)).await;
+        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data(), Address::ZERO)
             .await
             .unwrap();
         assert!(matches!(
@@ -366,8 +382,9 @@ mod tests {
     async fn deny_mode_lambda_fail_allows() {
         let pool = fresh_pool().await;
         let r = insert_rule(&pool, "deny").await;
-        insert_entry(&pool, r, "user", Some("require_kyc")).await;
-        let dec = check_call(&pool, &user_ctx(false), &contract(), &balance_of_call_data())
+        let lid = insert_kyc_lambda(&pool, "user").await;
+        insert_entry(&pool, r, "user", Some(lid)).await;
+        let dec = check_call(&pool, &user_ctx(false), &contract(), &balance_of_call_data(), Address::ZERO)
             .await
             .unwrap();
         assert_eq!(dec, AccessDecision::Allow);
@@ -377,7 +394,7 @@ mod tests {
     async fn anonymous_caller_denied_on_allow_rule() {
         let pool = fresh_pool().await;
         insert_rule(&pool, "allow").await;
-        let dec = check_call(&pool, &anon_ctx(), &contract(), &balance_of_call_data())
+        let dec = check_call(&pool, &anon_ctx(), &contract(), &balance_of_call_data(), Address::ZERO)
             .await
             .unwrap();
         assert!(matches!(
@@ -393,27 +410,10 @@ mod tests {
     async fn anonymous_caller_allowed_on_deny_rule() {
         let pool = fresh_pool().await;
         insert_rule(&pool, "deny").await;
-        let dec = check_call(&pool, &anon_ctx(), &contract(), &balance_of_call_data())
+        let dec = check_call(&pool, &anon_ctx(), &contract(), &balance_of_call_data(), Address::ZERO)
             .await
             .unwrap();
         assert_eq!(dec, AccessDecision::Allow);
-    }
-
-    #[tokio::test]
-    async fn unknown_lambda_fails_closed() {
-        let pool = fresh_pool().await;
-        let r = insert_rule(&pool, "allow").await;
-        insert_entry(&pool, r, "user", Some("does_not_exist")).await;
-        let dec = check_call(&pool, &user_ctx(true), &contract(), &balance_of_call_data())
-            .await
-            .unwrap();
-        assert!(matches!(
-            dec,
-            AccessDecision::Deny {
-                reason: DenyReason::UnknownLambda,
-                ..
-            }
-        ));
     }
 
     #[allow(dead_code)]

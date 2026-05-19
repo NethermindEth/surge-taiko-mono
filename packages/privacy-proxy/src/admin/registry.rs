@@ -5,10 +5,8 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 
-use crate::acl::lambdas::user as user_lambdas;
 use crate::admin::{normalize_address, normalize_selector, validate_mode};
 use crate::error::{ApiError, ApiResult};
-use crate::roles::{ROLE_ADMIN, ROLE_USER};
 use crate::state::AppState;
 
 #[derive(Serialize)]
@@ -24,6 +22,7 @@ pub struct RuleView {
 pub struct EntryView {
     pub id: i64,
     pub role: String,
+    pub lambda_id: Option<i64>,
     pub lambda_name: Option<String>,
 }
 
@@ -38,7 +37,7 @@ pub struct ListRulesQuery {
 pub struct EntryInput {
     pub role: String,
     #[serde(default)]
-    pub lambda_name: Option<String>,
+    pub lambda_id: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -60,34 +59,35 @@ pub struct ReplaceRuleReq {
 #[derive(Deserialize)]
 pub struct UpdateEntryReq {
     #[serde(default)]
-    pub lambda_name: Option<String>,
+    pub lambda_id: Option<i64>,
 }
 
-/// Validate that `name` is a lambda registered for the given role. The
-/// admin role rejects any lambda (admin has no registry); the user role
-/// looks up by name. Unknown role names error out.
-fn ensure_lambda_known(role: &str, name: &str) -> Result<(), ApiError> {
-    match role {
-        ROLE_USER => user_lambdas::lookup(name)
-            .map(|_| ())
-            .ok_or_else(|| ApiError::bad_request(format!("unknown lambda `{name}` for role `{role}`"))),
-        ROLE_ADMIN => Err(ApiError::bad_request(
-            "admin role does not accept lambdas",
-        )),
-        other => Err(ApiError::bad_request(format!("unknown role `{other}`"))),
+async fn ensure_lambda_attachable(
+    pool: &crate::db::Pool,
+    role_id: i64,
+    lambda_id: i64,
+) -> Result<(), ApiError> {
+    let row = sqlx::query("SELECT role_id FROM lambdas WHERE id = ?")
+        .bind(lambda_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| ApiError::bad_request(format!("unknown lambda id {lambda_id}")))?;
+    let lambda_role_id: i64 = row.get("role_id");
+    if lambda_role_id != role_id {
+        return Err(ApiError::bad_request(format!(
+            "lambda {lambda_id} belongs to a different role than this entry"
+        )));
     }
+    Ok(())
 }
 
-async fn lookup_entry_role(pool: &crate::db::Pool, entry_id: i64) -> Result<String, ApiError> {
-    sqlx::query(
-        "SELECT r.name AS role FROM access_rule_entries e
-         JOIN roles r ON r.id = e.role_id WHERE e.id = ?",
-    )
-    .bind(entry_id)
-    .fetch_optional(pool)
-    .await?
-    .map(|r| r.get::<String, _>("role"))
-    .ok_or_else(|| ApiError::not_found("entry"))
+async fn lookup_entry_role_id(pool: &crate::db::Pool, entry_id: i64) -> Result<i64, ApiError> {
+    sqlx::query("SELECT role_id FROM access_rule_entries WHERE id = ?")
+        .bind(entry_id)
+        .fetch_optional(pool)
+        .await?
+        .map(|r| r.get::<i64, _>("role_id"))
+        .ok_or_else(|| ApiError::not_found("entry"))
 }
 
 async fn resolve_role_id(pool: &crate::db::Pool, role: &str) -> Result<i64, ApiError> {
@@ -108,9 +108,10 @@ async fn load_rule(pool: &crate::db::Pool, id: i64) -> Result<RuleView, ApiError
     .await?
     .ok_or_else(|| ApiError::not_found("rule"))?;
     let entry_rows = sqlx::query(
-        "SELECT e.id, r.name AS role, e.lambda_name
+        "SELECT e.id, r.name AS role, e.lambda_id, l.name AS lambda_name
          FROM access_rule_entries e
          JOIN roles r ON r.id = e.role_id
+         LEFT JOIN lambdas l ON l.id = e.lambda_id
          WHERE e.rule_id = ?
          ORDER BY r.name",
     )
@@ -122,6 +123,7 @@ async fn load_rule(pool: &crate::db::Pool, id: i64) -> Result<RuleView, ApiError
         .map(|r| EntryView {
             id: r.get("id"),
             role: r.get("role"),
+            lambda_id: r.get("lambda_id"),
             lambda_name: r.get("lambda_name"),
         })
         .collect();
@@ -134,7 +136,6 @@ async fn load_rule(pool: &crate::db::Pool, id: i64) -> Result<RuleView, ApiError
     })
 }
 
-/// Capability 1: `GET /admin/registry/rules`
 pub async fn list_rules(
     State(state): State<AppState>,
     Query(q): Query<ListRulesQuery>,
@@ -166,7 +167,6 @@ pub async fn list_rules(
     Ok(Json(out))
 }
 
-/// Capability 2: `GET /admin/registry/rules/:id`
 pub async fn get_rule(
     State(state): State<AppState>,
     Path(id): Path<i64>,
@@ -174,7 +174,6 @@ pub async fn get_rule(
     Ok(Json(load_rule(&state.pool, id).await?))
 }
 
-/// Capability 3: `POST /admin/registry/rules`
 pub async fn create_rule(
     State(state): State<AppState>,
     Json(req): Json<CreateRuleReq>,
@@ -182,16 +181,13 @@ pub async fn create_rule(
     let contract = normalize_address(&req.contract_address)?;
     let selector = normalize_selector(&req.function_selector)?;
     let mode = validate_mode(&req.mode)?;
-    // Resolve every entry's role + validate lambdas *before* opening the
-    // transaction. Otherwise resolve_role_id holds a second pool connection
-    // while the tx holds the first, which deadlocks under pools sized to 1.
-    let mut entries_resolved: Vec<(i64, Option<String>)> = Vec::with_capacity(req.entries.len());
+    let mut entries_resolved: Vec<(i64, Option<i64>)> = Vec::with_capacity(req.entries.len());
     for e in &req.entries {
-        if let Some(name) = &e.lambda_name {
-            ensure_lambda_known(&e.role, name)?;
-        }
         let role_id = resolve_role_id(&state.pool, &e.role).await?;
-        entries_resolved.push((role_id, e.lambda_name.clone()));
+        if let Some(lid) = e.lambda_id {
+            ensure_lambda_attachable(&state.pool, role_id, lid).await?;
+        }
+        entries_resolved.push((role_id, e.lambda_id));
     }
 
     let mut tx = state.pool.begin().await?;
@@ -208,13 +204,13 @@ pub async fn create_rule(
         .await?
         .get("id");
 
-    for (role_id, lambda_name) in &entries_resolved {
+    for (role_id, lambda_id) in &entries_resolved {
         sqlx::query(
-            "INSERT INTO access_rule_entries (rule_id, role_id, lambda_name) VALUES (?, ?, ?)",
+            "INSERT INTO access_rule_entries (rule_id, role_id, lambda_id) VALUES (?, ?, ?)",
         )
         .bind(rule_id)
         .bind(role_id)
-        .bind(lambda_name.as_deref())
+        .bind(lambda_id)
         .execute(&mut *tx)
         .await?;
     }
@@ -224,21 +220,19 @@ pub async fn create_rule(
     Ok((StatusCode::CREATED, Json(view)))
 }
 
-/// Capability 4: `PUT /admin/registry/rules/:id`
 pub async fn replace_rule(
     State(state): State<AppState>,
     Path(id): Path<i64>,
     Json(req): Json<ReplaceRuleReq>,
 ) -> ApiResult<Json<RuleView>> {
     let mode = validate_mode(&req.mode)?;
-    // Same deadlock avoidance as create_rule: resolve roles before tx.
-    let mut entries_resolved: Vec<(i64, Option<String>)> = Vec::with_capacity(req.entries.len());
+    let mut entries_resolved: Vec<(i64, Option<i64>)> = Vec::with_capacity(req.entries.len());
     for e in &req.entries {
-        if let Some(name) = &e.lambda_name {
-            ensure_lambda_known(&e.role, name)?;
-        }
         let role_id = resolve_role_id(&state.pool, &e.role).await?;
-        entries_resolved.push((role_id, e.lambda_name.clone()));
+        if let Some(lid) = e.lambda_id {
+            ensure_lambda_attachable(&state.pool, role_id, lid).await?;
+        }
+        entries_resolved.push((role_id, e.lambda_id));
     }
 
     let mut tx = state.pool.begin().await?;
@@ -254,13 +248,13 @@ pub async fn replace_rule(
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    for (role_id, lambda_name) in &entries_resolved {
+    for (role_id, lambda_id) in &entries_resolved {
         sqlx::query(
-            "INSERT INTO access_rule_entries (rule_id, role_id, lambda_name) VALUES (?, ?, ?)",
+            "INSERT INTO access_rule_entries (rule_id, role_id, lambda_id) VALUES (?, ?, ?)",
         )
         .bind(id)
         .bind(role_id)
-        .bind(lambda_name.as_deref())
+        .bind(lambda_id)
         .execute(&mut *tx)
         .await?;
     }
@@ -269,7 +263,6 @@ pub async fn replace_rule(
     Ok(Json(load_rule(&state.pool, id).await?))
 }
 
-/// Capability 5: `DELETE /admin/registry/rules/:id`
 pub async fn delete_rule(
     State(state): State<AppState>,
     Path(id): Path<i64>,
@@ -284,15 +277,11 @@ pub async fn delete_rule(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Capability 6: `POST /admin/registry/rules/:id/entries`
 pub async fn add_entry(
     State(state): State<AppState>,
     Path(rule_id): Path<i64>,
     Json(req): Json<EntryInput>,
 ) -> ApiResult<impl IntoResponse> {
-    if let Some(name) = &req.lambda_name {
-        ensure_lambda_known(&req.role, name)?;
-    }
     let _ = sqlx::query("SELECT 1 FROM access_rules WHERE id = ?")
         .bind(rule_id)
         .fetch_optional(&state.pool)
@@ -300,42 +289,57 @@ pub async fn add_entry(
         .ok_or_else(|| ApiError::not_found("rule"))?;
 
     let role_id = resolve_role_id(&state.pool, &req.role).await?;
+    if let Some(lid) = req.lambda_id {
+        ensure_lambda_attachable(&state.pool, role_id, lid).await?;
+    }
+
     sqlx::query(
-        "INSERT INTO access_rule_entries (rule_id, role_id, lambda_name) VALUES (?, ?, ?)",
+        "INSERT INTO access_rule_entries (rule_id, role_id, lambda_id) VALUES (?, ?, ?)",
     )
     .bind(rule_id)
     .bind(role_id)
-    .bind(req.lambda_name.as_deref())
+    .bind(req.lambda_id)
     .execute(&state.pool)
     .await?;
     let entry_id: i64 = sqlx::query("SELECT last_insert_rowid() AS id")
         .fetch_one(&state.pool)
         .await?
         .get("id");
+
+    let lambda_name = if let Some(lid) = req.lambda_id {
+        sqlx::query("SELECT name FROM lambdas WHERE id = ?")
+            .bind(lid)
+            .fetch_optional(&state.pool)
+            .await?
+            .map(|r| r.get::<String, _>("name"))
+    } else {
+        None
+    };
+
     Ok((
         StatusCode::CREATED,
         Json(EntryView {
             id: entry_id,
             role: req.role,
-            lambda_name: req.lambda_name,
+            lambda_id: req.lambda_id,
+            lambda_name,
         }),
     ))
 }
 
-/// Capability 7: `PUT /admin/registry/rules/:id/entries/:entry_id`
 pub async fn update_entry(
     State(state): State<AppState>,
     Path((rule_id, entry_id)): Path<(i64, i64)>,
     Json(req): Json<UpdateEntryReq>,
 ) -> ApiResult<Json<EntryView>> {
-    if let Some(name) = &req.lambda_name {
-        let role = lookup_entry_role(&state.pool, entry_id).await?;
-        ensure_lambda_known(&role, name)?;
+    if let Some(lid) = req.lambda_id {
+        let role_id = lookup_entry_role_id(&state.pool, entry_id).await?;
+        ensure_lambda_attachable(&state.pool, role_id, lid).await?;
     }
     let res = sqlx::query(
-        "UPDATE access_rule_entries SET lambda_name = ? WHERE id = ? AND rule_id = ?",
+        "UPDATE access_rule_entries SET lambda_id = ? WHERE id = ? AND rule_id = ?",
     )
-    .bind(req.lambda_name.as_deref())
+    .bind(req.lambda_id)
     .bind(entry_id)
     .bind(rule_id)
     .execute(&state.pool)
@@ -344,8 +348,11 @@ pub async fn update_entry(
         return Err(ApiError::not_found("entry"));
     }
     let row = sqlx::query(
-        "SELECT e.id, r.name AS role, e.lambda_name FROM access_rule_entries e
-         JOIN roles r ON r.id = e.role_id WHERE e.id = ?",
+        "SELECT e.id, r.name AS role, e.lambda_id, l.name AS lambda_name
+         FROM access_rule_entries e
+         JOIN roles r ON r.id = e.role_id
+         LEFT JOIN lambdas l ON l.id = e.lambda_id
+         WHERE e.id = ?",
     )
     .bind(entry_id)
     .fetch_one(&state.pool)
@@ -353,11 +360,11 @@ pub async fn update_entry(
     Ok(Json(EntryView {
         id: row.get("id"),
         role: row.get("role"),
+        lambda_id: row.get("lambda_id"),
         lambda_name: row.get("lambda_name"),
     }))
 }
 
-/// Capability 8: `DELETE /admin/registry/rules/:id/entries/:entry_id`
 pub async fn delete_entry(
     State(state): State<AppState>,
     Path((rule_id, entry_id)): Path<(i64, i64)>,

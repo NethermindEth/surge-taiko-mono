@@ -194,7 +194,8 @@ async fn check_gated_method(
 
     if rule_opt.is_some() {
         let call_data = gated_methods::encode_call_data(method, params);
-        return match check_call(&state.pool, ctx, &target, &call_data).await {
+        let msg_sender = ctx.eoa.unwrap_or(Address::ZERO);
+        return match check_call(&state.pool, ctx, &target, &call_data, msg_sender).await {
             Ok(AccessDecision::Allow) => Ok(()),
             Ok(AccessDecision::Deny {
                 contract,
@@ -268,9 +269,11 @@ async fn handle_with_acl(
         .unwrap_or("0x");
     let input_bytes = hex::decode(input_hex.trim_start_matches("0x")).unwrap_or_default();
 
+    let tx_origin = ctx.eoa.unwrap_or(Address::ZERO);
+
     // Top-level ACL check (cheap; avoids tracer roundtrip when obviously denied).
     if let Some(to) = to_opt {
-        match check_call(&state.pool, ctx, &to, &input_bytes).await {
+        match check_call(&state.pool, ctx, &to, &input_bytes, tx_origin).await {
             Ok(AccessDecision::Allow) => {}
             Ok(AccessDecision::Deny {
                 contract,
@@ -305,7 +308,7 @@ async fn handle_with_acl(
     }
 
     for site in sites {
-        match check_call(&state.pool, ctx, &site.contract, &site.input).await {
+        match check_call(&state.pool, ctx, &site.contract, &site.input, site.from).await {
             Ok(AccessDecision::Allow) => {}
             Ok(AccessDecision::Deny {
                 contract,

@@ -23,9 +23,13 @@ pub struct CallFrame {
     pub error: Option<String>,
 }
 
-/// A single (contract, calldata) pair extracted from a call frame.
+/// A single (caller, contract, calldata) triple extracted from a call frame.
+/// `from` is the per-frame msg.sender — for the top-level frame this equals
+/// the original tx.from, for internal frames it's the parent contract's
+/// address.
 #[derive(Debug, Clone)]
 pub struct CallSite {
+    pub from: Address,
     pub contract: Address,
     pub input: Vec<u8>,
 }
@@ -40,11 +44,16 @@ impl CallFrame {
             "CALL" | "STATICCALL" | "DELEGATECALL" | "CALLCODE"
         );
         if gateable {
-            if let (Some(to), Some(input)) = (&self.to, &self.input) {
+            if let (Some(from), Some(to), Some(input)) = (&self.from, &self.to, &self.input) {
                 let trimmed = input.trim_start_matches("0x");
-                if let (Ok(addr), Ok(bytes)) = (to.parse::<Address>(), hex::decode(trimmed)) {
+                if let (Ok(from_addr), Ok(to_addr), Ok(bytes)) = (
+                    from.parse::<Address>(),
+                    to.parse::<Address>(),
+                    hex::decode(trimmed),
+                ) {
                     out.push(CallSite {
-                        contract: addr,
+                        from: from_addr,
+                        contract: to_addr,
                         input: bytes,
                     });
                 }

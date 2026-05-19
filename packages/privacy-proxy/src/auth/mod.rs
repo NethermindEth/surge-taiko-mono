@@ -5,20 +5,22 @@ pub mod verify;
 use alloy::primitives::Address;
 use serde::Serialize;
 
-use crate::acl::lambdas::user::UserCallerInfo;
 use crate::roles::{ROLE_ADMIN, ROLE_USER};
 
 pub use middleware::caller_ctx_layer;
 
-/// Typed attributes for the `admin` role. Identity-only: an admin has no
-/// extra state beyond the EOA used to authenticate.
 #[derive(Clone, Debug, Serialize)]
 pub struct AdminCallerInfo {
     pub eoa: Address,
 }
 
-/// Tagged union over the per-role attribute structs. The evaluator
-/// unwraps this to dispatch to the matching role's lambda registry.
+#[derive(Clone, Debug, Serialize)]
+pub struct UserCallerInfo {
+    pub eoa: Address,
+    pub kyc: bool,
+    pub blacklisted: bool,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "role", rename_all = "lowercase")]
 pub enum CallerAttributes {
@@ -42,9 +44,6 @@ impl CallerAttributes {
     }
 }
 
-/// Resolved caller for a single request. `eoa` and `attributes` are
-/// `None` for anonymous (no token / expired token / unknown token)
-/// requests.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct CallerCtx {
     pub eoa: Option<Address>,
@@ -72,8 +71,6 @@ impl CallerCtx {
     }
 }
 
-/// EIP-191 personal_sign message the wallet is asked to sign.
-/// Format is stable across the binary; any change is a wire-breaking change.
 pub fn build_signin_message(domain: &str, address: &Address, nonce: &str) -> String {
     format!(
         "{domain} sign-in\nAddress: {addr}\nNonce: {nonce}",

@@ -16,7 +16,6 @@ use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        // capabilities 1-8 — access rules + entries
         .route(
             "/admin/registry/rules",
             get(registry::list_rules).post(registry::create_rule),
@@ -35,16 +34,23 @@ pub fn router() -> Router<AppState> {
             "/admin/registry/rules/:id/entries/:entry_id",
             put(registry::update_entry).delete(registry::delete_entry),
         )
-        // capability 9 — list in-build lambdas grouped by role
-        .route("/admin/registry/lambdas", get(lambdas::list_lambdas))
-        // capability 10 — list synthetic selectors for gated RPC methods
+        .route(
+            "/admin/registry/lambdas",
+            get(lambdas::list_lambdas).post(lambdas::create_lambda),
+        )
+        .route(
+            "/admin/registry/lambdas/:id",
+            get(lambdas::get_lambda).delete(lambdas::delete_lambda),
+        )
+        .route(
+            "/admin/registry/role-attributes",
+            get(lambdas::list_role_attributes),
+        )
         .route(
             "/admin/registry/synthetic-selectors",
             get(lambdas::list_synthetic_selectors),
         )
-        // capability 11 — enumerate the code-declared roles
         .route("/admin/roles", get(roles::list_roles))
-        // capabilities 12-16 — members (admins + users live in one table)
         .route("/admin/members", get(members::list_members))
         .route(
             "/admin/members/:eoa",

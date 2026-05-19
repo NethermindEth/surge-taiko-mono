@@ -6,8 +6,7 @@ use axum::Extension;
 use sha2::{Digest, Sha256};
 use sqlx::Row;
 
-use crate::acl::lambdas::user::UserCallerInfo;
-use crate::auth::{AdminCallerInfo, CallerAttributes, CallerCtx};
+use crate::auth::{AdminCallerInfo, CallerAttributes, CallerCtx, UserCallerInfo};
 use crate::db::now_unix;
 use crate::roles::{ROLE_ADMIN, ROLE_USER};
 use crate::state::AppState;

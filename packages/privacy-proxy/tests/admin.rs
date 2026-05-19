@@ -139,7 +139,7 @@ async fn admin_endpoint_with_admin_token_returns_200() {
 }
 
 #[tokio::test]
-async fn lambdas_endpoint_groups_by_role() {
+async fn lambdas_endpoint_returns_empty_groups_on_fresh_db() {
     let (state, app) = build_test_app().await;
     let eoa: Address = "0x3333333333333333333333333333333333333333".parse().unwrap();
     let token = insert_member_with_token(&state, "admin", eoa).await;
@@ -152,19 +152,56 @@ async fn lambdas_endpoint_groups_by_role() {
     let body = to_bytes(res.into_body(), 4096).await.unwrap();
     let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let groups = v.as_array().unwrap();
+    for g in groups {
+        assert!(g["lambdas"].as_array().unwrap().is_empty());
+    }
+}
 
-    let admin_group = groups.iter().find(|g| g["role"] == "admin").unwrap();
-    assert!(admin_group["lambdas"].as_array().unwrap().is_empty());
+#[tokio::test]
+async fn create_lambda_then_list_returns_it() {
+    let (state, app) = build_test_app().await;
+    let eoa: Address = "0xb1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1".parse().unwrap();
+    let token = insert_member_with_token(&state, "admin", eoa).await;
 
-    let user_group = groups.iter().find(|g| g["role"] == "user").unwrap();
-    let user_names: Vec<&str> = user_group["lambdas"]
+    let one_word = format!("0x{}01", "00".repeat(31));
+    let body = json!({
+        "name": "require_kyc",
+        "role": "user",
+        "description": "kyc must be true",
+        "rules": [{
+            "selector": "0x70a08231",
+            "lhs_kind": "attribute",
+            "lhs_attribute": "kyc",
+            "condition": "eq",
+            "rhs_kind": "literal",
+            "rhs_value": one_word
+        }]
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/admin/registry/lambdas")
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&body).unwrap()))
+        .unwrap();
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let res = app
+        .clone()
+        .oneshot(make_req("GET", "/admin/registry/lambdas", Some(&token)))
+        .await
+        .unwrap();
+    let v: serde_json::Value =
+        serde_json::from_slice(&to_bytes(res.into_body(), 4096).await.unwrap()).unwrap();
+    let user_group = v.as_array().unwrap().iter().find(|g| g["role"] == "user").unwrap();
+    let names: Vec<&str> = user_group["lambdas"]
         .as_array()
         .unwrap()
         .iter()
         .map(|r| r["name"].as_str().unwrap())
         .collect();
-    assert!(user_names.contains(&"require_kyc"));
-    assert!(user_names.contains(&"erc20_self_only"));
+    assert!(names.contains(&"require_kyc"));
 }
 
 #[tokio::test]
@@ -257,17 +294,46 @@ async fn member_upsert_admin_with_attributes_rejected() {
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 }
 
+async fn create_user_lambda(app: &axum::Router, token: &str, name: &str) -> i64 {
+    let one_word = format!("0x{}01", "00".repeat(31));
+    let body = json!({
+        "name": name,
+        "role": "user",
+        "rules": [{
+            "selector": "0x70a08231",
+            "lhs_kind": "attribute",
+            "lhs_attribute": "kyc",
+            "condition": "eq",
+            "rhs_kind": "literal",
+            "rhs_value": one_word
+        }]
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/admin/registry/lambdas")
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&body).unwrap()))
+        .unwrap();
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let v: serde_json::Value =
+        serde_json::from_slice(&to_bytes(res.into_body(), 8192).await.unwrap()).unwrap();
+    v["id"].as_i64().unwrap()
+}
+
 #[tokio::test]
-async fn rule_with_admin_lambda_rejected() {
+async fn rule_with_role_mismatched_lambda_rejected() {
     let (state, app) = build_test_app().await;
     let admin_eoa: Address = "0xa3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3".parse().unwrap();
     let admin_token = insert_member_with_token(&state, "admin", admin_eoa).await;
+    let user_lambda_id = create_user_lambda(&app, &admin_token, "kyc_check").await;
 
     let body = json!({
         "contract_address": "0xcccccccccccccccccccccccccccccccccccccccc",
         "function_selector": "0xa9059cbb",
         "mode": "deny",
-        "entries": [ { "role": "admin", "lambda_name": "require_kyc" } ]
+        "entries": [ { "role": "admin", "lambda_id": user_lambda_id } ]
     });
     let req = Request::builder()
         .method("POST")
@@ -285,12 +351,13 @@ async fn rule_with_user_lambda_accepted() {
     let (state, app) = build_test_app().await;
     let admin_eoa: Address = "0xa4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4".parse().unwrap();
     let admin_token = insert_member_with_token(&state, "admin", admin_eoa).await;
+    let lambda_id = create_user_lambda(&app, &admin_token, "kyc_v2").await;
 
     let body = json!({
         "contract_address": "0xcccccccccccccccccccccccccccccccccccccccc",
         "function_selector": "0x70a08231",
         "mode": "allow",
-        "entries": [ { "role": "user", "lambda_name": "require_kyc" } ]
+        "entries": [ { "role": "user", "lambda_id": lambda_id } ]
     });
     let req = Request::builder()
         .method("POST")
@@ -301,6 +368,41 @@ async fn rule_with_user_lambda_accepted() {
         .unwrap();
     let res = app.clone().oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::CREATED);
+}
+
+#[tokio::test]
+async fn delete_lambda_blocked_when_referenced() {
+    let (state, app) = build_test_app().await;
+    let admin_eoa: Address = "0xb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2".parse().unwrap();
+    let token = insert_member_with_token(&state, "admin", admin_eoa).await;
+    let lambda_id = create_user_lambda(&app, &token, "kyc_locked").await;
+
+    let body = json!({
+        "contract_address": "0xcccccccccccccccccccccccccccccccccccccccc",
+        "function_selector": "0x70a08231",
+        "mode": "allow",
+        "entries": [ { "role": "user", "lambda_id": lambda_id } ]
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/admin/registry/rules")
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&body).unwrap()))
+        .unwrap();
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let res = app
+        .clone()
+        .oneshot(make_req(
+            "DELETE",
+            &format!("/admin/registry/lambdas/{lambda_id}"),
+            Some(&token),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CONFLICT);
 }
 
 #[tokio::test]

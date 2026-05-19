@@ -17,7 +17,7 @@ pub struct AccessRuleEntry {
     pub rule_id: i64,
     pub role_id: i64,
     pub role_name: String,
-    pub lambda_name: Option<String>,
+    pub lambda_id: Option<i64>,
 }
 
 pub async fn find_rule(
@@ -47,7 +47,7 @@ pub async fn entry_for_role(
     role_name: &str,
 ) -> Result<Option<AccessRuleEntry>> {
     let row = sqlx::query(
-        "SELECT e.id, e.rule_id, e.role_id, r.name AS role_name, e.lambda_name
+        "SELECT e.id, e.rule_id, e.role_id, r.name AS role_name, e.lambda_id
          FROM access_rule_entries e
          JOIN roles r ON r.id = e.role_id
          WHERE e.rule_id = ? AND r.name = ?",
@@ -61,13 +61,13 @@ pub async fn entry_for_role(
         rule_id: r.get("rule_id"),
         role_id: r.get("role_id"),
         role_name: r.get("role_name"),
-        lambda_name: r.get("lambda_name"),
+        lambda_id: r.get("lambda_id"),
     }))
 }
 
 pub async fn list_entries(pool: &Pool, rule_id: i64) -> Result<Vec<AccessRuleEntry>> {
     let rows = sqlx::query(
-        "SELECT e.id, e.rule_id, e.role_id, r.name AS role_name, e.lambda_name
+        "SELECT e.id, e.rule_id, e.role_id, r.name AS role_name, e.lambda_id
          FROM access_rule_entries e
          JOIN roles r ON r.id = e.role_id
          WHERE e.rule_id = ?
@@ -83,7 +83,7 @@ pub async fn list_entries(pool: &Pool, rule_id: i64) -> Result<Vec<AccessRuleEnt
             rule_id: r.get("rule_id"),
             role_id: r.get("role_id"),
             role_name: r.get("role_name"),
-            lambda_name: r.get("lambda_name"),
+            lambda_id: r.get("lambda_id"),
         })
         .collect())
 }

@@ -227,7 +227,7 @@ async fn admin_deny_rule_on_contract_blocks_user() {
         .await
         .unwrap();
     sqlx::query(
-        "INSERT INTO access_rule_entries (rule_id, role_id, lambda_name)
+        "INSERT INTO access_rule_entries (rule_id, role_id, lambda_id)
          VALUES (?, (SELECT id FROM roles WHERE name = 'user'), NULL)",
     )
     .bind(rule_id)
