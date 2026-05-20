@@ -27,52 +27,86 @@ export function NetworkSetup({ isOpen, onClose, targetChain = 'l1' }: NetworkSet
     currencySymbol: chain.nativeCurrency.symbol,
   };
 
+  const isHttpsRequiredError = (err: any) =>
+    err?.code === -32602 ||
+    err?.code === -32000 ||
+    /https/i.test(err?.message ?? '') ||
+    /https/i.test(err?.data?.message ?? '');
+
   const addNetwork = async () => {
     if (!window.ethereum) {
       toast.error('No wallet detected');
       return;
     }
 
+    const hexChainId = `0x${chain.id.toString(16)}`;
     setIsAdding(true);
     try {
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: `0x${chain.id.toString(16)}` }],
-      });
+      try {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: hexChainId,
+            chainName: chain.name,
+            nativeCurrency: chain.nativeCurrency,
+            rpcUrls: [rpcUrl],
+          }],
+        });
+      } catch (addError: any) {
+        if (isHttpsRequiredError(addError)) {
+          setShowManual(true);
+          toast.error('Wallet requires HTTPS. Please add network manually.');
+          return;
+        }
+        if (addError?.code === 4001) {
+          toast.error('Request rejected');
+          return;
+        }
+        throw addError;
+      }
+
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: hexChainId }],
+        });
+      } catch {
+        // Some wallets auto-switch after add and reject the explicit switch — non-fatal.
+      }
       toast.success(`Switched to ${chain.name}!`);
       onClose();
-    } catch (switchError: any) {
-      if (switchError.code === 4902) {
-        try {
-          await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: `0x${chain.id.toString(16)}`,
-              chainName: chain.name,
-              nativeCurrency: chain.nativeCurrency,
-              rpcUrls: [rpcUrl],
-            }],
-          });
-          toast.success('Network added! Please switch to it.');
-        } catch (addError: any) {
-          if (addError.code === -32602 || addError.message?.includes('HTTPS')) {
-            setShowManual(true);
-            toast.error('Wallet requires HTTPS. Please add network manually.');
-          } else {
-            toast.error('Failed to add network');
-          }
-        }
+    } catch (err: any) {
+      if (isHttpsRequiredError(err)) {
+        setShowManual(true);
+        toast.error('Wallet requires HTTPS. Please add network manually.');
       } else {
-        toast.error('Failed to switch network');
+        toast.error('Failed to add network');
       }
     } finally {
       setIsAdding(false);
     }
   };
 
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied!`);
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      if (navigator.clipboard?.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (!ok) throw new Error('execCommand copy failed');
+      }
+      toast.success(`${label} copied!`);
+    } catch {
+      toast.error('Copy failed — select and copy manually');
+    }
   };
 
   return (
