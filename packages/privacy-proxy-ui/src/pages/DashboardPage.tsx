@@ -1,9 +1,7 @@
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader";
 import { useListMembers } from "../hooks/members/useMembers";
-import { useListRules } from "../hooks/rules/useRules";
-import { useLambdas } from "../hooks/useLambdas";
-import { useSyntheticSelectors } from "../hooks/useSyntheticSelectors";
+import { useListBindings, useListRules } from "../hooks/rules/useRules";
 import { useRoles } from "../hooks/useRoles";
 
 interface StatCardProps {
@@ -40,8 +38,7 @@ function StatCard({ label, value, to, hint }: StatCardProps) {
 export function DashboardPage() {
   const members = useListMembers();
   const rules = useListRules();
-  const lambdas = useLambdas();
-  const selectors = useSyntheticSelectors();
+  const bindings = useListBindings();
   const roles = useRoles();
 
   const memberCount = members.data?.length ?? 0;
@@ -49,10 +46,9 @@ export function DashboardPage() {
     members.data?.filter((m) => m.role === "admin").length ?? 0;
   const userCount = members.data?.filter((m) => m.role === "user").length ?? 0;
   const ruleCount = rules.data?.length ?? 0;
+  const bindingCount = bindings.data?.length ?? 0;
   const entryCount =
     rules.data?.reduce((acc, r) => acc + r.entries.length, 0) ?? 0;
-  const lambdaCount =
-    lambdas.data?.reduce((acc, g) => acc + g.lambdas.length, 0) ?? 0;
 
   return (
     <div>
@@ -74,16 +70,10 @@ export function DashboardPage() {
           to="/rules"
         />
         <StatCard
-          label="In-build lambdas"
-          value={lambdas.isLoading ? "…" : lambdaCount}
-          hint={`across ${lambdas.data?.length ?? 0} roles`}
-          to="/lambdas"
-        />
-        <StatCard
-          label="Gated RPC endpoints"
-          value={selectors.isLoading ? "…" : selectors.data?.length ?? 0}
-          hint="reserved 0xff selectors"
-          to="/selectors"
+          label="Contract bindings"
+          value={bindings.isLoading ? "…" : bindingCount}
+          hint="(contract, selector) → rule"
+          to="/rules"
         />
         <StatCard
           label="Declared roles"

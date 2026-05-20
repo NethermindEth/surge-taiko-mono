@@ -53,8 +53,6 @@ const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: ICONS.dashboard, end: true },
   { to: "/members", label: "Members", icon: ICONS.members },
   { to: "/rules", label: "Access rules", icon: ICONS.rules },
-  { to: "/lambdas", label: "Lambdas", icon: ICONS.lambdas },
-  { to: "/selectors", label: "Gated RPC endpoints", icon: ICONS.selectors },
   { to: "/roles", label: "Roles", icon: ICONS.roles },
 ];
 

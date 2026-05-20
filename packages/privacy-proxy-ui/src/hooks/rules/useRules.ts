@@ -6,6 +6,8 @@ import {
 } from "@tanstack/react-query";
 import { request } from "../../lib/apiClient";
 import type {
+  BindingView,
+  CreateBindingRequest,
   CreateRuleRequest,
   EntryInput,
   EntryView,
@@ -15,29 +17,24 @@ import type {
 } from "../../types/api";
 
 const KEYS = {
-  list: (contract?: string) => ["rules", "list", contract ?? "all"] as const,
-  detail: (id: number) => ["rules", "detail", id] as const,
+  rules: () => ["rules", "list"] as const,
+  rule: (id: number) => ["rules", "detail", id] as const,
+  bindings: (contract?: string, ruleId?: number) =>
+    ["bindings", "list", contract ?? "all", ruleId ?? "all"] as const,
 };
 
-export function useListRules(contract?: string): UseQueryResult<RuleView[]> {
+export function useListRules(): UseQueryResult<RuleView[]> {
   return useQuery({
-    queryKey: KEYS.list(contract),
-    queryFn: () => {
-      const params = new URLSearchParams();
-      if (contract) params.set("contract", contract);
-      params.set("limit", "1000");
-      return request<RuleView[]>(
-        `/admin/registry/rules${params.toString() ? `?${params.toString()}` : ""}`,
-      );
-    },
-    staleTime: 10_000,
+    queryKey: KEYS.rules(),
+    queryFn: () => request<RuleView[]>("/admin/registry/rules?limit=1000"),
+    staleTime: 5_000,
   });
 }
 
 export function useGetRule(id: number | undefined): UseQueryResult<RuleView> {
   return useQuery({
     enabled: id !== undefined,
-    queryKey: id !== undefined ? KEYS.detail(id) : ["rules", "detail", "none"],
+    queryKey: id !== undefined ? KEYS.rule(id) : ["rules", "detail", "none"],
     queryFn: () => request<RuleView>(`/admin/registry/rules/${id}`),
   });
 }
@@ -48,8 +45,8 @@ export function useCreateRule() {
     mutationFn: (body: CreateRuleRequest) =>
       request<RuleView>("/admin/registry/rules", { method: "POST", body }),
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["rules", "list"] });
-      qc.setQueryData(KEYS.detail(data.id), data);
+      qc.invalidateQueries({ queryKey: KEYS.rules() });
+      qc.setQueryData(KEYS.rule(data.id), data);
     },
   });
 }
@@ -63,8 +60,9 @@ export function useReplaceRule() {
         body,
       }),
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["rules", "list"] });
-      qc.setQueryData(KEYS.detail(data.id), data);
+      qc.invalidateQueries({ queryKey: KEYS.rules() });
+      qc.invalidateQueries({ queryKey: ["bindings", "list"] });
+      qc.setQueryData(KEYS.rule(data.id), data);
     },
   });
 }
@@ -75,8 +73,8 @@ export function useDeleteRule() {
     mutationFn: (id: number) =>
       request<void>(`/admin/registry/rules/${id}`, { method: "DELETE" }),
     onSuccess: (_, id) => {
-      qc.invalidateQueries({ queryKey: ["rules", "list"] });
-      qc.removeQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: KEYS.rules() });
+      qc.removeQueries({ queryKey: KEYS.rule(id) });
     },
   });
 }
@@ -90,8 +88,8 @@ export function useAddEntry() {
         body,
       }),
     onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: KEYS.detail(vars.ruleId) });
-      qc.invalidateQueries({ queryKey: ["rules", "list"] });
+      qc.invalidateQueries({ queryKey: KEYS.rule(vars.ruleId) });
+      qc.invalidateQueries({ queryKey: KEYS.rules() });
     },
   });
 }
@@ -113,8 +111,8 @@ export function useUpdateEntry() {
         { method: "PUT", body },
       ),
     onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: KEYS.detail(vars.ruleId) });
-      qc.invalidateQueries({ queryKey: ["rules", "list"] });
+      qc.invalidateQueries({ queryKey: KEYS.rule(vars.ruleId) });
+      qc.invalidateQueries({ queryKey: KEYS.rules() });
     },
   });
 }
@@ -128,8 +126,54 @@ export function useDeleteEntry() {
         { method: "DELETE" },
       ),
     onSuccess: (_, vars) => {
-      qc.invalidateQueries({ queryKey: KEYS.detail(vars.ruleId) });
-      qc.invalidateQueries({ queryKey: ["rules", "list"] });
+      qc.invalidateQueries({ queryKey: KEYS.rule(vars.ruleId) });
+      qc.invalidateQueries({ queryKey: KEYS.rules() });
+    },
+  });
+}
+
+export function useListBindings(opts?: {
+  contract?: string;
+  ruleId?: number;
+}): UseQueryResult<BindingView[]> {
+  return useQuery({
+    queryKey: KEYS.bindings(opts?.contract, opts?.ruleId),
+    queryFn: () => {
+      const p = new URLSearchParams();
+      if (opts?.contract) p.set("contract", opts.contract);
+      if (opts?.ruleId !== undefined) p.set("rule_id", String(opts.ruleId));
+      p.set("limit", "1000");
+      return request<BindingView[]>(
+        `/admin/registry/bindings?${p.toString()}`,
+      );
+    },
+    staleTime: 5_000,
+  });
+}
+
+export function useCreateBinding() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateBindingRequest) =>
+      request<BindingView>("/admin/registry/bindings", {
+        method: "POST",
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["bindings", "list"] });
+      qc.invalidateQueries({ queryKey: KEYS.rules() });
+    },
+  });
+}
+
+export function useDeleteBinding() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      request<void>(`/admin/registry/bindings/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["bindings", "list"] });
+      qc.invalidateQueries({ queryKey: KEYS.rules() });
     },
   });
 }

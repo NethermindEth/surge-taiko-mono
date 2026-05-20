@@ -9,15 +9,18 @@ import { EmptyState } from "../components/common/EmptyState";
 import { TableSkeleton } from "../components/common/Skeleton";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { RuleDrawer } from "../components/rules/RuleDrawer";
+import { BindingDrawer } from "../components/rules/BindingDrawer";
 import {
+  useDeleteBinding,
   useDeleteRule,
+  useListBindings,
   useListRules,
 } from "../hooks/rules/useRules";
 import { useSyntheticSelectors } from "../hooks/useSyntheticSelectors";
-import { isAddress } from "../lib/format";
 import { findCommonSelector } from "../lib/selectors";
+import { isAddress } from "../lib/format";
 import { AdminApiError } from "../lib/apiClient";
-import type { RuleView } from "../types/api";
+import type { BindingView, RuleView } from "../types/api";
 
 function SelectorCell({ selector }: { selector: string }) {
   const { data: selectors } = useSyntheticSelectors();
@@ -25,16 +28,13 @@ function SelectorCell({ selector }: { selector: string }) {
     (s) => s.selector.toLowerCase() === selector.toLowerCase(),
   );
   const common = !method ? findCommonSelector(selector) : undefined;
-  // Sub-label below the hex: "RPC: eth_getBalance" for gated RPC endpoints
-  // (lower-case styling to read as a label, preserving the method's camelCase),
-  // or the human signature for well-known contract selectors.
   const subLabel =
     method ? `RPC: ${method.method}` : common ? common.signature : null;
   return (
     <div className="flex flex-col">
       <span className="font-mono text-xs text-surge-text">{selector}</span>
       {subLabel ? (
-        <span className="text-[11px] font-normal normal-case text-surge-muted">
+        <span className="text-[11px] normal-case text-surge-muted">
           {subLabel}
         </span>
       ) : null}
@@ -45,35 +45,44 @@ function SelectorCell({ selector }: { selector: string }) {
 export function RulesPage() {
   const navigate = useNavigate();
   const [contractFilter, setContractFilter] = useState<string>("");
-  const [modeFilter, setModeFilter] = useState<"" | "allow" | "deny">("");
-  const list = useListRules(
-    contractFilter && isAddress(contractFilter) ? contractFilter : undefined,
+
+  const bindings = useListBindings({
+    contract:
+      contractFilter && isAddress(contractFilter)
+        ? contractFilter.toLowerCase()
+        : undefined,
+  });
+  const rules = useListRules();
+  const deleteBinding = useDeleteBinding();
+  const deleteRule = useDeleteRule();
+
+  const [bindingDrawerOpen, setBindingDrawerOpen] = useState(false);
+  const [ruleDrawerOpen, setRuleDrawerOpen] = useState(false);
+  const [editingRuleId, setEditingRuleId] = useState<number | undefined>(
+    undefined,
   );
-  const del = useDeleteRule();
-
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | undefined>(undefined);
-  const [confirmDelete, setConfirmDelete] = useState<RuleView | null>(null);
-
-  const rows = (list.data ?? []).filter((r) =>
-    modeFilter ? r.mode === modeFilter : true,
+  const [confirmDeleteBinding, setConfirmDeleteBinding] =
+    useState<BindingView | null>(null);
+  const [confirmDeleteRule, setConfirmDeleteRule] = useState<RuleView | null>(
+    null,
   );
 
-  const onCreate = () => {
-    setEditingId(undefined);
-    setDrawerOpen(true);
+  const onApplyRule = () => setBindingDrawerOpen(true);
+  const onCreateRule = () => {
+    setEditingRuleId(undefined);
+    setRuleDrawerOpen(true);
   };
-  const onEdit = (rule: RuleView) => {
-    setEditingId(rule.id);
-    setDrawerOpen(true);
+  const onEditRule = (rule: RuleView) => {
+    setEditingRuleId(rule.id);
+    setRuleDrawerOpen(true);
   };
 
-  const onConfirmDelete = async () => {
-    if (!confirmDelete) return;
+  const onConfirmDeleteBinding = async () => {
+    if (!confirmDeleteBinding) return;
     try {
-      await del.mutateAsync(confirmDelete.id);
-      toast.success(`Rule #${confirmDelete.id} deleted`);
-      setConfirmDelete(null);
+      await deleteBinding.mutateAsync(confirmDeleteBinding.id);
+      toast.success("Rule unbound from contract");
+      setConfirmDeleteBinding(null);
     } catch (err) {
       toast.error(
         err instanceof AdminApiError ? err.message : (err as Error).message,
@@ -81,22 +90,87 @@ export function RulesPage() {
     }
   };
 
-  const columns: Column<RuleView>[] = [
-    {
-      key: "id",
-      header: "#",
-      width: "60px",
-      render: (r) => <span className="text-xs text-surge-muted">{r.id}</span>,
-    },
+  const onConfirmDeleteRule = async () => {
+    if (!confirmDeleteRule) return;
+    try {
+      await deleteRule.mutateAsync(confirmDeleteRule.id);
+      toast.success(`Rule "${confirmDeleteRule.name}" deleted`);
+      setConfirmDeleteRule(null);
+    } catch (err) {
+      toast.error(
+        err instanceof AdminApiError ? err.message : (err as Error).message,
+      );
+    }
+  };
+
+  const bindingColumns: Column<BindingView>[] = [
     {
       key: "contract",
       header: "Contract",
-      render: (r) => <AddressDisplay value={r.contract_address} />,
+      render: (b) => <AddressDisplay value={b.contract_address} />,
     },
     {
       key: "selector",
       header: "Selector",
-      render: (r) => <SelectorCell selector={r.function_selector} />,
+      render: (b) => <SelectorCell selector={b.selector} />,
+    },
+    {
+      key: "rule",
+      header: "Rule",
+      render: (b) => (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/rules/${b.rule_id}`);
+          }}
+          className="text-sm font-semibold text-surge-secondary hover:underline"
+        >
+          {b.rule_name}
+        </button>
+      ),
+    },
+    {
+      key: "mode",
+      header: "Mode",
+      render: (b) => <ModeBadge mode={b.mode} />,
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      render: (b) => (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setConfirmDeleteBinding(b);
+          }}
+          className="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+        >
+          Unbind
+        </button>
+      ),
+    },
+  ];
+
+  const ruleColumns: Column<RuleView>[] = [
+    {
+      key: "name",
+      header: "Name",
+      render: (r) => (
+        <div className="flex flex-col">
+          <span className="font-semibold text-surge-text">{r.name}</span>
+          {r.description ? (
+            <span className="text-[11px] text-surge-muted">{r.description}</span>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: "selector",
+      header: "Selector",
+      render: (r) => <SelectorCell selector={r.selector} />,
     },
     {
       key: "mode",
@@ -105,7 +179,7 @@ export function RulesPage() {
     },
     {
       key: "entries",
-      header: "Entries",
+      header: "Role entries",
       render: (r) =>
         r.entries.length === 0 ? (
           <span className="text-xs text-surge-muted">—</span>
@@ -125,6 +199,15 @@ export function RulesPage() {
         ),
     },
     {
+      key: "usage",
+      header: "Bindings",
+      render: (r) => (
+        <span className="text-xs text-surge-muted">
+          {r.binding_count} contract{r.binding_count === 1 ? "" : "s"}
+        </span>
+      ),
+    },
+    {
       key: "actions",
       header: "",
       align: "right",
@@ -134,7 +217,7 @@ export function RulesPage() {
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              onEdit(r);
+              onEditRule(r);
             }}
             className="rounded-md px-2 py-1 text-xs font-medium text-surge-secondary hover:bg-surge-card-hover"
           >
@@ -144,9 +227,15 @@ export function RulesPage() {
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              setConfirmDelete(r);
+              setConfirmDeleteRule(r);
             }}
-            className="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+            disabled={r.binding_count > 0}
+            title={
+              r.binding_count > 0
+                ? "Unbind from every contract before deleting"
+                : undefined
+            }
+            className="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
           >
             Delete
           </button>
@@ -156,89 +245,142 @@ export function RulesPage() {
   ];
 
   return (
-    <div>
-      <PageHeader
-        title="Access rules"
-        description="Per-(contract, selector) allow/deny rules with role entries."
-        actions={
+    <div className="space-y-10">
+      <section>
+        <PageHeader
+          title="Access rules"
+          description="Apply reusable rules to a (contract, selector) pair. Each contract can have many bindings, but only one rule per selector."
+          actions={
+            <button
+              type="button"
+              onClick={onApplyRule}
+              className="rounded-lg bg-surge-primary px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-surge-primary/90"
+            >
+              + Apply rule to contract
+            </button>
+          }
+        />
+
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            value={contractFilter}
+            onChange={(e) => setContractFilter(e.target.value)}
+            placeholder="Filter bindings by contract (0x...)"
+            className="w-80 rounded-lg border border-surge-border bg-surge-card px-3 py-2 font-mono text-sm outline-none focus:border-surge-secondary"
+          />
           <button
             type="button"
-            onClick={onCreate}
-            className="rounded-lg bg-surge-primary px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-surge-primary/90"
+            onClick={() => bindings.refetch()}
+            className="rounded-lg border border-surge-border bg-surge-card px-3 py-2 text-sm text-surge-muted hover:bg-surge-card-hover"
+          >
+            Refresh
+          </button>
+        </div>
+
+        <DataTable
+          columns={bindingColumns}
+          rows={bindings.data ?? []}
+          rowKey={(b) => String(b.id)}
+          loading={bindings.isLoading}
+          loadingNode={<TableSkeleton />}
+          emptyState={
+            <EmptyState
+              title="No contract bindings yet"
+              description="A (contract, selector) pair without a binding is freely callable. Apply a rule to gate one."
+              action={
+                <button
+                  type="button"
+                  onClick={onApplyRule}
+                  className="rounded-lg bg-surge-primary px-3 py-2 text-sm font-semibold text-white"
+                >
+                  + Apply rule to contract
+                </button>
+              }
+            />
+          }
+        />
+      </section>
+
+      <section>
+        <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-surge-text">
+              Rule library
+            </h2>
+            <p className="text-sm text-surge-muted">
+              Reusable templates. Each rule is bound to its selector at
+              creation and can be applied to many contracts.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCreateRule}
+            className="rounded-lg border border-surge-secondary bg-surge-secondary/10 px-3 py-2 text-sm font-semibold text-surge-primary hover:bg-surge-secondary/20"
           >
             + Create rule
           </button>
-        }
-      />
+        </header>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <input
-          type="text"
-          value={contractFilter}
-          onChange={(e) => setContractFilter(e.target.value)}
-          placeholder="Filter by contract address (0x...)"
-          className="w-80 rounded-lg border border-surge-border bg-surge-card px-3 py-2 font-mono text-sm outline-none focus:border-surge-secondary"
-        />
-        <select
-          value={modeFilter}
-          onChange={(e) =>
-            setModeFilter(e.target.value as "" | "allow" | "deny")
+        <DataTable
+          columns={ruleColumns}
+          rows={rules.data ?? []}
+          rowKey={(r) => String(r.id)}
+          onRowClick={(r) => navigate(`/rules/${r.id}`)}
+          loading={rules.isLoading}
+          loadingNode={<TableSkeleton />}
+          emptyState={
+            <EmptyState
+              title="No rules defined"
+              description="Define a reusable allow/deny rule with role entries, then bind it to a contract selector above."
+              action={
+                <button
+                  type="button"
+                  onClick={onCreateRule}
+                  className="rounded-lg bg-surge-primary px-3 py-2 text-sm font-semibold text-white"
+                >
+                  + Create rule
+                </button>
+              }
+            />
           }
-          className="rounded-lg border border-surge-border bg-surge-card px-3 py-2 text-sm outline-none focus:border-surge-secondary"
-        >
-          <option value="">All modes</option>
-          <option value="allow">allow</option>
-          <option value="deny">deny</option>
-        </select>
-        <button
-          type="button"
-          onClick={() => list.refetch()}
-          className="rounded-lg border border-surge-border bg-surge-card px-3 py-2 text-sm text-surge-muted hover:bg-surge-card-hover"
-        >
-          Refresh
-        </button>
-      </div>
+        />
+      </section>
 
-      <DataTable
-        columns={columns}
-        rows={rows}
-        rowKey={(r) => String(r.id)}
-        onRowClick={(r) => navigate(`/rules/${r.id}`)}
-        loading={list.isLoading}
-        loadingNode={<TableSkeleton />}
-        emptyState={
-          <EmptyState
-            title="No rules yet"
-            description="Contracts/selectors with no rule are freely callable. Create your first rule to gate one."
-            action={
-              <button
-                type="button"
-                onClick={onCreate}
-                className="rounded-lg bg-surge-primary px-3 py-2 text-sm font-semibold text-white"
-              >
-                + Create rule
-              </button>
-            }
-          />
+      <BindingDrawer
+        open={bindingDrawerOpen}
+        onClose={() => setBindingDrawerOpen(false)}
+        presetContract={
+          contractFilter && isAddress(contractFilter) ? contractFilter : undefined
         }
       />
 
       <RuleDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        editingId={editingId}
+        open={ruleDrawerOpen}
+        onClose={() => setRuleDrawerOpen(false)}
+        editingId={editingRuleId}
       />
 
       <ConfirmDialog
-        open={!!confirmDelete}
-        title={`Delete rule #${confirmDelete?.id ?? ""}`}
-        description="Removes the rule and all of its entries. The (contract, selector) pair becomes freely callable again."
-        confirmString={String(confirmDelete?.id ?? "")}
+        open={!!confirmDeleteBinding}
+        title="Unbind rule from contract"
+        description={`Removes the (contract, selector) → rule "${confirmDeleteBinding?.rule_name ?? ""}" mapping. The selector becomes freely callable again.`}
+        destructive
+        confirmLabel="Unbind"
+        onConfirm={onConfirmDeleteBinding}
+        onCancel={() => setConfirmDeleteBinding(null)}
+        isLoading={deleteBinding.isPending}
+      />
+
+      <ConfirmDialog
+        open={!!confirmDeleteRule}
+        title={`Delete rule "${confirmDeleteRule?.name ?? ""}"`}
+        description="Removes the rule and all its entries. Bindings must be removed first."
         destructive
         confirmLabel="Delete"
-        onConfirm={onConfirmDelete}
-        onCancel={() => setConfirmDelete(null)}
-        isLoading={del.isPending}
+        onConfirm={onConfirmDeleteRule}
+        onCancel={() => setConfirmDeleteRule(null)}
+        isLoading={deleteRule.isPending}
       />
     </div>
   );

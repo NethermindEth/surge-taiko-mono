@@ -17,8 +17,6 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { MembersPage } from "./pages/MembersPage";
 import { RulesPage } from "./pages/RulesPage";
 import { RuleDetailPage } from "./pages/RuleDetailPage";
-import { LambdasPage } from "./pages/LambdasPage";
-import { SelectorsPage } from "./pages/SelectorsPage";
 import { RolesPage } from "./pages/RolesPage";
 
 const queryClient = new QueryClient({
@@ -67,8 +65,6 @@ export default function App() {
                   <Route path="members" element={<MembersPage />} />
                   <Route path="rules" element={<RulesPage />} />
                   <Route path="rules/:id" element={<RuleDetailPage />} />
-                  <Route path="lambdas" element={<LambdasPage />} />
-                  <Route path="selectors" element={<SelectorsPage />} />
                   <Route path="roles" element={<RolesPage />} />
                 </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />

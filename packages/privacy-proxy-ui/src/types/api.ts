@@ -40,10 +40,12 @@ export type UpsertMemberRequest =
 
 export interface RuleView {
   id: number;
-  contract_address: string;
-  function_selector: string;
+  name: string;
+  description: string | null;
+  selector: string;
   mode: "allow" | "deny";
   entries: EntryView[];
+  binding_count: number;
 }
 
 export interface EntryView {
@@ -59,19 +61,36 @@ export interface EntryInput {
 }
 
 export interface CreateRuleRequest {
-  contract_address: string;
-  function_selector: string;
+  name: string;
+  description?: string | null;
+  selector: string;
   mode: "allow" | "deny";
   entries: EntryInput[];
 }
 
 export interface ReplaceRuleRequest {
+  name: string;
+  description?: string | null;
   mode: "allow" | "deny";
   entries: EntryInput[];
 }
 
 export interface UpdateEntryRequest {
   lambda_id: number | null;
+}
+
+export interface BindingView {
+  id: number;
+  contract_address: string;
+  selector: string;
+  rule_id: number;
+  rule_name: string;
+  mode: "allow" | "deny";
+}
+
+export interface CreateBindingRequest {
+  contract_address: string;
+  rule_id: number;
 }
 
 export type LhsKind = "calldata" | "attribute";

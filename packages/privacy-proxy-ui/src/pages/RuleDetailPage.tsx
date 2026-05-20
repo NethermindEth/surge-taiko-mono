@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { PageHeader } from "../components/layout/PageHeader";
-import { AddressDisplay } from "../components/common/AddressDisplay";
 import { Badge, ModeBadge, RoleBadge } from "../components/common/Badge";
 import { Skeleton } from "../components/common/Skeleton";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
@@ -53,7 +52,7 @@ export function RuleDetailPage() {
 
   const rule = detail.data;
   const selectorMethod = selectors.data?.find(
-    (s) => s.selector.toLowerCase() === rule.function_selector.toLowerCase(),
+    (s) => s.selector.toLowerCase() === rule.selector.toLowerCase(),
   );
 
   const onAddEntry = async (e: React.FormEvent) => {
@@ -143,24 +142,30 @@ export function RuleDetailPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-surge-muted">
-              Contract
+              Name
             </p>
-            <div className="mt-1">
-              <AddressDisplay value={rule.contract_address} />
-            </div>
+            <p className="mt-1 text-sm font-semibold text-surge-text">
+              {rule.name}
+            </p>
+            {rule.description ? (
+              <p className="mt-1 text-xs text-surge-muted">{rule.description}</p>
+            ) : null}
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-surge-muted">
               Selector
             </p>
             <p className="mt-1 font-mono text-sm text-surge-text">
-              {rule.function_selector}
+              {rule.selector}
             </p>
             {selectorMethod ? (
               <p className="text-[10px] uppercase tracking-wide text-surge-muted">
                 {selectorMethod.method}
               </p>
             ) : null}
+            <p className="mt-1 text-[11px] text-surge-muted">
+              Used by {rule.binding_count} contract(s)
+            </p>
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-surge-muted">
@@ -208,7 +213,7 @@ export function RuleDetailPage() {
                         {isEditing ? (
                           <LambdaPicker
                             role={e.role}
-                            selector={rule.function_selector}
+                            selector={rule.selector}
                             value={editingLambda!.lambdaId}
                             onChange={(id) =>
                               setEditingLambda({ entry: e, lambdaId: id })
@@ -320,7 +325,7 @@ export function RuleDetailPage() {
             <div className="mt-1">
               <LambdaPicker
                 role={newEntryRole}
-                selector={rule.function_selector}
+                selector={rule.selector}
                 value={newEntryLambda}
                 onChange={(id) => setNewEntryLambda(id)}
               />
