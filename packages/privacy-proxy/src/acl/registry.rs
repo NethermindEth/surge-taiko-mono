@@ -6,8 +6,9 @@ use crate::db::Pool;
 #[derive(Clone, Debug)]
 pub struct AccessRule {
     pub id: i64,
-    pub contract_address: String,
-    pub function_selector: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub selector: String,
     pub mode: String,
 }
 
@@ -20,14 +21,16 @@ pub struct AccessRuleEntry {
     pub lambda_id: Option<i64>,
 }
 
-pub async fn find_rule(
+pub async fn find_rule_for(
     pool: &Pool,
     contract_hex: &str,
     selector_hex: &str,
 ) -> Result<Option<AccessRule>> {
     let row = sqlx::query(
-        "SELECT id, contract_address, function_selector, mode
-         FROM access_rules WHERE contract_address = ? AND function_selector = ?",
+        "SELECT r.id, r.name, r.description, r.selector, r.mode
+         FROM contract_rules cr
+         JOIN access_rules r ON r.id = cr.rule_id
+         WHERE cr.contract_address = ? AND cr.selector = ?",
     )
     .bind(contract_hex)
     .bind(selector_hex)
@@ -35,8 +38,9 @@ pub async fn find_rule(
     .await?;
     Ok(row.map(|r| AccessRule {
         id: r.get("id"),
-        contract_address: r.get("contract_address"),
-        function_selector: r.get("function_selector"),
+        name: r.get("name"),
+        description: r.get("description"),
+        selector: r.get("selector"),
         mode: r.get("mode"),
     }))
 }

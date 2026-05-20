@@ -35,6 +35,14 @@ pub fn router() -> Router<AppState> {
             put(registry::update_entry).delete(registry::delete_entry),
         )
         .route(
+            "/admin/registry/bindings",
+            get(registry::list_bindings).post(registry::create_binding),
+        )
+        .route(
+            "/admin/registry/bindings/:id",
+            delete(registry::delete_binding),
+        )
+        .route(
             "/admin/registry/lambdas",
             get(lambdas::list_lambdas).post(lambdas::create_lambda),
         )

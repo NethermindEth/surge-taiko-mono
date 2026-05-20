@@ -42,7 +42,7 @@ pub async fn check_call(
     let selector_hex = format!("0x{}", hex::encode(selector));
     let contract_hex = format!("0x{}", hex::encode(contract.as_slice()));
 
-    let Some(rule) = registry::find_rule(pool, &contract_hex, &selector_hex).await? else {
+    let Some(rule) = registry::find_rule_for(pool, &contract_hex, &selector_hex).await? else {
         return Ok(AccessDecision::Allow);
     };
 
@@ -189,19 +189,26 @@ mod tests {
     }
 
     async fn insert_rule(pool: &Pool, mode: &str) -> i64 {
+        let row = sqlx::query(
+            "INSERT INTO access_rules (name, description, selector, mode)
+             VALUES (?, NULL, '0x70a08231', ?)
+             RETURNING id",
+        )
+        .bind(format!("rule-{mode}-{}", rand::random::<u32>()))
+        .bind(mode)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let rule_id: i64 = row.get("id");
         sqlx::query(
-            "INSERT INTO access_rules (contract_address, function_selector, mode)
+            "INSERT INTO contract_rules (contract_address, selector, rule_id)
              VALUES ('0x000000000000000000000000000000000000beef', '0x70a08231', ?)",
         )
-        .bind(mode)
+        .bind(rule_id)
         .execute(pool)
         .await
         .unwrap();
-        let row = sqlx::query("SELECT last_insert_rowid() AS id")
-            .fetch_one(pool)
-            .await
-            .unwrap();
-        row.get("id")
+        rule_id
     }
 
     async fn insert_kyc_lambda(pool: &Pool, role: &str) -> i64 {

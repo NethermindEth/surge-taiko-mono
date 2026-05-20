@@ -65,14 +65,14 @@ CREATE INDEX idx_lambda_rules_lambda ON lambda_rules(lambda_id);
 CREATE INDEX idx_lambda_rules_selector ON lambda_rules(lambda_id, selector);
 
 CREATE TABLE access_rules (
-    id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    contract_address  TEXT NOT NULL,
-    function_selector TEXT NOT NULL,
-    mode              TEXT NOT NULL CHECK (mode IN ('allow','deny')),
-    UNIQUE (contract_address, function_selector)
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    name         TEXT NOT NULL UNIQUE,
+    description  TEXT,
+    selector     TEXT NOT NULL,
+    mode         TEXT NOT NULL CHECK (mode IN ('allow','deny'))
 );
 
-CREATE INDEX idx_access_rules_contract ON access_rules(contract_address);
+CREATE INDEX idx_access_rules_selector ON access_rules(selector);
 
 CREATE TABLE access_rule_entries (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,3 +83,14 @@ CREATE TABLE access_rule_entries (
 );
 
 CREATE INDEX idx_access_rule_entries_lambda ON access_rule_entries(lambda_id);
+
+CREATE TABLE contract_rules (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    contract_address  TEXT NOT NULL,
+    selector          TEXT NOT NULL,
+    rule_id           INTEGER NOT NULL REFERENCES access_rules(id) ON DELETE RESTRICT,
+    UNIQUE (contract_address, selector)
+);
+
+CREATE INDEX idx_contract_rules_contract ON contract_rules(contract_address);
+CREATE INDEX idx_contract_rules_rule ON contract_rules(rule_id);

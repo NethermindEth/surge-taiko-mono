@@ -374,8 +374,8 @@ async fn rule_with_role_mismatched_lambda_rejected() {
     let user_lambda_id = create_user_lambda(&app, &admin_token, "kyc_check").await;
 
     let body = json!({
-        "contract_address": "0xcccccccccccccccccccccccccccccccccccccccc",
-        "function_selector": "0xa9059cbb",
+        "name": "transfer-admin-with-user-lambda",
+        "selector": "0xa9059cbb",
         "mode": "deny",
         "entries": [ { "role": "admin", "lambda_id": user_lambda_id } ]
     });
@@ -398,8 +398,8 @@ async fn rule_with_user_lambda_accepted() {
     let lambda_id = create_user_lambda(&app, &admin_token, "kyc_v2").await;
 
     let body = json!({
-        "contract_address": "0xcccccccccccccccccccccccccccccccccccccccc",
-        "function_selector": "0x70a08231",
+        "name": "balanceof-user-allowlist",
+        "selector": "0x70a08231",
         "mode": "allow",
         "entries": [ { "role": "user", "lambda_id": lambda_id } ]
     });
@@ -422,8 +422,8 @@ async fn delete_lambda_blocked_when_referenced() {
     let lambda_id = create_user_lambda(&app, &token, "kyc_locked").await;
 
     let body = json!({
-        "contract_address": "0xcccccccccccccccccccccccccccccccccccccccc",
-        "function_selector": "0x70a08231",
+        "name": "balanceof-locked-rule",
+        "selector": "0x70a08231",
         "mode": "allow",
         "entries": [ { "role": "user", "lambda_id": lambda_id } ]
     });

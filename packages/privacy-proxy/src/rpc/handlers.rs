@@ -179,7 +179,7 @@ async fn check_gated_method(
 
     let target_hex = format!("0x{}", hex::encode(target.as_slice()));
     let selector_hex = format!("0x{}", hex::encode(method.selector));
-    let rule_opt = match acl_registry::find_rule(&state.pool, &target_hex, &selector_hex).await
+    let rule_opt = match acl_registry::find_rule_for(&state.pool, &target_hex, &selector_hex).await
     {
         Ok(r) => r,
         Err(e) => {

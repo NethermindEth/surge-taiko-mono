@@ -215,9 +215,9 @@ async fn admin_deny_rule_on_contract_blocks_user() {
     let token = issue_token(&state, "user", user).await;
 
     sqlx::query(
-        "INSERT INTO access_rules (contract_address, function_selector, mode) VALUES (?, ?, 'deny')",
+        "INSERT INTO access_rules (name, description, selector, mode)
+         VALUES ('deny-getBalance', NULL, ?, 'deny')",
     )
-    .bind(CONTRACT_ADDR)
     .bind("0xff010001") // synthetic selector for eth_getBalance
     .execute(&state.pool)
     .await
@@ -230,6 +230,15 @@ async fn admin_deny_rule_on_contract_blocks_user() {
         "INSERT INTO access_rule_entries (rule_id, role_id, lambda_id)
          VALUES (?, (SELECT id FROM roles WHERE name = 'user'), NULL)",
     )
+    .bind(rule_id)
+    .execute(&state.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO contract_rules (contract_address, selector, rule_id) VALUES (?, ?, ?)",
+    )
+    .bind(CONTRACT_ADDR)
+    .bind("0xff010001")
     .bind(rule_id)
     .execute(&state.pool)
     .await
@@ -257,8 +266,8 @@ async fn admin_can_create_rule_with_method_name_selector() {
     let token = issue_token(&state, "admin", admin).await;
 
     let body = json!({
-        "contract_address": CONTRACT_ADDR,
-        "function_selector": "eth_getBalance",
+        "name": "deny-getBalance",
+        "selector": "eth_getBalance",
         "mode": "deny",
         "entries": [ { "role": "user" } ]
     });
@@ -272,8 +281,7 @@ async fn admin_can_create_rule_with_method_name_selector() {
     let res = app.clone().oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::CREATED);
     let v = body_json(res).await;
-    assert_eq!(v["function_selector"], "0xff010001");
-    assert_eq!(v["contract_address"], CONTRACT_ADDR);
+    assert_eq!(v["selector"], "0xff010001");
     assert_eq!(v["mode"], "deny");
 }
 
