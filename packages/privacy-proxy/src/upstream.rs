@@ -48,17 +48,38 @@ impl UpstreamClient {
     }
 
     /// Forward a raw JSON-RPC payload verbatim and return the response body.
+    ///
+    /// Non-2xx responses are still parsed and returned when their body is
+    /// valid JSON: many JSON-RPC servers return structured `{ error: ... }`
+    /// bodies with HTTP 4xx/5xx, and clients need the JSON-RPC error to
+    /// surface to the caller. Only treat the response as a transport
+    /// failure when the body isn't parseable JSON.
     pub async fn forward(&self, body: &Value) -> Result<Value> {
+        // CodeQL: ssrf - false positive. `self.url` is set once from the
+        // UPSTREAM_URL env var at boot (see config.rs); it is never derived
+        // from request input.
         let resp = self
             .client
             .post(&self.url)
             .json(body)
             .send()
-            .await?
-            .error_for_status()?
-            .json::<Value>()
             .await?;
-        Ok(resp)
+        let status = resp.status();
+        let bytes = resp.bytes().await?;
+        match serde_json::from_slice::<Value>(&bytes) {
+            Ok(v) => Ok(v),
+            Err(e) => {
+                if status.is_success() {
+                    Err(anyhow::anyhow!("decode upstream response: {e}"))
+                } else {
+                    let body_preview = String::from_utf8_lossy(&bytes);
+                    let trimmed: String = body_preview.chars().take(256).collect();
+                    Err(anyhow::anyhow!(
+                        "upstream returned HTTP {status} with non-JSON body: {trimmed}"
+                    ))
+                }
+            }
+        }
     }
 
     /// Issue a one-off JSON-RPC call (used internally for debug_traceCall, eth_getCode).

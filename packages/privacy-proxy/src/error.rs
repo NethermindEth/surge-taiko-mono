@@ -41,8 +41,33 @@ impl From<sqlx::Error> for ApiError {
     fn from(e: sqlx::Error) -> Self {
         if let sqlx::Error::Database(ref db) = e {
             if let Some(code) = db.code() {
-                if code.as_ref() == "2067" || code.as_ref() == "1555" {
-                    return Self::Conflict("uniqueness violation".to_string());
+                match code.as_ref() {
+                    // SQLITE_CONSTRAINT_UNIQUE / SQLITE_CONSTRAINT_PRIMARYKEY
+                    "2067" | "1555" => {
+                        return Self::Conflict("uniqueness violation".to_string());
+                    }
+                    // SQLITE_CONSTRAINT_FOREIGNKEY
+                    "787" => {
+                        return Self::BadRequest(format!(
+                            "foreign key constraint failed: {}",
+                            db.message()
+                        ));
+                    }
+                    // SQLITE_CONSTRAINT_CHECK
+                    "275" => {
+                        return Self::BadRequest(format!(
+                            "check constraint failed: {}",
+                            db.message()
+                        ));
+                    }
+                    // SQLITE_CONSTRAINT_NOTNULL
+                    "1299" => {
+                        return Self::BadRequest(format!(
+                            "not-null constraint failed: {}",
+                            db.message()
+                        ));
+                    }
+                    _ => {}
                 }
             }
         }

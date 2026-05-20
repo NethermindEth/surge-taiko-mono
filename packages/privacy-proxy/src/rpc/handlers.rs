@@ -193,7 +193,12 @@ async fn check_gated_method(
     };
 
     if rule_opt.is_some() {
-        let call_data = gated_methods::encode_call_data(method, params);
+        let call_data = match gated_methods::encode_call_data(method, target, params) {
+            Ok(d) => d,
+            Err(msg) => {
+                return Err(rpc_error_resp(id.clone(), -32602, msg, None));
+            }
+        };
         let msg_sender = ctx.eoa.unwrap_or(Address::ZERO);
         return match check_call(&state.pool, ctx, &target, &call_data, msg_sender).await {
             Ok(AccessDecision::Allow) => Ok(()),
@@ -288,7 +293,11 @@ async fn handle_with_acl(
         }
     }
 
-    // Trace and check every internal frame.
+    // Trace and check every internal frame. We deliberately forward the
+    // user-supplied `call_obj` (including its `from`) verbatim to
+    // `debug_traceCall`: the top-level ACL above already evaluated with
+    // `tx_origin = ctx.eoa` and the inner frames are populated by the
+    // EVM, so the simulator's view of `from` doesn't affect authorization.
     let frame = match trace_call(&state.upstream, call_obj, block).await {
         Ok(f) => f,
         Err(e) => {

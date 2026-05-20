@@ -9,6 +9,8 @@ use crate::admin::{normalize_address, normalize_selector, validate_mode};
 use crate::error::{ApiError, ApiResult};
 use crate::state::AppState;
 
+const MAX_ENTRIES_PER_RULE: usize = 64;
+
 #[derive(Serialize)]
 pub struct RuleView {
     pub id: i64,
@@ -181,6 +183,11 @@ pub async fn create_rule(
     let contract = normalize_address(&req.contract_address)?;
     let selector = normalize_selector(&req.function_selector)?;
     let mode = validate_mode(&req.mode)?;
+    if req.entries.len() > MAX_ENTRIES_PER_RULE {
+        return Err(ApiError::bad_request(format!(
+            "too many entries (limit {MAX_ENTRIES_PER_RULE})"
+        )));
+    }
     let mut entries_resolved: Vec<(i64, Option<i64>)> = Vec::with_capacity(req.entries.len());
     for e in &req.entries {
         let role_id = resolve_role_id(&state.pool, &e.role).await?;
@@ -226,6 +233,11 @@ pub async fn replace_rule(
     Json(req): Json<ReplaceRuleReq>,
 ) -> ApiResult<Json<RuleView>> {
     let mode = validate_mode(&req.mode)?;
+    if req.entries.len() > MAX_ENTRIES_PER_RULE {
+        return Err(ApiError::bad_request(format!(
+            "too many entries (limit {MAX_ENTRIES_PER_RULE})"
+        )));
+    }
     let mut entries_resolved: Vec<(i64, Option<i64>)> = Vec::with_capacity(req.entries.len());
     for e in &req.entries {
         let role_id = resolve_role_id(&state.pool, &e.role).await?;

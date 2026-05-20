@@ -60,9 +60,15 @@ pub fn router() -> Router<AppState> {
         .route_layer(axum::middleware::from_fn(middleware::admin_gate))
 }
 
-/// On every startup, reconcile the contents of `ADMIN_EOAS` so the seed
-/// admins are always promoted in DB. Idempotent. If the EOA previously
+/// On every startup, ensure every EOA in `ADMIN_EOAS` is promoted to
+/// the `admin` role in the DB. Idempotent. If the EOA previously
 /// existed as a `user`, its `user_attributes` row is deleted.
+///
+/// This is **add-only** despite the name: removing an EOA from
+/// `ADMIN_EOAS` does **not** demote them on the next boot. To revoke
+/// an admin, call `DELETE /admin/members/:eoa` or
+/// `PUT /admin/members/:eoa { role: "user" }` — and also drop the
+/// EOA from the env var so it isn't re-promoted.
 pub async fn reconcile_seed_admins(pool: &Pool, admin_eoas: &[Address]) -> Result<()> {
     if admin_eoas.is_empty() {
         tracing::warn!("ADMIN_EOAS is empty — no seed admins will exist on this boot");

@@ -57,7 +57,7 @@ CREATE TABLE lambda_rules (
     ),
     CHECK (
         (rhs_kind = 'literal' AND rhs_value IS NOT NULL)
-        OR (rhs_kind IN ('tx_from', 'tx_to') AND rhs_value IS NULL)
+        OR (rhs_kind IN ('tx_origin', 'msg_sender') AND rhs_value IS NULL)
     )
 );
 

@@ -15,6 +15,8 @@ use crate::roles::ROLES;
 use crate::rpc::gated_methods;
 use crate::state::AppState;
 
+const MAX_RULES_PER_LAMBDA: usize = 64;
+
 #[derive(Serialize)]
 pub struct LambdaRuleView {
     pub id: i64,
@@ -128,6 +130,11 @@ pub async fn create_lambda(
     }
     if req.rules.is_empty() {
         return Err(ApiError::bad_request("at least one rule is required"));
+    }
+    if req.rules.len() > MAX_RULES_PER_LAMBDA {
+        return Err(ApiError::bad_request(format!(
+            "too many rules (limit {MAX_RULES_PER_LAMBDA})"
+        )));
     }
 
     let attributes = known_attribute_specs_for_role(&req.role);

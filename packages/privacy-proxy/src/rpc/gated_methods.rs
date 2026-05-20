@@ -59,25 +59,32 @@ pub fn extract_target(params: &Value) -> Option<Address> {
 /// 32-byte left-padded address. Lambdas can decode `data[4..36]` to recover
 /// the target. For `eth_getStorageAt`, the 32-byte slot is appended; future
 /// lambdas can read it from `data[36..68]`.
-pub fn encode_call_data(method: GatedMethod, params: &Value) -> Vec<u8> {
+pub fn encode_call_data(
+    method: GatedMethod,
+    target: Address,
+    params: &Value,
+) -> Result<Vec<u8>, &'static str> {
     let mut out = Vec::with_capacity(68);
     out.extend_from_slice(&method.selector);
-    let target = extract_target(params).unwrap_or(Address::ZERO);
     let mut padded = [0u8; 32];
     padded[12..].copy_from_slice(target.as_slice());
     out.extend_from_slice(&padded);
 
     if method.selector == ETH_GET_STORAGE_AT.selector {
-        let mut slot = [0u8; 32];
-        if let Some(s) = params.get(1).and_then(|v| v.as_str()) {
-            let bytes = hex::decode(s.trim_start_matches("0x")).unwrap_or_default();
-            if bytes.len() <= 32 {
-                slot[32 - bytes.len()..].copy_from_slice(&bytes);
-            }
+        let s = params
+            .get(1)
+            .and_then(|v| v.as_str())
+            .ok_or("eth_getStorageAt: missing slot parameter")?;
+        let bytes = hex::decode(s.trim_start_matches("0x"))
+            .map_err(|_| "eth_getStorageAt: slot is not hex")?;
+        if bytes.len() > 32 {
+            return Err("eth_getStorageAt: slot exceeds 32 bytes");
         }
+        let mut slot = [0u8; 32];
+        slot[32 - bytes.len()..].copy_from_slice(&bytes);
         out.extend_from_slice(&slot);
     }
-    out
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -110,7 +117,8 @@ mod tests {
     #[test]
     fn encode_call_data_layout() {
         let p = json!(["0x1111111111111111111111111111111111111111", "latest"]);
-        let data = encode_call_data(ETH_GET_BALANCE, &p);
+        let target = extract_target(&p).unwrap();
+        let data = encode_call_data(ETH_GET_BALANCE, target, &p).unwrap();
         assert_eq!(&data[0..4], &ETH_GET_BALANCE.selector);
         assert_eq!(&data[4..16], &[0u8; 12]);
         assert_eq!(
@@ -127,8 +135,33 @@ mod tests {
             "0x000000000000000000000000000000000000000000000000000000000000002a",
             "latest"
         ]);
-        let data = encode_call_data(ETH_GET_STORAGE_AT, &p);
+        let target = extract_target(&p).unwrap();
+        let data = encode_call_data(ETH_GET_STORAGE_AT, target, &p).unwrap();
         assert_eq!(data.len(), 68);
         assert_eq!(data[67], 0x2a);
+    }
+
+    #[test]
+    fn storage_at_rejects_oversized_slot() {
+        let p = json!([
+            "0x1111111111111111111111111111111111111111",
+            // 33 bytes of hex
+            "0x000000000000000000000000000000000000000000000000000000000000002a01",
+            "latest"
+        ]);
+        let target = extract_target(&p).unwrap();
+        let err = encode_call_data(ETH_GET_STORAGE_AT, target, &p).unwrap_err();
+        assert!(err.contains("slot exceeds 32 bytes"));
+    }
+
+    #[test]
+    fn storage_at_rejects_non_hex_slot() {
+        let p = json!([
+            "0x1111111111111111111111111111111111111111",
+            "not-hex",
+            "latest"
+        ]);
+        let target = extract_target(&p).unwrap();
+        assert!(encode_call_data(ETH_GET_STORAGE_AT, target, &p).is_err());
     }
 }

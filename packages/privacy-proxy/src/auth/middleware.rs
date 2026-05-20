@@ -66,6 +66,14 @@ async fn resolve_token(state: &AppState, token: &str) -> Option<CallerCtx> {
 
     let expires_at: i64 = row.try_get("expires_at").ok()?;
     if now > expires_at {
+        // Opportunistic sweep: drop every expired token row we encounter
+        // (this one plus any other stale rows in the table). Cheap given the
+        // expires_at index path is already warm, and keeps the table from
+        // growing without bound.
+        let _ = sqlx::query("DELETE FROM auth_tokens WHERE expires_at < ?")
+            .bind(now)
+            .execute(&state.pool)
+            .await;
         return None;
     }
     let eoa_str: String = row.try_get("eoa_address").ok()?;

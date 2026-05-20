@@ -205,6 +205,50 @@ async fn create_lambda_then_list_returns_it() {
 }
 
 #[tokio::test]
+async fn create_lambda_with_tx_origin_and_msg_sender_rhs() {
+    let (state, app) = build_test_app().await;
+    let eoa: Address = "0xb3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3".parse().unwrap();
+    let token = insert_member_with_token(&state, "admin", eoa).await;
+
+    let body = json!({
+        "name": "self_only",
+        "role": "user",
+        "rules": [
+            {
+                "selector": "0x70a08231",
+                "lhs_kind": "calldata",
+                "lhs_offset": 4,
+                "condition": "eq",
+                "rhs_kind": "tx_origin"
+            },
+            {
+                "selector": "0xa9059cbb",
+                "lhs_kind": "calldata",
+                "lhs_offset": 4,
+                "condition": "neq",
+                "rhs_kind": "msg_sender"
+            }
+        ]
+    });
+    let req = Request::builder()
+        .method("POST")
+        .uri("/admin/registry/lambdas")
+        .header("authorization", format!("Bearer {token}"))
+        .header("content-type", "application/json")
+        .body(Body::from(serde_json::to_vec(&body).unwrap()))
+        .unwrap();
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let v: serde_json::Value =
+        serde_json::from_slice(&to_bytes(res.into_body(), 8192).await.unwrap()).unwrap();
+    let rules = v["rules"].as_array().unwrap();
+    assert_eq!(rules.len(), 2);
+    let kinds: Vec<&str> = rules.iter().map(|r| r["rhs_kind"].as_str().unwrap()).collect();
+    assert!(kinds.contains(&"tx_origin"));
+    assert!(kinds.contains(&"msg_sender"));
+}
+
+#[tokio::test]
 async fn member_upsert_writes_typed_user_attributes() {
     let (state, app) = build_test_app().await;
     let admin_eoa: Address = "0xa0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0".parse().unwrap();
