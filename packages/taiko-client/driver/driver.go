@@ -26,6 +26,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/metrics"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/config"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/fork"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/privacy"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/rpc"
 )
 
@@ -112,6 +113,10 @@ func (d *Driver) InitFromConfig(ctx context.Context, cfg *Config) (err error) {
 		cfg.BlobServerEndpoint,
 		latestSeenProposalCh,
 		cfg.Fork,
+		privacy.Keys{
+			Symmetric: cfg.PrivacySymmetricKey,
+			FIPrivate: cfg.PrivacyFIPrivateKey,
+		},
 	); err != nil {
 		return fmt.Errorf("failed to create L2 chain syncer: %w", err)
 	}

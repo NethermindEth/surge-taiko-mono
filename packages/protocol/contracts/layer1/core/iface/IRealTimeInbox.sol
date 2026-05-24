@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import { LibBlobs } from "../libs/LibBlobs.sol";
+import { IForcedInclusionStore } from "./IForcedInclusionStore.sol";
 import { IInbox } from "./IInbox.sol";
 import { ICheckpointStore } from "src/shared/signal/ICheckpointStore.sol";
 
@@ -9,8 +10,12 @@ import { ICheckpointStore } from "src/shared/signal/ICheckpointStore.sol";
 /// @notice Interface for the real-time proving inbox.
 /// @dev This inbox combines proposal and proof verification into a single atomic operation.
 ///      Proposer checks (lookahead, PreconfWhitelist) and bond logic are scrapped for this POC.
+/// @dev Forced inclusions are supported: any user may pay a fee to enqueue a blob via
+///      `saveForcedInclusion`. The proposer consumes them by setting `numForcedInclusions`
+///      on `ProposeInput`/`ProposeInputV2`. If the oldest unconsumed inclusion is older than
+///      `forcedInclusionDelay`, proposing reverts unless that inclusion is consumed.
 /// @custom:security-contact security@nethermind.io
-interface IRealTimeInbox {
+interface IRealTimeInbox is IForcedInclusionStore {
     /// @notice Simplified configuration for real-time proving inbox.
     struct Config {
         /// @notice The proof verifier contract (SurgeVerifier).
@@ -19,12 +24,23 @@ interface IRealTimeInbox {
         address signalService;
         /// @notice The percentage of basefee paid to coinbase.
         uint8 basefeeSharingPctg;
+        /// @notice The delay in seconds after which a forced inclusion is "due" — proposing
+        ///         must consume it or revert.
+        uint16 forcedInclusionDelay;
+        /// @notice The base fee in Gwei used for the forced-inclusion dynamic-fee curve.
+        uint64 forcedInclusionFeeInGwei;
+        /// @notice The pending-queue size at which the forced-inclusion fee doubles.
+        ///         See `IForcedInclusionStore.getCurrentForcedInclusionFee` for formula details.
+        uint64 forcedInclusionFeeDoubleThreshold;
     }
 
     /// @notice Input data for the propose function.
     struct ProposeInput {
         /// @notice Blob reference for proposal data.
         LibBlobs.BlobReference blobReference;
+        /// @notice The number of forced inclusions to consume from the queue. Must be at least
+        ///         the count of "due" inclusions or proposing will revert.
+        uint16 numForcedInclusions;
         /// @notice L1 signal slots to relay to L2.
         /// @dev All signal slots will be included in the first anchor tx of the first block in POC.
         bytes32[] signalSlots;
@@ -45,6 +61,9 @@ interface IRealTimeInbox {
     struct ProposeInputV2 {
         /// @notice Blob reference for proposal data.
         LibBlobs.BlobReference blobReference;
+        /// @notice The number of forced inclusions to consume from the queue. Must be at least
+        ///         the count of "due" inclusions or proposing will revert.
+        uint16 numForcedInclusions;
         /// @notice L1 signals already on L1, verified at `tentativePropose` time.
         bytes32[] existingSignals;
         /// @notice L1 signals that must exist on L1 by `finalizePropose`. Produced by

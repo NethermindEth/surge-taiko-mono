@@ -36,6 +36,17 @@ type Config struct {
 	P2PConfigs                    *p2p.Config
 	P2PSignerConfigs              p2p.SignerSetup
 	PreconfOperatorAddress        common.Address
+	// PrivacyMode toggles realtime blob privacy. When true, blob payloads are
+	// expected to carry encrypted manifests (scheme 0x01 / 0x02). When false,
+	// only scheme 0x00 (plaintext) blobs are accepted.
+	PrivacyMode bool
+	// PrivacySymmetricKey is the 32-byte AES-256-GCM key (scheme 0x01) shared
+	// with Catalyst and the prover. Required when PrivacyMode is true.
+	PrivacySymmetricKey []byte
+	// PrivacyFIPrivateKey is the 32-byte secp256k1 system FI private key (scheme 0x02).
+	// Required when PrivacyMode is true; otherwise FI blobs encrypted to the system
+	// pubkey will fall back to the empty-block-with-anchor path.
+	PrivacyFIPrivateKey []byte
 }
 
 // NewConfigFromCliContext creates a new config instance from
@@ -154,6 +165,24 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		preconfOperatorAddress = crypto.PubkeyToAddress(sequencerP2PKey.PublicKey)
 	}
 
+	privacyMode := c.Bool(flags.PrivacyMode.Name)
+	var privacySymKey, privacyFIPrivKey []byte
+	if v := c.String(flags.PrivacySymmetricKey.Name); v != "" {
+		privacySymKey = common.FromHex(v)
+		if len(privacySymKey) != 32 {
+			return nil, fmt.Errorf("--privacy.symmetricKey must be 32 bytes, got %d", len(privacySymKey))
+		}
+	}
+	if v := c.String(flags.PrivacyFIPrivateKey.Name); v != "" {
+		privacyFIPrivKey = common.FromHex(v)
+		if len(privacyFIPrivKey) != 32 {
+			return nil, fmt.Errorf("--privacy.fiPrivateKey must be 32 bytes, got %d", len(privacyFIPrivKey))
+		}
+	}
+	if privacyMode && len(privacySymKey) == 0 {
+		return nil, errors.New("--privacy.mode=true requires --privacy.symmetricKey to be set")
+	}
+
 	return &Config{
 		ClientConfig:                  clientConfig,
 		Fork:                          c.String(flags.Fork.Name),
@@ -167,5 +196,8 @@ func NewConfigFromCliContext(c *cli.Context) (*Config, error) {
 		P2PConfigs:                    p2pConfigs,
 		P2PSignerConfigs:              signerConfigs,
 		PreconfOperatorAddress:        preconfOperatorAddress,
+		PrivacyMode:                   privacyMode,
+		PrivacySymmetricKey:           privacySymKey,
+		PrivacyFIPrivateKey:           privacyFIPrivKey,
 	}, nil
 }

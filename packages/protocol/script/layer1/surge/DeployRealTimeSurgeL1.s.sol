@@ -63,6 +63,15 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
     // ---------------------------------------------------------------
     uint8 internal immutable basefeeSharingPctg = uint8(vm.envUint("BASEFEE_SHARING_PCTG"));
 
+    // Forced inclusion configuration
+    // ---------------------------------------------------------------
+    uint16 internal immutable forcedInclusionDelay =
+        uint16(vm.envOr("FORCED_INCLUSION_DELAY", uint256(3600)));
+    uint64 internal immutable forcedInclusionFeeInGwei =
+        uint64(vm.envOr("FORCED_INCLUSION_FEE_IN_GWEI", uint256(10_000_000)));
+    uint64 internal immutable forcedInclusionFeeDoubleThreshold =
+        uint64(vm.envOr("FORCED_INCLUSION_FEE_DOUBLE_THRESHOLD", uint256(100)));
+
     // Genesis configuration
     // ---------------------------------------------------------------
     bytes32 internal immutable genesisBlockHash = vm.envBytes32("GENESIS_BLOCK_HASH");
@@ -370,7 +379,10 @@ contract DeployRealTimeSurgeL1 is DeployCapability {
         IRealTimeInbox.Config memory config = IRealTimeInbox.Config({
             proofVerifier: _rollupContracts.proofVerifier,
             signalService: _sharedContracts.signalService,
-            basefeeSharingPctg: basefeeSharingPctg
+            basefeeSharingPctg: basefeeSharingPctg,
+            forcedInclusionDelay: forcedInclusionDelay,
+            forcedInclusionFeeInGwei: forcedInclusionFeeInGwei,
+            forcedInclusionFeeDoubleThreshold: forcedInclusionFeeDoubleThreshold
         });
 
         // Deploy inbox implementation

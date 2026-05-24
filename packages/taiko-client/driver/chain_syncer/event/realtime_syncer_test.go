@@ -12,6 +12,7 @@ import (
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/driver/state"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/internal/testutils"
 	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/fork"
+	"github.com/taikoxyz/taiko-mono/packages/taiko-client/pkg/privacy"
 )
 
 type RealTimeSyncerTestSuite struct {
@@ -36,6 +37,7 @@ func (s *RealTimeSyncerTestSuite) SetupTest() {
 		s.BlobServer.URL(),
 		nil,
 		fork.RealTime,
+		privacy.Keys{},
 	)
 	s.Nil(err)
 	s.s = syncer
