@@ -64,5 +64,10 @@
     "urc": "github:eth-fabric/urc#main",
     "sp1-contracts": "github:succinctlabs/sp1-contracts#v6.0.0",
     "azure-tdx-verifier": "github:Hyodar/azure-tdx-verifier#master"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "optimism"
+    ]
   }
 }
