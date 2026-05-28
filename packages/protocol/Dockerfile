@@ -27,7 +27,7 @@ COPY package.json pnpm-lock.yaml* ./
 
 # Install pnpm and dependencies
 # Use --frozen-lockfile only if lockfile exists, otherwise install normally
-RUN npm install -g pnpm@latest && \
+RUN npm install -g pnpm@10 && \
     if [ -f pnpm-lock.yaml ]; then \
       pnpm install --frozen-lockfile; \
     else \
@@ -71,6 +71,6 @@ RUN foundryup -i 1.4.2
 COPY --from=builder /app ./
 
 # Install pnpm
-RUN npm install -g pnpm@latest
+RUN npm install -g pnpm@10
 
 CMD ["sh", "-c", "echo Please verify the environment variables and command."]
