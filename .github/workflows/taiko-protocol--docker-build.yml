@@ -10,7 +10,7 @@ on:
   push:
     branches: [main]
     tags:
-      - "taiko-protocol-v*"
+      - "v*"
     paths:
       - "packages/protocol/**"
       - ".github/workflows/taiko-protocol--docker-build.yml"
